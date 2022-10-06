@@ -1,7 +1,7 @@
-name: PR Build & Test
+name: Main Build & Version
 
 on:
-  pull_request:
+  push:
     branches: [ "main" ]
 
 jobs:
@@ -21,3 +21,7 @@ jobs:
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
+    - name: Changelog
+      run: dotnet versionize --skip dirty
+    - name: Push Tags
+      run: git push --tags
