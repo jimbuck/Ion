@@ -3,8 +3,16 @@ Modern game engine framework for C#.
 
 ## Modules
 
-### ECS
+### Kyber Engine
+A simple, modern code-first game engine inspired by Monogame and Bevy.
+
+### Kyber ECS
 A fast and intuitive archetype-based ECS. Custom built, based on flecs with inspiration from SimpleECS and Bevy.
+
+### Kyber UI
+An ergonomic web-based user interface layer. 
+
+### 
 
 ## Useful Links
 
