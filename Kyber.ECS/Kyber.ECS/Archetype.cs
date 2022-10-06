@@ -87,8 +87,7 @@ public class Archetype
         if (!IsAlive(entityId)) return;
 
         var componentId = ComponentId.From<T>();
-        if (!Components.TryGetValue(componentId, out var buffer)) return;
-        buffer.Data[RowIndex[entityId]] = value;
+        Components[componentId].Data[RowIndex[entityId]] = value;
         // TODO: Trigger event emitter?
     }
 

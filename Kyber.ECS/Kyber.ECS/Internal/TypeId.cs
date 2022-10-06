@@ -18,8 +18,6 @@ public readonly partial struct TypeId
             foreach(var component in components.OrderBy(t => t.FullName)) hash = hash * 31 + ((ulong)component.GetHashCode() * index++);
             foreach (var tag in tags.OrderBy(t => t.FullName)) hash = hash * 31 + ((ulong)tag.GetHashCode() * index++);
 
-            Console.WriteLine($"t{hash} ({string.Join('|', components.Select(t => t.Name))};{string.Join('|', tags.Select(t => t.Name))})");
-
             return hash;
         }
     }

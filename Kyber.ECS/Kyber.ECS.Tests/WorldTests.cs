@@ -113,7 +113,7 @@ public class WorldTests
         _output.WriteLine(world.ToString());
         _output.WriteLine(world.ToGraphString());
         Assert.Equal(3, world.Archetypes(new[] { velocityId }).Count());
-        //Assert.Equal(2, world.Archetypes(new[] { velocityId, positionId }).Count());
+        Assert.Equal(2, world.Archetypes(new[] { velocityId, positionId }).Count());
         Assert.Equal(2, world.Archetypes(new ComponentId[] { }, new[] { velocityId }).Count());
         Assert.Equal(1, world.Archetypes(new ComponentId[] { rotationId }, new[] { velocityId }).Count());
     }

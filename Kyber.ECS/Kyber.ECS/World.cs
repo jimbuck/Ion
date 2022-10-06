@@ -5,12 +5,39 @@ public readonly partial struct WorldId {
     public override string ToString() => $"w{_value}";
 }
 
-public record class ArchetypeGraphEntry(Archetype Prev, Archetype Next, ComponentId ComponentId);
+public readonly struct ArchetypeGraphEntry : IEquatable<ArchetypeGraphEntry>
+{
+    public readonly Archetype Prev;
+    public readonly ComponentId ComponentId;
+    public readonly Archetype Next;
+
+    public ArchetypeGraphEntry(Archetype prev, ComponentId componentId, Archetype next)
+    {
+        Prev = prev;
+        ComponentId = componentId;
+        Next = next;
+    }
+
+    public bool Equals(ArchetypeGraphEntry other)
+    {
+        return Prev == other.Prev && ComponentId == other.ComponentId && Next == other.Next;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is ArchetypeGraphEntry entry && Equals(entry);
+    }
+
+    public override int GetHashCode()
+    {
+        return Prev.GetHashCode() * 7 + ComponentId.GetHashCode() * 13 + Next.GetHashCode() * 31;
+    }
+}
 
 public partial class World : IDisposable, IEnumerable<Archetype>
 {
     internal static World?[] All = new World?[2];
-    private static readonly object _lockObject = new();
+    private static readonly object _worldLock = new();
     private static readonly IntPool _worldIds = new();
 
     private bool _disposed;
@@ -30,7 +57,7 @@ public partial class World : IDisposable, IEnumerable<Archetype>
 
     public World(string? name = null)
     {
-        lock (_lockObject)
+        lock (_worldLock)
         {
             WorldId = _worldIds.Next();
             if (WorldId >= All.Length) Array.Resize(ref All, All.Length * 2);
@@ -189,7 +216,7 @@ public partial class World : IDisposable, IEnumerable<Archetype>
             {
                 if (edge.Value.Add != null)
                 {
-                    yield return new ArchetypeGraphEntry(prev, edge.Value.Add, edge.Key);
+                    yield return new ArchetypeGraphEntry(prev, edge.Key, edge.Value.Add);
                     archetypes.Enqueue(edge.Value.Add);
                 }
             }
@@ -235,7 +262,7 @@ public partial class World : IDisposable, IEnumerable<Archetype>
         var graphString = new System.Text.StringBuilder();
         foreach (var link in ArchetypeGraph())
         {
-            graphString.AppendLine($"{link.Prev} {link.Next} {link.ComponentId.Type.Name}");
+            graphString.AppendLine($"{link.Prev} {link.Next} {link.ComponentId}");
         }
         return graphString.ToString();
     }
@@ -250,8 +277,11 @@ public partial class World : IDisposable, IEnumerable<Archetype>
             }
 
             // TODO: set large fields to null
-            All[WorldId] = null;
-            _worldIds.Recycle(WorldId);
+            lock (_worldLock)
+            {
+                All[WorldId] = null;
+                _worldIds.Recycle(WorldId);
+            }
             _disposed = true;
         }
     }
