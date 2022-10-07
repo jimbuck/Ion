@@ -24,8 +24,8 @@
         "hidden": true
       },
       {
-        "type": "internals",
-        "section": "🛠 Internals",
+        "type": "internal",
+        "section": "🛠 Internal",
         "hidden": false
       }
     ]
