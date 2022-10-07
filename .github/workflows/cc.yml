@@ -1,5 +1,7 @@
 name: Conventional Commits
-on: pull_request
+on:
+  pull_request:
+    types: [opened, reopened, edited]
 jobs:
   conventional:
     name: Conventional PR
