@@ -24,6 +24,10 @@ jobs:
     - name: Test
       run: dotnet test --no-build --verbosity normal
     - name: Changelog
-      run: dotnet versionize --skip-dirty --commit-suffix [skip ci]
-    - name: Push Tags
-      run: git push --follow-tags origin main
+      run: dotnet versionize --skip-dirty
+    - name: Git Config
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+    - name: Push changes
+      uses: ad-m/github-push-action@master
