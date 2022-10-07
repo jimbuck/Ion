@@ -1,0 +1,23 @@
+﻿{
+  "changelogAll": true,
+  "changelog": {
+    "header": "My Changelog",
+    "sections": [
+      {
+        "type": "feature",
+        "section": "✨ Features",
+        "hidden": false
+      },
+      {
+        "type": "fix",
+        "section": "🐛 Fixes",
+        "hidden": false
+      },
+      {
+        "type": "perf",
+        "section": "🚀 Performance",
+        "hidden": true
+      }
+    ]
+  }
+}
