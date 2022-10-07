@@ -1,4 +1,5 @@
 ﻿{
+  "commitSuffix": "[skip ci]",
   "changelogAll": true,
   "changelog": {
     "header": "My Changelog",
