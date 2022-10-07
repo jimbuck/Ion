@@ -33,3 +33,5 @@ jobs:
       run: dotnet versionize --skip-dirty
     - name: Push changes
       uses: ad-m/github-push-action@master
+      with:
+        force: true
