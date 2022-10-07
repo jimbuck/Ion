@@ -1,7 +1,7 @@
-name: PR Build & Test
+name: Main Build & Version
 
 on:
-  pull_request:
+  push:
     branches: [ "main" ]
 
 jobs:
@@ -17,7 +17,13 @@ jobs:
         dotnet-version: 6.0.x
     - name: Restore dependencies
       run: dotnet restore
+    - name: Restore tools
+      run: dotnet tool restore
     - name: Build
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
+    - name: Changelog
+      run: dotnet versionize --skip-dirty --commit-suffix [skip ci]
+    - name: Push Tags
+      run: git push --follow-tags origin main

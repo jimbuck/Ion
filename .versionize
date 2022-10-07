@@ -1,0 +1,33 @@
+﻿{
+  "changelogAll": true,
+  "changelog": {
+    "header": "My Changelog",
+    "sections": [
+      {
+        "type": "feature",
+        "section": "✨ Features",
+        "hidden": false
+      },
+      {
+        "type": "fix",
+        "section": "🐛 Fixes",
+        "hidden": false
+      },
+      {
+        "type": "docs",
+        "section": "🐛 Documentation",
+        "hidden": false
+      },
+      {
+        "type": "perf",
+        "section": "🚀 Performance",
+        "hidden": true
+      },
+      {
+        "type": "internal",
+        "section": "🛠 Internal",
+        "hidden": false
+      }
+    ]
+  }
+}

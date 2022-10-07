@@ -6,7 +6,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{91104B3E-FB76-4C83-A255-4D7A765E766F}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
+		.versionize = .versionize
 		Directory.Build.targets = Directory.Build.targets
+		.config\dotnet-tools.json = .config\dotnet-tools.json
 		LICENSE = LICENSE
 		README.md = README.md
 	EndProjectSection
@@ -16,6 +18,13 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.ECS", "Kyber.ECS\Kyber.ECS\Kyber.ECS.csproj", "{CDE6E59B-73F6-4C6D-9EAD-923224F785A0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.ECS.Tests", "Kyber.ECS\Kyber.ECS.Tests\Kyber.ECS.Tests.csproj", "{95DF00F2-65E4-4D9E-B7EF-BB27FAB2A76E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Workflows", "Workflows", "{C0F5BCF3-2CCD-48BE-826B-FA7CE6EC6090}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\cc.yml = .github\workflows\cc.yml
+		.github\workflows\main.yml = .github\workflows\main.yml
+		.github\workflows\pr.yml = .github\workflows\pr.yml
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -38,6 +47,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{CDE6E59B-73F6-4C6D-9EAD-923224F785A0} = {FFA11FD9-B060-4F55-93E8-DF067E652C5E}
 		{95DF00F2-65E4-4D9E-B7EF-BB27FAB2A76E} = {FFA11FD9-B060-4F55-93E8-DF067E652C5E}
+		{C0F5BCF3-2CCD-48BE-826B-FA7CE6EC6090} = {91104B3E-FB76-4C83-A255-4D7A765E766F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CCF839E2-AF6A-4444-95F2-76F60225DC55}
