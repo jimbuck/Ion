@@ -14,9 +14,19 @@
         "hidden": false
       },
       {
+        "type": "docs",
+        "section": "🐛 Documentation",
+        "hidden": false
+      },
+      {
         "type": "perf",
         "section": "🚀 Performance",
         "hidden": true
+      },
+      {
+        "type": "internals",
+        "section": "🛠 Internals",
+        "hidden": false
       }
     ]
   }
