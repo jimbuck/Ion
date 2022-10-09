@@ -1,4 +1,4 @@
-name: Build/Test/Release
+name: Create Release
 
 on:
   push:
@@ -8,25 +8,20 @@ env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
 jobs:
-  setup:
+  create-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Token Setup
-        if: env.GH_TOKEN == ''
-        env: 
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "GH_TOKEN=${GITHUB_TOKEN}" >> $GITHUB_ENV
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-          token: ${{ env.GH_TOKEN }}
-          
-  build-test:
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
+    - name: Token Setup
+      if: env.GH_TOKEN == ''
+      env: 
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: echo "GH_TOKEN=${GITHUB_TOKEN}" >> $GITHUB_ENV
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.head_ref }}
+        fetch-depth: 0
+        token: ${{ env.GH_TOKEN }}
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
@@ -39,10 +34,6 @@ jobs:
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
-  create-release:
-    runs-on: ubuntu-latest
-    needs: build-test
-    steps:
     - name: Git Config
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
