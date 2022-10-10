@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.1.1"></a>
+## [0.1.1](https://www.github.com/jimbuck/Kyber/releases/tag/v0.1.1) (2022-10-10)
+
+### ✨ Features
+
+* Added Entity methods. (#10) ([f003315](https://www.github.com/jimbuck/Kyber/commit/f003315a11ae7ee5a5286fded3a7dac9c150f66e))
+
 <a name="0.1.0"></a>
 ## [0.1.0](https://www.github.com/jimbuck/Kyber/releases/tag/v0.1.0) (2022-10-9)
 
