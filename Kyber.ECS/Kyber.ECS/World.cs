@@ -34,7 +34,7 @@ public readonly struct ArchetypeGraphEntry : IEquatable<ArchetypeGraphEntry>
     }
 }
 
-public partial class World : IDisposable, IEnumerable<Archetype>
+public partial class World : IDisposable
 {
     internal static World?[] All = new World?[2];
     private static readonly object _worldLock = new();
@@ -50,6 +50,7 @@ public partial class World : IDisposable, IEnumerable<Archetype>
     internal readonly Dictionary<TypeId, Archetype> ArchetypeByTypeId = new();
     internal readonly Dictionary<EntityId, Archetype> ArchetypeByEntityId = new();
     internal readonly Dictionary<ComponentId, HashSet<Archetype>> ArchetypesByComponentId = new();
+    internal readonly Dictionary<Type, HashSet<Archetype>> ArchetypesByTagType = new();
 
     public string Name { get; }
 
@@ -69,7 +70,7 @@ public partial class World : IDisposable, IEnumerable<Archetype>
         ArchetypeByTypeId[TypeId.Empty] = Archetype.Empty(this);
     }
 
-    public EntityId CreateEntity()
+    public EntityId CreateEntityId()
     {
         var archetype = ArchetypeByTypeId[TypeId.Empty];
 
@@ -77,6 +78,11 @@ public partial class World : IDisposable, IEnumerable<Archetype>
         ArchetypeByEntityId[entityId] = archetype;
 
         return entityId;
+    }
+
+    public Entity CreateEntity()
+    {
+        return new Entity(CreateEntityId(), WorldId);
     }
 
     public void DestroyEntity(EntityId entityId)
@@ -92,10 +98,20 @@ public partial class World : IDisposable, IEnumerable<Archetype>
         return archetype.IsAlive(entityId);
     }
 
-    public bool HasComponent(EntityId entityId, ComponentId componentId)
+    public bool HasComponent<T>(EntityId entityId)
     {
-        if (!ArchetypeByEntityId.TryGetValue(entityId, out var archetype) || !ArchetypesByComponentId.TryGetValue(componentId, out var applicableArchetypes)) return false;
+        if (!ArchetypeByEntityId.TryGetValue(entityId, out var archetype) || !ArchetypesByComponentId.TryGetValue(ComponentId.From<T>(), out var applicableArchetypes)) return false;
         return applicableArchetypes.Contains(archetype);
+    }
+
+    public bool HasTag<T>(EntityId entityId)
+    {
+        return ArchetypeByEntityId.TryGetValue(entityId, out var archetype) && archetype.TagTypes.Contains(typeof(T));
+    }
+
+    public ref T GetComponent<T>(EntityId entityId)
+    {
+        return ref ArchetypeByEntityId[entityId].GetComponent<T>(entityId);
     }
 
     public bool TryGetComponent<T>(EntityId entityId, ref T value)
@@ -103,7 +119,7 @@ public partial class World : IDisposable, IEnumerable<Archetype>
         return ArchetypeByEntityId.TryGetValue(entityId, out var archetype) && archetype.TryGetComponent(entityId, ref value);
     }
 
-    public World Add(EntityId entityId, params Type[] tagTypes)
+    public World Tag(EntityId entityId, params Type[] tagTypes)
     {
         var srcArchetype = ArchetypeByEntityId[entityId];
 
@@ -115,7 +131,7 @@ public partial class World : IDisposable, IEnumerable<Archetype>
         return this;
     }
 
-    public World Remove(EntityId entityId, params Type[] tagTypes)
+    public World Untag(EntityId entityId, params Type[] tagTypes)
     {
         var srcArchetype = ArchetypeByEntityId[entityId];
 
@@ -128,7 +144,9 @@ public partial class World : IDisposable, IEnumerable<Archetype>
             foreach(var type in tagTypes)
             {
                 var componentId = ComponentId.From(type);
+                srcArchetype.Edges.TryAdd(componentId, new());
                 srcArchetype.Edges[componentId].Remove = destArchetype;
+                destArchetype.Edges.TryAdd(componentId, new());
                 destArchetype.Edges[componentId].Add = srcArchetype;
             }
         }
@@ -155,6 +173,27 @@ public partial class World : IDisposable, IEnumerable<Archetype>
         }
 
         destArchetype.SetComponent(entityId, value);
+
+        return this;
+    }
+
+    public World Unset<T>(EntityId entityId)
+    {
+        var componentId = ComponentId.From<T>();
+        var srcArchetype = ArchetypeByEntityId[entityId];
+
+        var destArchetype = GetOrCreateNewArchetypeWithout(srcArchetype, new[] { typeof(T) }, Array.Empty<Type>());
+
+        if (srcArchetype != destArchetype)
+        {
+            srcArchetype.Move(destArchetype, entityId);
+            ArchetypeByEntityId[entityId] = destArchetype;
+
+            srcArchetype.Edges.TryAdd(componentId, new());
+            srcArchetype.Edges[componentId].Remove = destArchetype;
+            destArchetype.Edges.TryAdd(componentId, new());
+            destArchetype.Edges[componentId].Add = srcArchetype;
+        }
 
         return this;
     }
@@ -198,6 +237,12 @@ public partial class World : IDisposable, IEnumerable<Archetype>
             ArchetypesByComponentId[componentId].Add(destArchetype);
         }
 
+        foreach(var tag in destArchetype.TagTypes)
+        {
+            ArchetypesByTagType.TryAdd(tag, new());
+            ArchetypesByTagType[tag].Add(destArchetype);
+        }
+
         return destArchetype;
     }
 
@@ -221,6 +266,15 @@ public partial class World : IDisposable, IEnumerable<Archetype>
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Iterates through every archetype in the world.
+    /// </summary>
+    /// <returns>The enumerator for archetypes.</returns>
+    public IEnumerable<Archetype> Archetypes()
+    {
+        return ArchetypeByTypeId.Values;
     }
 
     /// <summary>
@@ -290,15 +344,5 @@ public partial class World : IDisposable, IEnumerable<Archetype>
     {
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
-    }
-
-    public IEnumerator<Archetype> GetEnumerator()
-    {
-        return ArchetypeByTypeId.Values.GetEnumerator();
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
     }
 }

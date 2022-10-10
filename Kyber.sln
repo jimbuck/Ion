@@ -26,6 +26,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Workflows", "Workflows", "{
 		.github\workflows\pr.yml = .github\workflows\pr.yml
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.ECS.Generators", "Kyber.ECS\Kyber.ECS.Generators\Kyber.ECS.Generators.csproj", "{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -40,6 +42,10 @@ Global
 		{95DF00F2-65E4-4D9E-B7EF-BB27FAB2A76E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{95DF00F2-65E4-4D9E-B7EF-BB27FAB2A76E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{95DF00F2-65E4-4D9E-B7EF-BB27FAB2A76E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -48,6 +54,7 @@ Global
 		{CDE6E59B-73F6-4C6D-9EAD-923224F785A0} = {FFA11FD9-B060-4F55-93E8-DF067E652C5E}
 		{95DF00F2-65E4-4D9E-B7EF-BB27FAB2A76E} = {FFA11FD9-B060-4F55-93E8-DF067E652C5E}
 		{C0F5BCF3-2CCD-48BE-826B-FA7CE6EC6090} = {91104B3E-FB76-4C83-A255-4D7A765E766F}
+		{A1811C48-3E99-40EC-9417-7FE8B0DE05B5} = {FFA11FD9-B060-4F55-93E8-DF067E652C5E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CCF839E2-AF6A-4444-95F2-76F60225DC55}
