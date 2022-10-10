@@ -5,35 +5,6 @@ public readonly partial struct WorldId {
     public override string ToString() => $"w{_value}";
 }
 
-public readonly struct ArchetypeGraphEntry : IEquatable<ArchetypeGraphEntry>
-{
-    public readonly Archetype Prev;
-    public readonly ComponentId ComponentId;
-    public readonly Archetype Next;
-
-    public ArchetypeGraphEntry(Archetype prev, ComponentId componentId, Archetype next)
-    {
-        Prev = prev;
-        ComponentId = componentId;
-        Next = next;
-    }
-
-    public bool Equals(ArchetypeGraphEntry other)
-    {
-        return Prev == other.Prev && ComponentId == other.ComponentId && Next == other.Next;
-    }
-
-    public override bool Equals(object? obj)
-    {
-        return obj is ArchetypeGraphEntry entry && Equals(entry);
-    }
-
-    public override int GetHashCode()
-    {
-        return Prev.GetHashCode() * 7 + ComponentId.GetHashCode() * 13 + Next.GetHashCode() * 31;
-    }
-}
-
 public partial class World : IDisposable
 {
     internal static World?[] All = new World?[2];
@@ -344,5 +315,34 @@ public partial class World : IDisposable
     {
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
+    }
+}
+
+public readonly struct ArchetypeGraphEntry : IEquatable<ArchetypeGraphEntry>
+{
+    public readonly Archetype Prev;
+    public readonly ComponentId ComponentId;
+    public readonly Archetype Next;
+
+    public ArchetypeGraphEntry(Archetype prev, ComponentId componentId, Archetype next)
+    {
+        Prev = prev;
+        ComponentId = componentId;
+        Next = next;
+    }
+
+    public bool Equals(ArchetypeGraphEntry other)
+    {
+        return Prev == other.Prev && ComponentId == other.ComponentId && Next == other.Next;
+    }
+
+    public static bool operator ==(ArchetypeGraphEntry a, ArchetypeGraphEntry b) => a.Prev == b.Prev && a.ComponentId == b.ComponentId && a.Next == b.Next;
+    public static bool operator !=(ArchetypeGraphEntry a, ArchetypeGraphEntry b) => !(a == b);
+
+    public override bool Equals(object? obj) => obj is ArchetypeGraphEntry entry && this == entry;
+
+    public override int GetHashCode()
+    {
+        return Prev.GetHashCode() * 7 + ComponentId.GetHashCode() * 13 + Next.GetHashCode() * 31;
     }
 }
