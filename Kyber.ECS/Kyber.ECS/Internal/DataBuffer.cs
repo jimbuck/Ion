@@ -26,6 +26,8 @@ public abstract class DataBuffer {
 
     public static DataBuffer Create(Type type, int initialSize = 64)
     {
+        // RuntimeHelpers.IsReferenceOrContainsReferences<T>
+
         if (Activator.CreateInstance(typeof(DataBuffer<>).MakeGenericType(type), initialSize) is not DataBuffer buffer) throw new Exception($"Failed to create {nameof(DataBuffer)} for '{type.FullName}'!");
 
         return buffer;

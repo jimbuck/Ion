@@ -38,7 +38,7 @@ public class WorldTests
     {
         using var world = new World();
 
-        var entityId = world.CreateEntity();
+        var entityId = world.CreateEntityId();
         Assert.True(entityId.Id > 0);
     }
 
@@ -47,7 +47,7 @@ public class WorldTests
     {
         using var world = new World();
 
-        var entityId = world.CreateEntity();
+        var entityId = world.CreateEntityId();
         var isAliveAfterCreate = world.IsAlive(entityId);
         Assert.True(isAliveAfterCreate);
         world.DestroyEntity(entityId);
@@ -59,10 +59,10 @@ public class WorldTests
     public void ArchetypeGraph_Iterator()
     {
         using var world = new World();
-        var entity1 = world.CreateEntity();
-        var entity2 = world.CreateEntity();
-        var entity3 = world.CreateEntity();
-        var entity4 = world.CreateEntity();
+        var entity1 = world.CreateEntityId();
+        var entity2 = world.CreateEntityId();
+        var entity3 = world.CreateEntityId();
+        var entity4 = world.CreateEntityId();
 
         world.Set(entity1, new Position());
         world.Set(entity1, new Rotation());
@@ -87,10 +87,10 @@ public class WorldTests
     public void ArchetypeGraph_Filter()
     {
         using var world = new World();
-        var entity1 = world.CreateEntity();
-        var entity2 = world.CreateEntity();
-        var entity3 = world.CreateEntity();
-        var entity4 = world.CreateEntity();
+        var entity1 = world.CreateEntityId();
+        var entity2 = world.CreateEntityId();
+        var entity3 = world.CreateEntityId();
+        var entity4 = world.CreateEntityId();
 
         var positionId = ComponentId.From<Position>();
         var rotationId = ComponentId.From<Rotation>();
@@ -114,8 +114,8 @@ public class WorldTests
         _output.WriteLine(world.ToGraphString());
         Assert.Equal(3, world.Archetypes(new[] { velocityId }).Count());
         Assert.Equal(2, world.Archetypes(new[] { velocityId, positionId }).Count());
-        Assert.Equal(2, world.Archetypes(new ComponentId[] { }, new[] { velocityId }).Count());
-        Assert.Equal(1, world.Archetypes(new ComponentId[] { rotationId }, new[] { velocityId }).Count());
+        Assert.Equal(2, world.Archetypes(Array.Empty<ComponentId>(), new[] { velocityId }).Count());
+        Assert.Single(world.Archetypes(new ComponentId[] { rotationId }, new[] { velocityId }));
     }
 
     [Fact]

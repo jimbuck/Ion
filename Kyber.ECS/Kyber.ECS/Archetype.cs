@@ -70,6 +70,11 @@ public class Archetype
         return RowIndex.ContainsKey(entityId);
     }
 
+    public ref T GetComponent<T>(EntityId entityId)
+    {
+        return ref Components[ComponentId.From<T>()].Get<T>(RowIndex[entityId]);
+    }
+
     public bool TryGetComponent<T>(EntityId entityId, ref T value)
     {
         var componentId = ComponentId.From<T>();
