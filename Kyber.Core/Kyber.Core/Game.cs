@@ -40,9 +40,10 @@ internal class Game : IDisposable
         _window.Initialize();
         _graphicsDevice.Initialize();
         
-        foreach(var service in _systems.GetStartupSystems())
+        foreach(var system in _systems.GetStartupSystems())
         {
-            service.Startup();
+            system.Startup();
+            if (system is IDisposable disposable) disposable.Dispose();
         }
 
         _updateSystems = _systems.GetUpdateSystems();
@@ -97,6 +98,8 @@ internal class Game : IDisposable
             if (disposing)
             {
                 _graphicsDevice.Dispose();
+                foreach (var system in _updateSystems) if (system is IDisposable disposable) disposable.Dispose();
+                foreach (var system in _renderSystems) if (system is IDisposable disposable) disposable.Dispose();
             }
 
             // TODO: free unmanaged resources (unmanaged objects) and override finalizer
