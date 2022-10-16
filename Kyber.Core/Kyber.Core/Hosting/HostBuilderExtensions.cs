@@ -13,18 +13,17 @@ public static class KyberHostBuilderExtensions
     /// <param name="hostBuilder">The host builder instance.</param>
     /// <param name="configure">Callback to configure the basic options for the game.</param>
     /// <returns>The host builder instance.</returns>
-    public static IHostBuilder ConfigureKyber(this IHostBuilder hostBuilder, Action<IGameBuilder, IServiceCollection> configure)
+    public static IHostBuilder ConfigureKyber(this IHostBuilder hostBuilder, Action<IGameBuilder> configure)
     {
         return hostBuilder.ConfigureServices((hostContext, services) =>
         {
-            var gameBuilder = new GameBuilder();
-            configure(gameBuilder, services);
+            var startupConfig = new StartupConfig();
+            var gameBuilder = new GameBuilder(services);
+            configure(gameBuilder);
 
-            gameBuilder.Configure(hostContext, services);
+            services.AddSingleton<IStartupConfig>(gameBuilder.Config);
 
-            services.AddSingleton<StartupConfig>(gameBuilder.Config);
-
-            services.AddSingleton<Game>();
+            services.AddSingleton<Game>(services => ActivatorUtilities.CreateInstance<Game>(services, gameBuilder.Build(services)));
             services.AddSingleton<Window>();
             services.AddSingleton<GraphicsDevice>();
 
@@ -32,28 +31,6 @@ public static class KyberHostBuilderExtensions
             //services.AddSingleton(serviceProvider => InternalGame.Instance.SpriteBatch);
 
             services.AddHostedService<HostedKyberService>();
-        });
-    }
-
-    /// <summary>
-    /// Adds SceneManager plus GlobalContentManager and IContentManager (scoped) to the available services.
-    /// </summary>
-    /// <param name="hostBuilder">The host builder instance.</param>
-    /// <returns>The host builder instance.</returns>
-    public static IHostBuilder ConfigureScenes(this IHostBuilder hostBuilder)
-    {
-        return hostBuilder.ConfigureServices((hostContext, services) =>
-        {
-            //services.AddSingleton<SceneManager>();
-
-            //services.AddSingleton(serviceProvider =>
-            //{
-            //    var gameServices = serviceProvider.GetRequiredService<GameServiceContainer>();
-            //    var config = serviceProvider.GetRequiredService<BaseGameConfig>();
-
-            //    return new GlobalContentManager(gameServices, config.RootDirectory);
-            //});
-            //services.AddScoped<IContentManager, ScopedContentManager>();
         });
     }
 }

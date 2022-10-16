@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace Kyber.Core.Hosting;
 
@@ -14,7 +13,7 @@ internal class HostedKyberService : IHostedService
 
 	public HostedKyberService(
 			Game internalGame,
-			StartupConfig config,
+			IStartupConfig config,
 			ILogger<HostedKyberService> logger,
 			IHostApplicationLifetime applicationLifetime)
 	{

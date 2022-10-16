@@ -5,12 +5,12 @@ namespace Kyber.Core;
 
 public class GraphicsDevice : IDisposable
 {
-    private readonly StartupConfig _startupConfig;
+    private readonly IStartupConfig _startupConfig;
     private readonly Window _window;
 
-    private Veldrid.GraphicsDevice _gd;
+    private Veldrid.GraphicsDevice? _gd;
 
-    public GraphicsDevice(StartupConfig startupConfig, Window window)
+    public GraphicsDevice(IStartupConfig startupConfig, Window window)
     {
         _startupConfig = startupConfig;
         _window = window;
@@ -18,6 +18,11 @@ public class GraphicsDevice : IDisposable
 
     public void Initialize()
     {
+        var gd = Veldrid.GraphicsDevice.CreateVulkan(new GraphicsDeviceOptions()
+        {
+            HasMainSwapchain = false,
+        });
+
         _gd = VeldridStartup.CreateGraphicsDevice(_window._sdl2Window, new GraphicsDeviceOptions()
         {
             PreferStandardClipSpaceYDirection = true,
@@ -27,6 +32,6 @@ public class GraphicsDevice : IDisposable
 
     public void Dispose()
     {
-        _gd.Dispose();
+        _gd?.Dispose();
     }
 }

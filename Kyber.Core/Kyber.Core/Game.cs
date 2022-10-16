@@ -1,5 +1,6 @@
 ﻿global using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
+
+using Kyber.Core.Graphics;
 
 using System.Diagnostics;
 
@@ -8,62 +9,58 @@ namespace Kyber.Core;
 /// <summary>
 /// Top-level class representing the runnable game.
 /// </summary>
-internal class Game : IDisposable
+internal class Game
 {
     private bool _shouldExit;
-    private bool _disposed;
 
-    private readonly StartupConfig _startupConfig;
-    private readonly Window _window;
-    private readonly GraphicsDevice _graphicsDevice;
-    private readonly SystemCollection _systems;
+    private readonly IStartupConfig _startupConfig;
+    private readonly Window? _window;
+    private readonly GraphicsDevice? _graphicsDevice;
+    private readonly SystemGroup _systems;
 
-    private IUpdateSystem[] _updateSystems = Array.Empty<IUpdateSystem>();
-    private IRenderSystem[] _renderSystems = Array.Empty<IRenderSystem>();
+    private readonly Stopwatch _updateStopwatch = new ();
+    private readonly Stopwatch _renderStopwatch = new();
 
     public event EventHandler<EventArgs>? Exiting;
 
     public Game(
-        StartupConfig startupConfig,
+        IStartupConfig startupConfig,
         Window window,
         GraphicsDevice graphicsDevice,
-        SystemCollection systems)
+        SystemGroup systems)
     {
         _startupConfig = startupConfig;
-        _window = window;
-        _graphicsDevice = graphicsDevice;
+        _window = _startupConfig.GraphicsOutput == GraphicsOutput.Window ? window : null;
+        _graphicsDevice = _startupConfig.GraphicsOutput == GraphicsOutput.None ? null : graphicsDevice;
         _systems = systems;
     }
 
     public void Startup()
     {
-        _window.Initialize();
-        _graphicsDevice.Initialize();
-        
-        foreach(var system in _systems.GetStartupSystems())
-        {
-            system.Startup();
-            if (system is IDisposable disposable) disposable.Dispose();
-        }
-
-        _updateSystems = _systems.GetUpdateSystems();
-        _renderSystems = _systems.GetRenderSystems();
+        _window?.Initialize();
+        _graphicsDevice?.Initialize();
+        _systems.Startup();
     }
+
+    public void PreUpdate(float dt) => _systems.PreUpdate(dt);
 
     public void Update(float dt)
     {
-        _window.Update(dt);
-
-        foreach(var system in _updateSystems) system.Update(dt);
+        _window?.Update(dt);
+        _systems.Update(dt);
     }
 
-    public void Render(float dt)
-    {
-        foreach (var system in _renderSystems) system.Render(dt);
-    }
+    public void PostUpdate(float dt) => _systems.PostUpdate(dt);
+
+    public void PreRender(float dt) => _systems.PreRender(dt);
+
+    public void Render(float dt) => _systems.Render(dt);
+
+    public void PostRender(float dt) => _systems.PostRender(dt);
 
     public void Shutdown()
     {
+        _systems.Shutdown();
         _window?.Close();
     }
 
@@ -72,13 +69,12 @@ internal class Game : IDisposable
         Startup();
 
         var stopwatch = Stopwatch.StartNew();
-        while (!_shouldExit && _window.IsOpen)
+
+        while ((_shouldExit || (_window?.HasClosed ?? false)) == false)
         {
             var dt = (float)stopwatch.Elapsed.TotalSeconds;
             stopwatch.Restart();
-
-            Update(dt);
-            Render(dt);
+            Step(dt);
         }
 
         Shutdown();
@@ -86,31 +82,28 @@ internal class Game : IDisposable
         Exiting?.Invoke(this, EventArgs.Empty);
     }
 
-    public void Exit()
+    public void Step(float dt)
     {
-        _shouldExit = true;
-    }
+        _updateStopwatch.Restart();
+        PreUpdate(dt);
+        Update(dt);
+        PostUpdate(dt);
+        _updateStopwatch.Stop();
+        // TODO: Emit/Store Update time.
 
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposed)
+        if (_startupConfig.GraphicsOutput != GraphicsOutput.None)
         {
-            if (disposing)
-            {
-                _graphicsDevice.Dispose();
-                foreach (var system in _updateSystems) if (system is IDisposable disposable) disposable.Dispose();
-                foreach (var system in _renderSystems) if (system is IDisposable disposable) disposable.Dispose();
-            }
-
-            // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-            // TODO: set large fields to null
-            _disposed = true;
+            _renderStopwatch.Start();
+            PreRender(dt);
+            Render(dt);
+            PostRender(dt);
+            _renderStopwatch.Stop();
+            // TODO: Emit/Store Render time.
         }
     }
 
-    public void Dispose()
+    public void Exit()
     {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
+        _shouldExit = true;
     }
 }

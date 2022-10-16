@@ -3,14 +3,18 @@ global using Kyber.Core;
 global using Kyber.Core.Hosting;
 
 using Kyber.Examples.Simple;
+using Kyber.Core.Scenes;
 
-var host = KyberHost.CreateDefaultBuilder()
-    .ConfigureKyber((game, services) =>
-    {
+var gameHost = KyberHost.CreateDefaultBuilder()
+    .ConfigureKyber(static (game) => {
         game.Config.WindowTitle = "Kyber Simple Example";
 
-        game.AddSystem<StartedLoggerSystem>();
-    })
+        game.AddSystem<ComprehnsiveLoggerSystem>()
+            .AddSystem<SceneSwitcherSystem>()
+            .AddScene<Scenes.Main>() // Class with interface
+            .AddScene(Scenes.Gameplay) // Named method
+            .AddScene("Inline", static (scene) => scene.AddSystem<ComprehnsiveLoggerSystem>());
+    })    
     .Build();
 
-host.StartAsync().Wait();
+gameHost.StartAsync().Wait();

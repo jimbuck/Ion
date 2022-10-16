@@ -25,12 +25,13 @@ public static class KyberHost
         builder.UseContentRoot(Directory.GetCurrentDirectory());
         builder.ConfigureHostConfiguration(config =>
         {
+            config.AddEnvironmentVariables();
             if (args != null && args.Length > 0) config.AddCommandLine(args);
         });
-        builder.ConfigureAppConfiguration((hostingContext, config) =>
-        {
-            if (args != null && args.Length > 0) config.AddCommandLine(args);
-        });
+        //builder.ConfigureAppConfiguration((hostingContext, config) =>
+        //{
+        //    if (args != null && args.Length > 0) config.AddCommandLine(args);
+        //});
 
         builder.ConfigureLogging(config =>
         {

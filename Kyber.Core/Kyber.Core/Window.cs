@@ -1,50 +1,64 @@
-﻿using Veldrid.Sdl2;
+﻿using Kyber.Core.Graphics;
+
+using Veldrid.Sdl2;
 using Veldrid.StartupUtilities;
 
 namespace Kyber.Core;
 
 public class Window
 {
-    private readonly StartupConfig _startupConfig;
+    private readonly IStartupConfig _startupConfig;
     private readonly ILogger _logger;
 
     private WindowCreateInfo _windowCreateInfo;
-    internal Sdl2Window _sdl2Window;
+    internal Sdl2Window? _sdl2Window;
 
-    public bool IsOpen => _sdl2Window.Exists && _sdl2Window.Visible;
-    public bool IsActive => _sdl2Window.Focused && _sdl2Window.Visible;
+    public bool HasClosed { get; private set; }
+    public bool IsActive => (_sdl2Window?.Focused ?? false);
 
-    public IntPtr Handle => _sdl2Window.SdlWindowHandle;
+    public IntPtr? Handle => _sdl2Window?.SdlWindowHandle;
 
-    public Window(StartupConfig startupConfig, ILogger<Window> logger)
+    public Window(IStartupConfig startupConfig, ILogger<Window> logger)
     {
         _startupConfig = startupConfig;
         _logger = logger;
 
         _windowCreateInfo = new WindowCreateInfo()
         {
-            // TODO: Pull size/position from StartupConfig.
-            X = 100,
-            Y = 100,
-            WindowWidth = 960,
-            WindowHeight = 540,
+            X = _startupConfig.WindowX ?? 100,
+            Y = _startupConfig.WindowY ?? 100,
+            WindowWidth = _startupConfig.WindowWidth ?? 960,
+            WindowHeight = _startupConfig.WindowHeight ?? 540,
+            WindowInitialState = _startupConfig.WindowState.ToInternal(),
             WindowTitle = _startupConfig.WindowTitle ?? "Kyber"
         };
     }
 
     public void Initialize()
     {
+        if (_startupConfig.GraphicsOutput != GraphicsOutput.Window) return;
+
+        _logger.LogDebug("Creating window...");
         _sdl2Window = VeldridStartup.CreateWindow(ref _windowCreateInfo);
+        _sdl2Window.Closed += _onClosed;
+    }
+
+    private void _onClosed()
+    {
+        HasClosed = true;
+        _logger.LogDebug("Window closed!");
     }
 
     public void Update(float dt)
     {
-        //_logger.LogInformation($"Update {dt}");
-        _sdl2Window.PumpEvents();
+        if (_startupConfig.GraphicsOutput != GraphicsOutput.Window) return;
+        var snapshot = _sdl2Window?.PumpEvents();
     }
 
     public void Close()
     {
-        _sdl2Window.Close();
+        if (_startupConfig.GraphicsOutput != GraphicsOutput.Window) return;
+        _logger.LogDebug("Closing window...");
+        _sdl2Window?.Close();
     }
 }
