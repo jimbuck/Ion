@@ -1,8 +1,6 @@
 ﻿global using Microsoft.Extensions.Logging;
-
-using Kyber.Core.Graphics;
-
 using System.Diagnostics;
+using Kyber.Core.Graphics;
 
 namespace Kyber.Core;
 
@@ -14,8 +12,8 @@ internal class Game
     private bool _shouldExit;
 
     private readonly IStartupConfig _startupConfig;
-    private readonly Window? _window;
-    private readonly GraphicsDevice? _graphicsDevice;
+    private readonly Window _window;
+    private readonly GraphicsDevice _graphicsDevice;
     private readonly SystemGroup _systems;
 
     private readonly Stopwatch _updateStopwatch = new ();
@@ -30,14 +28,19 @@ internal class Game
         SystemGroup systems)
     {
         _startupConfig = startupConfig;
-        _window = _startupConfig.GraphicsOutput == GraphicsOutput.Window ? window : null;
-        _graphicsDevice = _startupConfig.GraphicsOutput == GraphicsOutput.None ? null : graphicsDevice;
+        _window = window;
+        _graphicsDevice = graphicsDevice;
         _systems = systems;
     }
 
     public void Startup()
     {
-        _window?.Initialize();
+        if (_window != null)
+        {
+            _window.Initialize();
+            _window.Closed += Exit;
+        }
+
         _graphicsDevice?.Initialize();
         _systems.Startup();
     }
@@ -70,7 +73,7 @@ internal class Game
 
         var stopwatch = Stopwatch.StartNew();
 
-        while ((_shouldExit || (_window?.HasClosed ?? false)) == false)
+        while (_shouldExit == false)
         {
             var dt = (float)stopwatch.Elapsed.TotalSeconds;
             stopwatch.Restart();

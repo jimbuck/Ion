@@ -38,7 +38,7 @@ public class StartupConfig : IStartupConfig
     public int? WindowWidth { get; set; }
     public int? WindowX { get; set; }
     public int? WindowY { get; set;  }
-    public WindowState WindowState { get; set; } = WindowState.Hidden;
+    public WindowState WindowState { get; set; } = WindowState.Normal;
 
 
     public GraphicsOutput GraphicsOutput { get; set; } = GraphicsOutput.Window;

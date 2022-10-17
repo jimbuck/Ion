@@ -18,10 +18,7 @@ public class GraphicsDevice : IDisposable
 
     public void Initialize()
     {
-        var gd = Veldrid.GraphicsDevice.CreateVulkan(new GraphicsDeviceOptions()
-        {
-            HasMainSwapchain = false,
-        });
+        if (_startupConfig.GraphicsOutput == Graphics.GraphicsOutput.None) return;
 
         _gd = VeldridStartup.CreateGraphicsDevice(_window._sdl2Window, new GraphicsDeviceOptions()
         {

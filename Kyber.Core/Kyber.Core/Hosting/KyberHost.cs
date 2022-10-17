@@ -28,10 +28,12 @@ public static class KyberHost
             config.AddEnvironmentVariables();
             if (args != null && args.Length > 0) config.AddCommandLine(args);
         });
-        //builder.ConfigureAppConfiguration((hostingContext, config) =>
-        //{
-        //    if (args != null && args.Length > 0) config.AddCommandLine(args);
-        //});
+        builder.ConfigureAppConfiguration((hostingContext, config) =>
+        {
+            config.AddJsonFile("appsettings.json", true);
+            config.AddJsonFile("appsettings.{Environment}.json", true);
+            config.AddJsonFile("appsettings.local.json", true);
+        });
 
         builder.ConfigureLogging(config =>
         {

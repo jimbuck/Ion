@@ -16,7 +16,9 @@ public class Window
     public bool HasClosed { get; private set; }
     public bool IsActive => (_sdl2Window?.Focused ?? false);
 
-    public IntPtr? Handle => _sdl2Window?.SdlWindowHandle;
+    public event Action? Closed;
+
+    //public IntPtr? Handle => _sdl2Window?.SdlWindowHandle;
 
     public Window(IStartupConfig startupConfig, ILogger<Window> logger)
     {
@@ -47,6 +49,7 @@ public class Window
     {
         HasClosed = true;
         _logger.LogDebug("Window closed!");
+        Closed?.Invoke();
     }
 
     public void Update(float dt)
