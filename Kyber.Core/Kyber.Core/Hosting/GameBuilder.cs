@@ -3,6 +3,13 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Kyber.Core.Hosting;
 
+public interface IGameBuilder
+{
+    StartupConfig Config { get; }
+    IServiceCollection Services { get; }
+    IGameBuilder AddSystem<T>() where T : class;
+}
+
 public class GameBuilder : IGameBuilder
 {
     public StartupConfig Config { get; }

@@ -10,13 +10,13 @@ public static class Scenes
         public void Configure(ISceneBuilder scene)
         {
             Console.WriteLine($"Configuring Main scene...");
-            scene.AddSystem<ComprehnsiveLoggerSystem>();
+            scene.AddSystem<TestLoggerSystem>();
         }
     }
 
     public static void Gameplay(ISceneBuilder scene)
     {
         Console.WriteLine($"Configuring Gameplay scene...");
-        scene.AddSystem<ComprehnsiveLoggerSystem>();
+        scene.AddSystem<TestLoggerSystem>();
     }
 }

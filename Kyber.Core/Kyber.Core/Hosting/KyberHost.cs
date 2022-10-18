@@ -20,31 +20,24 @@ public static class KyberHost
     /// <returns>A HostBuilder ready for additional configuration.</returns>
     public static IHostBuilder CreateDefaultBuilder(params string[] args)
     {
-        var builder = new HostBuilder();
-
-        builder.UseContentRoot(Directory.GetCurrentDirectory());
-        builder.ConfigureHostConfiguration(config =>
-        {
-            config.AddEnvironmentVariables();
-            if (args != null && args.Length > 0) config.AddCommandLine(args);
-        });
-        builder.ConfigureAppConfiguration((hostingContext, config) =>
-        {
-            config.AddJsonFile("appsettings.json", true);
-            config.AddJsonFile("appsettings.{Environment}.json", true);
-            config.AddJsonFile("appsettings.local.json", true);
-        });
-
-        builder.ConfigureLogging(config =>
-        {
-            config.AddSimpleConsole(options =>
-            {
-                //options.TimestampFormat = "HH:mm:ss";
-                options.SingleLine = true;
+        return new HostBuilder()
+            .UseContentRoot(Directory.GetCurrentDirectory())
+            .ConfigureHostConfiguration(config => {
+                config.AddEnvironmentVariables();
+                if (args != null && args.Length > 0) config.AddCommandLine(args);
             })
-            .AddDebug();
-        });
-
-        return builder;
+            .ConfigureAppConfiguration((hostingContext, config) => {
+                config.AddJsonFile("./appsettings.json", true);
+                config.AddJsonFile("./appsettings.{Environment}.json", true);
+                config.AddJsonFile("./appsettings.local.json", true);
+            })
+            .ConfigureLogging(config => {
+                config.AddSimpleConsole(options =>
+                {
+                    options.TimestampFormat = "[HH:mm:ss] ";
+                    options.SingleLine = true;
+                })
+                .AddDebug();
+            });
     }
 }

@@ -1,5 +1,5 @@
-﻿global using Microsoft.Extensions.Logging;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+
 using Kyber.Core.Graphics;
 
 namespace Kyber.Core;
@@ -14,8 +14,10 @@ internal class Game
     private readonly IStartupConfig _startupConfig;
     private readonly Window _window;
     private readonly GraphicsDevice _graphicsDevice;
+    private readonly EventSystem _eventSystem;
+    private readonly IEventListener _eventListener;
     private readonly SystemGroup _systems;
-
+    
     private readonly Stopwatch _updateStopwatch = new ();
     private readonly Stopwatch _renderStopwatch = new();
 
@@ -25,35 +27,44 @@ internal class Game
         IStartupConfig startupConfig,
         Window window,
         GraphicsDevice graphicsDevice,
+        IEventEmitter eventSystem,
+        IEventListener eventListener,
         SystemGroup systems)
     {
         _startupConfig = startupConfig;
         _window = window;
         _graphicsDevice = graphicsDevice;
+        _eventSystem = (EventSystem)eventSystem;
         _systems = systems;
+
+        _eventListener = eventListener;
     }
 
     public void Startup()
     {
-        if (_window != null)
-        {
-            _window.Initialize();
-            _window.Closed += Exit;
-        }
-
+        _window?.Initialize();
         _graphicsDevice?.Initialize();
         _systems.Startup();
     }
 
-    public void PreUpdate(float dt) => _systems.PreUpdate(dt);
+    public void PreUpdate(float dt)
+    {
+        _eventSystem.PreUpdate(dt);
+        _systems.PreUpdate(dt);
+    }
 
     public void Update(float dt)
     {
         _window?.Update(dt);
+        if (_eventListener.On<WindowClosedEvent>()) Exit();
         _systems.Update(dt);
     }
 
-    public void PostUpdate(float dt) => _systems.PostUpdate(dt);
+    public void PostUpdate(float dt)
+    {
+        _systems.PostUpdate(dt);
+        _graphicsDevice.HandleWindowResize(dt);
+    }
 
     public void PreRender(float dt) => _systems.PreRender(dt);
 

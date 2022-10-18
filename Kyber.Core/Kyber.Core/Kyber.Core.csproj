@@ -10,7 +10,9 @@
 	<ItemGroup>
 		<Using Include="System.Collections" />
 		<Using Include="System.Collections.Concurrent" />
+		<Using Include="System.Numerics" />
 		<Using Include="System.Diagnostics.CodeAnalysis" />
+		<Using Include="Microsoft.Extensions.Logging" />
 		<Using Include="WrapperValueObject" />
 	</ItemGroup>
 

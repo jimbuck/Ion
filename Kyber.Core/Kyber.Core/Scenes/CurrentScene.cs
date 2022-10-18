@@ -1,24 +1,27 @@
 ﻿namespace Kyber.Core.Scenes;
 
 public sealed class CurrentScene {
-
-	private string _value;
 	public static readonly string Root = "<ROOT>";
 
-	public CurrentScene()
+	public string Name { get; private set; }
+    public bool IsRoot { get; private set; }
+
+    public CurrentScene()
 	{
-		_value = Root;
+		Name = Root;
+		IsRoot = true;
 	}
 
 	internal void Set(string name)
 	{
-		_value = name;
-	}
+        Name = name;
+		IsRoot = Name == Root;
+    }
 
-    public static implicit operator string(CurrentScene cs) => cs._value;
+    public static implicit operator string(CurrentScene cs) => cs.Name;
 
     public override string ToString()
 	{
-		return _value ?? Root;
+		return Name ?? Root;
 	}
 }

@@ -26,7 +26,7 @@ public class SceneSwitcherSystem : IUpdateSystem
 		{
 			_countdown = _max;
 			_index = (_index + 1) % _sceneManager.Scenes.Length;
-            _logger.LogInformation("Changing scenes ({0} = {1})!", _index, _sceneManager.Scenes[_index]);
+            _logger.LogDebug("Changing scenes ({0} = {1})!", _index, _sceneManager.Scenes[_index]);
             _sceneManager.LoadScene(_sceneManager.Scenes[_index]);
 		}
 	}
