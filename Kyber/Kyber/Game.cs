@@ -22,6 +22,8 @@ internal class Game
     private readonly Stopwatch _updateStopwatch = new ();
     private readonly Stopwatch _renderStopwatch = new();
 
+    public bool IsRunning { get; private set; } = false;
+
     public event EventHandler<EventArgs>? Exiting;
 
     public Game(
@@ -81,6 +83,7 @@ internal class Game
 
     public void Run()
     {
+        IsRunning = true;
         Startup();
 
         var stopwatch = Stopwatch.StartNew();
@@ -93,6 +96,7 @@ internal class Game
         }
 
         Shutdown();
+        IsRunning = false;
 
         Exiting?.Invoke(this, EventArgs.Empty);
     }

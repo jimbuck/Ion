@@ -3,7 +3,38 @@
 public class GameTests
 {
     [Fact]
-    public void Game_LifeCycle_NoGraphics()
+    public async Task Run_Exit()
+    {
+        using var _ = SetupWithSystems(GraphicsOutput.None, out var services, out var game);
+        Assert.False(game.IsRunning);
+
+        var gameTask = Task.Run(() => game.Run());
+        await Task.Delay(50);
+        Assert.True(game.IsRunning);
+
+        game.Exit();
+        await gameTask;
+        Assert.False(game.IsRunning);
+    }
+
+    [Fact]
+    public async Task Run_ExitOnWindowClose()
+    {
+        using var _ = SetupWithSystems(GraphicsOutput.Window, out var services, out var game);
+        var window = services.GetRequiredService<Window>();
+        Assert.False(game.IsRunning);
+
+        var gameTask = Task.Run(() => game.Run());
+        await Task.Delay(TimeSpan.FromSeconds(2));
+        Assert.True(game.IsRunning);
+
+        window.Close();
+        await gameTask;
+        Assert.False(game.IsRunning);
+    }
+
+    [Fact]
+    public void LifeCycle_NoGraphics()
     {
         using var _ = SetupWithSystems(GraphicsOutput.None, out var services, out var game, typeof(TestSystem));
 
@@ -55,7 +86,7 @@ public class GameTests
     }
 
     [Fact]
-    public void Game_LifeCycle_Window()
+    public void LifeCycle_Window()
     {
         using var _ = SetupWithSystems(GraphicsOutput.Window, out var services, out var game, typeof(TestSystem));
 

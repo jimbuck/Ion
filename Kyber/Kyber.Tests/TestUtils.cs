@@ -8,7 +8,11 @@ internal static class TestUtils
     {
         var gameHost = KyberHost.CreateDefaultBuilder().ConfigureKyber((game) => {
             game.Config.GraphicsOutput = graphicsOutput;
-            if (graphicsOutput == GraphicsOutput.Window) game.Config.WindowState = WindowState.Hidden;
+            if (graphicsOutput == GraphicsOutput.Window)
+            {
+                //game.Config.WindowState = WindowState.Hidden;
+                game.Config.WindowX = game.Config.WindowY = -5000;
+            }
 
             foreach (var type in systems) game.AddSystem(type);
         }).Build();
