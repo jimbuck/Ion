@@ -1,4 +1,4 @@
-namespace Kyber.Hosting.Tests
+namespace Kyber.Tests
 {
     public class HostingTests
     {

@@ -8,6 +8,7 @@ public interface IGameBuilder
     StartupConfig Config { get; }
     IServiceCollection Services { get; }
     IGameBuilder AddSystem<T>() where T : class;
+    IGameBuilder AddSystem(Type type);
 }
 
 public class GameBuilder : IGameBuilder
@@ -24,8 +25,13 @@ public class GameBuilder : IGameBuilder
 
     public IGameBuilder AddSystem<T>() where T : class
     {
-        _systems.AddSystem<T>();
-        Services.TryAddScoped<T>();
+        return AddSystem(typeof(T));
+    }
+
+    public IGameBuilder AddSystem(Type type)
+    {
+        _systems.AddSystem(type);
+        Services.TryAddScoped(type);
         return this;
     }
 

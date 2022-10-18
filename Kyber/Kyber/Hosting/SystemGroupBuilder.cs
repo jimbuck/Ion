@@ -7,8 +7,11 @@ internal class SystemGroupBuilder
 
     public SystemGroupBuilder AddSystem<T>() where T : class
     {
-        var systemType = typeof(T);
-
+        return AddSystem(typeof(T));        
+    }
+    
+    public SystemGroupBuilder AddSystem(Type systemType)
+    {
         if (!_isValidSystem(systemType))
         {
             throw new Exception($"Invalid system provided ({systemType.FullName})!");
