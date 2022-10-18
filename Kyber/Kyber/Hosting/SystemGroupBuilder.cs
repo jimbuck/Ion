@@ -1,4 +1,4 @@
-﻿namespace Kyber;
+﻿namespace Kyber.Hosting;
 
 internal class SystemGroupBuilder
 {

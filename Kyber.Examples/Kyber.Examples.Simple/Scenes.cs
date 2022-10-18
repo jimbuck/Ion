@@ -1,5 +1,5 @@
 ﻿
-using Kyber.Core.Scenes.Hosting;
+using Kyber.Hosting.Scenes;
 
 namespace Kyber.Examples.Simple;
 

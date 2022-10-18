@@ -1,4 +1,5 @@
-﻿using Kyber.Core.Scenes;
+﻿using Kyber.Scenes;
+using Kyber.Events;
 
 namespace Kyber.Examples.Simple;
 

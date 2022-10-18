@@ -1,8 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿namespace Kyber;
 
-namespace Kyber.Core;
-
-public sealed class SystemGroup : IStartupSystem, IPreUpdateSystem, IUpdateSystem, IPostUpdateSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem, IShutdownSystem
+public sealed class SystemGroup : ISystem
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly HashSet<Type> _systemTypes;

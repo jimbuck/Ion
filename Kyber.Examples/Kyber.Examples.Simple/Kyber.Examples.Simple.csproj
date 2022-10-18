@@ -18,7 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Kyber.Core\Kyber.Core\Kyber.Core.csproj" />
+<ProjectReference Include="..\..\Kyber\Kyber\Kyber.csproj" />
+
   </ItemGroup>
 
 </Project>

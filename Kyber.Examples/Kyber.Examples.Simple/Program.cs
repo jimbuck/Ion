@@ -1,9 +1,10 @@
 ﻿global using Microsoft.Extensions.Logging;
-global using Kyber.Core;
-global using Kyber.Core.Hosting;
+global using Kyber.Scenes;
+
+using Kyber.Hosting;
+using Kyber.Hosting.Scenes;
 
 using Kyber.Examples.Simple;
-using Kyber.Core.Scenes;
 
 var gameHost = KyberHost.CreateDefaultBuilder()
     .ConfigureKyber(static (game) => {
