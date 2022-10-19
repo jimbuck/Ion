@@ -21,9 +21,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.ECS.Tests", "Kyber.EC
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Workflows", "Workflows", "{C0F5BCF3-2CCD-48BE-826B-FA7CE6EC6090}"
 	ProjectSection(SolutionItems) = preProject
-		.github\workflows\cc.yml = .github\workflows\cc.yml
-		.github\workflows\main.yml = .github\workflows\main.yml
-		.github\workflows\pr.yml = .github\workflows\pr.yml
+		.github\workflows\check-pr.yml = .github\workflows\check-pr.yml
+		.github\workflows\conventional-commits.yml = .github\workflows\conventional-commits.yml
+		.github\workflows\create-release.yml = .github\workflows\create-release.yml
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.ECS.Generators", "Kyber.ECS\Kyber.ECS.Generators\Kyber.ECS.Generators.csproj", "{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}"
@@ -40,7 +40,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.Simple", "Ky
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Kyber.Core", "Kyber.Core", "{EA7196A2-54ED-4E68-8090-18E68E6322CB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Core", "Kyber.Core\Kyber.Core\Kyber.Core.csproj", "{45F3420A-8269-4DE9-B750-14F49B2C86A3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Core", "Kyber.Core\Kyber.Core\Kyber.Core.csproj", "{45F3420A-8269-4DE9-B750-14F49B2C86A3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
