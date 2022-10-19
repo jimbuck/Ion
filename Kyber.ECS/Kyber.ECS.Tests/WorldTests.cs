@@ -2,9 +2,9 @@ using Xunit.Abstractions;
 
 namespace Kyber.ECS.Tests;
 
-struct Position { }
-struct Rotation { }
-struct Velocity { }
+record struct Position;
+record struct Rotation;
+record struct Velocity;
 
 public class WorldTests
 {
@@ -15,7 +15,7 @@ public class WorldTests
         _output = output;
     }
 
-	[Fact]
+	[Fact, Trait(CATEGORY, UNIT)]
 	public void Create_DefaultName()
 	{
 		using var world = new World();
@@ -24,7 +24,7 @@ public class WorldTests
 		Assert.NotNull(world.Name);
 	}
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void Create_SpecifiedName()
     {
         var expected = "TestWorld";
@@ -33,7 +33,7 @@ public class WorldTests
         Assert.Equal(expected, world.Name);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void Create_Entity()
     {
         using var world = new World();
@@ -42,7 +42,7 @@ public class WorldTests
         Assert.True(entityId.Id > 0);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void IsAlive_Entity()
     {
         using var world = new World();
@@ -55,7 +55,7 @@ public class WorldTests
         Assert.False(isAliveAfterDestroy);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void ArchetypeGraph_Iterator()
     {
         using var world = new World();
@@ -83,7 +83,7 @@ public class WorldTests
         Assert.Equal(8, world.ArchetypeGraph().Count());
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void ArchetypeGraph_Filter()
     {
         using var world = new World();
@@ -118,7 +118,7 @@ public class WorldTests
         Assert.Single(world.Archetypes(new ComponentId[] { rotationId }, new[] { velocityId }));
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void Dispose()
     {
         var world = new World();

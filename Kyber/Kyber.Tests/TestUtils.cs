@@ -2,8 +2,6 @@
 
 internal static class TestUtils
 {
-    public const float DT = 0.01f;
-
     public static IDisposable SetupWithSystems(GraphicsOutput graphicsOutput, out IServiceProvider services, out Game game, params Type[] systems)
     {
         var gameHost = KyberHost.CreateDefaultBuilder().ConfigureKyber((game) => {

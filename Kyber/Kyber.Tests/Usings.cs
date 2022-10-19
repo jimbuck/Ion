@@ -8,3 +8,4 @@ global using Kyber.Scenes;
 global using Kyber.Hosting;
 global using Kyber.Hosting.Scenes;
 global using static Kyber.Tests.TestUtils;
+global using static Kyber.Tests.TestConstants;

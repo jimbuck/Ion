@@ -4,14 +4,14 @@ namespace Kyber.Tests;
 
 public class EventTests
 {
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void EventEmitter_EnabledByDefault()
     {
         var eventSystem = new EventSystem();
         Assert.True(eventSystem.IsEnabled);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void EventEmitter_Emit_Dataless()
     {
         var eventSystem = new EventSystem();
@@ -25,7 +25,7 @@ public class EventTests
         Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void EventEmitter_Emit_Data()
     {
         var eventSystem = new EventSystem();
@@ -44,7 +44,7 @@ public class EventTests
         Assert.Equal(resizeEvent, resizeEvents[0].Data);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void EventEmitter_EventsLastTwoFrames()
     {
         var eventSystem = new EventSystem();
@@ -61,7 +61,7 @@ public class EventTests
         Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void EventListener_SingleEvent()
     {
         var eventSystem = new EventSystem();
@@ -79,7 +79,7 @@ public class EventTests
         Assert.False(eventListener.On<WindowResizeEvent>(out _));
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void EventListener_DoubleEvent()
     {
         var eventSystem = new EventSystem();
@@ -112,7 +112,7 @@ public class EventTests
         Assert.False(eventListener.On<WindowResizeEvent>(out _));
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void EventListener_OnLatest()
     {
         var eventSystem = new EventSystem();
@@ -137,7 +137,7 @@ public class EventTests
         Assert.False(eventListener.On<WindowResizeEvent>(out _));
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void EventListener_Handled()
     {
         var eventSystem = new EventSystem();
@@ -156,7 +156,7 @@ public class EventTests
         Assert.False(eventListener2.On<WindowResizeEvent>(out _));
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void EventListener_Throughput()
     {
         var eventSystem = new EventSystem();
@@ -186,7 +186,7 @@ public class EventTests
             if (eventListener2.On<WindowClosedEvent>()) close2++;
             if (eventListener2.On<WindowResizeEvent>()) resize2++;
         }
-
+        
         Assert.Equal(ITEM_COUNT, close1);
         Assert.Equal(ITEM_COUNT, close2);
         Assert.Equal(ITEM_COUNT, resize1);

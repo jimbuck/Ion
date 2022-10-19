@@ -2,7 +2,7 @@
 
 public class GameTests
 {
-    [Fact]
+    [Fact, Trait("Category", "Unit")]
     public async Task Run_Exit()
     {
         using var _ = SetupWithSystems(GraphicsOutput.None, out var services, out var game);
@@ -17,7 +17,7 @@ public class GameTests
         Assert.False(game.IsRunning);
     }
 
-    [Fact]
+    [Fact, Trait("Category", "E2E")]
     public async Task Run_ExitOnWindowClose()
     {
         using var _ = SetupWithSystems(GraphicsOutput.Window, out var services, out var game);
@@ -33,7 +33,7 @@ public class GameTests
         Assert.False(game.IsRunning);
     }
 
-    [Fact]
+    [Fact, Trait("Category", "Unit")]
     public void LifeCycle_NoGraphics()
     {
         using var _ = SetupWithSystems(GraphicsOutput.None, out var services, out var game, typeof(TestSystem));
@@ -85,7 +85,7 @@ public class GameTests
         Assert.Equal(1, testSystem.ShutdownCount);
     }
 
-    [Fact]
+    [Fact, Trait("Category", "E2E")]
     public void LifeCycle_Window()
     {
         using var _ = SetupWithSystems(GraphicsOutput.Window, out var services, out var game, typeof(TestSystem));

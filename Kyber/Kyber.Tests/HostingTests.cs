@@ -2,7 +2,7 @@ namespace Kyber.Tests
 {
     public class HostingTests
     {
-        [Fact]
+        [Fact, Trait(CATEGORY, UNIT)]
         public void CreateDefaultBuilder()
         {
             var builder = KyberHost.CreateDefaultBuilder();

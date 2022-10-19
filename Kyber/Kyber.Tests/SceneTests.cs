@@ -2,7 +2,7 @@
 
 public class SceneTests
 {
-    [Fact]
+    [Fact, Trait(CATEGORY, INTEGRATION)]
     public void SceneManager_SwitchingScenes()
     {
         using var _ = SetupWithScenes(3, out var services, out var game);
