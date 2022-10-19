@@ -3,7 +3,8 @@
 public interface IEventListener
 {
     bool On<T>();
-    bool On<T>(out IEvent<T>? data);
+    bool On<T>([NotNullWhen(true)] out IEvent<T>? data);
+    bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? data);
 }
 
 public class EventListener : IEventListener, IDisposable
@@ -23,7 +24,7 @@ public class EventListener : IEventListener, IDisposable
         return On<T>(out _);
     }
 
-    public bool On<T>([MaybeNullWhen(true)]out IEvent<T>? @event)
+    public bool On<T>([NotNullWhen(true)]out IEvent<T>? @event)
     {
         foreach(var e in _emitter.GetEvents<T>())
         {
@@ -36,6 +37,20 @@ public class EventListener : IEventListener, IDisposable
 
         @event = default;
         return false;
+    }
+
+    public bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? @event)
+    {
+        @event = default;
+        foreach (var e in _emitter.GetEvents<T>())
+        {
+            if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+
+            @event = e;
+            _currFrameSeenEvents.Add(e.Id);
+        }
+
+        return @event != default;
     }
 
     internal void UpdateKnownEvents()

@@ -113,6 +113,31 @@ public class EventTests
     }
 
     [Fact]
+    public void EventListener_OnLatest()
+    {
+        var eventSystem = new EventSystem();
+        var eventListener = eventSystem.CreateListener();
+
+        Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
+
+        var resizeEvent1 = new WindowResizeEvent(60, 14);
+        eventSystem.Emit(resizeEvent1);
+
+        Assert.Single(eventSystem.GetEvents<WindowResizeEvent>());
+
+        var resizeEvent2 = new WindowResizeEvent(23, 19);
+        eventSystem.Emit(resizeEvent2);
+
+        Assert.Equal(2, eventSystem.GetEvents<WindowResizeEvent>().Count());
+
+        Assert.True(eventListener.OnLatest<WindowResizeEvent>(out var e));
+
+        Assert.Equal(resizeEvent2, e?.Data);
+
+        Assert.False(eventListener.On<WindowResizeEvent>(out _));
+    }
+
+    [Fact]
     public void EventListener_Handled()
     {
         var eventSystem = new EventSystem();
@@ -129,5 +154,42 @@ public class EventTests
         Assert.True(eventListener1.On<WindowResizeEvent>(out var e));
         e.Handled = true;
         Assert.False(eventListener2.On<WindowResizeEvent>(out _));
+    }
+
+    [Fact]
+    public void EventListener_Throughput()
+    {
+        var eventSystem = new EventSystem();
+        var eventListener1 = eventSystem.CreateListener();
+        var eventListener2 = eventSystem.CreateListener();
+
+        const int ITEM_COUNT = 100_000;
+        var resize1 = 0;
+        var resize2 = 0;
+        var close1 = 0;
+        var close2 = 0;
+
+        for (var i = 0; i < ITEM_COUNT; i++)
+        {
+            eventSystem.PreUpdate(DT);
+
+            eventSystem.Emit<WindowClosedEvent>();
+            eventSystem.Emit(new WindowResizeEvent((uint)i, (uint)i));
+
+            if(eventListener1.On<WindowClosedEvent>()) close1++;
+            if(eventListener1.On<WindowResizeEvent>(out var e))
+            {
+                resize1++;
+                e.Handled = true;
+            }
+
+            if (eventListener2.On<WindowClosedEvent>()) close2++;
+            if (eventListener2.On<WindowResizeEvent>()) resize2++;
+        }
+
+        Assert.Equal(ITEM_COUNT, close1);
+        Assert.Equal(ITEM_COUNT, close2);
+        Assert.Equal(ITEM_COUNT, resize1);
+        Assert.Equal(0, resize2);
     }
 }
