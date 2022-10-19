@@ -31,7 +31,7 @@ jobs:
     - name: Unit Tests
       if: ${{ matrix.os != 'windows-latest' }}
       run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category!=E2E" --collect:"XPlat Code Coverage" --results-directory ./coverage
-    - name: Unit & E2E Tests
+    - name: Unit Tests & E2E Tests
       if: ${{ matrix.os == 'windows-latest' }}
       run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
     - name: ReportGenerator
@@ -53,6 +53,7 @@ jobs:
         customSettings: '' # Optional custom settings (separated by semicolon). See: https://github.com/danielpalme/ReportGenerator/wiki/Settings.
         toolpath: 'reportgeneratortool' # Default directory for installing the dotnet tool.
     - uses: actions/upload-artifact@v3
+      if: ${{ matrix.os == 'windows-latest' }}
       with:
         name: CoverageReports
         path: CoverageReports/
