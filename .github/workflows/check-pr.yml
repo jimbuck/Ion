@@ -26,6 +26,8 @@ jobs:
         dotnet-version: 6.0.x
     - name: Restore dependencies
       run: dotnet restore
+    - name: Restore tools
+      run: dotnet tool restore
     - name: Build
       run: dotnet build --configuration Release --no-restore
     - name: Unit Tests
@@ -56,6 +58,7 @@ jobs:
         customSettings: '' # Optional custom settings (separated by semicolon). See: https://github.com/danielpalme/ReportGenerator/wiki/Settings.
         toolpath: 'reportgeneratortool' # Default directory for installing the dotnet tool.
     - uses: actions/upload-artifact@v3
+      name: Upload Artifacts
       if: ${{ matrix.os == 'windows-latest' }}
       with:
         name: CoverageReports
