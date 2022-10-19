@@ -57,4 +57,4 @@ jobs:
       if: ${{ github.event_name == 'pull_request' && matrix.os == 'windows-latest' }}
       with:
         recreate: true
-        path: MarkdownSummary\Summary.md
+        path: coveragereport\MarkdownSummary\Summary.md
