@@ -7,14 +7,16 @@ public class GraphicsDevice : IDisposable
     private readonly IStartupConfig _startupConfig;
     private readonly Window _window;
     private readonly IEventListener _events;
+    private readonly ILogger _logger;
 
     private Veldrid.GraphicsDevice? _gd;
 
-    public GraphicsDevice(IStartupConfig startupConfig, Window window, IEventListener events)
+    public GraphicsDevice(IStartupConfig startupConfig, Window window, IEventListener events, ILogger<GraphicsDevice> logger)
     {
         _startupConfig = startupConfig;
         _window = window;
         _events = events;
+        _logger = logger;
     }
 
     public void Initialize()
@@ -28,11 +30,9 @@ public class GraphicsDevice : IDisposable
         });
     }
 
-    public void HandleWindowResize(float dt)
+    public void HandleWindowResize()
     {
-        //IEvent<WindowResizeEvent>? e;
-        //while (_events.On(out e)) { }
-        //if (e != null) _gd?.ResizeMainWindow(e.Data.Width, e.Data.Height);
+        if (_gd != null && _events.OnLatest<WindowResizeEvent>(out var e)) _gd.ResizeMainWindow(e.Data.Width, e.Data.Height);
     }
 
     public void Dispose()

@@ -66,7 +66,7 @@ internal class Game
     public void PostUpdate(float dt)
     {
         _systems.PostUpdate(dt);
-        _graphicsDevice.HandleWindowResize(dt);
+        _graphicsDevice.HandleWindowResize();
     }
 
     public void PreRender(float dt) => _systems.PreRender(dt);
