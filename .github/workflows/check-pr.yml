@@ -13,12 +13,12 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Install E2E Dependencies
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: |
-        sudo add-apt-repository -y "deb http://archive.ubuntu.com/ubuntu `lsb_release -sc` main universe restricted multiverse"
-        sudo apt-get update -y -qq
-        sudo apt-get install libsdl2-dev
+    #- name: Install E2E Dependencies
+    #  if: ${{ matrix.os == 'ubuntu-latest' }}
+    #  run: |
+    #    sudo add-apt-repository -y "deb http://archive.ubuntu.com/ubuntu `lsb_release -sc` main universe restricted multiverse"
+    #    sudo apt-get update -y -qq
+    #    sudo apt-get install libsdl2-dev
     - uses: actions/checkout@v3
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
@@ -28,15 +28,15 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build --configuration Release --no-restore
-    - name: Test
-      if: ${{ matrix.os != 'ubuntu-latest' }}
+    - name: Unit Tests
+      if: ${{ matrix.os != 'windows-latest' }}
       run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category!=E2E" --collect:"XPlat Code Coverage" --results-directory ./coverage
-    - name: Test
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+    - name: Unit & E2E Tests
+      if: ${{ matrix.os == 'windows-latest' }}
       run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
     - name: Code Coverage Report
       uses: irongut/CodeCoverageSummary@v1.3.0
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+      if: ${{ matrix.os == 'windows-latest' }}
       with:
         filename: coverage/**/coverage.cobertura.xml
         badge: false
@@ -49,7 +49,7 @@ jobs:
         thresholds: '40 60'
     - name: Add Coverage PR Comment
       uses: marocchino/sticky-pull-request-comment@v2
-      if: ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' }}
+      if: ${{ github.event_name == 'pull_request' && matrix.os == 'windows-latest' }}
       with:
         recreate: true
         path: code-coverage-results.md
