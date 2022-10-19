@@ -52,9 +52,13 @@ jobs:
         tag: '${{ github.run_number }}_${{ github.run_id }}' # Optional tag or build version.
         customSettings: '' # Optional custom settings (separated by semicolon). See: https://github.com/danielpalme/ReportGenerator/wiki/Settings.
         toolpath: 'reportgeneratortool' # Default directory for installing the dotnet tool.
-    - name: Add Coverage PR Comment
-      uses: marocchino/sticky-pull-request-comment@v2
-      if: ${{ github.event_name == 'pull_request' && matrix.os == 'windows-latest' }}
+    - uses: actions/upload-artifact@v3
       with:
-        recreate: true
-        path: coveragereport\MarkdownSummary\Summary.md
+        name: CodeCoverageReports
+        path: coveragereport/
+    #- name: Add Coverage PR Comment
+    #  uses: marocchino/sticky-pull-request-comment@v2
+    #  if: ${{ github.event_name == 'pull_request' && matrix.os == 'windows-latest' }}
+    #  with:
+    #    recreate: true
+    #    path: coveragereport\MarkdownSummary\Summary.md
