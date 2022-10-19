@@ -7,6 +7,12 @@
       "commands": [
         "versionize"
       ]
+    },
+    "dotnet-coverage": {
+      "version": "17.4.4",
+      "commands": [
+        "dotnet-coverage"
+      ]
     }
   }
 }
