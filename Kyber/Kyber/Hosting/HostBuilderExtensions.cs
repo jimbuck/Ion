@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 
 using Kyber.Events;
+using Kyber.Systems;
 
 namespace Kyber.Hosting;
 
@@ -17,23 +18,30 @@ public static class KyberHostBuilderExtensions
     {
         return hostBuilder.ConfigureServices((hostContext, services) =>
         {
-            var startupConfig = new StartupConfig();
-            var gameBuilder = new GameBuilder(services);
-            configure(gameBuilder);
+			var gameBuilder = new GameBuilder(services);
+			gameBuilder.DirectAddSystem<EventSystem>();
+			gameBuilder.DirectAddSystem<Window>();
+			gameBuilder.DirectAddSystem<GraphicsDevice>();
+			configure(gameBuilder);
 
-            services.AddSingleton<IStartupConfig>(gameBuilder.Config);
+			gameBuilder.AddSystem<ExitSystem>();
+			gameBuilder.AddSystem<SurfaceResizeSystem>();
+			
+			services.AddSingleton<IStartupConfig>(gameBuilder.Config);
+			services.AddSingleton<Game>(services => ActivatorUtilities.CreateInstance<Game>(services, gameBuilder.Build(services)));
 
-            services.AddSingleton<Game>(services => ActivatorUtilities.CreateInstance<Game>(services, gameBuilder.Build(services)));
-            services.AddSingleton<Window>();
+			services.AddSingleton<Window>();
             services.AddSingleton<GraphicsDevice>();
-            services.AddSingleton<IEventEmitter, EventSystem>();
-            services.AddTransient<IEventListener>(svcs => ((EventSystem)svcs.GetRequiredService<IEventEmitter>()).CreateListener());
+
+			services.AddSingleton<EventSystem>();
+			services.AddSingleton<IEventEmitter>(s => s.GetRequiredService<EventSystem>());
+            services.AddTransient<IEventListener>(svcs => svcs.GetRequiredService<EventSystem>().CreateListener());
             services.AddSingleton<IInputState, InputState>();
 
             //services.AddSingleton(serviceProvider => InternalGame.Instance.Content);
             //services.AddSingleton(serviceProvider => InternalGame.Instance.SpriteBatch);
 
             services.AddHostedService<HostedKyberService>();
-        });
+		});
     }
 }

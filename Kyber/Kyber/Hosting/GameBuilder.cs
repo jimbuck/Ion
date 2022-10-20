@@ -23,15 +23,29 @@ public class GameBuilder : IGameBuilder
         Config = new();
     }
 
-    public IGameBuilder AddSystem<T>() where T : class
-    {
-        return AddSystem(typeof(T));
-    }
+	public IGameBuilder AddSystem<T>() where T : class
+	{
+		_systems.AddSystem(typeof(T));
+		Services.TryAddScoped<T>();
+		return this;
+	}
 
-    public IGameBuilder AddSystem(Type type)
+	public IGameBuilder AddSystem(Type type)
+	{
+		_systems.AddSystem(type);
+		Services.TryAddScoped(type);
+		return this;
+	}
+
+	internal IGameBuilder DirectAddSystem<T>() where T : class
+	{
+		_systems.AddSystem(typeof(T));
+		return this;
+	}
+
+    internal IGameBuilder DirectAddSystem(Type type)
     {
         _systems.AddSystem(type);
-        Services.TryAddScoped(type);
         return this;
     }
 

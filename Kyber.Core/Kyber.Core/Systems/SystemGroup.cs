@@ -1,32 +1,34 @@
-﻿namespace Kyber;
+﻿using System;
+
+namespace Kyber;
 
 public sealed class SystemGroup : ISystem
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly HashSet<Type> _systemTypes;
+    private readonly HashSet<Type> _systems;
 
-    private readonly List<IStartupSystem> _startupSystems = new();
+    private readonly List<IInitializeSystem> _initializeSystems = new();
     private readonly List<IPreUpdateSystem> _preUpdateSystems = new();
     private readonly List<IUpdateSystem> _updateSystems = new();
     private readonly List<IPostUpdateSystem> _postUpdateSystems = new();
     private readonly List<IPreRenderSystem> _preRenderSystems = new();
     private readonly List<IRenderSystem> _renderSystems = new();
     private readonly List<IPostRenderSystem> _postRenderSystems = new();
-    private readonly List<IShutdownSystem> _shutdownSystems = new();
+    private readonly List<IDestroySystem> _destroySystems = new();
 
     public bool IsEnabled { get; set; } = true;
 
     public SystemGroup(IServiceProvider serviceProvider, HashSet<Type> systemTypes)
     {
         _serviceProvider = serviceProvider;
-        _systemTypes = systemTypes;
+        _systems = systemTypes;
     }
 
-    public void Startup()
+    public void Initialize()
     {
         _setupSystems();
 
-        foreach (var system in _startupSystems) if (system.IsEnabled) system.Startup();
+        foreach (var system in _initializeSystems) if (system.IsEnabled) system.Initialize();
     }
 
     public void PreUpdate(float dt)
@@ -59,26 +61,109 @@ public sealed class SystemGroup : ISystem
         foreach (var system in _postRenderSystems) if (system.IsEnabled) system.PostRender(dt);
     }
 
-    public void Shutdown()
+    public void Destroy()
     {
-        foreach (var system in _shutdownSystems) if (system.IsEnabled) system.Shutdown();
+        foreach (var system in _destroySystems) if (system.IsEnabled) system.Destroy();
     }
+
+	public bool AddSystem<T>()
+	{
+		var type = typeof(T);
+		if (_systems.Contains(type)) return false;
+
+		var instance = _serviceProvider.GetService(type);
+		var added = _addSystem(type, instance);
+
+		if (added) _systems.Add(type);
+
+		return added;
+	}
+
+	internal bool AddSystem<T>(T system)
+	{
+		var type = typeof(T);
+		if (_systems.Contains(type)) return false;
+
+		return _addSystem(type, system);
+	}
+
+	private bool _addSystem(Type type, object? system)
+	{
+		if (system is null) return false;
+
+		var added = false;
+
+		if (system is IInitializeSystem startupSystem)
+		{
+			_initializeSystems.Add(startupSystem);
+			added = true;
+		}
+
+		if (system is IPreUpdateSystem preUpdateSystem)
+		{
+			_preUpdateSystems.Add(preUpdateSystem);
+			added = true;
+		}
+
+		if (system is IUpdateSystem updateSystem)
+		{
+			_updateSystems.Add(updateSystem);
+			added = true;
+		}
+
+		if (system is IPostUpdateSystem postUpdateSystem)
+		{
+			_postUpdateSystems.Add(postUpdateSystem);
+			added = true;
+		}
+
+		if (system is IPreRenderSystem preRenderSystem)
+		{
+			_preRenderSystems.Add(preRenderSystem);
+			added = true;
+		}
+
+		if (system is IRenderSystem renderSystem)
+		{
+			_renderSystems.Add(renderSystem);
+			added = true;
+		}
+
+		if (system is IPostRenderSystem postRenderSystem)
+		{
+			_postRenderSystems.Add(postRenderSystem);
+			added = true;
+		}
+
+		if (system is IDestroySystem shutdownSystem)
+		{
+			_destroySystems.Add(shutdownSystem);
+			added = true;
+		}
+
+		return added;
+	}
+
+	public void RemoveSystem<T>()
+	{
+		_initializeSystems.RemoveAll(s => s is T);
+		_preUpdateSystems.RemoveAll(s => s is T);
+		_updateSystems.RemoveAll(s => s is T);
+		_postUpdateSystems.RemoveAll(s => s is T);
+		_preRenderSystems.RemoveAll(s => s is T);
+		_renderSystems.RemoveAll(s => s is T);
+		_postRenderSystems.RemoveAll(s => s is T);
+		_destroySystems.RemoveAll(s => s is T);
+
+		_systems.Remove(typeof(T));
+	}
 
     private void _setupSystems()
     {
-        foreach (var type in _systemTypes)
+        foreach (var type in _systems)
         {
-            var instance = _serviceProvider.GetService(type);
-            if (instance is null) continue;
-            
-            if (instance is IStartupSystem startupSystem) _startupSystems.Add(startupSystem);
-            if (instance is IPreUpdateSystem preUpdateSystem) _preUpdateSystems.Add(preUpdateSystem);
-            if (instance is IUpdateSystem updateSystem) _updateSystems.Add(updateSystem);
-            if (instance is IPostUpdateSystem postUpdateSystem) _postUpdateSystems.Add(postUpdateSystem);
-            if (instance is IPreRenderSystem preRenderSystem) _preRenderSystems.Add(preRenderSystem);
-            if (instance is IRenderSystem renderSystem) _renderSystems.Add(renderSystem);
-            if (instance is IPostRenderSystem postRenderSystem) _postRenderSystems.Add(postRenderSystem);
-            if (instance is IShutdownSystem shutdownSystem) _shutdownSystems.Add(shutdownSystem);
+			var instance = _serviceProvider.GetService(type);
+			_addSystem(type, instance);
         }
     }
 }

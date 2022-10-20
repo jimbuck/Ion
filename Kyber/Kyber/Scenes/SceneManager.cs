@@ -5,7 +5,7 @@ using Kyber.Scenes.Transitions;
 
 namespace Kyber;
 
-public sealed class SceneManager : IStartupSystem, IPreUpdateSystem, IUpdateSystem, IPostUpdateSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem, IShutdownSystem, IDisposable
+public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateSystem, IPostUpdateSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem, IDestroySystem, IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger _logger;
@@ -83,7 +83,7 @@ public sealed class SceneManager : IStartupSystem, IPreUpdateSystem, IUpdateSyst
         if (_activeScene != null)
         {
             _logger.LogInformation("Unloading {0} Scene.", CurrentScene);
-            _activeScene?.Shutdown();
+            _activeScene?.Destroy();
             _activeScope?.Dispose();
             _logger.LogInformation("Unloaded {0} Scene.", CurrentScene);
             _activeScene = null;
@@ -96,7 +96,7 @@ public sealed class SceneManager : IStartupSystem, IPreUpdateSystem, IUpdateSyst
         currScene.Set(_nextScene);
 
         _activeScene = _scenesBuilders[_nextScene].Build(_activeScope.ServiceProvider);
-        _activeScene.Startup();
+        _activeScene.Initialize();
         _logger.LogInformation("Loaded {0} Scene.", _nextScene);
         _nextScene = null;
     }
@@ -122,13 +122,13 @@ public sealed class SceneManager : IStartupSystem, IPreUpdateSystem, IUpdateSyst
     /// <summary>
     /// Initializes the active scene.
     /// </summary>
-    public void Startup()
+    public void Initialize()
     {
         _logger.LogDebug($"Startup");
         
         if (_activeScene != null)
         {
-            _activeScene.Startup();
+            _activeScene.Initialize();
         }
         else
         {
@@ -188,10 +188,10 @@ public sealed class SceneManager : IStartupSystem, IPreUpdateSystem, IUpdateSyst
     /// <summary>
     /// Unloads content for the active scene.
     /// </summary>
-    public void Shutdown()
+    public void Destroy()
     {
         _logger.LogDebug("Shutdown");
-        _activeScene?.Shutdown();
+        _activeScene?.Destroy();
     }
 
     public void Dispose()

@@ -6,14 +6,7 @@ using Veldrid.SPIRV;
 
 namespace Kyber.Examples.Veldrid;
 
-record struct VertexPositionColor(Vector2 Position, RgbaFloat Color)
-{
-    public const uint SizeInBytes = 24;
-
-	public VertexPositionColor(float x, float y, RgbaFloat color) : this(new Vector2(x, y), color) { }
-}
-
-public class QuadRendererSystem : IStartupSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem
+public class QuadRendererSystem : IInitializeSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem
 {
     private readonly GraphicsDevice _graphicsDevice;
     private readonly ILogger _logger;
@@ -55,17 +48,16 @@ void main()
     {
         _graphicsDevice = graphicsDevice;
         _logger = logger;
-
-        if (_graphicsDevice.Internal == null)
-        {
-            IsEnabled = false;
-            _logger.LogWarning($"{nameof(QuadRendererSystem)} automically disabled due to GraphicsDevice not being set.");
-        }
     }
 
-    public void Startup()
+    public void Initialize()
     {
-        if (_graphicsDevice.Internal == null) return;
+		if (_graphicsDevice.Internal == null)
+		{
+			IsEnabled = false;
+			_logger.LogWarning($"{nameof(QuadRendererSystem)} automically disabled due to GraphicsDevice not being set.");
+			return;
+		}
 
         ResourceFactory factory = _graphicsDevice.Internal.ResourceFactory;
 
@@ -137,4 +129,11 @@ void main()
         _graphicsDevice.Internal.SubmitCommands(_commandList);
         _graphicsDevice.Internal.SwapBuffers();
     }
+}
+
+record struct VertexPositionColor(Vector2 Position, RgbaFloat Color)
+{
+	public const uint SizeInBytes = 24;
+
+	public VertexPositionColor(float x, float y, RgbaFloat color) : this(new Vector2(x, y), color) { }
 }

@@ -2,7 +2,7 @@
 
 namespace Kyber;
 
-public class GraphicsDevice : IDisposable
+public class GraphicsDevice : IInitializeSystem, IDisposable
 {
     private readonly IStartupConfig _startupConfig;
     private readonly Window _window;
@@ -10,6 +10,8 @@ public class GraphicsDevice : IDisposable
     private readonly ILogger _logger;
 
     private Veldrid.GraphicsDevice? _gd;
+
+	public bool IsEnabled { get; set; } = true;
 
     // TODO: Remove this once the graphics API is implemented.
     public Veldrid.GraphicsDevice? Internal => _gd;
@@ -26,17 +28,12 @@ public class GraphicsDevice : IDisposable
     {
         if (_startupConfig.GraphicsOutput == Graphics.GraphicsOutput.None) return;
 
-        _gd = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new Veldrid.GraphicsDeviceOptions()
+		_gd = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new Veldrid.GraphicsDeviceOptions()
         {
             PreferStandardClipSpaceYDirection = true,
             PreferDepthRangeZeroToOne = true,
             SyncToVerticalBlank = _startupConfig.VSync,
         });
-    }
-
-    public void HandleWindowResize()
-    {
-        if (_gd != null && _events.OnLatest<WindowResizeEvent>(out var e)) _gd.ResizeMainWindow(e.Data.Width, e.Data.Height);
     }
 
     public void Dispose()

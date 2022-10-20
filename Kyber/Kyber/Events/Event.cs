@@ -11,8 +11,6 @@ public interface IEvent<T> : IEvent
     T? Data { get; }
 }
 
-
-
 internal record struct Event<T>(ulong Id, T? Data, bool Handled) : IEvent<T>
 {
 	public Event(ulong id) : this(id, default, false) { }

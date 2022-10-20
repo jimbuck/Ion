@@ -9,7 +9,7 @@ public class SceneTests
 
         var sceneManager = services.GetRequiredService<SceneManager>();
 
-        game.Startup();
+		game.Initialize();
 
         Assert.Equal(sceneManager.Scenes[0], sceneManager.CurrentScene);
 
@@ -23,5 +23,7 @@ public class SceneTests
         game.Step(DT);
 
         Assert.Equal(sceneManager.Scenes[0], sceneManager.CurrentScene);
+
+		game.Destroy();
     }
 }

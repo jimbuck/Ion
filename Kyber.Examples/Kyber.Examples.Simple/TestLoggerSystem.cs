@@ -3,7 +3,7 @@ using Kyber.Events;
 
 namespace Kyber.Examples.Simple;
 
-public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
+public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 {
     private readonly ILogger _logger;
     private readonly ICurrentScene _currentScene;
@@ -22,7 +22,7 @@ public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
         _events = events;
     }
 
-    public void Startup()
+    public void Initialize()
     {
         _logger.LogInformation("Simple Example Started ({CurrentScene} scene)", _currentScene);
     }
@@ -31,7 +31,7 @@ public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
     {
         if (_currentScene.IsRoot)
         {
-            if (_events.On<WindowResizeEvent>()) _logger.LogInformation("Window Resized!");
+            if (_events.On<SurfaceResizeEvent>()) _logger.LogInformation("Window Resized!");
             if (_events.On<WindowFocusGainedEvent>()) _logger.LogInformation("Window Focus Gained!");
             if (_events.On<WindowFocusLostEvent>()) _logger.LogInformation("Window Focus Lost!");
             if (_events.On<WindowClosedEvent>()) _logger.LogInformation("Window Closed!");
@@ -65,7 +65,7 @@ public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
         //_logger.LogInformation("Simple Example Update ({CurrentScene} scene)", _currentScene);
     }
 
-    public void Shutdown()
+    public void Destroy()
     {
         _logger.LogInformation("Simple Example Stopped ({CurrentScene} scene)", _currentScene);
     }

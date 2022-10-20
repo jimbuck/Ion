@@ -2,7 +2,7 @@
 
 namespace Kyber.Examples.Veldrid;
 
-public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
+public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 {
 	private readonly ILogger _logger;
 	private readonly IInputState _input;
@@ -21,7 +21,7 @@ public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
 		_events = events;
 	}
 
-	public void Startup()
+	public void Initialize()
 	{
 		_logger.LogInformation("Simple Example Started");
 	}
@@ -38,7 +38,7 @@ public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
             _frameCount = 0;
         }
 
-        if (_events.On<WindowResizeEvent>()) _logger.LogInformation("Window Resized!");
+        if (_events.On<SurfaceResizeEvent>()) _logger.LogInformation("Window Resized!");
         if (_events.On<WindowFocusGainedEvent>()) _logger.LogInformation("Window Focus Gained!");
         if (_events.On<WindowFocusLostEvent>()) _logger.LogInformation("Window Focus Lost!");
         if (_events.On<WindowClosedEvent>()) _logger.LogInformation("Window Closed!");
@@ -69,7 +69,7 @@ public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
         if (_input.Released(MouseButton.Left)) _logger.LogInformation("LEFT MOUSE UP!");
     }
 
-	public void Shutdown()
+	public void Destroy()
 	{
 		_logger.LogInformation("Simple Example Stopped!");
 	}

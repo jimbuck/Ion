@@ -17,12 +17,12 @@ public class EventTests
         var eventSystem = new EventSystem();
 
         Assert.Empty(eventSystem.GetEvents<WindowClosedEvent>());
-        Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Empty(eventSystem.GetEvents<SurfaceResizeEvent>());
 
         eventSystem.Emit<WindowClosedEvent>();
 
         Assert.Single(eventSystem.GetEvents<WindowClosedEvent>());
-        Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Empty(eventSystem.GetEvents<SurfaceResizeEvent>());
     }
 
     [Fact, Trait(CATEGORY, UNIT)]
@@ -31,12 +31,12 @@ public class EventTests
         var eventSystem = new EventSystem();
 
         Assert.Empty(eventSystem.GetEvents<WindowClosedEvent>());
-        Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Empty(eventSystem.GetEvents<SurfaceResizeEvent>());
 
-        var resizeEvent = new WindowResizeEvent(60, 14);
+        var resizeEvent = new SurfaceResizeEvent(60, 14);
         eventSystem.Emit(resizeEvent);
 
-        var resizeEvents = eventSystem.GetEvents<WindowResizeEvent>().ToArray();
+        var resizeEvents = eventSystem.GetEvents<SurfaceResizeEvent>().ToArray();
 
         Assert.Single(resizeEvents);
         Assert.Empty(eventSystem.GetEvents<WindowClosedEvent>());
@@ -49,16 +49,16 @@ public class EventTests
     {
         var eventSystem = new EventSystem();
 
-        eventSystem.Emit(new WindowResizeEvent(60, 14));
+        eventSystem.Emit(new SurfaceResizeEvent(60, 14));
 
-        Assert.Single(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Single(eventSystem.GetEvents<SurfaceResizeEvent>());
         eventSystem.PreUpdate(DT);
-        eventSystem.Emit(new WindowResizeEvent(23, 19));
-        Assert.Equal(2, eventSystem.GetEvents<WindowResizeEvent>().Count());
+        eventSystem.Emit(new SurfaceResizeEvent(23, 19));
+        Assert.Equal(2, eventSystem.GetEvents<SurfaceResizeEvent>().Count());
         eventSystem.PreUpdate(DT);
-        Assert.Single(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Single(eventSystem.GetEvents<SurfaceResizeEvent>());
         eventSystem.PreUpdate(DT);
-        Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Empty(eventSystem.GetEvents<SurfaceResizeEvent>());
     }
 
     [Fact, Trait(CATEGORY, UNIT)]
@@ -67,16 +67,16 @@ public class EventTests
         var eventSystem = new EventSystem();
         var eventListener = eventSystem.CreateListener();
 
-        Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Empty(eventSystem.GetEvents<SurfaceResizeEvent>());
 
-        var resizeEvent = new WindowResizeEvent(60, 14);
+        var resizeEvent = new SurfaceResizeEvent(60, 14);
         eventSystem.Emit(resizeEvent);
 
-        Assert.Single(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Single(eventSystem.GetEvents<SurfaceResizeEvent>());
 
-        Assert.True(eventListener.On<WindowResizeEvent>(out var e));
+        Assert.True(eventListener.On<SurfaceResizeEvent>(out var e));
         Assert.Equal(resizeEvent, e?.Data);
-        Assert.False(eventListener.On<WindowResizeEvent>(out _));
+        Assert.False(eventListener.On<SurfaceResizeEvent>(out _));
     }
 
     [Fact, Trait(CATEGORY, UNIT)]
@@ -85,31 +85,31 @@ public class EventTests
         var eventSystem = new EventSystem();
         var eventListener = eventSystem.CreateListener();
 
-        Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Empty(eventSystem.GetEvents<SurfaceResizeEvent>());
 
-        var resizeEvent1 = new WindowResizeEvent(60, 14);
+        var resizeEvent1 = new SurfaceResizeEvent(60, 14);
         eventSystem.Emit(resizeEvent1);
 
-        Assert.Single(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Single(eventSystem.GetEvents<SurfaceResizeEvent>());
 
-        var resizeEvent2 = new WindowResizeEvent(23, 19);
+        var resizeEvent2 = new SurfaceResizeEvent(23, 19);
         eventSystem.Emit(resizeEvent2);
 
-        Assert.Equal(2, eventSystem.GetEvents<WindowResizeEvent>().Count());
+        Assert.Equal(2, eventSystem.GetEvents<SurfaceResizeEvent>().Count());
 
-        Assert.True(eventListener.On<WindowResizeEvent>(out var e));
+        Assert.True(eventListener.On<SurfaceResizeEvent>(out var e));
 
         Assert.Equal(resizeEvent1, e?.Data);
 
         eventSystem.PreUpdate(DT);
 
-        Assert.True(eventListener.On<WindowResizeEvent>(out e));
+        Assert.True(eventListener.On<SurfaceResizeEvent>(out e));
 
         Assert.Equal(resizeEvent2, e?.Data);
 
         eventSystem.PreUpdate(DT);
 
-        Assert.False(eventListener.On<WindowResizeEvent>(out _));
+        Assert.False(eventListener.On<SurfaceResizeEvent>(out _));
     }
 
     [Fact, Trait(CATEGORY, UNIT)]
@@ -118,23 +118,23 @@ public class EventTests
         var eventSystem = new EventSystem();
         var eventListener = eventSystem.CreateListener();
 
-        Assert.Empty(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Empty(eventSystem.GetEvents<SurfaceResizeEvent>());
 
-        var resizeEvent1 = new WindowResizeEvent(60, 14);
+        var resizeEvent1 = new SurfaceResizeEvent(60, 14);
         eventSystem.Emit(resizeEvent1);
 
-        Assert.Single(eventSystem.GetEvents<WindowResizeEvent>());
+        Assert.Single(eventSystem.GetEvents<SurfaceResizeEvent>());
 
-        var resizeEvent2 = new WindowResizeEvent(23, 19);
+        var resizeEvent2 = new SurfaceResizeEvent(23, 19);
         eventSystem.Emit(resizeEvent2);
 
-        Assert.Equal(2, eventSystem.GetEvents<WindowResizeEvent>().Count());
+        Assert.Equal(2, eventSystem.GetEvents<SurfaceResizeEvent>().Count());
 
-        Assert.True(eventListener.OnLatest<WindowResizeEvent>(out var e));
+        Assert.True(eventListener.OnLatest<SurfaceResizeEvent>(out var e));
 
         Assert.Equal(resizeEvent2, e?.Data);
 
-        Assert.False(eventListener.On<WindowResizeEvent>(out _));
+        Assert.False(eventListener.On<SurfaceResizeEvent>(out _));
     }
 
     [Fact, Trait(CATEGORY, UNIT)]
@@ -149,11 +149,11 @@ public class EventTests
         Assert.True(eventListener1.On<WindowClosedEvent>());
         Assert.True(eventListener2.On<WindowClosedEvent>());
 
-        eventSystem.Emit(new WindowResizeEvent(60, 14));
+        eventSystem.Emit(new SurfaceResizeEvent(60, 14));
 
-        Assert.True(eventListener1.On<WindowResizeEvent>(out var e));
+        Assert.True(eventListener1.On<SurfaceResizeEvent>(out var e));
         e.Handled = true;
-        Assert.False(eventListener2.On<WindowResizeEvent>(out _));
+        Assert.False(eventListener2.On<SurfaceResizeEvent>(out _));
     }
 
     [Fact, Trait(CATEGORY, UNIT)]
@@ -174,17 +174,17 @@ public class EventTests
             eventSystem.PreUpdate(DT);
 
             eventSystem.Emit<WindowClosedEvent>();
-            eventSystem.Emit(new WindowResizeEvent((uint)i, (uint)i));
+            eventSystem.Emit(new SurfaceResizeEvent((uint)i, (uint)i));
 
             if(eventListener1.On<WindowClosedEvent>()) close1++;
-            if(eventListener1.On<WindowResizeEvent>(out var e))
+            if(eventListener1.On<SurfaceResizeEvent>(out var e))
             {
                 resize1++;
                 e.Handled = true;
             }
 
             if (eventListener2.On<WindowClosedEvent>()) close2++;
-            if (eventListener2.On<WindowResizeEvent>()) resize2++;
+            if (eventListener2.On<SurfaceResizeEvent>()) resize2++;
         }
         
         Assert.Equal(ITEM_COUNT, close1);

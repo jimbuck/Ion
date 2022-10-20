@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 
-using Kyber.Events;
 using Kyber.Graphics;
 
 namespace Kyber;
@@ -17,14 +16,13 @@ internal class Game
     private readonly IStartupConfig _startupConfig;
     private readonly Window _window;
     private readonly GraphicsDevice _graphicsDevice;
-    private readonly EventSystem _eventSystem;
-    private readonly IEventListener _eventListener;
-    private readonly SystemGroup _systems;
     
-    private readonly Stopwatch _updateStopwatch = new ();
+    private readonly Stopwatch _updateStopwatch = new();
     private readonly Stopwatch _renderStopwatch = new();
 
-    public bool IsRunning { get; private set; } = false;
+	public readonly SystemGroup Systems;
+
+	public bool IsRunning { get; private set; } = false;
 
     public event EventHandler<EventArgs>? Exiting;
 
@@ -32,62 +30,34 @@ internal class Game
         IStartupConfig startupConfig,
         Window window,
         GraphicsDevice graphicsDevice,
-        IEventEmitter eventSystem,
-        IEventListener eventListener,
         SystemGroup systems)
     {
         _startupConfig = startupConfig;
         _window = window;
         _graphicsDevice = graphicsDevice;
-        _eventSystem = (EventSystem)eventSystem;
-        _systems = systems;
-
-        _eventListener = eventListener;
+        Systems = systems;
     }
 
-    public void Startup()
-    {
-        _window?.Initialize();
-        _graphicsDevice?.Initialize();
-        _systems.Startup();
-    }
+	public void Initialize() => Systems.Initialize();
 
-    public void PreUpdate(float dt)
-    {
-        _eventSystem.PreUpdate(dt);
-        _systems.PreUpdate(dt);
-    }
+	public void PreUpdate(float dt) => Systems.PreUpdate(dt);
 
-    public void Update(float dt)
-    {
-        _window?.Update(dt);
-        if (_eventListener.On<WindowClosedEvent>()) Exit();
-        _systems.Update(dt);
-	}
+	public void Update(float dt) => Systems.Update(dt);
 
-    public void PostUpdate(float dt)
-    {
-        _systems.PostUpdate(dt);
-		if (_eventListener.On<GameExitEvent>()) Exit();
-		_graphicsDevice.HandleWindowResize();
-    }
+	public void PostUpdate(float dt) => Systems.PostUpdate(dt);
 
-    public void PreRender(float dt) => _systems.PreRender(dt);
+    public void PreRender(float dt) => Systems.PreRender(dt);
 
-    public void Render(float dt) => _systems.Render(dt);
+    public void Render(float dt) => Systems.Render(dt);
 
-    public void PostRender(float dt) => _systems.PostRender(dt);
+    public void PostRender(float dt) => Systems.PostRender(dt);
 
-    public void Shutdown()
-    {
-        _systems.Shutdown();
-        _window?.Close();
-    }
+	public void Destroy() => Systems.Destroy();
 
     public void Run()
     {
         IsRunning = true;
-        Startup();
+		Initialize();
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -98,7 +68,7 @@ internal class Game
             Step(dt);
         }
 
-        Shutdown();
+		Destroy();
         IsRunning = false;
 
         Exiting?.Invoke(this, EventArgs.Empty);
@@ -111,9 +81,9 @@ internal class Game
         Update(dt);
         PostUpdate(dt);
         _updateStopwatch.Stop();
-        // TODO: Emit/Store Update time.
+		// TODO: Emit/Store Update time.
 
-        if (_startupConfig.GraphicsOutput != GraphicsOutput.None)
+		if (_startupConfig.GraphicsOutput != GraphicsOutput.None)
         {
             _renderStopwatch.Start();
             PreRender(dt);

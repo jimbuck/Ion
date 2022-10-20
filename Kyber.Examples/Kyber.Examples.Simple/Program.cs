@@ -8,13 +8,16 @@ using Kyber.Examples.Simple;
 
 var gameHost = KyberHost.CreateDefaultBuilder()
     .ConfigureKyber(static (game) => {
-        game.Config.WindowTitle = "Kyber Simple Example";
+		game.Config.WindowTitle = "Kyber Simple Example";
 
-        game.AddSystem<TestLoggerSystem>()
-            //.AddSystem<SceneSwitcherSystem>()
-            .AddScene<Scenes.Main>() // Class with interface
-            .AddScene(Scenes.Gameplay) // Named method
-            .AddScene("Inline", static (scene) => scene.AddSystem<TestLoggerSystem>());
+		void NamedFunction(ISceneBuilder scene) { scene.AddSystem<TestLoggerSystem>(); }
+
+		game.AddSystem<TestLoggerSystem>()
+			//.AddSystem<SceneSwitcherSystem>()
+			.AddScene<Scenes.Main>() // Class with interface
+			.AddScene(Scenes.Gameplay) // Named method
+			.AddScene(NamedFunction)
+			.AddScene("Inline", static (scene) => scene.AddSystem<TestLoggerSystem>());
     })    
     .Build();
 
