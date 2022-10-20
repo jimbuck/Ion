@@ -11,6 +11,9 @@ public class GraphicsDevice : IDisposable
 
     private Veldrid.GraphicsDevice? _gd;
 
+    // TODO: Remove this once the graphics API is implemented.
+    public Veldrid.GraphicsDevice? Internal => _gd;
+
     public GraphicsDevice(IStartupConfig startupConfig, Window window, IEventListener events, ILogger<GraphicsDevice> logger)
     {
         _startupConfig = startupConfig;
@@ -26,7 +29,8 @@ public class GraphicsDevice : IDisposable
         _gd = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new Veldrid.GraphicsDeviceOptions()
         {
             PreferStandardClipSpaceYDirection = true,
-            PreferDepthRangeZeroToOne = true
+            PreferDepthRangeZeroToOne = true,
+            SyncToVerticalBlank = _startupConfig.VSync,
         });
     }
 

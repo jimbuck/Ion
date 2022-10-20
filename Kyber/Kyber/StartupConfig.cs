@@ -19,6 +19,8 @@ public interface IStartupConfig
 
     GraphicsBackend PreferredBackend { get; }
 
+    bool VSync { get; set; }
+
 
     #endregion
 
@@ -42,6 +44,7 @@ public class StartupConfig : IStartupConfig
 
 
     public GraphicsOutput GraphicsOutput { get; set; } = GraphicsOutput.Window;
+    public bool VSync { get; set; } = false;
 
     public GraphicsBackend PreferredBackend { get; set; } = GraphicsBackend.Unspecified;
 
