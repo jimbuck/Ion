@@ -40,7 +40,7 @@ public static class IGameBuilderExtensions
     {
         // Only add the scene manager once.
         gameBuilder.Services.TryAddSingleton<SceneManager>(svc => new SceneManager(svc, svc.GetRequiredService<ILogger<SceneManager>>(), svc.GetServices<SceneBuilder>()));
-        gameBuilder.Services.TryAddScoped<CurrentScene>();
+        gameBuilder.Services.TryAddScoped<ICurrentScene, CurrentScene>();
 
         gameBuilder.AddSystem<SceneManager>();
 

@@ -28,7 +28,7 @@ public static class KyberHostBuilderExtensions
             services.AddSingleton<GraphicsDevice>();
             services.AddSingleton<IEventEmitter, EventSystem>();
             services.AddTransient<IEventListener>(svcs => ((EventSystem)svcs.GetRequiredService<IEventEmitter>()).CreateListener());
-            services.AddSingleton<InputState>();
+            services.AddSingleton<IInputState, InputState>();
 
             //services.AddSingleton(serviceProvider => InternalGame.Instance.Content);
             //services.AddSingleton(serviceProvider => InternalGame.Instance.SpriteBatch);

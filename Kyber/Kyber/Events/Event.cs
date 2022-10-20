@@ -3,18 +3,18 @@
 public interface IEvent
 {
     ulong Id { get; }
-    EventCategory Category { get; }
     bool Handled { get; set; }
 }
 
 public interface IEvent<T> : IEvent
 {
-    T Data { get; }
+    T? Data { get; }
 }
 
-internal struct Event<T>: IEvent<T> {
-    public ulong Id { get; init;  }
-    public EventCategory Category { get; init; }
-    public T Data { get; init; }
-    public bool Handled { get; set; }
+
+
+internal record struct Event<T>(ulong Id, T? Data, bool Handled) : IEvent<T>
+{
+	public Event(ulong id) : this(id, default, false) { }
+	public Event(ulong id, T data) : this(id, data, false) { }
 }

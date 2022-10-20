@@ -5,6 +5,8 @@ using Kyber.Graphics;
 
 namespace Kyber;
 
+public record struct GameExitEvent();
+
 /// <summary>
 /// Top-level class representing the runnable game.
 /// </summary>
@@ -61,12 +63,13 @@ internal class Game
         _window?.Update(dt);
         if (_eventListener.On<WindowClosedEvent>()) Exit();
         _systems.Update(dt);
-    }
+	}
 
     public void PostUpdate(float dt)
     {
         _systems.PostUpdate(dt);
-        _graphicsDevice.HandleWindowResize();
+		if (_eventListener.On<GameExitEvent>()) Exit();
+		_graphicsDevice.HandleWindowResize();
     }
 
     public void PreRender(float dt) => _systems.PreRender(dt);

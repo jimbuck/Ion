@@ -23,11 +23,11 @@ public class Window
     public bool HasClosed { get; private set; }
     public bool IsActive => (Sdl2Window?.Focused ?? false);
 
-    public Window(IStartupConfig startupConfig, InputState inputState, ILogger<Window> logger, IEventEmitter events)
+    public Window(IStartupConfig startupConfig, IInputState inputState, ILogger<Window> logger, IEventEmitter events)
     {
         _startupConfig = startupConfig;
         _logger = logger;
-        _inputState = inputState;
+        _inputState = (InputState)inputState;
         _events = (EventSystem)events;
 
         _windowCreateInfo = new()
@@ -59,18 +59,18 @@ public class Window
         if (_prevSize == (Sdl2Window.Width, Sdl2Window.Height)) return;
 
         _prevSize = (Sdl2Window.Width, Sdl2Window.Height);
-        _events.Emit(EventCategory.Window, new WindowResizeEvent((uint)Sdl2Window.Width, (uint)Sdl2Window.Height));
+        _events.Emit(new WindowResizeEvent((uint)Sdl2Window.Width, (uint)Sdl2Window.Height));
     }
 
-    private void _onFocusGained() => _events.Emit<WindowFocusGainedEvent>(EventCategory.Window);
+    private void _onFocusGained() => _events.Emit<WindowFocusGainedEvent>();
 
-    private void _onFocusLost() => _events.Emit<WindowFocusLostEvent>(EventCategory.Window);
+    private void _onFocusLost() => _events.Emit<WindowFocusLostEvent>();
 
     private void _onClosed()
     {
         HasClosed = true;
         _logger.LogDebug("Window closed!");
-        _events.Emit<WindowClosedEvent>(EventCategory.Window);
+        _events.Emit<WindowClosedEvent>();
     }
 
     public void Update(float dt)

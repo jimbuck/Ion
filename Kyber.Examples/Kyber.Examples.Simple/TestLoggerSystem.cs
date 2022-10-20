@@ -6,15 +6,15 @@ namespace Kyber.Examples.Simple;
 public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
 {
     private readonly ILogger _logger;
-    private readonly CurrentScene _currentScene;
-    private readonly InputState _input;
+    private readonly ICurrentScene _currentScene;
+    private readonly IInputState _input;
     private readonly IEventListener _events;
 
     public bool IsEnabled { get; set; } = true;
 
     private bool _wasDown = false;
 
-    public TestLoggerSystem(ILogger<TestLoggerSystem> logger, CurrentScene currentScene, InputState input, IEventListener events)
+    public TestLoggerSystem(ILogger<TestLoggerSystem> logger, ICurrentScene currentScene, IInputState input, IEventListener events)
     {
         _logger = logger;
         _currentScene = currentScene;

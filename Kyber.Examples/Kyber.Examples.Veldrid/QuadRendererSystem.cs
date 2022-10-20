@@ -9,6 +9,8 @@ namespace Kyber.Examples.Veldrid;
 record struct VertexPositionColor(Vector2 Position, RgbaFloat Color)
 {
     public const uint SizeInBytes = 24;
+
+	public VertexPositionColor(float x, float y, RgbaFloat color) : this(new Vector2(x, y), color) { }
 }
 
 public class QuadRendererSystem : IStartupSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem
@@ -68,10 +70,10 @@ void main()
         ResourceFactory factory = _graphicsDevice.Internal.ResourceFactory;
 
         VertexPositionColor[] quadVertices = {
-            new(new Vector2(-0.75f, 0.75f), RgbaFloat.Red),
-            new(new Vector2(0.75f, 0.75f), RgbaFloat.Green),
-            new(new Vector2(-0.75f, -0.75f), RgbaFloat.Blue),
-            new(new Vector2(0.75f, -0.75f), RgbaFloat.Yellow)
+            new(-0.75f, 0.75f, RgbaFloat.Red),
+            new(0.75f, 0.75f, RgbaFloat.Green),
+            new(-0.75f, -0.75f, RgbaFloat.Blue),
+            new(0.75f, -0.75f, RgbaFloat.Yellow)
         };
 
         ushort[] quadIndices = { 0, 1, 2, 3 };
@@ -91,16 +93,17 @@ void main()
 
         _shaders = factory.CreateFromSpirv(vertexShaderDesc, fragmentShaderDesc);
 
-        GraphicsPipelineDescription pipelineDescription = new() {
-            BlendState = BlendStateDescription.SingleOverrideBlend,
-            DepthStencilState = new DepthStencilStateDescription(depthTestEnabled: true, depthWriteEnabled: true, comparisonKind: ComparisonKind.LessEqual),
-            RasterizerState = new RasterizerStateDescription(cullMode: FaceCullMode.Back, fillMode: PolygonFillMode.Solid, frontFace: FrontFace.Clockwise, depthClipEnabled: true, scissorTestEnabled: false),
-            PrimitiveTopology = PrimitiveTopology.TriangleStrip,
-            ResourceLayouts = Array.Empty<ResourceLayout>(),
-            ShaderSet = new ShaderSetDescription(new VertexLayoutDescription[] { vertexLayout }, _shaders),
-            Outputs = _graphicsDevice.Internal.SwapchainFramebuffer.OutputDescription
-        };
-        _pipeline = factory.CreateGraphicsPipeline(pipelineDescription);
+        _pipeline = factory.CreateGraphicsPipeline(new()
+		{
+			BlendState = BlendStateDescription.SingleOverrideBlend,
+			DepthStencilState = new DepthStencilStateDescription(depthTestEnabled: true, depthWriteEnabled: true, comparisonKind: ComparisonKind.LessEqual),
+			RasterizerState = new RasterizerStateDescription(cullMode: FaceCullMode.Back, fillMode: PolygonFillMode.Solid, frontFace: FrontFace.Clockwise, depthClipEnabled: true, scissorTestEnabled: false),
+			PrimitiveTopology = PrimitiveTopology.TriangleStrip,
+			ResourceLayouts = Array.Empty<ResourceLayout>(),
+			ShaderSet = new ShaderSetDescription(new VertexLayoutDescription[] { vertexLayout }, _shaders),
+			Outputs = _graphicsDevice.Internal.SwapchainFramebuffer.OutputDescription
+		});
+
         _commandList = factory.CreateCommandList();
     }
 

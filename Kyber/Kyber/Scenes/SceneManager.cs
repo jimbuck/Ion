@@ -91,8 +91,8 @@ public sealed class SceneManager : IStartupSystem, IPreUpdateSystem, IUpdateSyst
 
         _logger.LogInformation("Loading {0} Scene.", _nextScene);
         _activeScope = _serviceProvider.CreateScope();
-        var rootScene = _serviceProvider.GetRequiredService<CurrentScene>();
-        var currScene = _activeScope.ServiceProvider.GetRequiredService<CurrentScene>();
+        var rootScene = (CurrentScene)_serviceProvider.GetRequiredService<ICurrentScene>();
+        var currScene = (CurrentScene)_activeScope.ServiceProvider.GetRequiredService<ICurrentScene>();
         currScene.Set(_nextScene);
 
         _activeScene = _scenesBuilders[_nextScene].Build(_activeScope.ServiceProvider);

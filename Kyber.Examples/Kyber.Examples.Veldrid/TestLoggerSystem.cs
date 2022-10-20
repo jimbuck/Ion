@@ -5,7 +5,7 @@ namespace Kyber.Examples.Veldrid;
 public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
 {
 	private readonly ILogger _logger;
-	private readonly InputState _input;
+	private readonly IInputState _input;
 	private readonly IEventListener _events;
 
     private bool _wasDown = false;
@@ -14,7 +14,7 @@ public class TestLoggerSystem : IStartupSystem, IShutdownSystem, IUpdateSystem
 
     public bool IsEnabled { get; set; } = true;
 
-    public TestLoggerSystem(ILogger<TestLoggerSystem> logger, InputState input, IEventListener events)
+    public TestLoggerSystem(ILogger<TestLoggerSystem> logger, IInputState input, IEventListener events)
 	{
 		_logger = logger;
 		_input = input;

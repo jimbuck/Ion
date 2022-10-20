@@ -1,48 +1,65 @@
 ﻿namespace Kyber;
 
-public class InputState
+public interface IInputState
 {
-    private Veldrid.InputSnapshot? _inputSnapshot;
+	Vector2 MousePosition { get; }
+	float WheelDelta { get; }
 
-    private readonly Dictionary<Key, KeyEvent> _keyEvents = new();
-    private readonly Dictionary<MouseButton, MouseEvent> _mouseEvents = new();
-    private readonly HashSet<Key> _downKeys = new();
+	bool Down(Key key);
+	bool Down(MouseButton btn);
+	bool Pressed(Key key);
+	bool Pressed(Key key, ModifierKeys modifiers);
+	bool Pressed(MouseButton btn);
+	bool Released(Key key);
+	bool Released(Key key, ModifierKeys modifiers);
+	bool Released(MouseButton btn);
+	bool Up(Key key);
+	bool Up(MouseButton btn);
+}
 
-    public Vector2 MousePosition => _inputSnapshot?.MousePosition ?? Vector2.Zero;
+internal class InputState : IInputState
+{
+	private Veldrid.InputSnapshot? _inputSnapshot;
 
-    public float WheelDelta => _inputSnapshot?.WheelDelta ?? 0;
+	private readonly Dictionary<Key, KeyEvent> _keyEvents = new();
+	private readonly Dictionary<MouseButton, MouseEvent> _mouseEvents = new();
+	private readonly HashSet<Key> _downKeys = new();
 
-    internal void UpdateState(Veldrid.InputSnapshot snapshot)
+	public Vector2 MousePosition => _inputSnapshot?.MousePosition ?? Vector2.Zero;
+
+	public float WheelDelta => _inputSnapshot?.WheelDelta ?? 0;
+
+	internal void UpdateState(Veldrid.InputSnapshot snapshot)
 	{
 		_inputSnapshot = snapshot;
 
-        _keyEvents.Clear();
-        foreach(var k in _inputSnapshot.KeyEvents)
-        {
-            var key = (Key)k.Key;
-            _keyEvents[key] = k;
+		_keyEvents.Clear();
+		foreach (var k in _inputSnapshot.KeyEvents)
+		{
+			var key = (Key)k.Key;
+			_keyEvents[key] = k;
 
-            if (!k.Down) _downKeys.Remove(key);
-            else if (!k.Repeat) _downKeys.Add(key);
-        }
+			if (!k.Down) _downKeys.Remove(key);
+			else if (!k.Repeat) _downKeys.Add(key);
+		}
 
-        _mouseEvents.Clear();
-        foreach (var m in _inputSnapshot.MouseEvents) _mouseEvents[(MouseButton)m.MouseButton] = m;
-    }
+		_mouseEvents.Clear();
+		foreach (var m in _inputSnapshot.MouseEvents) _mouseEvents[(MouseButton)m.MouseButton] = m;
+	}
 
-    public bool Pressed(MouseButton btn) => _mouseEvents.TryGetValue(btn, out var mouseEvent) && mouseEvent.Down;
-    public bool Released(MouseButton btn) => _mouseEvents.TryGetValue(btn, out var mouseEvent) && !mouseEvent.Down;
-    public bool Down(MouseButton btn) => _inputSnapshot?.IsMouseDown((Veldrid.MouseButton)btn) ?? false;
-    public bool Up(MouseButton btn) => !Down(btn);
+	public bool Pressed(MouseButton btn) => _mouseEvents.TryGetValue(btn, out var mouseEvent) && mouseEvent.Down;
+	public bool Released(MouseButton btn) => _mouseEvents.TryGetValue(btn, out var mouseEvent) && !mouseEvent.Down;
+	public bool Down(MouseButton btn) => _inputSnapshot?.IsMouseDown((Veldrid.MouseButton)btn) ?? false;
+	public bool Up(MouseButton btn) => !Down(btn);
 
 
-    public bool Pressed(Key key) => _keyEvents.TryGetValue(key, out var keyEvent) && keyEvent.Down && !keyEvent.Repeat;
-    public bool Pressed(Key key, ModifierKeys modifiers) => _keyEvents.TryGetValue(key, out var keyEvent) && ((keyEvent.Modifiers & modifiers) != ModifierKeys.None) && keyEvent.Down && !keyEvent.Repeat;
+	public bool Pressed(Key key) => _keyEvents.TryGetValue(key, out var keyEvent) && keyEvent.Down && !keyEvent.Repeat;
+	public bool Pressed(Key key, ModifierKeys modifiers) => _keyEvents.TryGetValue(key, out var keyEvent) && ((keyEvent.Modifiers & modifiers) != ModifierKeys.None) && keyEvent.Down && !keyEvent.Repeat;
 
-    public bool Released(Key key) => _keyEvents.TryGetValue(key, out var keyEvent) && !keyEvent.Down;
-    public bool Released(Key key, ModifierKeys modifiers) => _keyEvents.TryGetValue(key, out var keyEvent) && ((keyEvent.Modifiers & modifiers) != ModifierKeys.None) && !keyEvent.Down;
+	public bool Released(Key key) => _keyEvents.TryGetValue(key, out var keyEvent) && !keyEvent.Down;
+	public bool Released(Key key, ModifierKeys modifiers) => _keyEvents.TryGetValue(key, out var keyEvent) && ((keyEvent.Modifiers & modifiers) != ModifierKeys.None) && !keyEvent.Down;
 
-    public bool Down(Key key) => _downKeys.Contains(key);
+	public bool Down(Key key) => _downKeys.Contains(key);
 
-    public bool Up(Key key) => !Down(key);
+	public bool Up(Key key) => !Down(key);
 }

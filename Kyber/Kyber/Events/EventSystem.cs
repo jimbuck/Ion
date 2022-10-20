@@ -3,7 +3,6 @@
 public interface IEventEmitter
 {
     void Emit<T>();
-
     void Emit<T>(T data);
 }
 
@@ -38,22 +37,12 @@ internal class EventSystem : IEventEmitter, IPreUpdateSystem
 
     public void Emit<T>()
     {
-        Emit(EventCategory.Game, default(T));
-    }
+		_currFrame.Enqueue(new Event<T>(Interlocked.Increment(ref _nextId)));
+	}
 
     public void Emit<T>(T data)
     {
-        Emit(EventCategory.Game, data);
-    }
-
-    internal void Emit<T>(EventCategory category)
-    {
-        Emit(category, default(T));
-    }
-
-    internal void Emit<T>(EventCategory category, T data)
-    {
-        _currFrame.Enqueue(new Event<T>() { Id = Interlocked.Increment(ref _nextId), Category = category, Data = data });
+        _currFrame.Enqueue(new Event<T>(Interlocked.Increment(ref _nextId), data));
     }   
 
     internal IEnumerable<IEvent<T>> GetEvents<T>()
