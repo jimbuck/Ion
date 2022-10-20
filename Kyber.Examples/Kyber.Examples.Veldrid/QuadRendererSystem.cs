@@ -11,15 +11,16 @@ record struct VertexPositionColor(Vector2 Position, RgbaFloat Color)
     public const uint SizeInBytes = 24;
 }
 
-public class QuadRendererSystem : IStartupSystem, IRenderSystem
+public class QuadRendererSystem : IStartupSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem
 {
     private readonly GraphicsDevice _graphicsDevice;
+    private readonly ILogger _logger;
 
-    private static CommandList? _commandList;
-    private static DeviceBuffer? _vertexBuffer;
-    private static DeviceBuffer? _indexBuffer;
-    private static Shader[]? _shaders;
-    private static Pipeline? _pipeline;
+    private CommandList? _commandList;
+    private DeviceBuffer? _vertexBuffer;
+    private DeviceBuffer? _indexBuffer;
+    private Shader[]? _shaders;
+    private Pipeline? _pipeline;
 
     private const string VertexCode = @"
 #version 450
@@ -48,9 +49,16 @@ void main()
 
     public bool IsEnabled { get; set; } = true;
 
-    public QuadRendererSystem(GraphicsDevice graphicsDevice)
+    public QuadRendererSystem(GraphicsDevice graphicsDevice, ILogger<QuadRendererSystem> logger)
     {
         _graphicsDevice = graphicsDevice;
+        _logger = logger;
+
+        if (_graphicsDevice.Internal == null)
+        {
+            IsEnabled = false;
+            _logger.LogWarning($"{nameof(QuadRendererSystem)} automically disabled due to GraphicsDevice not being set.");
+        }
     }
 
     public void Startup()
@@ -59,13 +67,12 @@ void main()
 
         ResourceFactory factory = _graphicsDevice.Internal.ResourceFactory;
 
-        VertexPositionColor[] quadVertices =
-        {
-                new(new Vector2(-0.75f, 0.75f), RgbaFloat.Red),
-                new(new Vector2(0.75f, 0.75f), RgbaFloat.Green),
-                new(new Vector2(-0.75f, -0.75f), RgbaFloat.Blue),
-                new(new Vector2(0.75f, -0.75f), RgbaFloat.Yellow)
-            };
+        VertexPositionColor[] quadVertices = {
+            new(new Vector2(-0.75f, 0.75f), RgbaFloat.Red),
+            new(new Vector2(0.75f, 0.75f), RgbaFloat.Green),
+            new(new Vector2(-0.75f, -0.75f), RgbaFloat.Blue),
+            new(new Vector2(0.75f, -0.75f), RgbaFloat.Yellow)
+        };
 
         ushort[] quadIndices = { 0, 1, 2, 3 };
 
@@ -97,20 +104,31 @@ void main()
         _commandList = factory.CreateCommandList();
     }
 
-    public void Render(float dt)
+
+    public void PreRender(float dt)
     {
         if (_graphicsDevice.Internal == null || _commandList == null) return;
 
         _commandList.Begin();
+    }
+
+    public void Render(float dt)
+    {
+        if (_graphicsDevice.Internal == null || _commandList == null) return;
 
         _commandList.SetFramebuffer(_graphicsDevice.Internal.SwapchainFramebuffer);
 
         _commandList.ClearColorTarget(0, RgbaFloat.Black);
-
         _commandList.SetVertexBuffer(0, _vertexBuffer);
         _commandList.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
+
         _commandList.SetPipeline(_pipeline);
         _commandList.DrawIndexed(4, 1, 0, 0, 0);
+    }
+
+    public void PostRender(float dt)
+    {
+        if (_graphicsDevice.Internal == null || _commandList == null) return;
 
         _commandList.End();
         _graphicsDevice.Internal.SubmitCommands(_commandList);
