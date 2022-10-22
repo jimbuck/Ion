@@ -46,6 +46,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Core", "Kyber.Core\Ky
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.Veldrid", "Kyber.Examples\Kyber.Examples.Veldrid\Kyber.Examples.Veldrid.csproj", "{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Kyber.Graphics", "Kyber.Graphics", "{888BF8FD-0D79-4C61-9FA8-D88894152CEF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Graphics", "Kyber.Graphics\Kyber.Graphics\Kyber.Graphics.csproj", "{064872CB-3D45-4469-B5CB-F573FC7BBB00}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -84,6 +88,10 @@ Global
 		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{064872CB-3D45-4469-B5CB-F573FC7BBB00}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{064872CB-3D45-4469-B5CB-F573FC7BBB00}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{064872CB-3D45-4469-B5CB-F573FC7BBB00}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{064872CB-3D45-4469-B5CB-F573FC7BBB00}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -98,6 +106,7 @@ Global
 		{8042821C-776D-47A8-AB66-ECB485480624} = {4D2CCFA7-A07F-4101-B7F8-351DDFE783F3}
 		{45F3420A-8269-4DE9-B750-14F49B2C86A3} = {EA7196A2-54ED-4E68-8090-18E68E6322CB}
 		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE} = {4D2CCFA7-A07F-4101-B7F8-351DDFE783F3}
+		{064872CB-3D45-4469-B5CB-F573FC7BBB00} = {888BF8FD-0D79-4C61-9FA8-D88894152CEF}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CCF839E2-AF6A-4444-95F2-76F60225DC55}

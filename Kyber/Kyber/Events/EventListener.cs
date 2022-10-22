@@ -9,14 +9,14 @@ public interface IEventListener
 
 public class EventListener : IEventListener, IDisposable
 {
-    private readonly EventSystem _emitter;
+    private readonly EventSystem _eventSystem;
 
     private HashSet<ulong> _currFrameSeenEvents = new();
     private HashSet<ulong> _prevFrameKnownEvents = new();
 
-    internal EventListener(EventSystem emitter)
+    internal EventListener(EventSystem eventSystem)
     {
-        _emitter = emitter;
+        _eventSystem = eventSystem;
     }
 
     public bool On<T>()
@@ -26,7 +26,7 @@ public class EventListener : IEventListener, IDisposable
 
     public bool On<T>([NotNullWhen(true)]out IEvent<T>? @event)
     {
-        foreach(var e in _emitter.GetEvents<T>())
+        foreach(var e in _eventSystem.GetEvents<T>())
         {
             if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
 
@@ -42,7 +42,7 @@ public class EventListener : IEventListener, IDisposable
     public bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? @event)
     {
         @event = default;
-        foreach (var e in _emitter.GetEvents<T>())
+        foreach (var e in _eventSystem.GetEvents<T>())
         {
             if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
 
@@ -60,6 +60,6 @@ public class EventListener : IEventListener, IDisposable
 
     public void Dispose()
     {
-        _emitter.DetachListener(this);
+        _eventSystem.DetachListener(this);
     }
 }

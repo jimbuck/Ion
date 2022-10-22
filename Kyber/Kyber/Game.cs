@@ -14,27 +14,19 @@ internal class Game
     private bool _shouldExit;
 
     private readonly IStartupConfig _startupConfig;
-    private readonly Window _window;
-    private readonly GraphicsDevice _graphicsDevice;
     
     private readonly Stopwatch _updateStopwatch = new();
     private readonly Stopwatch _renderStopwatch = new();
 
-	public readonly SystemGroup Systems;
+	public SystemGroup Systems { get; init; }
 
 	public bool IsRunning { get; private set; } = false;
 
     public event EventHandler<EventArgs>? Exiting;
 
-    public Game(
-        IStartupConfig startupConfig,
-        Window window,
-        GraphicsDevice graphicsDevice,
-        SystemGroup systems)
+    public Game(IStartupConfig startupConfig, SystemGroup systems)
     {
         _startupConfig = startupConfig;
-        _window = window;
-        _graphicsDevice = graphicsDevice;
         Systems = systems;
     }
 

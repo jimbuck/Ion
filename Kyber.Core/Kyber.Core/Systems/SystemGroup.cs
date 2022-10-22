@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Kyber;
+﻿namespace Kyber;
 
 public sealed class SystemGroup : ISystem
 {
@@ -72,22 +70,26 @@ public sealed class SystemGroup : ISystem
 		if (_systems.Contains(type)) return false;
 
 		var instance = _serviceProvider.GetService(type);
-		var added = _addSystem(type, instance);
+		var added = _addSystem(instance);
 
 		if (added) _systems.Add(type);
 
 		return added;
 	}
 
-	internal bool AddSystem<T>(T system)
+	internal bool AddSystem<T>(T instance)
 	{
 		var type = typeof(T);
 		if (_systems.Contains(type)) return false;
 
-		return _addSystem(type, system);
+		var added = _addSystem(instance);
+
+		if (added) _systems.Add(type);
+
+		return added;
 	}
 
-	private bool _addSystem(Type type, object? system)
+	private bool _addSystem(object? system)
 	{
 		if (system is null) return false;
 
@@ -163,7 +165,7 @@ public sealed class SystemGroup : ISystem
         foreach (var type in _systems)
         {
 			var instance = _serviceProvider.GetService(type);
-			_addSystem(type, instance);
+			_addSystem(instance);
         }
     }
 }

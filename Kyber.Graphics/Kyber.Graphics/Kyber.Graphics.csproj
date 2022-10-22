@@ -6,7 +6,6 @@
 		<LangVersion>latest</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<RootNamespace>Kyber</RootNamespace>
 	</PropertyGroup>
 
 </Project>
