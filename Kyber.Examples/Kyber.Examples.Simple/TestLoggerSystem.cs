@@ -1,5 +1,4 @@
 ﻿using Kyber.Scenes;
-using Kyber.Events;
 
 namespace Kyber.Examples.Simple;
 
@@ -31,7 +30,7 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
     {
         if (_currentScene.IsRoot)
         {
-            if (_events.On<SurfaceResizeEvent>()) _logger.LogInformation("Window Resized!");
+            if (_events.On<WindowResizeEvent>()) _logger.LogInformation("Window Resized!");
             if (_events.On<WindowFocusGainedEvent>()) _logger.LogInformation("Window Focus Gained!");
             if (_events.On<WindowFocusLostEvent>()) _logger.LogInformation("Window Focus Lost!");
             if (_events.On<WindowClosedEvent>()) _logger.LogInformation("Window Closed!");

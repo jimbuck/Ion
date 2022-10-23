@@ -1,14 +1,16 @@
 ﻿using System.Numerics;
 using System.Text;
+using Kyber.Graphics;
 
 using Veldrid;
 using Veldrid.SPIRV;
 
+
 namespace Kyber.Examples.Veldrid;
 
-public class QuadRendererSystem : IInitializeSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem
+public class QuadRendererSystem : IInitializeSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem, IDisposable
 {
-    private readonly GraphicsDevice _graphicsDevice;
+    private readonly IGraphicsDevice _graphicsDevice;
     private readonly ILogger _logger;
 
     private CommandList? _commandList;
@@ -44,7 +46,7 @@ void main()
 
     public bool IsEnabled { get; set; } = true;
 
-    public QuadRendererSystem(GraphicsDevice graphicsDevice, ILogger<QuadRendererSystem> logger)
+    public QuadRendererSystem(IGraphicsDevice graphicsDevice, ILogger<QuadRendererSystem> logger)
     {
         _graphicsDevice = graphicsDevice;
         _logger = logger;
@@ -129,6 +131,16 @@ void main()
         _graphicsDevice.Internal.SubmitCommands(_commandList);
         _graphicsDevice.Internal.SwapBuffers();
     }
+
+	public void Dispose()
+	{
+		_pipeline?.Dispose();
+		if (_shaders != null) foreach (var shader in _shaders) shader.Dispose();
+
+		_commandList?.Dispose();
+		_vertexBuffer?.Dispose();
+		_indexBuffer?.Dispose();
+	}
 }
 
 record struct VertexPositionColor(Vector2 Position, RgbaFloat Color)

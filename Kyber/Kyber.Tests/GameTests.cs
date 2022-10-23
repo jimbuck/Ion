@@ -5,22 +5,22 @@ public class GameTests
     [Fact, Trait(CATEGORY, UNIT)]
     public async Task Run_Exit()
     {
-        using var _ = SetupWithSystems(GraphicsOutput.None, out var services, out var game);
+        using var _ = SetupWithSystems(out var services, out var game);
         Assert.False(game.IsRunning);
 
-        var gameTask = Task.Run(() => game.Run());
+        var gameTask = Task.Run(() => game.RunNoRender());
         await Task.Delay(50);
         Assert.True(game.IsRunning);
 
         game.Exit();
-        await gameTask;
+		await Task.WhenAny(gameTask, Task.Delay(TimeSpan.FromSeconds(15)));
         Assert.False(game.IsRunning);
     }
 
     [Fact, Trait(CATEGORY, E2E)]
     public async Task Run_ExitOnWindowClose()
     {
-        using var _ = SetupWithSystems(GraphicsOutput.Window, out var services, out var game);
+        using var _ = SetupWithSystems(out var services, out var game);
         var window = services.GetRequiredService<Window>();
         Assert.False(game.IsRunning);
 
@@ -29,14 +29,14 @@ public class GameTests
         Assert.True(game.IsRunning);
 
         window.Close();
-        await gameTask;
-        Assert.False(game.IsRunning);
+		await Task.WhenAny(gameTask, Task.Delay(TimeSpan.FromSeconds(15)));
+		Assert.False(game.IsRunning);
     }
 
     [Fact, Trait(CATEGORY, UNIT)]
     public void LifeCycle_NoGraphics()
     {
-        using var _ = SetupWithSystems(GraphicsOutput.None, out var services, out var game, typeof(TestSystem));
+        using var _ = SetupWithSystems(out var services, out var game, typeof(TestSystem));
 
         var testSystem = services.GetRequiredService<TestSystem>();
 
@@ -51,7 +51,7 @@ public class GameTests
         Assert.Equal(0, testSystem.PostRenderCount);
         Assert.Equal(0, testSystem.DestroyCount);
 
-        game.Step(DT);
+        game.UpdateStep(DT);
 
         Assert.Equal(1, testSystem.InitializeCount);
         Assert.Equal(1, testSystem.PreUpdateCount);
@@ -62,7 +62,7 @@ public class GameTests
         Assert.Equal(0, testSystem.PostRenderCount);
         Assert.Equal(0, testSystem.DestroyCount);
 
-        game.Step(DT);
+		game.UpdateStep(DT);
 
         Assert.Equal(1, testSystem.InitializeCount);
         Assert.Equal(2, testSystem.PreUpdateCount);
@@ -88,7 +88,7 @@ public class GameTests
     [Fact, Trait(CATEGORY, E2E)]
     public void LifeCycle_Window()
     {
-        using var _ = SetupWithSystems(GraphicsOutput.Window, out var services, out var game, typeof(TestSystem));
+        using var _ = SetupWithSystems(out var services, out var game, typeof(TestSystem));
 
         var testSystem = services.GetRequiredService<TestSystem>();
 

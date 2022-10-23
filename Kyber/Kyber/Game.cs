@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
-
-using Kyber.Graphics;
+using System.Runtime.CompilerServices;
 
 namespace Kyber;
 
@@ -11,24 +10,24 @@ public record struct GameExitEvent();
 /// </summary>
 internal class Game
 {
-    private bool _shouldExit;
+	private bool _shouldExit;
 
-    private readonly IStartupConfig _startupConfig;
-    
-    private readonly Stopwatch _updateStopwatch = new();
-    private readonly Stopwatch _renderStopwatch = new();
+	private readonly IGameConfig _gameConfig;
+
+	private readonly Stopwatch _updateStopwatch = new();
+	private readonly Stopwatch _renderStopwatch = new();
 
 	public SystemGroup Systems { get; init; }
 
 	public bool IsRunning { get; private set; } = false;
 
-    public event EventHandler<EventArgs>? Exiting;
+	public event EventHandler<EventArgs>? Exiting;
 
-    public Game(IStartupConfig startupConfig, SystemGroup systems)
-    {
-        _startupConfig = startupConfig;
-        Systems = systems;
-    }
+	public Game(IGameConfig gameConfig, SystemGroup systems)
+	{
+		_gameConfig = gameConfig;
+		Systems = systems;
+	}
 
 	public void Initialize() => Systems.Initialize();
 
@@ -46,9 +45,9 @@ internal class Game
 
 	public void Destroy() => Systems.Destroy();
 
-    public void Run()
+	public void Run()
     {
-        IsRunning = true;
+		IsRunning = true;
 		Initialize();
 
         var stopwatch = Stopwatch.StartNew();
@@ -61,32 +60,59 @@ internal class Game
         }
 
 		Destroy();
-        IsRunning = false;
+		IsRunning = false;
 
-        Exiting?.Invoke(this, EventArgs.Empty);
-    }
+		Exiting?.Invoke(this, EventArgs.Empty);
+	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Step(float dt)
     {
-        _updateStopwatch.Restart();
-        PreUpdate(dt);
-        Update(dt);
-        PostUpdate(dt);
-        _updateStopwatch.Stop();
-		// TODO: Emit/Store Update time.
-
-		if (_startupConfig.GraphicsOutput != GraphicsOutput.None)
-        {
-            _renderStopwatch.Start();
-            PreRender(dt);
-            Render(dt);
-            PostRender(dt);
-            _renderStopwatch.Stop();
-            // TODO: Emit/Store Render time.
-        }
+		UpdateStep(dt);
+		RenderStep(dt);
     }
 
-    public void Exit()
+	public void RunNoRender()
+	{
+		IsRunning = true;
+		Initialize();
+
+		var stopwatch = Stopwatch.StartNew();
+
+		while (_shouldExit == false)
+		{
+			var dt = (float)stopwatch.Elapsed.TotalSeconds;
+			stopwatch.Restart();
+			UpdateStep(dt);
+		}
+
+		Destroy();
+		IsRunning = false;
+
+		Exiting?.Invoke(this, EventArgs.Empty);
+	}
+
+	public void UpdateStep(float dt)
+	{
+		_updateStopwatch.Restart();
+		PreUpdate(dt);
+		Update(dt);
+		PostUpdate(dt);
+		_updateStopwatch.Stop();
+		// TODO: Emit/Store Update time.
+	}
+
+	public void RenderStep(float dt)
+	{
+		_renderStopwatch.Start();
+		PreRender(dt);
+		Render(dt);
+		PostRender(dt);
+		_renderStopwatch.Stop();
+		// TODO: Emit/Store Render time.
+	}
+
+	public void Exit()
     {
         _shouldExit = true;
     }

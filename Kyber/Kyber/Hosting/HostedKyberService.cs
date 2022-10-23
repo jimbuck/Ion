@@ -13,7 +13,7 @@ internal class HostedKyberService : IHostedService
 
 	public HostedKyberService(
 			Game internalGame,
-			IStartupConfig config,
+			IGameConfig config,
 			ILogger<HostedKyberService> logger,
 			IHostApplicationLifetime applicationLifetime)
 	{
@@ -32,7 +32,7 @@ internal class HostedKyberService : IHostedService
 
 	public Task StartAsync(CancellationToken cancellationToken)
 	{
-		_logger.LogDebug("Starting kyber service...");
+		_logger.LogDebug("Starting Kyber service...");
 		_mainGameThread.Start(_mainGameThreadCancellationToken.Token);
 		_logger.LogDebug("Kyber service started!");
 		return Task.CompletedTask;
@@ -60,7 +60,7 @@ internal class HostedKyberService : IHostedService
 
 	public Task StopAsync(CancellationToken cancellationToken)
 	{
-		_logger.LogDebug("Stopping kyber service...");
+		_logger.LogDebug("Stopping Kyber service...");
 		_game.Exiting -= _onGameExiting;
 		_mainGameThreadCancellationToken.Cancel();
 		_logger.LogDebug("Kyber service stopped!");

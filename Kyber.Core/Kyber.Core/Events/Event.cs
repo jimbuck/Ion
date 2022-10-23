@@ -1,4 +1,4 @@
-﻿namespace Kyber.Events;
+﻿namespace Kyber;
 
 public interface IEvent
 {

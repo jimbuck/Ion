@@ -1,6 +1,5 @@
 ﻿global using Microsoft.Extensions.Logging;
 global using Kyber;
-global using Kyber.Events;
 
 using Kyber.Hosting;
 
@@ -10,6 +9,7 @@ var gameHost = KyberHost.CreateDefaultBuilder()
 		.ConfigureKyber(static (game) =>
 		{
 			game.Config.WindowTitle = "Kyber Veldrid Example";
+			game.Config.VSync = false;
 
 			game.AddSystem<TestLoggerSystem>()
 				.AddSystem<QuadRendererSystem>()

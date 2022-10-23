@@ -1,16 +1,15 @@
-﻿using Kyber.Events;
-using Kyber.Graphics;
+﻿using Kyber.Graphics;
 
 namespace Kyber;
 
-public record struct SurfaceResizeEvent(uint Width, uint Height);
+public record struct WindowResizeEvent(uint Width, uint Height);
 public record struct WindowClosedEvent;
 public record struct WindowFocusGainedEvent;
 public record struct WindowFocusLostEvent;
 
 public class Window : IInitializeSystem, IPreUpdateSystem
 {
-    private readonly IStartupConfig _startupConfig;
+    private readonly IGameConfig _config;
     private readonly ILogger _logger;
     private readonly InputState _inputState;
     private readonly EventSystem _events;
@@ -25,27 +24,27 @@ public class Window : IInitializeSystem, IPreUpdateSystem
     public bool HasClosed { get; private set; }
     public bool IsActive => (Sdl2Window?.Focused ?? false);
 
-    public Window(IStartupConfig startupConfig, IInputState inputState, ILogger<Window> logger, IEventEmitter events)
+    public Window(IGameConfig config, IInputState inputState, ILogger<Window> logger, IEventEmitter events)
     {
-        _startupConfig = startupConfig;
+        _config = config;
         _logger = logger;
         _inputState = (InputState)inputState;
         _events = (EventSystem)events;
 
         _windowCreateInfo = new()
         {
-            X = _startupConfig.WindowX ?? 100,
-            Y = _startupConfig.WindowY ?? 100,
-            WindowWidth = _startupConfig.WindowWidth ?? 960,
-            WindowHeight = _startupConfig.WindowHeight ?? 540,
-            WindowInitialState = _startupConfig.WindowState.ToInternal(),
-            WindowTitle = _startupConfig.WindowTitle ?? "Kyber"
+            X = _config.WindowX ?? 100,
+            Y = _config.WindowY ?? 100,
+            WindowWidth = _config.WindowWidth ?? 960,
+            WindowHeight = _config.WindowHeight ?? 540,
+            WindowInitialState = _config.WindowState.ToInternal(),
+            WindowTitle = _config.WindowTitle ?? "Kyber"
         };
     }
 
     public void Initialize()
     {
-        if (_startupConfig.GraphicsOutput != GraphicsOutput.Window) return;
+        if (_config.Output != GraphicsOutput.Window) return;
 
 		_logger.LogInformation("Creating window...");
         Sdl2Window = Veldrid.StartupUtilities.VeldridStartup.CreateWindow(ref _windowCreateInfo);
@@ -57,7 +56,7 @@ public class Window : IInitializeSystem, IPreUpdateSystem
 
     public void PreUpdate(float dt)
     {
-        if (_startupConfig.GraphicsOutput != GraphicsOutput.Window) return;
+        if (_config.Output != GraphicsOutput.Window) return;
         if (Sdl2Window != null)
         {
             var snapshot = Sdl2Window.PumpEvents();
@@ -67,7 +66,7 @@ public class Window : IInitializeSystem, IPreUpdateSystem
 
     public void Close()
     {
-        if (_startupConfig.GraphicsOutput != GraphicsOutput.Window) return;
+        if (_config.Output != GraphicsOutput.Window) return;
         _logger.LogDebug("Closing window...");
         Sdl2Window?.Close();
     }
@@ -78,7 +77,7 @@ public class Window : IInitializeSystem, IPreUpdateSystem
 		if (_prevSize == (Sdl2Window.Width, Sdl2Window.Height)) return;
 
 		_prevSize = (Sdl2Window.Width, Sdl2Window.Height);
-		_events.Emit(new SurfaceResizeEvent((uint)Sdl2Window.Width, (uint)Sdl2Window.Height));
+		_events.Emit(new WindowResizeEvent((uint)Sdl2Window.Width, (uint)Sdl2Window.Height));
 	}
 
 	private void _onFocusGained() => _events.Emit<WindowFocusGainedEvent>();

@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
-using Kyber.Events;
 using Kyber.Systems;
+using Kyber.Graphics;
 
 namespace Kyber.Hosting;
 
@@ -20,18 +20,19 @@ public static class KyberHostBuilderExtensions
         {
 			var gameBuilder = new GameBuilder(services);
 			gameBuilder.DirectAddSystem<EventSystem>();
+
 			gameBuilder.DirectAddSystem<Window>();
 			gameBuilder.DirectAddSystem<GraphicsDevice>();
 			configure(gameBuilder);
-
 			gameBuilder.AddSystem<ExitSystem>();
-			gameBuilder.AddSystem<SurfaceResizeSystem>();
+			gameBuilder.AddSystem<ViewResizeSystem>();
 			
-			services.AddSingleton<IStartupConfig>(gameBuilder.Config);
+			services.AddSingleton<IGameConfig>(gameBuilder.Config);
 			services.AddSingleton<Game>(services => ActivatorUtilities.CreateInstance<Game>(services, gameBuilder.Build(services)));
 
 			services.AddSingleton<Window>();
             services.AddSingleton<GraphicsDevice>();
+			services.AddSingleton<IGraphicsDevice>(s => s.GetRequiredService<GraphicsDevice>());
 
 			services.AddSingleton<EventSystem>();
 			services.AddSingleton<IEventEmitter>(s => s.GetRequiredService<EventSystem>());

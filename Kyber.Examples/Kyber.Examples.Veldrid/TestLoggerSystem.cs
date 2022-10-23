@@ -1,6 +1,4 @@
-﻿using Kyber.Events;
-
-namespace Kyber.Examples.Veldrid;
+﻿namespace Kyber.Examples.Veldrid;
 
 public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 {
@@ -38,7 +36,7 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
             _frameCount = 0;
         }
 
-        if (_events.On<SurfaceResizeEvent>()) _logger.LogInformation("Window Resized!");
+        if (_events.On<WindowResizeEvent>()) _logger.LogInformation("Window Resized!");
         if (_events.On<WindowFocusGainedEvent>()) _logger.LogInformation("Window Focus Gained!");
         if (_events.On<WindowFocusLostEvent>()) _logger.LogInformation("Window Focus Lost!");
         if (_events.On<WindowClosedEvent>()) _logger.LogInformation("Window Closed!");

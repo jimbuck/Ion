@@ -2,11 +2,9 @@
 
 internal static class TestUtils
 {
-    public static IDisposable SetupWithSystems(GraphicsOutput graphicsOutput, out IServiceProvider services, out Game game, params Type[] systems)
+    public static IDisposable SetupWithSystems(out IServiceProvider services, out Game game, params Type[] systems)
     {
         var gameHost = KyberHost.CreateDefaultBuilder().ConfigureKyber((game) => {
-            game.Config.GraphicsOutput = graphicsOutput;
-
             foreach (var type in systems) game.AddSystem(type);
         }).Build();
 
@@ -19,13 +17,9 @@ internal static class TestUtils
     public static IDisposable SetupWithScenes(int sceneCount, out IServiceProvider services, out Game game)
     {
         var gameHost = KyberHost.CreateDefaultBuilder().ConfigureKyber((game) => {
-            game.Config.GraphicsOutput = GraphicsOutput.None;
 
-            for (var i = 0; i < sceneCount; i++)
-            {
-                game.AddScene($"Scene{i}", (scene) => { });
-            }
-        }).Build();
+            for (var i = 0; i < sceneCount; i++) game.AddScene($"Scene{i}", (scene) => { });
+		}).Build();
 
         services = gameHost.Services;
         game = gameHost.Services.GetRequiredService<Game>();

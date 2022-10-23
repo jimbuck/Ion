@@ -1,6 +1,4 @@
-﻿using Kyber.Events;
-
-namespace Kyber.Systems;
+﻿namespace Kyber.Systems;
 
 internal class ExitSystem : IPostUpdateSystem
 {

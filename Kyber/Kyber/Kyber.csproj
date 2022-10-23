@@ -14,18 +14,25 @@
 		<Using Include="System.Numerics" />
 		<Using Include="System.Diagnostics.CodeAnalysis" />
 		<Using Include="Microsoft.Extensions.Logging" />
-		<Using Include="WrapperValueObject" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleToSuffix Include=".Tests" />
+		<InternalsVisibleTo Include="Kyber.Tests.E2E" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />
-		<PackageReference Include="Veldrid" Version="4.8.0" />
-		<PackageReference Include="Veldrid.StartupUtilities" Version="4.8.0" />
-		<PackageReference Include="WrapperValueObject.Generator" Version="0.0.1">
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-			<PrivateAssets>all</PrivateAssets>
+		<PackageReference Include="Veldrid" Version="4.8.0">
+			<PrivateAssets>true</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Veldrid.SPIRV" Version="1.0.15">
+			<PrivateAssets>true</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Veldrid.StartupUtilities" Version="4.8.0">
+			<PrivateAssets>true</PrivateAssets>
 		</PackageReference>
 	</ItemGroup>
 

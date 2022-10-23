@@ -5,7 +5,7 @@ namespace Kyber.Hosting;
 
 public interface IGameBuilder
 {
-    StartupConfig Config { get; }
+	IGameConfig Config { get; }
     IServiceCollection Services { get; }
     IGameBuilder AddSystem<T>() where T : class;
     IGameBuilder AddSystem(Type type);
@@ -13,14 +13,14 @@ public interface IGameBuilder
 
 public class GameBuilder : IGameBuilder
 {
-    public StartupConfig Config { get; }
+    public IGameConfig Config { get; }
     public IServiceCollection Services { get; }
     private readonly SystemGroupBuilder _systems = new();
 
     public GameBuilder(IServiceCollection services)
     {
         Services = services;
-        Config = new();
+        Config = new GameConfig();
     }
 
 	public IGameBuilder AddSystem<T>() where T : class
