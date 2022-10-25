@@ -18,31 +18,31 @@ public static class KyberHostBuilderExtensions
     {
         return hostBuilder.ConfigureServices((hostContext, services) =>
         {
-			var gameBuilder = new GameBuilder(services);
-			gameBuilder.DirectAddSystem<EventSystem>();
+			services.AddSingleton<IWindow, Window>();
+			services.AddSingleton<IGraphicsDevice, GraphicsDevice>();
+			services.AddSingleton<ISpriteRenderer, SpriteRenderer>();
 
-			gameBuilder.DirectAddSystem<Window>();
-			gameBuilder.DirectAddSystem<GraphicsDevice>();
+			services.AddSingleton<IEventEmitter, EventEmitter>();
+            services.AddTransient<IEventListener>(svcs => ((EventEmitter)svcs.GetRequiredService<IEventEmitter>()).CreateListener());
+            services.AddSingleton<IInputState, InputState>();
+
+			//services.AddSingleton(serviceProvider => InternalGame.Instance.Content);
+			//services.AddSingleton(serviceProvider => InternalGame.Instance.SpriteBatch);
+
+			var gameBuilder = new GameBuilder(services);
+			gameBuilder.AddSingletonSystem<EventSystem>();
+			gameBuilder.AddSingletonSystem<WindowSystems>();
+			gameBuilder.AddSingletonSystem<GraphicsDeviceInitializerSystem>();
+			gameBuilder.AddSingletonSystem<SpriteRendererBeginSystem>();
 			configure(gameBuilder);
-			gameBuilder.AddSystem<ExitSystem>();
-			gameBuilder.AddSystem<ViewResizeSystem>();
-			
+			gameBuilder.AddSingletonSystem<SpriteRendererEndSystem>();
+			gameBuilder.AddSingletonSystem<ExitSystem>();
+			gameBuilder.AddSingletonSystem<WindowResizeSystem>();
+
 			services.AddSingleton<IGameConfig>(gameBuilder.Config);
 			services.AddSingleton<Game>(services => ActivatorUtilities.CreateInstance<Game>(services, gameBuilder.Build(services)));
 
-			services.AddSingleton<Window>();
-            services.AddSingleton<GraphicsDevice>();
-			services.AddSingleton<IGraphicsDevice>(s => s.GetRequiredService<GraphicsDevice>());
-
-			services.AddSingleton<EventSystem>();
-			services.AddSingleton<IEventEmitter>(s => s.GetRequiredService<EventSystem>());
-            services.AddTransient<IEventListener>(svcs => svcs.GetRequiredService<EventSystem>().CreateListener());
-            services.AddSingleton<IInputState, InputState>();
-
-            //services.AddSingleton(serviceProvider => InternalGame.Instance.Content);
-            //services.AddSingleton(serviceProvider => InternalGame.Instance.SpriteBatch);
-
-            services.AddHostedService<HostedKyberService>();
+			services.AddHostedService<HostedKyberService>();
 		});
     }
 }

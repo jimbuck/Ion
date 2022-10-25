@@ -10,7 +10,7 @@ namespace Kyber.Examples.Veldrid;
 
 public class QuadRendererSystem : IInitializeSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem, IDisposable
 {
-    private readonly IGraphicsDevice _graphicsDevice;
+    private readonly Kyber.Graphics.GraphicsDevice _graphicsDevice;
     private readonly ILogger _logger;
 
     private CommandList? _commandList;
@@ -48,7 +48,7 @@ void main()
 
     public QuadRendererSystem(IGraphicsDevice graphicsDevice, ILogger<QuadRendererSystem> logger)
     {
-        _graphicsDevice = graphicsDevice;
+        _graphicsDevice = (Kyber.Graphics.GraphicsDevice)graphicsDevice;
         _logger = logger;
     }
 

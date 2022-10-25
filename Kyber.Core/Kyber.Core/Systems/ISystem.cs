@@ -7,6 +7,8 @@ public interface IBaseSystem
 
 public interface IInitializeSystem : IBaseSystem { void Initialize(); }
 
+public interface IFirstSystem : IBaseSystem { void First(float dt); }
+
 public interface IPreUpdateSystem : IBaseSystem { void PreUpdate(float dt); }
 
 public interface IUpdateSystem : IBaseSystem { void Update(float dt); }
@@ -18,6 +20,8 @@ public interface IPreRenderSystem : IBaseSystem { void PreRender(float dt); }
 public interface IRenderSystem : IBaseSystem { void Render(float dt); }
 
 public interface IPostRenderSystem : IBaseSystem { void PostRender(float dt); }
+
+public interface ILastSystem : IBaseSystem { void Last(float dt); }
 
 public interface IDestroySystem : IBaseSystem { void Destroy(); }
 

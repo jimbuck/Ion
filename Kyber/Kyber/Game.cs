@@ -17,7 +17,7 @@ internal class Game
 	private readonly Stopwatch _updateStopwatch = new();
 	private readonly Stopwatch _renderStopwatch = new();
 
-	public SystemGroup Systems { get; init; }
+	public SystemGroup Systems { get; }
 
 	public bool IsRunning { get; private set; } = false;
 
@@ -31,6 +31,8 @@ internal class Game
 
 	public void Initialize() => Systems.Initialize();
 
+	public void First(float dt) => Systems.First(dt);
+
 	public void PreUpdate(float dt) => Systems.PreUpdate(dt);
 
 	public void Update(float dt) => Systems.Update(dt);
@@ -43,6 +45,8 @@ internal class Game
 
     public void PostRender(float dt) => Systems.PostRender(dt);
 
+	public void Last(float dt) => Systems.Last(dt);
+
 	public void Destroy() => Systems.Destroy();
 
 	public void Run()
@@ -52,11 +56,16 @@ internal class Game
 
         var stopwatch = Stopwatch.StartNew();
 
-        while (_shouldExit == false)
+		var targetFrameTime = _gameConfig.MaxFPS == 0 ? 0f : 1000f / _gameConfig.MaxFPS;
+
+
+		while (_shouldExit == false)
         {
             var dt = (float)stopwatch.Elapsed.TotalSeconds;
             stopwatch.Restart();
             Step(dt);
+			var timeDiff = (int)(targetFrameTime - dt);
+			if (timeDiff > 0) Thread.Sleep(timeDiff);
         }
 
 		Destroy();
@@ -68,8 +77,10 @@ internal class Game
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Step(float dt)
     {
+		First(dt);
 		UpdateStep(dt);
 		RenderStep(dt);
+		Last(dt);
     }
 
 	public void RunNoRender()
@@ -83,7 +94,10 @@ internal class Game
 		{
 			var dt = (float)stopwatch.Elapsed.TotalSeconds;
 			stopwatch.Restart();
+			First(dt);
 			UpdateStep(dt);
+			Last(dt);
+
 		}
 
 		Destroy();

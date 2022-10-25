@@ -37,6 +37,13 @@ public class GameBuilder : IGameBuilder
 		return this;
 	}
 
+	internal IGameBuilder AddSingletonSystem<T>() where T : class
+	{
+		_systems.AddSystem(typeof(T));
+		Services.TryAddSingleton<T>();
+		return this;
+	}
+
 	internal IGameBuilder DirectAddSystem<T>() where T : class
 	{
 		_systems.AddSystem(typeof(T));

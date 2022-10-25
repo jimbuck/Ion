@@ -48,6 +48,6 @@ internal class GameConfig : IGameConfig
 
 	public bool VSync { get; set; } = false;
 
-	public uint MaxFPS { get; set; } = 0;
+	public uint MaxFPS { get; set; } = 300;
 	public GraphicsOutput Output { get; set; } = GraphicsOutput.Window;
 }

@@ -6,16 +6,14 @@ public interface IEventEmitter
     void Emit<T>(T data);
 }
 
-internal class EventSystem : IPreUpdateSystem, IEventEmitter
+internal class EventEmitter : IEventEmitter
 {
 	private readonly ConcurrentQueue<IEvent> _currFrame = new();
 	private IEvent[] _prevFrame = Array.Empty<IEvent>();
 	private readonly List<EventListener> _listeners = new();
 	private ulong _nextId = 0;
 
-	public bool IsEnabled { get; set; } = true;
-
-    public void PreUpdate(float dt)
+    public void Step()
     {
 		_prevFrame = _currFrame.Where(e => !e.Handled).ToArray();
 		_currFrame.Clear();
@@ -59,5 +57,22 @@ internal class EventSystem : IPreUpdateSystem, IEventEmitter
 			if (e.Handled || e is not IEvent<T>) continue;
 			yield return (IEvent<T>)e;
 		}
+	}
+}
+
+internal class EventSystem : IPreUpdateSystem
+{
+	private readonly EventEmitter _eventEmitter;
+
+	public bool IsEnabled { get; set; } = true;
+
+	public EventSystem(IEventEmitter eventEmitter)
+	{
+		_eventEmitter = (EventEmitter)eventEmitter;
+	}
+
+	public void PreUpdate(float dt)
+	{
+		_eventEmitter.Step();
 	}
 }

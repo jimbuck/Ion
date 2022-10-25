@@ -1,18 +1,20 @@
 ﻿namespace Kyber;
 
-public sealed class SystemGroup : ISystem
+public sealed class SystemGroup : ISystem, IFirstSystem, ILastSystem
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly HashSet<Type> _systems;
 
     private readonly List<IInitializeSystem> _initializeSystems = new();
-    private readonly List<IPreUpdateSystem> _preUpdateSystems = new();
-    private readonly List<IUpdateSystem> _updateSystems = new();
+	private readonly List<IFirstSystem> _firstSystems = new();
+	private readonly List<IPreUpdateSystem> _preUpdateSystems = new();
+	private readonly List<IUpdateSystem> _updateSystems = new();
     private readonly List<IPostUpdateSystem> _postUpdateSystems = new();
     private readonly List<IPreRenderSystem> _preRenderSystems = new();
     private readonly List<IRenderSystem> _renderSystems = new();
     private readonly List<IPostRenderSystem> _postRenderSystems = new();
-    private readonly List<IDestroySystem> _destroySystems = new();
+	private readonly List<ILastSystem> _lastSystems = new();
+	private readonly List<IDestroySystem> _destroySystems = new();
 
     public bool IsEnabled { get; set; } = true;
 
@@ -29,7 +31,12 @@ public sealed class SystemGroup : ISystem
         foreach (var system in _initializeSystems) if (system.IsEnabled) system.Initialize();
     }
 
-    public void PreUpdate(float dt)
+	public void First(float dt)
+	{
+		foreach (var system in _firstSystems) if (system.IsEnabled) system.First(dt);
+	}
+
+	public void PreUpdate(float dt)
     {
         foreach(var system in _preUpdateSystems) if (system.IsEnabled) system.PreUpdate(dt);
     }
@@ -59,7 +66,12 @@ public sealed class SystemGroup : ISystem
         foreach (var system in _postRenderSystems) if (system.IsEnabled) system.PostRender(dt);
     }
 
-    public void Destroy()
+	public void Last(float dt)
+	{
+		foreach (var system in _lastSystems) if (system.IsEnabled) system.Last(dt);
+	}
+
+	public void Destroy()
     {
         foreach (var system in _destroySystems) if (system.IsEnabled) system.Destroy();
     }
@@ -101,6 +113,12 @@ public sealed class SystemGroup : ISystem
 			added = true;
 		}
 
+		if (system is IFirstSystem firstSystem)
+		{
+			_firstSystems.Add(firstSystem);
+			added = true;
+		}
+
 		if (system is IPreUpdateSystem preUpdateSystem)
 		{
 			_preUpdateSystems.Add(preUpdateSystem);
@@ -134,6 +152,12 @@ public sealed class SystemGroup : ISystem
 		if (system is IPostRenderSystem postRenderSystem)
 		{
 			_postRenderSystems.Add(postRenderSystem);
+			added = true;
+		}
+
+		if (system is ILastSystem lastSystem)
+		{
+			_lastSystems.Add(lastSystem);
 			added = true;
 		}
 

@@ -10,9 +10,10 @@ var gameHost = KyberHost.CreateDefaultBuilder()
 		{
 			game.Config.WindowTitle = "Kyber Veldrid Example";
 			game.Config.VSync = false;
+			game.Config.MaxFPS = 300;
 
 			game.AddSystem<TestLoggerSystem>()
-				.AddSystem<QuadRendererSystem>()
+				//.AddSystem<QuadRendererSystem>()
 				.AddSystem<UserInputSystem>();
 		})
 		.Build();

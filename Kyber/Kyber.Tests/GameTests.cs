@@ -21,7 +21,7 @@ public class GameTests
     public async Task Run_ExitOnWindowClose()
     {
         using var _ = SetupWithSystems(out var services, out var game);
-        var window = services.GetRequiredService<Window>();
+        var window = services.GetRequiredService<IWindow>();
         Assert.False(game.IsRunning);
 
         var gameTask = Task.Run(() => game.Run());

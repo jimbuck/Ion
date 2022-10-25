@@ -1,12 +1,11 @@
 ﻿namespace Kyber.Graphics;
 
-public interface IGraphicsDevice : IDisposable
+public interface IGraphicsDevice
 {
-	Veldrid.GraphicsDevice? Internal { get; }
 
 }
 
-public class GraphicsDevice : IGraphicsDevice, IInitializeSystem
+public class GraphicsDevice : IGraphicsDevice, IDisposable
 {
 	private readonly IGameConfig _config;
 	private readonly Window _window;
@@ -15,15 +14,13 @@ public class GraphicsDevice : IGraphicsDevice, IInitializeSystem
 
 	private Veldrid.GraphicsDevice? _gd;
 
-	public bool IsEnabled { get; set; } = true;
-
 	// TODO: Remove this once the graphics API is implemented.
 	public Veldrid.GraphicsDevice? Internal => _gd;
 
-	public GraphicsDevice(IGameConfig config, Window window, IEventListener events, ILogger<GraphicsDevice> logger)
+	public GraphicsDevice(IGameConfig config, IWindow window, IEventListener events, ILogger<GraphicsDevice> logger)
 	{
 		_config = config;
-		_window = window;
+		_window = (Window)window;
 		_events = events;
 		_logger = logger;
 	}
@@ -32,12 +29,16 @@ public class GraphicsDevice : IGraphicsDevice, IInitializeSystem
 	{
 		if (_config.Output == GraphicsOutput.None) return;
 
+		_logger.LogInformation("Creating graphics device...");
+
 		_gd = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new Veldrid.GraphicsDeviceOptions()
 		{
 			PreferStandardClipSpaceYDirection = true,
 			PreferDepthRangeZeroToOne = true,
 			SyncToVerticalBlank = _config.VSync,
 		});
+
+		_logger.LogInformation("Graphics device created!");
 	}
 
 	public void Dispose()

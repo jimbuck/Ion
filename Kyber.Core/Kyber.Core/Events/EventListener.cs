@@ -9,12 +9,12 @@ public interface IEventListener
 
 public class EventListener : IEventListener, IDisposable
 {
-    private readonly EventSystem _eventSystem;
+    private readonly EventEmitter _eventSystem;
 
     private HashSet<ulong> _currFrameSeenEvents = new();
     private HashSet<ulong> _prevFrameKnownEvents = new();
 
-    internal EventListener(EventSystem eventSystem)
+    internal EventListener(EventEmitter eventSystem)
     {
         _eventSystem = eventSystem;
     }
