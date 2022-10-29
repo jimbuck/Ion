@@ -1,4 +1,6 @@
-﻿namespace Kyber.Graphics;
+﻿using Veldrid.StartupUtilities;
+
+namespace Kyber.Graphics;
 
 public enum GraphicsBackend : byte
 {
@@ -21,6 +23,7 @@ internal static class GraphicsBackendExtensions {
             GraphicsBackend.OpenGL => Veldrid.GraphicsBackend.OpenGL,
             GraphicsBackend.Metal => Veldrid.GraphicsBackend.Metal,
             GraphicsBackend.OpenGLES => Veldrid.GraphicsBackend.OpenGLES,
+			GraphicsBackend.Unspecified => VeldridStartup.GetPlatformDefaultBackend(),
             _ => throw new KyberException("Invalid GraphicsBackend: " + backend),
         };
     }

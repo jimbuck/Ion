@@ -13,6 +13,7 @@ internal class Game
 	private bool _shouldExit;
 
 	private readonly IGameConfig _gameConfig;
+	private readonly IWindow _window;
 
 	private readonly Stopwatch _updateStopwatch = new();
 	private readonly Stopwatch _renderStopwatch = new();
@@ -23,10 +24,11 @@ internal class Game
 
 	public event EventHandler<EventArgs>? Exiting;
 
-	public Game(IGameConfig gameConfig, SystemGroup systems)
+	public Game(IGameConfig gameConfig, SystemGroup systems, IWindow window)
 	{
 		_gameConfig = gameConfig;
 		Systems = systems;
+		_window = window;
 	}
 
 	public void Initialize() => Systems.Initialize();
@@ -118,6 +120,8 @@ internal class Game
 
 	public void RenderStep(float dt)
 	{
+		if (_shouldExit || _window.HasClosed) return;
+
 		_renderStopwatch.Start();
 		PreRender(dt);
 		Render(dt);

@@ -1,5 +1,7 @@
 ﻿using Kyber.Graphics;
 
+using Veldrid.Sdl2;
+
 namespace Kyber;
 
 public record struct WindowResizeEvent(uint Width, uint Height);
@@ -9,6 +11,11 @@ public record struct WindowFocusLostEvent;
 
 public interface IWindow
 {
+	int Width { get; set; }
+	int Height { get; set; }
+
+	Vector2 Size { get; set; }
+	
 	bool HasClosed { get; }
 	bool IsActive { get; }
 
@@ -16,7 +23,7 @@ public interface IWindow
 	bool IsMaximized { get; set; }
 	bool IsMinimized { get; set; }
 	bool IsFullscreen { get; set; }
-	bool IsBorderless { get; set; }
+	bool IsBorderlessFullscreen { get; set; }
 
 	string Title { get; set; }
 	bool IsResizable { get; set; }
@@ -37,7 +44,48 @@ internal class Window : IWindow
 
 	private (int, int) _prevSize = (0, 0);
 
-    public bool HasClosed { get; private set; }
+	public int Width
+	{
+		get => Sdl2Window?.Width ?? 0;
+		set {
+			if (Sdl2Window != null)
+			{
+				Sdl2Window.Width = value;
+				_size = _size with { X = value };
+			}
+		}
+	}
+
+	public int Height
+	{
+		get => Sdl2Window?.Height ?? 0;
+		set
+		{
+			if (Sdl2Window != null)
+			{
+				Sdl2Window.Height = value;
+				_size = _size with { Y = value };
+			}
+		}
+	}
+
+	private Vector2 _size = default;
+	public Vector2 Size
+	{
+		get => _size;
+		set { 
+			if (Sdl2Window != null)
+			{
+				_size = value;
+				Sdl2Window.Width = (int)value.X;
+				Sdl2Window.Height = (int)value.Y;
+			}
+				
+		}
+	}
+
+
+	public bool HasClosed { get; private set; }
     public bool IsActive => (Sdl2Window?.Focused ?? false);
 
 	public bool IsVisible
@@ -61,7 +109,7 @@ internal class Window : IWindow
 		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.FullScreen;
 		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.FullScreen : Veldrid.WindowState.Normal; }
 	}
-	public bool IsBorderless
+	public bool IsBorderlessFullscreen
 	{
 		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.BorderlessFullScreen;
 		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.BorderlessFullScreen : Veldrid.WindowState.Normal; }
@@ -115,12 +163,19 @@ internal class Window : IWindow
 
 		_logger.LogInformation("Creating window...");
         Sdl2Window = Veldrid.StartupUtilities.VeldridStartup.CreateWindow(ref _windowCreateInfo);
-        Sdl2Window.Closed += _onClosed;
+		Sdl2Window.SetCloseRequestedHandler(() =>
+		{
+			_onClosed();
+			return false;
+		});
+
+		Sdl2Window.Closed += _onClosed;
         Sdl2Window.FocusLost += _onFocusLost;
         Sdl2Window.Resized += _onResize;
         Sdl2Window.FocusGained += _onFocusGained;
+		_size = new(Sdl2Window.Width, Sdl2Window.Height);
 
-		_logger.LogInformation("Window created!");
+		_logger.LogInformation($"Window created! ({Sdl2Window.Width}x{Sdl2Window.Height})");
 	}
 
     public Veldrid.InputSnapshot? Step()
@@ -142,6 +197,7 @@ internal class Window : IWindow
 		if (Sdl2Window == null) return;
 		if (_prevSize == (Sdl2Window.Width, Sdl2Window.Height)) return;
 
+		_size = new(Sdl2Window.Width, Sdl2Window.Height);
 		_prevSize = (Sdl2Window.Width, Sdl2Window.Height);
 		_events.Emit(new WindowResizeEvent((uint)Sdl2Window.Width, (uint)Sdl2Window.Height));
 	}

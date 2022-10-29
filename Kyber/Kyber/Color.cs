@@ -1,6 +1,6 @@
-﻿using System.Diagnostics;
+﻿using Newtonsoft.Json.Linq;
+
 using System.Runtime.Serialization;
-using System.Text;
 
 namespace Kyber;
 
@@ -9,7 +9,6 @@ namespace Kyber;
 /// Based MonoGame's Color struct but modified to work with System.Numerics Vector4.
 /// </summary>
 [DataContract]
-[DebuggerDisplay("{DebugDisplayString,nq}")]
 public struct Color : IEquatable<Color>
 {
 	// X-------Y-------Z-------W-------
@@ -108,7 +107,7 @@ public struct Color : IEquatable<Color>
 	/// <param name="r">Red component value from 0.0f to 1.0f.</param>
 	/// <param name="g">Green component value from 0.0f to 1.0f.</param>
 	/// <param name="b">Blue component value from 0.0f to 1.0f.</param>
-	public Color(float r, float g, float b) : this(r,g, b, 1) { }
+	public Color(float r, float g, float b) : this(r,g, b, 1f) { }
 
 	/// <summary>
 	/// Constructs an RGBA color from scalars representing red, green, blue and alpha values.
@@ -207,6 +206,31 @@ public struct Color : IEquatable<Color>
 		return new Color(value.R * scale, value.G * scale, value.B * scale, value.A * scale);
 	}
 
+	public static Color FromHSV(float hue, float saturation, float value)
+	{
+		int hi = Convert.ToInt32(MathF.Floor(hue / 60)) % 6;
+		double f = hue / 60 - MathF.Floor(hue / 60);
+
+		value *= 255;
+		int v = Convert.ToInt32(value);
+		int p = Convert.ToInt32(value * (1 - saturation));
+		int q = Convert.ToInt32(value * (1 - f * saturation));
+		int t = Convert.ToInt32(value * (1 - (1 - f) * saturation));
+
+		if (hi == 0)
+			return new Color(v, t, p);
+		else if (hi == 1)
+			return new Color(q, v, p);
+		else if (hi == 2)
+			return new Color(p, v, t);
+		else if (hi == 3)
+			return new Color(p, q, v);
+		else if (hi == 4)
+			return new Color(t, p, v);
+		else
+			return new Color(v, p, q);
+	}
+
 	/// <summary>
 	/// Multiply <see cref="Color"/> by value.
 	/// </summary>
@@ -267,17 +291,7 @@ public struct Color : IEquatable<Color>
 	/// <returns><see cref="string"/> representation of this <see cref="Color"/>.</returns>
 	public override string ToString()
 	{
-		StringBuilder sb = new(25);
-		sb.Append("{R:");
-		sb.Append((uint)R * 255);
-		sb.Append(" G:");
-		sb.Append((uint)G * 255);
-		sb.Append(" B:");
-		sb.Append((uint)B * 255);
-		sb.Append(" A:");
-		sb.Append((uint)A * 255);
-		sb.Append('}');
-		return sb.ToString();
+		return $"#{(uint)(R * 255):X2}{(uint)(G * 255):X2}{(uint)(B * 255):X2} {A:0.##}";
 	}
 
 	#region IEquatable<Color> Members

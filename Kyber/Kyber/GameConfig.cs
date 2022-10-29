@@ -1,5 +1,6 @@
 ﻿using Kyber.Graphics;
 
+
 namespace Kyber;
 
 public interface IGameConfig
@@ -7,22 +8,22 @@ public interface IGameConfig
 	#region Window Options
 
 	string WindowTitle { get; set; }
-	int? WindowHeight { get; }
-	int? WindowWidth { get; }
-	int? WindowX { get; }
-	int? WindowY { get; }
+	int? WindowHeight { get; set; }
+	int? WindowWidth { get; set; }
+	int? WindowX { get; set; }
+	int? WindowY { get; set; }
 	uint? ResolutionX { get; set; }
 	uint? ResolutionY { get; set; }
-	WindowState WindowState { get; }
+	WindowState WindowState { get; set; }
 
 	#endregion
 
 	#region Graphics Options
 
-	GraphicsBackend PreferredBackend { get; }
+	GraphicsBackend PreferredBackend { get; set; }
 	bool VSync { get; set; }
 	uint MaxFPS { get; set; }
-	GraphicsOutput Output { get; }
+	GraphicsOutput Output { get; set; }
 
 	#endregion
 }
@@ -35,9 +36,9 @@ internal class GameConfig : IGameConfig
 
 	public int? WindowWidth { get; set; }
 
-	public int? WindowX { get; set; } = 100;
+	public int? WindowX { get; set; } = Veldrid.Sdl2.Sdl2Native.SDL_WINDOWPOS_CENTERED;
 
-	public int? WindowY { get; set; } = 100;
+	public int? WindowY { get; set; } = Veldrid.Sdl2.Sdl2Native.SDL_WINDOWPOS_CENTERED;
 
 	public uint? ResolutionX { get; set; }
 	public uint? ResolutionY { get; set; }

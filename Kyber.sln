@@ -46,9 +46,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Core", "Kyber.Core\Ky
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.Veldrid", "Kyber.Examples\Kyber.Examples.Veldrid\Kyber.Examples.Veldrid.csproj", "{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Core.Tests", "Kyber.Core\Kyber.Core.Tests\Kyber.Core.Tests.csproj", "{7FEAA613-D48B-4947-8AA0-2DD60876F5CD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Core.Tests", "Kyber.Core\Kyber.Core.Tests\Kyber.Core.Tests.csproj", "{7FEAA613-D48B-4947-8AA0-2DD60876F5CD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Tests.E2E", "Kyber\Kyber.Tests.E2E\Kyber.Tests.E2E.csproj", "{C409C0FF-A4CD-47BE-BFD6-8041641AA067}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Tests.E2E", "Kyber\Kyber.Tests.E2E\Kyber.Tests.E2E.csproj", "{C409C0FF-A4CD-47BE-BFD6-8041641AA067}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.SpriteRenderer", "Kyber.Examples\Kyber.Examples.SpriteRenderer\Kyber.Examples.SpriteRenderer.csproj", "{F6A420FF-459E-425C-98C4-F7E25E5996D3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -96,6 +98,10 @@ Global
 		{C409C0FF-A4CD-47BE-BFD6-8041641AA067}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C409C0FF-A4CD-47BE-BFD6-8041641AA067}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C409C0FF-A4CD-47BE-BFD6-8041641AA067}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -112,6 +118,7 @@ Global
 		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE} = {4D2CCFA7-A07F-4101-B7F8-351DDFE783F3}
 		{7FEAA613-D48B-4947-8AA0-2DD60876F5CD} = {EA7196A2-54ED-4E68-8090-18E68E6322CB}
 		{C409C0FF-A4CD-47BE-BFD6-8041641AA067} = {04FAD615-3827-4ED3-8114-08B39D448145}
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3} = {4D2CCFA7-A07F-4101-B7F8-351DDFE783F3}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CCF839E2-AF6A-4444-95F2-76F60225DC55}

@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
-using Kyber.Systems;
 using Kyber.Graphics;
 
 namespace Kyber.Hosting;
@@ -26,9 +25,6 @@ public static class KyberHostBuilderExtensions
             services.AddTransient<IEventListener>(svcs => ((EventEmitter)svcs.GetRequiredService<IEventEmitter>()).CreateListener());
             services.AddSingleton<IInputState, InputState>();
 
-			//services.AddSingleton(serviceProvider => InternalGame.Instance.Content);
-			//services.AddSingleton(serviceProvider => InternalGame.Instance.SpriteBatch);
-
 			var gameBuilder = new GameBuilder(services);
 			gameBuilder.AddSingletonSystem<EventSystem>();
 			gameBuilder.AddSingletonSystem<WindowSystems>();
@@ -36,8 +32,8 @@ public static class KyberHostBuilderExtensions
 			gameBuilder.AddSingletonSystem<SpriteRendererBeginSystem>();
 			configure(gameBuilder);
 			gameBuilder.AddSingletonSystem<SpriteRendererEndSystem>();
+			gameBuilder.AddSingletonSystem<GraphicsDeviceSwapBuffers>();
 			gameBuilder.AddSingletonSystem<ExitSystem>();
-			gameBuilder.AddSingletonSystem<WindowResizeSystem>();
 
 			services.AddSingleton<IGameConfig>(gameBuilder.Config);
 			services.AddSingleton<Game>(services => ActivatorUtilities.CreateInstance<Game>(services, gameBuilder.Build(services)));

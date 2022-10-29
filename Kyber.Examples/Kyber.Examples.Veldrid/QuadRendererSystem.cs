@@ -8,12 +8,12 @@ using Veldrid.SPIRV;
 
 namespace Kyber.Examples.Veldrid;
 
-public class QuadRendererSystem : IInitializeSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem, IDisposable
+public class QuadRendererSystem : IInitializeSystem, IRenderSystem, IDisposable
 {
+	private readonly IWindow _window;
     private readonly Kyber.Graphics.GraphicsDevice _graphicsDevice;
     private readonly ILogger _logger;
 
-    private CommandList? _commandList;
     private DeviceBuffer? _vertexBuffer;
     private DeviceBuffer? _indexBuffer;
     private Shader[]? _shaders;
@@ -46,29 +46,25 @@ void main()
 
     public bool IsEnabled { get; set; } = true;
 
-    public QuadRendererSystem(IGraphicsDevice graphicsDevice, ILogger<QuadRendererSystem> logger)
+    public QuadRendererSystem(IWindow window, IGraphicsDevice graphicsDevice, ILogger<QuadRendererSystem> logger)
     {
-        _graphicsDevice = (Kyber.Graphics.GraphicsDevice)graphicsDevice;
+		_window = window;
+		_graphicsDevice = (Kyber.Graphics.GraphicsDevice)graphicsDevice;
         _logger = logger;
     }
 
     public void Initialize()
     {
-		if (_graphicsDevice.Internal == null)
-		{
-			IsEnabled = false;
-			_logger.LogWarning($"{nameof(QuadRendererSystem)} automically disabled due to GraphicsDevice not being set.");
-			return;
-		}
-
         ResourceFactory factory = _graphicsDevice.Internal.ResourceFactory;
 
-        VertexPositionColor[] quadVertices = {
-            new(-0.75f, 0.75f, RgbaFloat.Red),
-            new(0.75f, 0.75f, RgbaFloat.Green),
-            new(-0.75f, -0.75f, RgbaFloat.Blue),
-            new(0.75f, -0.75f, RgbaFloat.Yellow)
-        };
+		(Vector2 position, Color color)[] points = {
+			(new(100f, 800f), Color.Red),   // TOP LEFT
+			(new(800f, 800f), Color.Yellow),   // TOP RIGHT
+			(new(100f, 100f), Color.Blue),   // BOTTOM LEFT
+			(new(800f, 100f), Color.Green)    // BOTTOM RIGHT
+		};
+
+		VertexPositionColor[] quadVertices = points.Select(p => new VertexPositionColor((2 * p.position / _window.Size) - Vector2.One, p.color)).ToArray();
 
         ushort[] quadIndices = { 0, 1, 2, 3 };
 
@@ -97,47 +93,24 @@ void main()
 			ShaderSet = new ShaderSetDescription(new VertexLayoutDescription[] { vertexLayout }, _shaders),
 			Outputs = _graphicsDevice.Internal.SwapchainFramebuffer.OutputDescription
 		});
-
-        _commandList = factory.CreateCommandList();
     }
 
-
-    public void PreRender(float dt)
-    {
-        if (_graphicsDevice.Internal == null || _commandList == null) return;
-
-        _commandList.Begin();
-    }
 
     public void Render(float dt)
     {
-        if (_graphicsDevice.Internal == null || _commandList == null) return;
+		_graphicsDevice.CommandList.SetVertexBuffer(0, _vertexBuffer);
+		_graphicsDevice.CommandList.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
 
-        _commandList.SetFramebuffer(_graphicsDevice.Internal.SwapchainFramebuffer);
-
-        _commandList.ClearColorTarget(0, RgbaFloat.Black);
-        _commandList.SetVertexBuffer(0, _vertexBuffer);
-        _commandList.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
-
-        _commandList.SetPipeline(_pipeline);
-        _commandList.DrawIndexed(4, 1, 0, 0, 0);
+		_graphicsDevice.CommandList.SetPipeline(_pipeline);
+		_graphicsDevice.CommandList.DrawIndexed(4, 1, 0, 0, 0);
     }
 
-    public void PostRender(float dt)
-    {
-        if (_graphicsDevice.Internal == null || _commandList == null) return;
-
-        _commandList.End();
-        _graphicsDevice.Internal.SubmitCommands(_commandList);
-        _graphicsDevice.Internal.SwapBuffers();
-    }
 
 	public void Dispose()
 	{
 		_pipeline?.Dispose();
 		if (_shaders != null) foreach (var shader in _shaders) shader.Dispose();
 
-		_commandList?.Dispose();
 		_vertexBuffer?.Dispose();
 		_indexBuffer?.Dispose();
 	}
