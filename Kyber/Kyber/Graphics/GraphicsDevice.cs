@@ -2,7 +2,7 @@
 
 public interface IGraphicsDevice
 {
-
+	Matrix4x4 ProjectionMatrix { get; }
 }
 
 public class GraphicsDevice : IGraphicsDevice, IDisposable
@@ -21,6 +21,8 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 	public Veldrid.CommandList CommandList => _cl;
 	public Veldrid.ResourceFactory Factory => _gd?.ResourceFactory;
 #pragma warning restore CS8603 // Possible null reference return.
+
+	public Matrix4x4 ProjectionMatrix { get; private set; } = Matrix4x4.Identity;
 
 	public GraphicsDevice(IGameConfig config, IWindow window, IEventListener events, ILogger<GraphicsDevice> logger)
 	{
@@ -42,7 +44,7 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 			Debug = true,
 #endif
 			SwapchainDepthFormat = Veldrid.PixelFormat.D32_Float_S8_UInt,
-			ResourceBindingModel = Veldrid.ResourceBindingModel.Improved,
+			ResourceBindingModel = Veldrid.ResourceBindingModel.Default,
 			PreferStandardClipSpaceYDirection = true,
 			PreferDepthRangeZeroToOne = true,
 			SyncToVerticalBlank = _config.VSync,
@@ -51,6 +53,12 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 		_cl = _gd.ResourceFactory.CreateCommandList();
 
 		_logger.LogInformation("Graphics device created!");
+	}
+
+	public void UpdateProjection(uint width, uint height)
+	{
+		ProjectionMatrix = CreateOrthographic(0, width, 0, height, 0f, -100f);
+		//ProjectionMatrix = CreateOrthographic(0, width, 0, height, 0, -100);
 	}
 
 	public Matrix4x4 CreateOrthographic(float left, float right, float bottom, float top, float near, float far)

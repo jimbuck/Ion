@@ -18,6 +18,7 @@ public class WindowSystems : IInitializeSystem, IFirstSystem
 	public void Initialize()
 	{
 		_window.Initialize();
+
 	}
 
 	public void First(float dt)

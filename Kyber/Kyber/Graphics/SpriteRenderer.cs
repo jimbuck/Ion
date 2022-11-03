@@ -1,8 +1,11 @@
-﻿using System.Runtime.InteropServices;
+﻿using SharpDX.DXGI;
+
+using System.Drawing;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 using Veldrid;
 using Veldrid.SPIRV;
-
 
 namespace Kyber.Graphics;
 
@@ -10,8 +13,8 @@ public interface ISpriteRenderer
 {
 	void Begin();
 
-	void Draw(Color color, Rectangle destinationRectangle, Vector2 origin = default, float rotation = 0, byte layer = 0);
-	void Draw(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, byte layer = 0);
+	void Draw(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float layer = 0, SpriteOptions options = SpriteOptions.None);
+	void Draw(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float layer = 0, SpriteOptions options = SpriteOptions.None);
 
 	//void Draw(Texture texture, Rectangle destinationRectangle, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, SpriteOptions options = SpriteOptions.None, float rotation = 0, byte layerDepth = 0);
 	//void Draw(Texture texture, Vector2 position, Vector2 scale, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, SpriteOptions options = SpriteOptions.None, float rotation = 0, byte layerDepth = 0);
@@ -22,8 +25,6 @@ public interface ISpriteRenderer
 internal class SpriteRenderer : ISpriteRenderer, IDisposable
 {
 	private const int MAX_SPRITE_COUNT = 2048;
-	private const int MAX_VERTEX_COUNT = MAX_SPRITE_COUNT * 4;
-	private const int MAX_INDEX_COUNT = MAX_SPRITE_COUNT * 6;
 
 	private readonly IWindow _window;
 	private readonly GraphicsDevice _graphicsDevice;
@@ -32,73 +33,113 @@ internal class SpriteRenderer : ISpriteRenderer, IDisposable
 
 	private DeviceBuffer? _matrixBuffer;
 	private DeviceBuffer? _vertexBuffer;
-	private DeviceBuffer? _indexBuffer;
+	private DeviceBuffer? _instanceBuffer;
+
+	private ResourceSet? _instanceResourceSet;
+	private ResourceLayout? _instanceResourceLayout;
 	private ResourceSet? _viewProjResourceSet;
+	private ResourceLayout? _viewProjResourceLayout;
+
 	private Shader[]? _shaders;
 	private Pipeline? _pipeline;
 
-	private int _batchStepSize = 256;
+	private readonly int _batchStepSize = 256;
 
-	private Sprite[] _sprites;
-	private IntPtr[] _sortedSprites; // Sprite*[]
+	private Instance[] _instances;
 
-	private readonly BackToFrontComparer _backToFrontComparer = new();
-
-	private VertexPositionColor[] _vertexArray;
-	private ushort[] _indexArray;
-	private uint _spriteCount = 0;
+	private int _instanceCount = 0;
 	private bool _beginCalled = false;
-	
-	private Matrix4x4 _projMatrix = Matrix4x4.Identity;
 
 	private const string VertexCode = @"
 #version 450
 
-layout(location = 0) in vec3 Position;
-layout(location = 1) in vec4 Color;
+layout (constant_id = 0) const bool InvertY = false;
+
+layout(location = 0) in vec2 Position;
+layout(location = 0) out vec4 fsin_Color;
+layout(location = 1) out vec2 tex_coord;
+layout(location = 2) out vec4 bounds;
+layout(location = 3) out vec2 pos;
 
 layout(set = 0, binding = 0) uniform MVP
 {
     mat4 projection;
 };
 
-layout(location = 0) out vec4 fsin_Color;
+struct Instance 
+{
+	vec4 UV;
+	vec4 Color;
+	vec2 Scale;
+	vec2 Origin;
+	vec4 Location;
+	vec4 Scissor;
+};
+
+layout(std430, binding = 1) readonly buffer Instances
+{
+    Instance instances[];
+};
+
+mat2 makeRotation(float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat2(c, -s, s, c);
+}
 
 void main()
 {
-    gl_Position = projection * vec4(Position.xy, 0, 1);
-	fsin_Color = Color;
-	//fsin_Color = vec4(Position.zzz, 1);
+    Instance item = instances[gl_InstanceIndex];
+
+    pos = Position * item.Scale;
+    pos -= item.Origin;
+    pos *= makeRotation(item.Location.w);
+    pos += item.Location.xy;
+
+    tex_coord = Position * item.UV.zw + item.UV.xy;
+    
+    // scissor bounds
+    vec2 start = item.Scissor.xy;
+    vec2 end = start + item.Scissor.zw;
+    bounds = vec4(start, end);
+
+    gl_Position = projection * vec4(pos, item.Location.z, 1);
+    pos = gl_Position.xy;
+
+    if(!InvertY)
+        gl_Position.y = -gl_Position.y;
+
+
+    fsin_Color = item.Color;
 }";
 
 	private const string FragmentCode = @"
 #version 450
 
 layout(location = 0) in vec4 fsin_Color;
+layout(location = 1) in vec2 tex_coord;
+layout(location = 2) in vec4 bounds;
+layout(location = 3) in vec2 pos;
 layout(location = 0) out vec4 fsout_Color;
 
 void main()
 {
+	float left = bounds.x;
+    float top = bounds.y;
+    float right = bounds.z;
+    float bottom = bounds.w;
+
+    //if(!(left <= pos.x && right >= pos.x &&
+    //    top <= pos.y && bottom >= pos.y))
+    //    discard;
+
     fsout_Color = fsin_Color;
 }";
 
-	[StructLayout(LayoutKind.Sequential, Pack = 1)]
-	private struct VertexPositionColor
-	{
-		public Vector3 Position0;
-		public Color Color0;
-		public Vector3 Position1;
-		public Color Color1;
-		public Vector3 Position2;
-		public Color Color2;
-		public Vector3 Position3;
-		public Color Color3;
-
-		public const uint SizeInBytes = StrideInBytes * 4;
-		public const uint StrideInBytes = 28;
-	}
-
 	public bool IsEnabled { get; set; } = true;
+
+	private static readonly RectangleF _defaultScissor = new(-(1 << 22), -(1 << 22), 1 << 23, 1 << 23);
 
 	public SpriteRenderer(IWindow window, IGraphicsDevice graphicsDevice, ILogger<SpriteRenderer> logger, IEventListener events)
 	{
@@ -107,11 +148,7 @@ void main()
 		_logger = logger;
 		_events = events;
 
-		_sprites = new Sprite[_batchStepSize];
-		_sortedSprites = new IntPtr[_batchStepSize];
-
-		_vertexArray = new VertexPositionColor[MAX_SPRITE_COUNT];
-		_indexArray = _generateIndexArray();
+		_instances = new Instance[_batchStepSize];
 	}
 
 	public void Initialize()
@@ -125,40 +162,38 @@ void main()
 
 		var factory = _graphicsDevice.Factory;
 
-		VertexLayoutDescription vertexLayout = new(
-			new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
-			new VertexElementDescription("Color", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float4));
+		VertexLayoutDescription vertexLayout = new(new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2));
 
 		ShaderDescription vertexShaderDesc = new(ShaderStages.Vertex, System.Text.Encoding.UTF8.GetBytes(VertexCode), "main");
 		ShaderDescription fragmentShaderDesc = new(ShaderStages.Fragment, System.Text.Encoding.UTF8.GetBytes(FragmentCode), "main");
 
 		_matrixBuffer = factory.CreateBuffer(new(64, BufferUsage.UniformBuffer));
-		ResourceLayout projectionViewLayout = factory.CreateResourceLayout(new(
-					new ResourceLayoutElementDescription("MVP", ResourceKind.UniformBuffer, ShaderStages.Vertex)
-				));
+		_viewProjResourceLayout = factory.CreateResourceLayout(new(new ResourceLayoutElementDescription("MVP", ResourceKind.UniformBuffer, ShaderStages.Vertex)));
+		_viewProjResourceSet = factory.CreateResourceSet(new(_viewProjResourceLayout, _matrixBuffer));
 
-		_viewProjResourceSet = factory.CreateResourceSet(new(projectionViewLayout, _matrixBuffer));
+		_instanceResourceLayout = factory.CreateResourceLayout(new(new ResourceLayoutElementDescription[] { new("Instances", ResourceKind.StructuredBufferReadOnly, ShaderStages.Vertex) }));
+		_setupInstanceBuffer();
 
 		_shaders = factory.CreateFromSpirv(vertexShaderDesc, fragmentShaderDesc);
 
 		_pipeline = factory.CreateGraphicsPipeline(new()
 		{
 			BlendState = BlendStateDescription.SingleAlphaBlend,
-			DepthStencilState = new DepthStencilStateDescription(depthTestEnabled: true, depthWriteEnabled: true, comparisonKind: ComparisonKind.LessEqual),
-			RasterizerState = new RasterizerStateDescription(cullMode: FaceCullMode.Back, fillMode: PolygonFillMode.Solid, frontFace: FrontFace.Clockwise, depthClipEnabled: true, scissorTestEnabled: false),
-			PrimitiveTopology = PrimitiveTopology.TriangleList,
-			ResourceLayouts = new ResourceLayout[] { projectionViewLayout },
-			ShaderSet = new ShaderSetDescription(new VertexLayoutDescription[] { vertexLayout }, _shaders, new[] { new SpecializationConstant(0, _graphicsDevice.Internal.IsClipSpaceYInverted) }),
+			DepthStencilState = new DepthStencilStateDescription(depthTestEnabled: true, depthWriteEnabled: true, comparisonKind: ComparisonKind.GreaterEqual),
+			RasterizerState = new RasterizerStateDescription(cullMode: FaceCullMode.None, fillMode: PolygonFillMode.Solid, frontFace: FrontFace.Clockwise, depthClipEnabled: true, scissorTestEnabled: false),
+			PrimitiveTopology = PrimitiveTopology.TriangleStrip,
+			ResourceLayouts = new ResourceLayout[] { _viewProjResourceLayout, _instanceResourceLayout },
+			ShaderSet = new(vertexLayouts: new [] { vertexLayout }, shaders: _shaders, specializations: new[] { new SpecializationConstant(0, _graphicsDevice.Internal.IsClipSpaceYInverted) }),
 			Outputs = _graphicsDevice.Internal.SwapchainFramebuffer.OutputDescription
 		});
-
-		_vertexBuffer = factory.CreateBuffer(new((uint)(_vertexArray.Length * VertexPositionColor.SizeInBytes), BufferUsage.VertexBuffer));
-		_indexBuffer = factory.CreateBuffer(new((uint)(_indexArray.Length * sizeof(ushort)), BufferUsage.IndexBuffer));
-
-		_graphicsDevice.Internal.UpdateBuffer(_indexBuffer, 0, _indexArray);
-		_graphicsDevice.Internal.UpdateBuffer(_vertexBuffer, 0, _vertexArray);
-
-		_updateMatricies();
+		
+		_vertexBuffer = factory.CreateBuffer(new(4 * MemUtils.SizeOf<Vector2>(), BufferUsage.VertexBuffer));
+		_graphicsDevice.Internal.UpdateBuffer(_vertexBuffer, 0, new Vector2[] { 
+			new( 0,  0),
+			new( 1,  0),
+			new( 0,  1),
+			new( 1,  1),
+		});
 	}
 
 	public void Begin()
@@ -167,22 +202,25 @@ void main()
 
 		if (_beginCalled) throw new InvalidOperationException("Begin cannot be called again until End has been successfully called.");
 
-		_spriteCount = 0;
+		//if (_events.On<WindowResizeEvent>())
+		_updateMatricies();
+
+		_instanceCount = 0;
 		_beginCalled = true;
 	}
 
-	public void Draw(Color color, Rectangle destinationRectangle, Vector2 origin = default, float rotation = 0, byte layer = 0)
+	public void Draw(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float depth = 0f, SpriteOptions options = SpriteOptions.None)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
-		_addSprite(color, default, destinationRectangle, origin, rotation, layer);
+		_addSprite(color, new RectangleF(0, 0, 1, 1), destinationRectangle, origin, rotation, depth, _defaultScissor, options);
 	}
 
-	public unsafe void Draw(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, byte layer = 0)
+	public void Draw(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0f, SpriteOptions options = SpriteOptions.None)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
-		_addSprite(color, default, new Rectangle((int)position.X, (int)position.Y, (int)size.X, (int)size.Y), origin, rotation, layer);
+		_addSprite(color, new RectangleF(0, 0, 1, 1), new RectangleF(position.X, position.Y, size.X, size.Y), origin, rotation, depth, _defaultScissor, options);
 	}
 
 	//public void Draw(Texture texture, Rectangle destinationRectangle, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, SpriteOptions options = SpriteOptions.None, float rotation = 0, float layerDepth = 0)
@@ -201,18 +239,15 @@ void main()
 
 		_beginCalled = false;
 
-		if (_spriteCount == 0) return;
-
-		if (_events.On<WindowResizeEvent>()) _updateMatricies();
-
-		_updateVertexAndIndexArrays();
-
-		_graphicsDevice.CommandList.SetVertexBuffer(0, _vertexBuffer);
-		_graphicsDevice.CommandList.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
+		if (_instanceCount == 0) return;
 
 		_graphicsDevice.CommandList.SetPipeline(_pipeline);
+		_updateInstanceBuffer();
+		_graphicsDevice.CommandList.SetVertexBuffer(0, _vertexBuffer);
 		_graphicsDevice.CommandList.SetGraphicsResourceSet(0, _viewProjResourceSet);
-		_graphicsDevice.CommandList.DrawIndexed(_spriteCount * 6, _spriteCount * 2, 0, 0, 0);
+		_graphicsDevice.CommandList.SetGraphicsResourceSet(1, _instanceResourceSet);
+		_graphicsDevice.CommandList.Draw(4, (uint)_instanceCount, 0, 0);
+		_instanceCount = 0;
 	}
 
 	public void Dispose()
@@ -221,188 +256,104 @@ void main()
 		if (_shaders != null) foreach (var shader in _shaders) shader.Dispose();
 
 		_vertexBuffer?.Dispose();
-		_indexBuffer?.Dispose();
-	}
-
-	private static ushort[] _generateIndexArray()
-	{
-		var indicies = new ushort[MAX_INDEX_COUNT];
-		for (int i = 0, j = 0; i < MAX_INDEX_COUNT; i += 6, j += 4)
-		{
-			indicies[i + 0] = (ushort)(j + 0);
-			indicies[i + 1] = (ushort)(j + 1);
-			indicies[i + 2] = (ushort)(j + 2);
-			indicies[i + 3] = (ushort)(j + 0);
-			indicies[i + 4] = (ushort)(j + 2);
-			indicies[i + 5] = (ushort)(j + 3);
-		}
-		return indicies;
 	}
 
 	private void _updateMatricies()
 	{
-		Console.WriteLine("Updating Matricies!");
-		_projMatrix = _graphicsDevice.CreateOrthographic(0, _window.Width, _window.Height, 0, -1, 0);
-		_graphicsDevice.CommandList.UpdateBuffer(_matrixBuffer, 0, _projMatrix);
+		_graphicsDevice.CommandList.UpdateBuffer(_matrixBuffer, 0, _graphicsDevice.ProjectionMatrix);
 	}
 
-	private unsafe void _addSprite(Color color, Rectangle sourceRect, Rectangle destinationRect, Vector2 origin, float rotation, byte layer)
+	private void _addSprite(Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteOptions options)
 	{
-		if (_spriteCount >= _sprites.Length)
+		if (_instanceCount >= _instances.Length)
 		{
-			Array.Resize(ref _sprites, _sprites.Length + _batchStepSize);
-			Array.Resize(ref _sortedSprites, _sortedSprites.Length + _batchStepSize);
+			Array.Resize(ref _instances, _instances.Length + _batchStepSize);
+			_setupInstanceBuffer();
 		}
+		
+		_instances[_instanceCount].Update(Vector2.One, destinationRect, sourceRect, color, rotation, origin, depth, _transformRectF(scissor, _graphicsDevice.ProjectionMatrix), options);
 
-		fixed (Sprite* sprite = &_sprites[_spriteCount])
-		{
-			sprite->Color = color;
-			sprite->SourceRect = sourceRect;
-			sprite->DestinationRect = destinationRect;
-			sprite->Origin = origin;
-			sprite->RotationSin = MathF.Sin(rotation);
-			sprite->RotationCos = MathF.Cos(rotation);
-			sprite->Layer = layer;
-		}
-
-		_spriteCount++;
+		_instanceCount++;
 	}
 
-	private unsafe void _updateVertexAndIndexArrays()
+	private void _setupInstanceBuffer()
 	{
-		fixed (IntPtr* sortedSprites = &_sortedSprites[0])
-		fixed (VertexPositionColor* verticies = &_vertexArray[0])
-		fixed (Sprite* sprites = &_sprites[0])
+		var factory = _graphicsDevice.Factory;
+
+		_instanceBuffer?.Dispose();
+		_instanceResourceSet?.Dispose();
+
+		_instanceBuffer = factory.CreateBuffer(new((uint)_instances.Length * Instance.SizeInBytes, BufferUsage.StructuredBufferReadOnly | BufferUsage.Dynamic, Instance.SizeInBytes));
+		_instanceResourceSet = factory.CreateResourceSet(new(_instanceResourceLayout, _instanceBuffer));
+	}
+
+	private unsafe void _updateInstanceBuffer()
+	{
+		var mapped = _graphicsDevice.Internal.Map(_instanceBuffer, MapMode.Write);
+		var sizeInBytes = (uint)_instanceCount * MemUtils.SizeOf<Instance>();
+
+		fixed (Instance* instances = &_instances[0])
 		{
-			for (int i = 0; i < _spriteCount; i++) _sortedSprites[i] = (IntPtr)(&sprites[i]);
+			MemUtils.Copy(mapped.Data, (IntPtr)instances, _instanceCount * MemUtils.SizeOf<Instance>());
+		}	
 
-			Array.Sort(_sortedSprites, 0, (int)_spriteCount, _backToFrontComparer);
+		_graphicsDevice.Internal.Unmap(_instanceBuffer);
+	}
 
-			for (int i = 0; i < _spriteCount; i += 1)
+	private struct Instance
+	{
+		public Vector4 UV;
+		public Color Color;
+		public Vector2 Scale;
+		public Vector2 Origin;
+		public Vector3 Location;
+		public float Rotation;
+		public RectangleF Scissor;
+
+		public static uint SizeInBytes => MemUtils.SizeOf<Instance>();
+
+		public void Update(Vector2 textureSize, RectangleF destinationRectangle, RectangleF sourceRectangle, Color color, float rotation, Vector2 origin, float layerDepth, RectangleF scissor, SpriteOptions options)
+		{
+			var sourceSize = new Vector2(sourceRectangle.Width, sourceRectangle.Height) / textureSize;
+			var pos = new Vector2(sourceRectangle.X, sourceRectangle.Y) / textureSize;
+
+			UV = _createUV(options, sourceSize, pos);
+			Color = color;
+			Scale = destinationRectangle.Size.ToVector2();
+			Origin = origin;
+			Location = new(destinationRectangle.Location.ToVector2(), layerDepth);
+			Rotation = rotation;
+			Scissor = scissor;
+		}
+			
+		private static Vector4 _createUV(SpriteOptions options, Vector2 sourceSize, Vector2 sourceLocation)
+		{
+			if (options != SpriteOptions.None)
 			{
-				Sprite* sprite = (Sprite*)_sortedSprites[i];
+				// flipX
+				if (options.HasFlag(SpriteOptions.FlipHorizontally))
+				{
+					sourceLocation.X += sourceSize.X;
+					sourceSize.X *= -1;
+				}
 
-				_generateVertexInfo(
-					&verticies[i],
-					sprite->SourceRect,
-					sprite->DestinationRect,
-					sprite->Color,
-					sprite->Origin,
-					sprite->RotationSin,
-					sprite->RotationCos,
-					sprite->Layer
-				);
+				// flipY
+				if (options.HasFlag(SpriteOptions.FlipVertically))
+				{
+					sourceLocation.Y += sourceSize.Y;
+					sourceSize.Y *= -1;
+				}
 			}
 
-			_graphicsDevice.Internal.UpdateBuffer(_vertexBuffer, 0, (IntPtr)(&verticies[0]), _spriteCount * VertexPositionColor.SizeInBytes);
+			return new(sourceLocation.X, sourceLocation.Y, sourceSize.X, sourceSize.Y);
 		}
 	}
 
-	private unsafe void _generateVertexInfo(
-			VertexPositionColor* sprite,
-			Rectangle source,
-			Rectangle destination,
-			Color color,
-			Vector2 origin,
-			float rotationSin,
-			float rotationCos,
-			int layer
-		)
+	private static RectangleF _transformRectF(RectangleF rect, Matrix4x4 matrix)
 	{
-		float cornerX = -origin.X * destination.Width;
-		float cornerY = -origin.Y * destination.Height;
-		sprite->Position0.X = (
-			(-rotationSin * cornerY) +
-			(rotationCos * cornerX) +
-			destination.X
-		);
-		sprite->Position0.Y = (
-			(rotationCos * cornerY) +
-			(rotationSin * cornerX) +
-			destination.Y
-		);
-		cornerX = (1.0f - origin.X) * destination.Width;
-		cornerY = -origin.Y * destination.Height;
-		sprite->Position1.X = (
-			(-rotationSin * cornerY) +
-			(rotationCos * cornerX) +
-			destination.X
-		);
-		sprite->Position1.Y = (
-			(rotationCos * cornerY) +
-			(rotationSin * cornerX) +
-			destination.Y
-		);
-		cornerX = (1.0f - origin.X) * destination.Width;
-		cornerY = (1.0f - origin.Y) * destination.Height;
-		sprite->Position2.X = (
-			(-rotationSin * cornerY) +
-			(rotationCos * cornerX) +
-			destination.X
-		);
-		sprite->Position2.Y = (
-			(rotationCos * cornerY) +
-			(rotationSin * cornerX) +
-			destination.Y
-		);
-		cornerX = -origin.X * destination.Width;
-		cornerY = (1.0f - origin.Y) * destination.Height;
-		sprite->Position3.X = (
-			(-rotationSin * cornerY) +
-			(rotationCos * cornerX) +
-			destination.X
-		);
-		sprite->Position3.Y = (
-			(rotationCos * cornerY) +
-			(rotationSin * cornerX) +
-			destination.Y
-		);
-		//fixed (float* flipX = &CornerOffset.X[0])
-		//{
-		//	fixed (float* flipY = &CornerOffsetY[0])
-		//	{
-		//		sprite->TextureCoordinate0.X = (flipX[0 ^ effects] * sourceW) + sourceX;
-		//		sprite->TextureCoordinate0.Y = (flipY[0 ^ effects] * sourceH) + sourceY;
-		//		sprite->TextureCoordinate1.X = (flipX[1 ^ effects] * sourceW) + sourceX;
-		//		sprite->TextureCoordinate1.Y = (flipY[1 ^ effects] * sourceH) + sourceY;
-		//		sprite->TextureCoordinate2.X = (flipX[2 ^ effects] * sourceW) + sourceX;
-		//		sprite->TextureCoordinate2.Y = (flipY[2 ^ effects] * sourceH) + sourceY;
-		//		sprite->TextureCoordinate3.X = (flipX[3 ^ effects] * sourceW) + sourceX;
-		//		sprite->TextureCoordinate3.Y = (flipY[3 ^ effects] * sourceH) + sourceY;
-		//	}
-		//}
-		sprite->Position0.Z = layer;
-		sprite->Position1.Z = layer;
-		sprite->Position2.Z = layer;
-		sprite->Position3.Z = layer;
-		sprite->Color0 = color;
-		sprite->Color1 = color;
-		sprite->Color2 = color;
-		sprite->Color3 = color;
-
-		var pos = Vector3.Transform(sprite->Position0, _projMatrix);
-	}
-
-	[StructLayout(LayoutKind.Sequential, Pack = 1)]
-	private struct Sprite
-	{
-		public Color Color;
-		public Rectangle SourceRect;
-		public Rectangle DestinationRect;
-		public Vector2 Origin;
-		public float RotationSin;
-		public float RotationCos;
-		public int Layer;
-	}
-
-	private class BackToFrontComparer : IComparer<IntPtr>
-	{
-		public unsafe int Compare(IntPtr i1, IntPtr i2)
-		{
-			Sprite* p1 = (Sprite*)i1;
-			Sprite* p2 = (Sprite*)i2;
-			return p2->Layer.CompareTo(p1->Layer);
-		}
+		var pos = Vector4.Transform(new Vector4(rect.X, rect.Y, 0, 1), matrix);
+		var size = Vector4.Transform(new Vector4(rect.X + rect.Width, rect.Y + rect.Height, 0, 1), matrix);
+		return new(pos.X, pos.Y, size.X - pos.X, size.Y - pos.Y);
 	}
 }
 

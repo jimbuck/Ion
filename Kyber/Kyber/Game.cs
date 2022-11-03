@@ -51,7 +51,7 @@ internal class Game
 
 	public void Destroy() => Systems.Destroy();
 
-	public void Run()
+	public void Run(bool render = true)
     {
 		IsRunning = true;
 		Initialize();
@@ -60,15 +60,17 @@ internal class Game
 
 		var targetFrameTime = _gameConfig.MaxFPS == 0 ? 0f : 1000f / _gameConfig.MaxFPS;
 
-
 		while (_shouldExit == false)
         {
             var dt = (float)stopwatch.Elapsed.TotalSeconds;
             stopwatch.Restart();
-            Step(dt);
-			var timeDiff = (int)(targetFrameTime - dt);
-			if (timeDiff > 0) Thread.Sleep(timeDiff);
-        }
+			First(dt);
+			UpdateStep(dt);
+			if (render) RenderStep(dt);
+			Last(dt);
+			//var timeDiff = (int)(targetFrameTime - dt);
+			//if (timeDiff > 0) Thread.Sleep(timeDiff);
+		}
 
 		Destroy();
 		IsRunning = false;
@@ -85,29 +87,7 @@ internal class Game
 		Last(dt);
     }
 
-	public void RunNoRender()
-	{
-		IsRunning = true;
-		Initialize();
-
-		var stopwatch = Stopwatch.StartNew();
-
-		while (_shouldExit == false)
-		{
-			var dt = (float)stopwatch.Elapsed.TotalSeconds;
-			stopwatch.Restart();
-			First(dt);
-			UpdateStep(dt);
-			Last(dt);
-
-		}
-
-		Destroy();
-		IsRunning = false;
-
-		Exiting?.Invoke(this, EventArgs.Empty);
-	}
-
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void UpdateStep(float dt)
 	{
 		_updateStopwatch.Restart();
@@ -118,6 +98,7 @@ internal class Game
 		// TODO: Emit/Store Update time.
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void RenderStep(float dt)
 	{
 		if (_shouldExit || _window.HasClosed) return;

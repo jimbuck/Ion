@@ -8,7 +8,7 @@ public class GameTests
         using var _ = SetupWithSystems(out var services, out var game);
         Assert.False(game.IsRunning);
 
-        var gameTask = Task.Run(() => game.RunNoRender());
+        var gameTask = Task.Run(() => game.Run(false));
         await Task.Delay(50);
         Assert.True(game.IsRunning);
 

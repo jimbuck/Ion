@@ -175,6 +175,7 @@ internal class Window : IWindow
         Sdl2Window.FocusGained += _onFocusGained;
 		_size = new(Sdl2Window.Width, Sdl2Window.Height);
 
+		//_onResize();
 		_logger.LogInformation($"Window created! ({Sdl2Window.Width}x{Sdl2Window.Height})");
 	}
 
