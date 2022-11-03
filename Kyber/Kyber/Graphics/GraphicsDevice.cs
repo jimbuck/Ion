@@ -3,6 +3,7 @@
 public interface IGraphicsDevice
 {
 	Matrix4x4 ProjectionMatrix { get; }
+	bool NoRender { get; }
 }
 
 public class GraphicsDevice : IGraphicsDevice, IDisposable
@@ -24,17 +25,20 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 
 	public Matrix4x4 ProjectionMatrix { get; private set; } = Matrix4x4.Identity;
 
+	public bool NoRender { get; }
+
 	public GraphicsDevice(IGameConfig config, IWindow window, IEventListener events, ILogger<GraphicsDevice> logger)
 	{
 		_config = config;
 		_window = (Window)window;
 		_events = events;
 		_logger = logger;
+		NoRender = _config.Output == GraphicsOutput.None;
 	}
 
 	public void Initialize()
 	{
-		if (_config.Output == GraphicsOutput.None) return;
+		if (NoRender) return;
 
 		_logger.LogInformation("Creating graphics device...");
 

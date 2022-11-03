@@ -1,7 +1,5 @@
 ﻿using Kyber.Graphics;
 
-using Veldrid;
-
 namespace Kyber.Examples.SpriteRenderer;
 
 public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRenderSystem
@@ -12,8 +10,6 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 	private readonly IInputState _input;
 	private readonly IGraphicsDevice _graphicsDevice;
 	private readonly Random _rand;
-
-	private Vector2 _lastMousePosition = Vector2.Zero;
 
 	private readonly List<(Vector2 pos, Vector2 size, Color color, float rotation, float layer)> _blocks = new();
 
@@ -31,32 +27,34 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 
 	public void Initialize()
 	{
-		for (var i = 0; i < 2000; i++)
+		for (var i = 0; i < 200; i++)
 		{
 			var size = _rand.Next(80) + 20;
 			_blocks.Add((
 				new Vector2(_rand.Next(_window.Width - size), _rand.Next(_window.Height - size)),
 				new Vector2(size, size),
 				new Color(_rand.NextSingle(), _rand.NextSingle(), _rand.NextSingle()),
-				0,
-				(float)i
+				MathHelper.TwoPi * _rand.NextSingle(),
+				10
 			));
 		}
 
-		_blocks.Add((new Vector2(125f, 125f), new Vector2(100, 100), Color.Red, 0, 1f));
-		_blocks.Add((new Vector2(150f, 150f), new Vector2(100, 100), Color.Yellow, 0, 2f));
-		_blocks.Add((new Vector2(100f, 100f), new Vector2(100, 100), Color.Blue, MathHelper.ToRadians(45), 3f));
+		_blocks.Add((new Vector2(125f, 125f), new Vector2(100, 100), Color.Red, 0f, 1));
+		_blocks.Add((new Vector2(150f, 150f), new Vector2(100, 100), Color.Yellow, 0f, 2));
+		_blocks.Add((new Vector2(100f, 100f), new Vector2(100, 100), Color.Blue, MathHelper.ToRadians(45), 3));
 	}
 
 	public void Update(float dt)
 	{
-		if (_lastMousePosition == _input.MousePosition) return;
+		for (int i = 0; i < _blocks.Count; i++)
+		{
+			var (pos, size, color, rotation, layer) = _blocks[i];
 
-		var clipSpace = Vector3.Transform(new(_input.MousePosition, _input.MousePosition.X), _graphicsDevice.ProjectionMatrix);
+			if (layer < 10) continue;
 
-		Console.WriteLine($"Clip Space: {clipSpace}");
-
-		_lastMousePosition = _input.MousePosition;
+			var rot = i % 2 == 0 ? -dt : dt;
+			_blocks[i] = _blocks[i] with { rotation = (rotation + rot) % MathHelper.TwoPi };
+		}
 	}
 
 	public void Render(float dt)

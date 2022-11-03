@@ -4,7 +4,9 @@ public interface IEventListener
 {
     bool On<T>();
     bool On<T>([NotNullWhen(true)] out IEvent<T>? data);
-    bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? data);
+
+	bool OnLatest<T>();
+	bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? data);
 }
 
 public class EventListener : IEventListener, IDisposable
@@ -39,7 +41,12 @@ public class EventListener : IEventListener, IDisposable
         return false;
     }
 
-    public bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? @event)
+	public bool OnLatest<T>()
+	{
+		return OnLatest<T>(out _);
+	}
+
+	public bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? @event)
     {
         @event = default;
         foreach (var e in _eventSystem.GetEvents<T>())

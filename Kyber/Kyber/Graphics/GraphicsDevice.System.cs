@@ -14,17 +14,21 @@ public class GraphicsDeviceInitializerSystem : IInitializeSystem, IFirstSystem
 
 	public void Initialize()
 	{
+		if (_graphicsDevice.NoRender) return;
+
 		_graphicsDevice.Initialize();
 	}
 
 	public void First(float dt)
 	{
+		if (_graphicsDevice.NoRender) return;
+
 		if (_events.OnLatest<WindowResizeEvent>(out var e)) _graphicsDevice.UpdateProjection(e.Data.Width, e.Data.Height);
 
 		_graphicsDevice.CommandList.Begin();
 		_graphicsDevice.CommandList.SetFramebuffer(_graphicsDevice.Internal.SwapchainFramebuffer);
 		_graphicsDevice.CommandList.SetFullViewports();
-		_graphicsDevice.CommandList.ClearDepthStencil(0);// _graphicsDevice.Internal.IsDepthRangeZeroToOne ? 0f : 1f);
+		_graphicsDevice.CommandList.ClearDepthStencil(_graphicsDevice.Internal.IsDepthRangeZeroToOne ? 0f : 1f);
 		_graphicsDevice.CommandList.ClearColorTarget(0, Color.Black);
 	}
 }
@@ -50,6 +54,8 @@ public class GraphicsDeviceSwapBuffers : IInitializeSystem, ILastSystem
 
 	public void Last(float dt)
 	{
+		if (_graphicsDevice.NoRender) return;
+
 		_graphicsDevice.CommandList.End();
 		_graphicsDevice.Internal.SubmitCommands(_graphicsDevice.CommandList);
 

@@ -15,6 +15,9 @@ internal class ExitSystem : IPostUpdateSystem
 
 	public void PostUpdate(float dt)
 	{
-		if (_events.On<WindowClosedEvent>() || _events.On<GameExitEvent>()) _game.Exit();
+		if (_events.On<WindowClosedEvent>() || _events.On<GameExitEvent>())
+		{
+			_game.Exit();
+		}
 	}
 }

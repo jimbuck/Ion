@@ -37,12 +37,14 @@ internal class Window : IWindow
 {
     private readonly IGameConfig _config;
     private readonly ILogger _logger;
-    private readonly EventEmitter _events;
+    private readonly EventEmitter _eventEmitter;
+	private readonly IEventListener _events;
 
     private Veldrid.StartupUtilities.WindowCreateInfo _windowCreateInfo;
     internal Veldrid.Sdl2.Sdl2Window? Sdl2Window { get; private set; }
 
 	private (int, int) _prevSize = (0, 0);
+	private bool _closeHandled = false;
 
 	public int Width
 	{
@@ -140,11 +142,12 @@ internal class Window : IWindow
 		set { if (Sdl2Window != null) Sdl2Window.BorderVisible = value; }
 	}
 
-	public Window(IGameConfig config, ILogger<Window> logger, IEventEmitter events)
+	public Window(IGameConfig config, ILogger<Window> logger, IEventEmitter eventEmitter, IEventListener events)
     {
         _config = config;
         _logger = logger;
-        _events = (EventEmitter)events;
+        _eventEmitter = (EventEmitter)eventEmitter;
+		_events = events;
 
 		_windowCreateInfo = new()
         {
@@ -163,11 +166,7 @@ internal class Window : IWindow
 
 		_logger.LogInformation("Creating window...");
         Sdl2Window = Veldrid.StartupUtilities.VeldridStartup.CreateWindow(ref _windowCreateInfo);
-		Sdl2Window.SetCloseRequestedHandler(() =>
-		{
-			_onClosed();
-			return false;
-		});
+		Sdl2Window.SetCloseRequestedHandler(() => _closeHandled);
 
 		Sdl2Window.Closed += _onClosed;
         Sdl2Window.FocusLost += _onFocusLost;
@@ -182,6 +181,8 @@ internal class Window : IWindow
     public Veldrid.InputSnapshot? Step()
     {
 		if (_config.Output != GraphicsOutput.Window || Sdl2Window == null) return default;
+
+		if (_events.OnLatest<WindowClosedEvent>()) _closeHandled = true;
 
 		return Sdl2Window.PumpEvents();
 	}
@@ -200,17 +201,17 @@ internal class Window : IWindow
 
 		_size = new(Sdl2Window.Width, Sdl2Window.Height);
 		_prevSize = (Sdl2Window.Width, Sdl2Window.Height);
-		_events.Emit(new WindowResizeEvent((uint)Sdl2Window.Width, (uint)Sdl2Window.Height));
+		_eventEmitter.Emit(new WindowResizeEvent((uint)Sdl2Window.Width, (uint)Sdl2Window.Height));
 	}
 
-	private void _onFocusGained() => _events.Emit<WindowFocusGainedEvent>();
+	private void _onFocusGained() => _eventEmitter.Emit<WindowFocusGainedEvent>();
 
-	private void _onFocusLost() => _events.Emit<WindowFocusLostEvent>();
+	private void _onFocusLost() => _eventEmitter.Emit<WindowFocusLostEvent>();
 
 	private void _onClosed()
 	{
 		HasClosed = true;
 		_logger.LogDebug("Window closed!");
-		_events.Emit<WindowClosedEvent>();
+		_eventEmitter.Emit<WindowClosedEvent>();
 	}
 }

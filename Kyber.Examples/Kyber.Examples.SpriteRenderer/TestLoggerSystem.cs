@@ -1,6 +1,6 @@
 ﻿namespace Kyber.Examples.SpriteRenderer;
 
-public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
+public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem, IFirstSystem
 {
 	private readonly ILogger _logger;
 	private readonly IInputState _input;
@@ -24,7 +24,7 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 		_logger.LogInformation("Simple Example Started");
 	}
 
-	public void Update(float dt)
+	public void First(float dt)
 	{
 		_totalDt += dt;
 		_frameCount++;
@@ -35,7 +35,10 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 			_totalDt = 0f;
 			_frameCount = 0;
 		}
+	}
 
+	public void Update(float dt)
+	{
 		if (_events.On<WindowResizeEvent>()) _logger.LogInformation("Window Resized!");
 		if (_events.On<WindowFocusGainedEvent>()) _logger.LogInformation("Window Focus Gained!");
 		if (_events.On<WindowFocusLostEvent>()) _logger.LogInformation("Window Focus Lost!");

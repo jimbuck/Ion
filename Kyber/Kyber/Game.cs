@@ -51,25 +51,43 @@ internal class Game
 
 	public void Destroy() => Systems.Destroy();
 
-	public void Run(bool render = true)
+	public void Run()
     {
 		IsRunning = true;
 		Initialize();
 
         var stopwatch = Stopwatch.StartNew();
 
-		var targetFrameTime = _gameConfig.MaxFPS == 0 ? 0f : 1000f / _gameConfig.MaxFPS;
+		var currentTime = stopwatch.Elapsed.TotalSeconds;
+		const double maxFrameTime = 0.25;
+		double t = 0;
+		double dt = _gameConfig.MaxFPS == 0 ? (1f / 60f) : (1f / _gameConfig.MaxFPS);
+		double accumulator = 0;
 
 		while (_shouldExit == false)
         {
-            var dt = (float)stopwatch.Elapsed.TotalSeconds;
-            stopwatch.Restart();
-			First(dt);
-			UpdateStep(dt);
-			if (render) RenderStep(dt);
-			Last(dt);
-			//var timeDiff = (int)(targetFrameTime - dt);
-			//if (timeDiff > 0) Thread.Sleep(timeDiff);
+			var newTime = stopwatch.Elapsed.TotalSeconds;
+			var frameTime = newTime - currentTime;
+
+			if (frameTime > maxFrameTime) frameTime = maxFrameTime;
+			currentTime = newTime;
+
+			accumulator += frameTime;
+
+			First((float)frameTime);
+
+			while (accumulator >= dt)
+			{
+				UpdateStep((float)dt);
+				t += dt;
+				accumulator -= dt;
+			}
+
+			// TODO: Figure out how/where to use this alpha.
+			var alpha = accumulator / dt;
+
+			if (_gameConfig.Output != Graphics.GraphicsOutput.None) RenderStep((float)frameTime);
+			Last((float)frameTime);
 		}
 
 		Destroy();
