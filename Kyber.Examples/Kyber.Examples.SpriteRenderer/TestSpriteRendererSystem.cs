@@ -91,7 +91,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 	{
 		foreach (var block in _blocks)
 		{
-			_spriteRenderer.Draw(block.Color, block.Rect, layer: block.Layer, rotation: block.Rotation);
+			_spriteRenderer.DrawRect(block.Color, block.Rect, depth: block.Layer, rotation: block.Rotation);
 		}
 	}
 

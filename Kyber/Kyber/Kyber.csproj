@@ -23,12 +23,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="AssimpNet" Version="4.1.0" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />
 		<PackageReference Include="Veldrid" Version="4.8.0">
 			<PrivateAssets>true</PrivateAssets>
 		</PackageReference>
+		<PackageReference Include="Veldrid.ImageSharp" Version="4.8.0" />
 		<PackageReference Include="Veldrid.SPIRV" Version="1.0.15">
 			<PrivateAssets>true</PrivateAssets>
 		</PackageReference>

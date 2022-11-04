@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 
 using Kyber.Graphics;
+using Kyber.Assets;
 
 namespace Kyber.Hosting;
 
@@ -19,6 +20,7 @@ public static class KyberHostBuilderExtensions
         {
 			services.AddSingleton<IWindow, Window>();
 			services.AddSingleton<IGraphicsDevice, GraphicsDevice>();
+			services.AddScoped<IAssetLoader, AssetLoader>();
 			services.AddSingleton<ISpriteRenderer, SpriteRenderer>();
 
 			services.AddSingleton<IEventEmitter, EventEmitter>();
@@ -29,6 +31,7 @@ public static class KyberHostBuilderExtensions
 			gameBuilder.AddSingletonSystem<EventSystem>();
 			gameBuilder.AddSingletonSystem<WindowSystems>();
 			gameBuilder.AddSingletonSystem<GraphicsDeviceInitializerSystem>();
+			gameBuilder.AddSingletonSystem<AssetSystem>();
 			gameBuilder.AddSingletonSystem<SpriteRendererBeginSystem>();
 			configure(gameBuilder);
 			gameBuilder.AddSingletonSystem<SpriteRendererEndSystem>();

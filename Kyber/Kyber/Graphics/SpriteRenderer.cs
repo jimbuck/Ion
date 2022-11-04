@@ -1,9 +1,7 @@
-﻿using SharpDX.DXGI;
-
-using System.Drawing;
+﻿using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-
+using Kyber.Assets;
 using Veldrid;
 using Veldrid.SPIRV;
 
@@ -13,11 +11,17 @@ public interface ISpriteRenderer
 {
 	void Begin();
 
-	void Draw(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float layer = 0, SpriteOptions options = SpriteOptions.None);
-	void Draw(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float layer = 0, SpriteOptions options = SpriteOptions.None);
+	void DrawRect(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float depth = 0);
+	void DrawRect(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0);
 
-	//void Draw(Texture texture, Rectangle destinationRectangle, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, SpriteOptions options = SpriteOptions.None, float rotation = 0, byte layerDepth = 0);
-	//void Draw(Texture texture, Vector2 position, Vector2 scale, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, SpriteOptions options = SpriteOptions.None, float rotation = 0, byte layerDepth = 0);
+	void DrawPoint(Color color, Vector2 position, float depth = 0);
+	void DrawPoint(Color color, Vector2 position, Vector2 size, float depth = 0);
+
+	void DrawLine(Color color, Vector2 pointA, Vector2 pointB, float thickness = 1f, float depth = 0);
+	void DrawLine(Color color, Vector2 start, float length, float angle, float thickness = 1, float depth = 0);
+
+	void Draw(Assets.Texture texture, Rectangle destinationRectangle, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteOptions options = SpriteOptions.None);
+	void Draw(Assets.Texture texture, Vector2 position, Vector2 scale, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteOptions options = SpriteOptions.None);
 
 	void End();
 }
@@ -25,6 +29,7 @@ public interface ISpriteRenderer
 internal class SpriteRenderer : ISpriteRenderer, IDisposable
 {
 	private const int MAX_SPRITE_COUNT = 2048;
+	private static readonly Vector2 VEC2_HALF = Vector2.One / 2f;
 
 	private readonly IWindow _window;
 	private readonly GraphicsDevice _graphicsDevice;
@@ -202,36 +207,59 @@ void main()
 
 		if (_beginCalled) throw new InvalidOperationException("Begin cannot be called again until End has been successfully called.");
 
-		//if (_events.On<WindowResizeEvent>())
 		_updateMatricies();
 
 		_instanceCount = 0;
 		_beginCalled = true;
 	}
 
-	public void Draw(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float depth = 0f, SpriteOptions options = SpriteOptions.None)
+	public void DrawRect(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float depth = 0f)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
-		_addSprite(color, new RectangleF(0, 0, 1, 1), destinationRectangle, origin, rotation, depth, _defaultScissor, options);
+		_addSprite(color, new RectangleF(0, 0, 1, 1), destinationRectangle, origin, rotation, depth, _defaultScissor, SpriteOptions.None);
 	}
 
-	public void Draw(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0f, SpriteOptions options = SpriteOptions.None)
+	public void DrawRect(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0f)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
-		_addSprite(color, new RectangleF(0, 0, 1, 1), new RectangleF(position.X, position.Y, size.X, size.Y), origin, rotation, depth, _defaultScissor, options);
+		_addSprite(color, new RectangleF(0, 0, 1, 1), new RectangleF(position.X, position.Y, size.X, size.Y), origin, rotation, depth, _defaultScissor, SpriteOptions.None);
 	}
 
-	//public void Draw(Texture texture, Rectangle destinationRectangle, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, SpriteOptions options = SpriteOptions.None, float rotation = 0, float layerDepth = 0)
-	//{
-	//	throw new NotImplementedException();
-	//}
+	public void DrawPoint(Color color, Vector2 position, Vector2 size, float depth = 0)
+	{
+		DrawRect(color, position, size, origin: VEC2_HALF, depth: depth);
+	}
 
-	//public void Draw(Texture texture, Vector2 position, Vector2 scale, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, SpriteOptions options = SpriteOptions.None, float rotation = 0, float layerDepth = 0)
-	//{
-	//	throw new NotImplementedException();
-	//}
+	public void DrawPoint(Color color, Vector2 position, float depth = 0)
+	{
+		DrawRect(color, position, Vector2.One, origin: VEC2_HALF, depth: depth);
+	}
+
+	public void DrawLine(Color color, Vector2 pointA, Vector2 pointB, float thickness = 1f, float depth = 0)
+	{
+		var diff = pointB - pointA;
+		var length = MathF.Sqrt(Vector2.Dot(diff, diff));
+		var angle = MathF.Atan2(diff.Y, diff.X);
+		DrawLine(color, pointA, length: length, angle: angle, thickness: thickness, depth: depth);
+	}
+
+	public void DrawLine(Color color, Vector2 start, float length, float angle, float thickness = 1, float depth = 0)
+	{
+		var rect = new RectangleF(start.X, start.Y, length, thickness);
+		DrawRect(color, rect, new Vector2(0, 0.5f), rotation: angle, depth: depth);
+	}
+
+	public void Draw(Assets.Texture texture, Rectangle destinationRectangle, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, float rotation = 0, float layerDepth = 0, SpriteOptions options = SpriteOptions.None)
+	{
+		throw new NotImplementedException();
+	}
+
+	public void Draw(Assets.Texture texture, Vector2 position, Vector2 scale, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, float rotation = 0, float layerDepth = 0, SpriteOptions options = SpriteOptions.None)
+	{
+		throw new NotImplementedException();
+	}
 
 	public void End()
 	{
