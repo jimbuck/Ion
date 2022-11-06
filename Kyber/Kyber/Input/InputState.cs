@@ -41,11 +41,15 @@ internal class InputState : IInputState
 		_logger = logger;
 	}
 
-	public void UpdateState(Veldrid.InputSnapshot snapshot)
+	public void Step()
 	{
-		_inputSnapshot = snapshot;
+		_inputSnapshot = _window.InputSnapshot;
 
 		_keyEvents.Clear();
+		_mouseEvents.Clear();
+
+		if (_inputSnapshot == default) return;
+
 		foreach (var k in _inputSnapshot.KeyEvents)
 		{
 			var key = (Key)k.Key;
@@ -55,7 +59,6 @@ internal class InputState : IInputState
 			else if (!k.Repeat) _downKeys.Add(key);
 		}
 
-		_mouseEvents.Clear();
 		foreach (var m in _inputSnapshot.MouseEvents) _mouseEvents[(MouseButton)m.MouseButton] = m;
 	}
 

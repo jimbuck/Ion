@@ -2,18 +2,18 @@
 
 namespace Kyber.Assets;
 
-public interface IAssetLoader
+public interface IAssetManager
 {
 	T Load<T>(string name);
 }
 
-public class AssetLoader : IAssetLoader
+public class AssetManager : IAssetManager
 {
 	private readonly ILogger _logger;
 	private readonly IServiceProvider _serviceProvider;
-	private readonly Dictionary<Type, BinaryAssetSerializer> _serializers = new();
+	private readonly Dictionary<Type, Type> _serializers = new();
 
-	public AssetLoader(ILogger<AssetLoader> logger, IServiceProvider	serviceProvider)
+	public AssetManager(ILogger<AssetManager> logger, IServiceProvider	serviceProvider)
 	{
 		_logger = logger;
 		_serviceProvider = serviceProvider;
@@ -30,12 +30,14 @@ public class AssetLoader : IAssetLoader
 
 	public void RegisterSerializer<TAsset, TSerializer>() where TSerializer : BinaryAssetSerializer
 	{
-		_serializers.Add(typeof(TAsset), _serviceProvider.GetRequiredService<TSerializer>());
+		_serializers.Add(typeof(TAsset), typeof(TSerializer));
 	}
 
 	public T Load<T>(string name)
 	{
-		if (!_serializers.TryGetValue(typeof(T), out BinaryAssetSerializer? serializer) || serializer == null) throw new InvalidOperationException("No serializer registered for type " + typeof(T).Name);
+		if (!_serializers.TryGetValue(typeof(T), out Type? serializerType) || serializerType == null) throw new InvalidOperationException("No serializer registered for type " + typeof(T).Name);
+
+		var serializer = (BinaryAssetSerializer)_serviceProvider.GetRequiredService(serializerType);
 
 		using Stream? stream = GetType().Assembly.GetManifestResourceStream(name);
 		
@@ -53,22 +55,5 @@ public class AssetLoader : IAssetLoader
 		Directory.CreateDirectory("Assets");
 		Directory.CreateDirectory("Mods");
 		Directory.CreateDirectory("Cache");
-	}
-}
-
-public class AssetSystem : IInitializeSystem
-{
-	private readonly AssetLoader _assets;
-
-	public bool IsEnabled { get; set; } = true;
-
-	public AssetSystem(IAssetLoader assets)
-	{
-		_assets = (AssetLoader)assets;
-	}
-
-	public void Initialize()
-	{
-		_assets.Initialize();
 	}
 }

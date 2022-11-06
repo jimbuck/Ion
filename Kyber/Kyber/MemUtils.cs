@@ -51,8 +51,7 @@ public static class MemUtils
 	/// <param name="offset">The offset to add.</param>
 	/// <returns>A new pointer that reflects the addition of <paramref name="offset"/> 
 	/// to <paramref name="ptr"/>.</returns>
-	public static IntPtr Add(IntPtr ptr, long offset) =>
-		new IntPtr(ptr.ToInt64() + offset);
+	public static IntPtr Add(IntPtr ptr, long offset) => new(ptr.ToInt64() + offset);
 
 	/// <summary>
 	/// Returns a value indicating whether an instance is anywhere in the array.
@@ -73,8 +72,7 @@ public static class MemUtils
 
 				while (current < max)
 				{
-					if (Equals(current, &value, SizeOf<T>()))
-						return true;
+					if (Equals(current, &value, SizeOf<T>())) return true;
 					current++;
 				}
 			}
@@ -98,8 +96,7 @@ public static class MemUtils
 		{
 			int count = a.Length;
 
-			if (count != b.Length)
-				return false;
+			if (count != b.Length) return false;
 
 			fixed (void* ptrA = a, ptrB = b)
 			{
@@ -134,8 +131,7 @@ public static class MemUtils
 
 		while (i8 < c8)
 		{
-			if (*(ulong*)aPos != *(ulong*)bPos)
-				return false;
+			if (*(ulong*)aPos != *(ulong*)bPos) return false;
 			aPos += 8;
 			bPos += 8;
 			i8++;
@@ -143,8 +139,7 @@ public static class MemUtils
 
 		while (i4 < c4)
 		{
-			if (*(uint*)aPos != *(uint*)bPos)
-				return false;
+			if (*(uint*)aPos != *(uint*)bPos) return false;
 			aPos += 4;
 			bPos += 4;
 			i4++;
@@ -152,8 +147,7 @@ public static class MemUtils
 
 		while (i2 < c2)
 		{
-			if (*(ushort*)aPos != *(ushort*)bPos)
-				return false;
+			if (*(ushort*)aPos != *(ushort*)bPos) return false;
 			aPos += 2;
 			bPos += 2;
 			i2++;
@@ -161,8 +155,7 @@ public static class MemUtils
 
 		while (i1 < c1)
 		{
-			if (*aPos != *bPos)
-				return false;
+			if (*aPos != *bPos) return false;
 			aPos++;
 			bPos++;
 			i1++;
@@ -204,8 +197,7 @@ public static class MemUtils
 	/// <param name="byteCount">The number of bytes to set.</param>
 	public static unsafe void Set(void* memoryPtr, byte value, long byteCount)
 	{
-		if (byteCount < 0)
-			throw new ArgumentOutOfRangeException(nameof(byteCount));
+		if (byteCount < 0) throw new ArgumentOutOfRangeException(nameof(byteCount));
 
 		if (byteCount <= uint.MaxValue)
 			Unsafe.InitBlockUnaligned(memoryPtr, value, (uint)byteCount);
@@ -271,8 +263,7 @@ public static class MemUtils
 	/// <param name="destination">The destination span.</param>
 	/// <param name="source">The source address to copy from.</param>
 	/// <returns>The number of bytes copied.</returns>
-	public static long Copy<T>(Span<T> destination, IntPtr source) where T : unmanaged =>
-		Copy(destination, GetSpan<T>(source, destination.Length));
+	public static long Copy<T>(Span<T> destination, IntPtr source) where T : unmanaged => Copy(destination, GetSpan<T>(source, destination.Length));
 
 	/// <summary>
 	/// Copies all data from one <see cref="ReadOnlySpan{T}"/> to a <see cref="Span{T}"/>.

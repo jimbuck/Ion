@@ -9,8 +9,6 @@ namespace Kyber.Graphics;
 
 public interface ISpriteRenderer
 {
-	void Begin();
-
 	void DrawRect(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float depth = 0);
 	void DrawRect(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0);
 
@@ -22,8 +20,6 @@ public interface ISpriteRenderer
 
 	void Draw(Assets.Texture texture, Rectangle destinationRectangle, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteOptions options = SpriteOptions.None);
 	void Draw(Assets.Texture texture, Vector2 position, Vector2 scale, Rectangle? sourceRectangle, Color? color, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteOptions options = SpriteOptions.None);
-
-	void End();
 }
 
 internal class SpriteRenderer : ISpriteRenderer, IDisposable
@@ -158,6 +154,7 @@ void main()
 
 	public void Initialize()
 	{
+		if (_graphicsDevice.NoRender) return;
 		if (_graphicsDevice.Internal == null)
 		{
 			IsEnabled = false;
@@ -201,8 +198,9 @@ void main()
 		});
 	}
 
-	public void Begin()
+	public void Begin(float dt)
 	{
+		if (_graphicsDevice.NoRender) return;
 		if (_graphicsDevice.Internal == null || _graphicsDevice.CommandList == null) throw new InvalidOperationException("Begin cannot be called until the GraphicsDevice has been initialized.");
 
 		if (_beginCalled) throw new InvalidOperationException("Begin cannot be called again until End has been successfully called.");
@@ -263,6 +261,7 @@ void main()
 
 	public void End()
 	{
+		if (_graphicsDevice.NoRender) return;
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling End.");
 
 		_beginCalled = false;

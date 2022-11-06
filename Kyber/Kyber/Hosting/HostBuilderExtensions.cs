@@ -20,7 +20,7 @@ public static class KyberHostBuilderExtensions
         {
 			services.AddSingleton<IWindow, Window>();
 			services.AddSingleton<IGraphicsDevice, GraphicsDevice>();
-			services.AddScoped<IAssetLoader, AssetLoader>();
+			services.AddScoped<IAssetManager, AssetManager>();
 			services.AddSingleton<ISpriteRenderer, SpriteRenderer>();
 
 			services.AddSingleton<IEventEmitter, EventEmitter>();
@@ -28,15 +28,7 @@ public static class KyberHostBuilderExtensions
             services.AddSingleton<IInputState, InputState>();
 
 			var gameBuilder = new GameBuilder(services);
-			gameBuilder.AddSingletonSystem<EventSystem>();
-			gameBuilder.AddSingletonSystem<WindowSystems>();
-			gameBuilder.AddSingletonSystem<GraphicsDeviceInitializerSystem>();
-			gameBuilder.AddSingletonSystem<AssetSystem>();
-			gameBuilder.AddSingletonSystem<SpriteRendererBeginSystem>();
 			configure(gameBuilder);
-			gameBuilder.AddSingletonSystem<SpriteRendererEndSystem>();
-			gameBuilder.AddSingletonSystem<GraphicsDeviceSwapBuffers>();
-			gameBuilder.AddSingletonSystem<ExitSystem>();
 
 			services.AddSingleton<IGameConfig>(gameBuilder.Config);
 			services.AddSingleton<Game>(services => ActivatorUtilities.CreateInstance<Game>(services, gameBuilder.Build(services)));

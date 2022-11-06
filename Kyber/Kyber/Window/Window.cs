@@ -40,7 +40,9 @@ internal class Window : IWindow
     private readonly EventEmitter _eventEmitter;
 	private readonly IEventListener _events;
 
-    private Veldrid.StartupUtilities.WindowCreateInfo _windowCreateInfo;
+	public Veldrid.InputSnapshot? InputSnapshot { get; private set; }
+
+	private Veldrid.StartupUtilities.WindowCreateInfo _windowCreateInfo;
     internal Veldrid.Sdl2.Sdl2Window? Sdl2Window { get; private set; }
 
 	private (int, int) _prevSize = (0, 0);
@@ -85,7 +87,6 @@ internal class Window : IWindow
 				
 		}
 	}
-
 
 	public bool HasClosed { get; private set; }
     public bool IsActive => (Sdl2Window?.Focused ?? false);
@@ -178,13 +179,17 @@ internal class Window : IWindow
 		_logger.LogInformation($"Window created! ({Sdl2Window.Width}x{Sdl2Window.Height})");
 	}
 
-    public Veldrid.InputSnapshot? Step()
+    public void Step()
     {
-		if (_config.Output != GraphicsOutput.Window || Sdl2Window == null) return default;
+		if (_config.Output != GraphicsOutput.Window || Sdl2Window == null)
+		{
+			InputSnapshot = default;
+			return;
+		}
 
 		if (_events.OnLatest<WindowClosedEvent>()) _closeHandled = true;
 
-		return Sdl2Window.PumpEvents();
+		InputSnapshot = Sdl2Window.PumpEvents();
 	}
 
     public void Close()

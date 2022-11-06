@@ -26,7 +26,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 		_graphicsDevice = graphicsDevice;
 		_rand = new Random();
 
-		_blocks = new Item[20_000]; 
+		_blocks = new Item[5_000]; 
 	}
 
 	public void Initialize()

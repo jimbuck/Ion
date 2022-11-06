@@ -1,4 +1,6 @@
-﻿namespace Kyber.Graphics;
+﻿using Veldrid;
+
+namespace Kyber.Graphics;
 
 public interface IGraphicsDevice
 {
@@ -9,9 +11,9 @@ public interface IGraphicsDevice
 public class GraphicsDevice : IGraphicsDevice, IDisposable
 {
 	private readonly IGameConfig _config;
-	private readonly Window _window;
 	private readonly IEventListener _events;
 	private readonly ILogger _logger;
+	private readonly Window _window;
 
 	private Veldrid.GraphicsDevice? _gd;
 	private Veldrid.CommandList? _cl;
@@ -27,12 +29,13 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 
 	public bool NoRender { get; }
 
-	public GraphicsDevice(IGameConfig config, IWindow window, IEventListener events, ILogger<GraphicsDevice> logger)
+	public GraphicsDevice(IGameConfig config, IEventListener events, ILogger<GraphicsDevice> logger, IWindow window)
 	{
 		_config = config;
-		_window = (Window)window;
 		_events = events;
 		_logger = logger;
+		_window = (Window)window;
+
 		NoRender = _config.Output == GraphicsOutput.None;
 	}
 
@@ -57,12 +60,43 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 		_cl = _gd.ResourceFactory.CreateCommandList();
 
 		_logger.LogInformation("Graphics device created!");
+
+		UpdateProjection((uint)_window.Width, (uint)_window.Height);
 	}
 
 	public void UpdateProjection(uint width, uint height)
 	{
 		ProjectionMatrix = CreateOrthographic(0, width, 0, height, 0f, -100f);
 		//ProjectionMatrix = CreateOrthographic(0, width, 0, height, 0, -100);
+	}
+
+	public void BeginFrame(float dt)
+	{
+		if (NoRender) return;
+
+		CommandList.Begin();
+		CommandList.SetFramebuffer(Internal.SwapchainFramebuffer);
+		CommandList.SetFullViewports();
+		CommandList.ClearDepthStencil(Internal.IsDepthRangeZeroToOne ? 0f : 1f);
+		CommandList.ClearColorTarget(0, Color.Black);
+	}
+
+	public void EndFrame(float dt)
+	{
+		if (NoRender) return;
+
+		CommandList.End();
+		Internal.SubmitCommands(CommandList);
+
+		if (_window.HasClosed) return;
+
+		Internal.SwapBuffers(Internal.MainSwapchain);
+		//_graphicsDevice.Internal.WaitForIdle();
+
+		if (_events.OnLatest<WindowResizeEvent>(out var e))
+		{
+			Internal.ResizeMainWindow(e.Data.Width, e.Data.Height);
+		}
 	}
 
 	public Matrix4x4 CreateOrthographic(float left, float right, float bottom, float top, float near, float far)

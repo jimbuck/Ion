@@ -1,4 +1,8 @@
-﻿using System.Diagnostics;
+﻿using Kyber.Assets;
+using Kyber.Graphics;
+using Kyber.Utils;
+
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace Kyber;
@@ -13,10 +17,13 @@ internal class Game
 	private bool _shouldExit;
 
 	private readonly IGameConfig _gameConfig;
-	private readonly IWindow _window;
-
-	private readonly Stopwatch _updateStopwatch = new();
-	private readonly Stopwatch _renderStopwatch = new();
+	private readonly Window _window;
+	private readonly GraphicsDevice _graphics;
+	private readonly SpriteRenderer _spriteRenderer;
+	private readonly AssetManager _assets;
+	private readonly InputState _input;
+	private readonly EventEmitter _eventEmitter;
+	private readonly IEventListener _events;
 
 	public SystemGroup Systems { get; }
 
@@ -24,32 +31,103 @@ internal class Game
 
 	public event EventHandler<EventArgs>? Exiting;
 
-	public Game(IGameConfig gameConfig, SystemGroup systems, IWindow window)
+	public Game(
+		IGameConfig gameConfig,
+		IWindow window,
+		IGraphicsDevice graphics,
+		ISpriteRenderer spriteRenderer,
+		IAssetManager assets,
+		IInputState input,
+		IEventEmitter eventEmitter,
+		IEventListener events,
+		SystemGroup systems)
 	{
 		_gameConfig = gameConfig;
+		_window = (Window)window;
+		_graphics = (GraphicsDevice)graphics;
+		_spriteRenderer = (SpriteRenderer)spriteRenderer;
+		_assets = (AssetManager)assets;
+		_input = (InputState)input;
+		_eventEmitter = (EventEmitter)eventEmitter;
+		_events = events;
+		
 		Systems = systems;
-		_window = window;
 	}
 
-	public void Initialize() => Systems.Initialize();
+	public void Initialize()
+	{
+		using var _ = MicroTimer.Start("Game.Initialize", 1);
+		_window.Initialize();
+		_graphics.Initialize();
+		_assets.Initialize();
+		_spriteRenderer.Initialize();
+		Systems.Initialize();
 
-	public void First(float dt) => Systems.First(dt);
+		_graphics.UpdateProjection((uint)_window.Width, (uint)_window.Height);
+	}
 
-	public void PreUpdate(float dt) => Systems.PreUpdate(dt);
+	public void First(float dt)
+	{
+		using var _ = MicroTimer.Start("Game.First");
+		_window.Step();
+		_input.Step();
+		if (_events.OnLatest<WindowResizeEvent>(out var e)) _graphics.UpdateProjection(e.Data.Width, e.Data.Height);
+		Systems.First(dt);
+	}
 
-	public void Update(float dt) => Systems.Update(dt);
+	public void PreUpdate(float dt)
+	{
+		using var _ = MicroTimer.Start("Game.PreUpdate");
+		_eventEmitter.Step();
+		Systems.PreUpdate(dt);
+	}
 
-	public void PostUpdate(float dt) => Systems.PostUpdate(dt);
+	public void Update(float dt)
+	{
+		using var _ = MicroTimer.Start("Game.Update");
+		Systems.Update(dt);
+	}
 
-    public void PreRender(float dt) => Systems.PreRender(dt);
+	public void PostUpdate(float dt)
+	{
+		using var _ = MicroTimer.Start("Game.PostUpdate");
+		Systems.PostUpdate(dt);
+		if (_events.On<WindowClosedEvent>() || _events.On<GameExitEvent>()) Exit();
+	}
 
-    public void Render(float dt) => Systems.Render(dt);
+	public void PreRender(float dt)
+	{
+		using var _ = MicroTimer.Start("Game.PreRender");
+		_graphics.BeginFrame(dt);
+		_spriteRenderer.Begin(dt);
+		Systems.PreRender(dt);
+	}
 
-    public void PostRender(float dt) => Systems.PostRender(dt);
+	public void Render(float dt)
+	{
+		using var _ = MicroTimer.Start("Game.Render");
+		Systems.Render(dt);
+	}
 
-	public void Last(float dt) => Systems.Last(dt);
+	public void PostRender(float dt)
+	{
+		using var _ = MicroTimer.Start("Game.PostRender");
+		Systems.PostRender(dt);
+		_spriteRenderer.End();
+		_graphics.EndFrame(dt);
+	}
 
-	public void Destroy() => Systems.Destroy();
+	public void Last(float dt)
+	{
+		using var _ = MicroTimer.Start("Game.Last");
+		Systems.Last(dt);
+	}
+
+	public void Destroy()
+	{
+		using var _ = MicroTimer.Start("Game.Destroy", 1);
+		Systems.Destroy();
+	}
 
 	public void Run()
     {
@@ -86,7 +164,7 @@ internal class Game
 			// TODO: Figure out how/where to use this alpha.
 			var alpha = accumulator / dt;
 
-			if (_gameConfig.Output != Graphics.GraphicsOutput.None) RenderStep((float)frameTime);
+			if (_gameConfig.Output != GraphicsOutput.None) RenderStep((float)frameTime);
 			Last((float)frameTime);
 		}
 
@@ -108,12 +186,9 @@ internal class Game
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void UpdateStep(float dt)
 	{
-		_updateStopwatch.Restart();
 		PreUpdate(dt);
 		Update(dt);
 		PostUpdate(dt);
-		_updateStopwatch.Stop();
-		// TODO: Emit/Store Update time.
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -121,12 +196,9 @@ internal class Game
 	{
 		if (_shouldExit || _window.HasClosed) return;
 
-		_renderStopwatch.Start();
 		PreRender(dt);
 		Render(dt);
 		PostRender(dt);
-		_renderStopwatch.Stop();
-		// TODO: Emit/Store Render time.
 	}
 
 	public void Exit()
