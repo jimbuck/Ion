@@ -26,7 +26,7 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
         _logger.LogInformation("Simple Example Started ({CurrentScene} scene)", _currentScene);
     }
 
-    public void Update(float dt)
+    public void Update(GameTime dt)
     {
         if (_currentScene.IsRoot)
         {

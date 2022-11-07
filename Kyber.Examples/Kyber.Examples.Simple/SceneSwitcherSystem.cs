@@ -18,7 +18,7 @@ public class SceneSwitcherSystem : IUpdateSystem
 		_countdown = _max;
 	}
 
-	public void Update(float dt)
+	public void Update(GameTime dt)
 	{
 		_countdown -= dt;
 

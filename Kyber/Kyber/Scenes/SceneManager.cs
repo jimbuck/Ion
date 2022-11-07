@@ -5,7 +5,7 @@ using Kyber.Scenes.Transitions;
 
 namespace Kyber;
 
-public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateSystem, IPostUpdateSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem, IDestroySystem, IDisposable
+public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateSystem, IFixedUpdateSystem, IPostUpdateSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem, IDestroySystem, IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger _logger;
@@ -138,31 +138,37 @@ public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateS
     }
 
 
-    public void PreUpdate(float dt)
+    public void PreUpdate(GameTime dt)
     {
         _logger.LogDebug("PreUpdate ({0}) {1}", CurrentScene, dt);
         _loadNextScene();
         _activeScene?.PreUpdate(dt);
     }
 
-    /// <summary>
-    /// Updates the active scene (and transition, if in progress).
-    /// </summary>
-    /// <param name="dt">The elapsed time since the last call to Update.</param>
-    public void Update(float dt)
+	public void FixedUpdate(GameTime dt)
+	{
+		_logger.LogDebug("FixedUpdate ({0}) {1}", CurrentScene, dt);
+		_activeScene?.FixedUpdate(dt);
+	}
+
+	/// <summary>
+	/// Updates the active scene (and transition, if in progress).
+	/// </summary>
+	/// <param name="dt">The elapsed time since the last call to Update.</param>
+	public void Update(GameTime dt)
     {
         _logger.LogDebug("Update ({0}) {1}", CurrentScene, dt);
         _activeScene?.Update(dt);
         _activeTransition?.Update(dt);
     }
 
-    public void PostUpdate(float dt)
+    public void PostUpdate(GameTime dt)
     {
         _logger.LogDebug("PostUpdate ({0}) {1}", CurrentScene, dt);
         _activeScene?.PostUpdate(dt);
     }
 
-    public void PreRender(float dt)
+    public void PreRender(GameTime dt)
     {
         _logger.LogDebug("PreRender ({0}) {1}", CurrentScene, dt);
         _activeScene?.PreRender(dt);
@@ -172,14 +178,14 @@ public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateS
     /// Draws the active scene (and transition, if in progress).
     /// </summary>
     /// <param name="dt">The elapsed time since the last call to Draw.</param>
-    public void Render(float dt)
+    public void Render(GameTime dt)
     {
         _logger.LogDebug("Render ({0}) {1}", CurrentScene, dt);
         _activeScene?.Render(dt);
         _activeTransition?.Render(dt);
     }
 
-    public void PostRender(float dt)
+    public void PostRender(GameTime dt)
     {
         _logger.LogDebug("PostRender ({0}) {1}", CurrentScene, dt);
         _activeScene?.PostRender(dt);

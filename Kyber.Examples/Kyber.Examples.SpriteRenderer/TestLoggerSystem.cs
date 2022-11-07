@@ -24,7 +24,7 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 		_logger.LogInformation("Simple Example Started");
 	}
 
-	public void First(float dt)
+	public void First(GameTime dt)
 	{
 		_totalDt += dt;
 		_frameCount++;
@@ -37,7 +37,7 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 		}
 	}
 
-	public void Update(float dt)
+	public void Update(GameTime dt)
 	{
 		if (_events.On<WindowResizeEvent>()) _logger.LogInformation("Window Resized!");
 		if (_events.On<WindowFocusGainedEvent>()) _logger.LogInformation("Window Focus Gained!");

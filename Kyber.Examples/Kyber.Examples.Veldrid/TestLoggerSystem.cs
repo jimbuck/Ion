@@ -24,7 +24,7 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 		_logger.LogInformation("Simple Example Started");
 	}
 
-	public void Update(float dt)
+	public void Update(GameTime dt)
 	{
         _totalDt += dt;
         _frameCount++;

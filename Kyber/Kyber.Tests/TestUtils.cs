@@ -36,6 +36,7 @@ public class TestSystem : ISystem, IFirstSystem, ILastSystem
 	public int InitializeCount { get; private set; } = 0;
 	public int FirstCount { get; private set; } = 0;
 	public int PreUpdateCount { get; private set; } = 0;
+	public int FixedUpdateCount { get; private set; } = 0;
 	public int UpdateCount { get; private set; } = 0;
 	public int PostUpdateCount { get; private set; } = 0;
 	public int PreRenderCount { get; private set; } = 0;
@@ -45,14 +46,15 @@ public class TestSystem : ISystem, IFirstSystem, ILastSystem
 	public int DestroyCount { get; private set; } = 0;
 
 	public void Initialize() { InitializeCount++; }
-	public void First(float dt) { FirstCount++; }
-	public void PreUpdate(float dt) { PreUpdateCount++; }
-	public void Update(float dt) { UpdateCount++; }
-	public void PostUpdate(float dt) { PostUpdateCount++; }
-	public void PreRender(float dt) { PreRenderCount++; }
-	public void Render(float dt) { RenderCount++; }
-	public void PostRender(float dt) { PostRenderCount++; }
-	public void Last(float dt) { LastCount++; }
+	public void First(GameTime dt) { FirstCount++; }
+	public void PreUpdate(GameTime dt) { PreUpdateCount++; }
+	public void FixedUpdate(GameTime dt) { FixedUpdateCount++; }
+	public void Update(GameTime dt) { UpdateCount++; }
+	public void PostUpdate(GameTime dt) { PostUpdateCount++; }
+	public void PreRender(GameTime dt) { PreRenderCount++; }
+	public void Render(GameTime dt) { RenderCount++; }
+	public void PostRender(GameTime dt) { PostRenderCount++; }
+	public void Last(GameTime dt) { LastCount++; }
 	public void Destroy() { DestroyCount++; }
 
 	public void Reset()
@@ -60,6 +62,7 @@ public class TestSystem : ISystem, IFirstSystem, ILastSystem
 		InitializeCount = 0;
 		FirstCount = 0;
 		PreUpdateCount = 0;
+		FixedUpdateCount = 0;
 		UpdateCount = 0;
 		PostUpdateCount = 0;
 		PreRenderCount = 0;

@@ -48,7 +48,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 		}
 	}
 
-	public void Update(float dt)
+	public void Update(GameTime dt)
 	{
 		for (int i = 0; i < _blocks.Length; i++)
 		{
@@ -87,7 +87,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 		}
 	}
 
-	public void Render(float dt)
+	public void Render(GameTime dt)
 	{
 		foreach (var block in _blocks)
 		{

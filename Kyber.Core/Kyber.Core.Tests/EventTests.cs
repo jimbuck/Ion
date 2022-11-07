@@ -6,14 +6,6 @@ public record struct DatafullEvent(int A, int B);
 public class EventTests
 {
     [Fact, Trait(CATEGORY, UNIT)]
-    public void EventEmitter_EnabledByDefault()
-    {
-		var eventEmitter = new EventEmitter();
-		var eventSystem = new EventSystem(eventEmitter);
-		Assert.True(eventSystem.IsEnabled);
-    }
-
-    [Fact, Trait(CATEGORY, UNIT)]
     public void EventEmitter_Emit_Dataless()
     {
         var eventSystem = new EventEmitter();
@@ -50,18 +42,17 @@ public class EventTests
     public void EventEmitter_EventsLastTwoFrames()
     {
 		var eventEmitter = new EventEmitter();
-        var eventSystem = new EventSystem(eventEmitter);
 
 		eventEmitter.Emit(new DatafullEvent(60, 14));
 
         Assert.Single(eventEmitter.GetEvents<DatafullEvent>());
-        eventSystem.PreUpdate(DT);
+		eventEmitter.Step();
 		eventEmitter.Emit(new DatafullEvent(23, 19));
         Assert.Equal(2, eventEmitter.GetEvents<DatafullEvent>().Count());
-        eventSystem.PreUpdate(DT);
-        Assert.Single(eventEmitter.GetEvents<DatafullEvent>());
-        eventSystem.PreUpdate(DT);
-        Assert.Empty(eventEmitter.GetEvents<DatafullEvent>());
+		eventEmitter.Step();
+		Assert.Single(eventEmitter.GetEvents<DatafullEvent>());
+		eventEmitter.Step();
+		Assert.Empty(eventEmitter.GetEvents<DatafullEvent>());
     }
 
     [Fact, Trait(CATEGORY, UNIT)]
@@ -86,7 +77,6 @@ public class EventTests
     public void EventListener_DoubleEvent()
     {
 		var eventEmitter = new EventEmitter();
-		var eventSystem = new EventSystem(eventEmitter);
 		var eventListener = eventEmitter.CreateListener();
 
         Assert.Empty(eventEmitter.GetEvents<DatafullEvent>());
@@ -105,15 +95,15 @@ public class EventTests
 
         Assert.Equal(resizeEvent1, e?.Data);
 
-        eventSystem.PreUpdate(DT);
+		eventEmitter.Step();
 
-        Assert.True(eventListener.On<DatafullEvent>(out e));
+		Assert.True(eventListener.On<DatafullEvent>(out e));
 
         Assert.Equal(resizeEvent2, e?.Data);
 
-        eventSystem.PreUpdate(DT);
+		eventEmitter.Step();
 
-        Assert.False(eventListener.On<DatafullEvent>());
+		Assert.False(eventListener.On<DatafullEvent>());
     }
 
     [Fact, Trait(CATEGORY, UNIT)]
@@ -164,7 +154,6 @@ public class EventTests
     public void EventListener_Throughput()
     {
 		var eventEmitter = new EventEmitter();
-		var eventSystem = new EventSystem(eventEmitter);
 		var eventListener1 = eventEmitter.CreateListener();
         var eventListener2 = eventEmitter.CreateListener();
 
@@ -176,7 +165,7 @@ public class EventTests
 
         for (var i = 0; i < ITEM_COUNT; i++)
         {
-            eventSystem.PreUpdate(DT);
+			eventEmitter.Step();
 
 			eventEmitter.Emit<DatalessEvent>();
 			eventEmitter.Emit(new DatafullEvent(i, i));

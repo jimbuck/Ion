@@ -8,6 +8,7 @@ public sealed class SystemGroup : ISystem, IFirstSystem, ILastSystem
     private readonly List<IInitializeSystem> _initializeSystems = new();
 	private readonly List<IFirstSystem> _firstSystems = new();
 	private readonly List<IPreUpdateSystem> _preUpdateSystems = new();
+	private readonly List<IFixedUpdateSystem> _fixedUpdateSystems = new();
 	private readonly List<IUpdateSystem> _updateSystems = new();
     private readonly List<IPostUpdateSystem> _postUpdateSystems = new();
     private readonly List<IPreRenderSystem> _preRenderSystems = new();
@@ -31,42 +32,47 @@ public sealed class SystemGroup : ISystem, IFirstSystem, ILastSystem
         foreach (var system in _initializeSystems) if (system.IsEnabled) system.Initialize();
     }
 
-	public void First(float dt)
+	public void First(GameTime dt)
 	{
 		foreach (var system in _firstSystems) if (system.IsEnabled) system.First(dt);
 	}
 
-	public void PreUpdate(float dt)
+	public void PreUpdate(GameTime dt)
     {
         foreach(var system in _preUpdateSystems) if (system.IsEnabled) system.PreUpdate(dt);
     }
 
-    public void Update(float dt)
+	public void FixedUpdate(GameTime dt)
+	{
+		foreach (var system in _fixedUpdateSystems) if (system.IsEnabled) system.FixedUpdate(dt);
+	}
+
+	public void Update(GameTime dt)
     {
         foreach (var system in _updateSystems) if (system.IsEnabled) system.Update(dt);
     }
 
-    public void PostUpdate(float dt)
+    public void PostUpdate(GameTime dt)
     {
         foreach (var system in _postUpdateSystems) if (system.IsEnabled) system.PostUpdate(dt);
     }
 
-    public void PreRender(float dt)
+    public void PreRender(GameTime dt)
     {
         foreach (var system in _preRenderSystems) if (system.IsEnabled) system.PreRender(dt);
     }
 
-    public void Render(float dt)
+    public void Render(GameTime dt)
     {
         foreach (var system in _renderSystems) if (system.IsEnabled) system.Render(dt);
     }
 
-    public void PostRender(float dt)
+    public void PostRender(GameTime dt)
     {
         foreach (var system in _postRenderSystems) if (system.IsEnabled) system.PostRender(dt);
     }
 
-	public void Last(float dt)
+	public void Last(GameTime dt)
 	{
 		foreach (var system in _lastSystems) if (system.IsEnabled) system.Last(dt);
 	}
@@ -125,6 +131,12 @@ public sealed class SystemGroup : ISystem, IFirstSystem, ILastSystem
 			added = true;
 		}
 
+		if (system is IFixedUpdateSystem fixedUpdateSystem)
+		{
+			_fixedUpdateSystems.Add(fixedUpdateSystem);
+			added = true;
+		}
+
 		if (system is IUpdateSystem updateSystem)
 		{
 			_updateSystems.Add(updateSystem);
@@ -174,6 +186,7 @@ public sealed class SystemGroup : ISystem, IFirstSystem, ILastSystem
 	{
 		_initializeSystems.RemoveAll(s => s is T);
 		_preUpdateSystems.RemoveAll(s => s is T);
+		_fixedUpdateSystems.RemoveAll(s => s is T);
 		_updateSystems.RemoveAll(s => s is T);
 		_postUpdateSystems.RemoveAll(s => s is T);
 		_preRenderSystems.RemoveAll(s => s is T);

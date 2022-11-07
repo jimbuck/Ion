@@ -13,7 +13,7 @@ public class UserInputSystem : IUpdateSystem
 		_eventEmitter = eventEmitter;
 	}
 
-	public void Update(float dt)
+	public void Update(GameTime dt)
 	{
 		if (_inputState.Pressed(Key.Escape)) _eventEmitter.Emit<GameExitEvent>();
 	}

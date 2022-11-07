@@ -96,7 +96,7 @@ void main()
     }
 
 
-    public void Render(float dt)
+    public void Render(GameTime dt)
     {
 		_graphicsDevice.CommandList.SetVertexBuffer(0, _vertexBuffer);
 		_graphicsDevice.CommandList.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);

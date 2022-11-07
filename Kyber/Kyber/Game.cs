@@ -15,6 +15,7 @@ public record struct GameExitEvent();
 internal class Game
 {
 	private bool _shouldExit;
+	private readonly float _maxFrameTime = 0.25f;
 
 	private readonly IGameConfig _gameConfig;
 	private readonly Window _window;
@@ -25,6 +26,8 @@ internal class Game
 	private readonly EventEmitter _eventEmitter;
 	private readonly IEventListener _events;
 
+	public GameTime GameTime { get; }
+	public GameTime FixedGameTime { get; }
 	public SystemGroup Systems { get; }
 
 	public bool IsRunning { get; private set; } = false;
@@ -52,6 +55,12 @@ internal class Game
 		_events = events;
 		
 		Systems = systems;
+		GameTime = new();
+		FixedGameTime = new()
+		{
+			Alpha = 1,
+			Delta = _gameConfig.MaxFPS == 0 ? (1f / 60f) : (1f / _gameConfig.MaxFPS)
+		};
 	}
 
 	public void Initialize()
@@ -66,61 +75,67 @@ internal class Game
 		_graphics.UpdateProjection((uint)_window.Width, (uint)_window.Height);
 	}
 
-	public void First(float dt)
+	public void First(GameTime time)
 	{
 		using var _ = MicroTimer.Start("Game.First");
 		_window.Step();
 		_input.Step();
 		if (_events.OnLatest<WindowResizeEvent>(out var e)) _graphics.UpdateProjection(e.Data.Width, e.Data.Height);
-		Systems.First(dt);
+		Systems.First(time);
 	}
 
-	public void PreUpdate(float dt)
+	public void PreUpdate(GameTime time)
 	{
 		using var _ = MicroTimer.Start("Game.PreUpdate");
 		_eventEmitter.Step();
-		Systems.PreUpdate(dt);
+		Systems.PreUpdate(time);
 	}
 
-	public void Update(float dt)
+	public void FixedUpdate(GameTime time)
+	{
+		using var _ = MicroTimer.Start("Game.FixedUpdate");
+		Systems.FixedUpdate(time);
+	}
+
+	public void Update(GameTime time)
 	{
 		using var _ = MicroTimer.Start("Game.Update");
-		Systems.Update(dt);
+		Systems.Update(time);
 	}
 
-	public void PostUpdate(float dt)
+	public void PostUpdate(GameTime time)
 	{
 		using var _ = MicroTimer.Start("Game.PostUpdate");
-		Systems.PostUpdate(dt);
+		Systems.PostUpdate(time);
 		if (_events.On<WindowClosedEvent>() || _events.On<GameExitEvent>()) Exit();
 	}
 
-	public void PreRender(float dt)
+	public void PreRender(GameTime time)
 	{
 		using var _ = MicroTimer.Start("Game.PreRender");
-		_graphics.BeginFrame(dt);
-		_spriteRenderer.Begin(dt);
-		Systems.PreRender(dt);
+		_graphics.BeginFrame(time);
+		_spriteRenderer.Begin(time);
+		Systems.PreRender(time);
 	}
 
-	public void Render(float dt)
+	public void Render(GameTime time)
 	{
 		using var _ = MicroTimer.Start("Game.Render");
-		Systems.Render(dt);
+		Systems.Render(time);
 	}
 
-	public void PostRender(float dt)
+	public void PostRender(GameTime time)
 	{
 		using var _ = MicroTimer.Start("Game.PostRender");
-		Systems.PostRender(dt);
+		Systems.PostRender(time);
 		_spriteRenderer.End();
-		_graphics.EndFrame(dt);
+		_graphics.EndFrame(time);
 	}
 
-	public void Last(float dt)
+	public void Last(GameTime time)
 	{
 		using var _ = MicroTimer.Start("Game.Last");
-		Systems.Last(dt);
+		Systems.Last(time);
 	}
 
 	public void Destroy()
@@ -137,35 +152,38 @@ internal class Game
         var stopwatch = Stopwatch.StartNew();
 
 		var currentTime = stopwatch.Elapsed.TotalSeconds;
-		const double maxFrameTime = 0.25;
-		double t = 0;
-		double dt = _gameConfig.MaxFPS == 0 ? (1f / 60f) : (1f / _gameConfig.MaxFPS);
-		double accumulator = 0;
+		float accumulator = 0;
 
 		while (_shouldExit == false)
         {
-			var newTime = stopwatch.Elapsed.TotalSeconds;
-			var frameTime = newTime - currentTime;
+			GameTime.Alpha = FixedGameTime.Alpha = 1;
+			GameTime.Elapsed = FixedGameTime.Elapsed = stopwatch.Elapsed;
+			var newTime = GameTime.Elapsed.TotalSeconds;
+			GameTime.Delta = (float)(newTime - currentTime);
 
-			if (frameTime > maxFrameTime) frameTime = maxFrameTime;
+			if (GameTime.Delta > _maxFrameTime) GameTime.Delta = _maxFrameTime;
 			currentTime = newTime;
 
-			accumulator += frameTime;
+			accumulator += GameTime.Delta;
 
-			First((float)frameTime);
+			First(GameTime);
+			PreUpdate(GameTime);
 
-			while (accumulator >= dt)
+			while (accumulator >= GameTime.Delta)
 			{
-				UpdateStep((float)dt);
-				t += dt;
-				accumulator -= dt;
+				FixedUpdate(FixedGameTime);
+				accumulator -= GameTime.Delta;
 			}
 
-			// TODO: Figure out how/where to use this alpha.
-			var alpha = accumulator / dt;
+			GameTime.Alpha = accumulator / FixedGameTime.Delta;
 
-			if (_gameConfig.Output != GraphicsOutput.None) RenderStep((float)frameTime);
-			Last((float)frameTime);
+			Update(GameTime);
+			PostUpdate(GameTime);
+
+			if (_gameConfig.Output != GraphicsOutput.None) RenderStep(GameTime);
+			Last(GameTime);
+
+			GameTime.Frame = FixedGameTime.Frame = (GameTime.Frame + 1);
 		}
 
 		Destroy();
@@ -175,30 +193,31 @@ internal class Game
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Step(float dt)
+    public void Step(GameTime time)
     {
-		First(dt);
-		UpdateStep(dt);
-		RenderStep(dt);
-		Last(dt);
+		First(time);
+		UpdateStep(time);
+		RenderStep(time);
+		Last(time);
     }
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void UpdateStep(float dt)
+	public void UpdateStep(GameTime time)
 	{
-		PreUpdate(dt);
-		Update(dt);
-		PostUpdate(dt);
+		PreUpdate(time);
+		FixedUpdate(time);
+		Update(time);
+		PostUpdate(time);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void RenderStep(float dt)
+	public void RenderStep(GameTime time)
 	{
 		if (_shouldExit || _window.HasClosed) return;
 
-		PreRender(dt);
-		Render(dt);
-		PostRender(dt);
+		PreRender(time);
+		Render(time);
+		PostRender(time);
 	}
 
 	public void Exit()
