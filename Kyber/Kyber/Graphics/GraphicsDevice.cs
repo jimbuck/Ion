@@ -45,6 +45,13 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 
 		_logger.LogInformation("Creating graphics device...");
 
+		var preferredBackend = _config.PreferredBackend.ToInternal();
+
+		if (_config.PreferredBackend != GraphicsBackend.Unspecified && !Veldrid.GraphicsDevice.IsBackendSupported(preferredBackend))
+		{
+			throw new KyberException($"Unsupported backend! ({_config.PreferredBackend}");
+		}
+
 		_gd = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new Veldrid.GraphicsDeviceOptions()
 		{
 #if DEBUG
@@ -55,33 +62,32 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 			PreferStandardClipSpaceYDirection = true,
 			PreferDepthRangeZeroToOne = true,
 			SyncToVerticalBlank = _config.VSync,
-		}, _config.PreferredBackend.ToInternal());
+		}, preferredBackend);
 
 		_cl = _gd.ResourceFactory.CreateCommandList();
 
-		_logger.LogInformation("Graphics device created!");
+		_logger.LogInformation($"Graphics device created ({_gd.BackendType})!");
 
 		UpdateProjection((uint)_window.Width, (uint)_window.Height);
 	}
 
 	public void UpdateProjection(uint width, uint height)
 	{
-		ProjectionMatrix = CreateOrthographic(0, width, 0, height, 0f, -100f);
-		//ProjectionMatrix = CreateOrthographic(0, width, 0, height, 0, -100);
+		ProjectionMatrix = CreateOrthographic(0, width, 0, height, 1000f, -100f);
 	}
 
-	public void BeginFrame(float dt)
+	public void BeginFrame(GameTime dt)
 	{
 		if (NoRender) return;
 
 		CommandList.Begin();
-		CommandList.SetFramebuffer(Internal.SwapchainFramebuffer);
+		CommandList.SetFramebuffer(Internal.MainSwapchain.Framebuffer);
 		CommandList.SetFullViewports();
+		CommandList.ClearColorTarget(0, _config.ClearColor);
 		CommandList.ClearDepthStencil(Internal.IsDepthRangeZeroToOne ? 0f : 1f);
-		CommandList.ClearColorTarget(0, Color.Black);
 	}
 
-	public void EndFrame(float dt)
+	public void EndFrame(GameTime dt)
 	{
 		if (NoRender) return;
 
@@ -90,8 +96,8 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 
 		if (_window.HasClosed) return;
 
+		//Internal.WaitForIdle();
 		Internal.SwapBuffers(Internal.MainSwapchain);
-		//_graphicsDevice.Internal.WaitForIdle();
 
 		if (_events.OnLatest<WindowResizeEvent>(out var e))
 		{

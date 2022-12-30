@@ -24,6 +24,7 @@ public interface IGameConfig
 	bool VSync { get; set; }
 	uint MaxFPS { get; set; }
 	GraphicsOutput Output { get; set; }
+	Color ClearColor { get; set; }
 
 	#endregion
 }
@@ -51,4 +52,6 @@ internal class GameConfig : IGameConfig
 
 	public uint MaxFPS { get; set; } = 300;
 	public GraphicsOutput Output { get; set; } = GraphicsOutput.Window;
+
+	public Color ClearColor { get; set; } = Color.Black;
 }

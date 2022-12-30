@@ -17,6 +17,7 @@
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="Kyber" />
+		<InternalsVisibleTo Include="Kyber.Tests" />
 		<InternalsVisibleToSuffix Include=".Tests" />
 	</ItemGroup>
 

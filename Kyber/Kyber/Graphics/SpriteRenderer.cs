@@ -32,14 +32,11 @@ internal class SpriteRenderer : ISpriteRenderer, IDisposable
 	private readonly ILogger _logger;
 	private readonly IEventListener _events;
 
-	private DeviceBuffer? _matrixBuffer;
 	private DeviceBuffer? _vertexBuffer;
 	private DeviceBuffer? _instanceBuffer;
 
 	private ResourceSet? _instanceResourceSet;
 	private ResourceLayout? _instanceResourceLayout;
-	private ResourceSet? _viewProjResourceSet;
-	private ResourceLayout? _viewProjResourceLayout;
 
 	private Shader[]? _shaders;
 	private Pipeline? _pipeline;
@@ -47,7 +44,6 @@ internal class SpriteRenderer : ISpriteRenderer, IDisposable
 	private readonly int _batchStepSize = 256;
 
 	private Instance[] _instances;
-
 	private int _instanceCount = 0;
 	private bool _beginCalled = false;
 
@@ -62,11 +58,6 @@ layout(location = 1) out vec2 tex_coord;
 layout(location = 2) out vec4 bounds;
 layout(location = 3) out vec2 pos;
 
-layout(set = 0, binding = 0) uniform MVP
-{
-    mat4 projection;
-};
-
 struct Instance 
 {
 	vec4 UV;
@@ -77,8 +68,9 @@ struct Instance
 	vec4 Scissor;
 };
 
-layout(std430, binding = 1) readonly buffer Instances
+layout(std430, binding = 0) readonly buffer Instances
 {
+	mat4 projection;
     Instance instances[];
 };
 
@@ -110,7 +102,6 @@ void main()
 
     if(!InvertY)
         gl_Position.y = -gl_Position.y;
-
 
     fsin_Color = item.Color;
 }";
@@ -149,7 +140,7 @@ void main()
 		_logger = logger;
 		_events = events;
 
-		_instances = new Instance[_batchStepSize];
+		_instances = new Instance[20_000];
 	}
 
 	public void Initialize()
@@ -169,43 +160,43 @@ void main()
 		ShaderDescription vertexShaderDesc = new(ShaderStages.Vertex, System.Text.Encoding.UTF8.GetBytes(VertexCode), "main");
 		ShaderDescription fragmentShaderDesc = new(ShaderStages.Fragment, System.Text.Encoding.UTF8.GetBytes(FragmentCode), "main");
 
-		_matrixBuffer = factory.CreateBuffer(new(64, BufferUsage.UniformBuffer));
-		_viewProjResourceLayout = factory.CreateResourceLayout(new(new ResourceLayoutElementDescription("MVP", ResourceKind.UniformBuffer, ShaderStages.Vertex)));
-		_viewProjResourceSet = factory.CreateResourceSet(new(_viewProjResourceLayout, _matrixBuffer));
-
-		_instanceResourceLayout = factory.CreateResourceLayout(new(new ResourceLayoutElementDescription[] { new("Instances", ResourceKind.StructuredBufferReadOnly, ShaderStages.Vertex) }));
-		_setupInstanceBuffer();
-
+		_logger.LogInformation("Created shaders");
 		_shaders = factory.CreateFromSpirv(vertexShaderDesc, fragmentShaderDesc);
 
+		_logger.LogInformation("Created _vertexBuffer");
+		_vertexBuffer = factory.CreateBuffer(new(4 * MemUtils.SizeOf<Vector2>(), BufferUsage.VertexBuffer));
+		_logger.LogInformation("Updated _vertexBuffer");
+		_graphicsDevice.Internal.UpdateBuffer(_vertexBuffer, 0, new Vector2[] {
+			new( 0,  0),
+			new( 1,  0),
+			new( 0,  1),
+			new( 1,  1),
+		});
+
+		_logger.LogInformation("Created _instanceLayout");
+		_instanceResourceLayout = factory.CreateResourceLayout(new(new ResourceLayoutElementDescription[] { new("Instances", ResourceKind.StructuredBufferReadOnly, ShaderStages.Vertex) }));		
+
+		_logger.LogInformation("Created _pipeline");
 		_pipeline = factory.CreateGraphicsPipeline(new()
 		{
 			BlendState = BlendStateDescription.SingleAlphaBlend,
 			DepthStencilState = new DepthStencilStateDescription(depthTestEnabled: true, depthWriteEnabled: true, comparisonKind: ComparisonKind.GreaterEqual),
 			RasterizerState = new RasterizerStateDescription(cullMode: FaceCullMode.None, fillMode: PolygonFillMode.Solid, frontFace: FrontFace.Clockwise, depthClipEnabled: true, scissorTestEnabled: false),
 			PrimitiveTopology = PrimitiveTopology.TriangleStrip,
-			ResourceLayouts = new ResourceLayout[] { _viewProjResourceLayout, _instanceResourceLayout },
-			ShaderSet = new(vertexLayouts: new [] { vertexLayout }, shaders: _shaders, specializations: new[] { new SpecializationConstant(0, _graphicsDevice.Internal.IsClipSpaceYInverted) }),
-			Outputs = _graphicsDevice.Internal.SwapchainFramebuffer.OutputDescription
-		});
-		
-		_vertexBuffer = factory.CreateBuffer(new(4 * MemUtils.SizeOf<Vector2>(), BufferUsage.VertexBuffer));
-		_graphicsDevice.Internal.UpdateBuffer(_vertexBuffer, 0, new Vector2[] { 
-			new( 0,  0),
-			new( 1,  0),
-			new( 0,  1),
-			new( 1,  1),
+			ResourceLayouts = new ResourceLayout[] { _instanceResourceLayout },
+			ShaderSet = new(vertexLayouts: new[] { vertexLayout }, shaders: _shaders, specializations: new[] {
+				new SpecializationConstant(0, _graphicsDevice.Internal.IsClipSpaceYInverted)
+			}),
+			Outputs = _graphicsDevice.Internal.MainSwapchain.Framebuffer.OutputDescription
 		});
 	}
 
-	public void Begin(float dt)
+	public void Begin(GameTime dt)
 	{
 		if (_graphicsDevice.NoRender) return;
 		if (_graphicsDevice.Internal == null || _graphicsDevice.CommandList == null) throw new InvalidOperationException("Begin cannot be called until the GraphicsDevice has been initialized.");
 
 		if (_beginCalled) throw new InvalidOperationException("Begin cannot be called again until End has been successfully called.");
-
-		_updateMatricies();
 
 		_instanceCount = 0;
 		_beginCalled = true;
@@ -267,12 +258,10 @@ void main()
 		_beginCalled = false;
 
 		if (_instanceCount == 0) return;
-
 		_graphicsDevice.CommandList.SetPipeline(_pipeline);
 		_updateInstanceBuffer();
 		_graphicsDevice.CommandList.SetVertexBuffer(0, _vertexBuffer);
-		_graphicsDevice.CommandList.SetGraphicsResourceSet(0, _viewProjResourceSet);
-		_graphicsDevice.CommandList.SetGraphicsResourceSet(1, _instanceResourceSet);
+		_graphicsDevice.CommandList.SetGraphicsResourceSet(0, _instanceResourceSet);		
 		_graphicsDevice.CommandList.Draw(4, (uint)_instanceCount, 0, 0);
 		_instanceCount = 0;
 	}
@@ -285,44 +274,42 @@ void main()
 		_vertexBuffer?.Dispose();
 	}
 
-	private void _updateMatricies()
-	{
-		_graphicsDevice.CommandList.UpdateBuffer(_matrixBuffer, 0, _graphicsDevice.ProjectionMatrix);
-	}
-
 	private void _addSprite(Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteOptions options)
 	{
 		if (_instanceCount >= _instances.Length)
 		{
-			Array.Resize(ref _instances, _instances.Length + _batchStepSize);
-			_setupInstanceBuffer();
+			throw new Exception("Too Many sprites!");
+			//Array.Resize(ref _instances, _instances.Length + _batchStepSize);
+			//_setupInstanceBuffer();
 		}
-		
+
 		_instances[_instanceCount].Update(Vector2.One, destinationRect, sourceRect, color, rotation, origin, depth, _transformRectF(scissor, _graphicsDevice.ProjectionMatrix), options);
 
 		_instanceCount++;
 	}
 
-	private void _setupInstanceBuffer()
-	{
-		var factory = _graphicsDevice.Factory;
-
-		_instanceBuffer?.Dispose();
-		_instanceResourceSet?.Dispose();
-
-		_instanceBuffer = factory.CreateBuffer(new((uint)_instances.Length * Instance.SizeInBytes, BufferUsage.StructuredBufferReadOnly | BufferUsage.Dynamic, Instance.SizeInBytes));
-		_instanceResourceSet = factory.CreateResourceSet(new(_instanceResourceLayout, _instanceBuffer));
-	}
-
 	private unsafe void _updateInstanceBuffer()
 	{
+		if (_instanceBuffer == null)
+		{
+			_logger.LogInformation("Created instance buffer (default)");
+			_instanceBuffer = _graphicsDevice.Factory.CreateBuffer(new((uint)_instances.Length * Instance.SizeInBytes, BufferUsage.StructuredBufferReadOnly | BufferUsage.Dynamic, Instance.SizeInBytes));
+			_logger.LogInformation("Created instaceLayoutResourceSet (default)");
+			_instanceResourceSet = _graphicsDevice.Factory.CreateResourceSet(new(_instanceResourceLayout, _instanceBuffer));
+		}
+
 		var mapped = _graphicsDevice.Internal.Map(_instanceBuffer, MapMode.Write);
-		var sizeInBytes = (uint)_instanceCount * MemUtils.SizeOf<Instance>();
+
+		MemUtils.Set(mapped.Data, _graphicsDevice.ProjectionMatrix, 1);
+
+		var matrixSize = (int)MemUtils.SizeOf<Matrix4x4>();
+		//var span = new ReadOnlySpan<Instance>(_instances, 0, _instanceCount);
+		//MemUtils.Copy(mapped.Data + matrixSize, span);
 
 		fixed (Instance* instances = &_instances[0])
 		{
-			MemUtils.Copy(mapped.Data, (IntPtr)instances, _instanceCount * MemUtils.SizeOf<Instance>());
-		}	
+			MemUtils.Copy(mapped.Data + matrixSize, (IntPtr)instances, _instanceCount * MemUtils.SizeOf<Instance>());
+		}
 
 		_graphicsDevice.Internal.Unmap(_instanceBuffer);
 	}
@@ -347,7 +334,7 @@ void main()
 			UV = _createUV(options, sourceSize, pos);
 			Color = color;
 			Scale = destinationRectangle.Size.ToVector2();
-			Origin = origin;
+			Origin = origin * Scale;
 			Location = new(destinationRectangle.Location.ToVector2(), layerDepth);
 			Rotation = rotation;
 			Scissor = scissor;

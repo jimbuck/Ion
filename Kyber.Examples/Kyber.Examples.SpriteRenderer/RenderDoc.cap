@@ -1,17 +1,17 @@
 {
     "rdocCaptureSettings": 1,
     "settings": {
-        "autoStart": true,
+        "autoStart": false,
         "commandLine": "",
         "environment": [
         ],
-        "executable": "C:\\Projects\\Kyber\\Kyber.Examples\\Kyber.Examples.SpriteRenderer\\bin\\Debug\\net6.0\\Kyber.Examples.SpriteRenderer.exe",
+        "executable": "C:\\Projects\\Kyber\\Kyber.Examples\\Kyber.Examples.SpriteRenderer\\bin\\Release\\net6.0\\Kyber.Examples.SpriteRenderer.exe",
         "inject": false,
         "numQueuedFrames": 0,
         "options": {
             "allowFullscreen": false,
             "allowVSync": true,
-            "apiValidation": false,
+            "apiValidation": true,
             "captureAllCmdLists": false,
             "captureCallstacks": true,
             "captureCallstacksOnlyDraws": false,

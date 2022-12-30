@@ -38,6 +38,7 @@ public class GameTests
     [Fact, Trait(CATEGORY, INTEGRATION)]
     public void LifeCycle_NoGraphics()
     {
+		var dt = GameTime.FromDelta(0.01f);
         using var _ = SetupWithSystems(false, out var services, out var game, typeof(TestSystem));
 
         var testSystem = services.GetRequiredService<TestSystem>();
@@ -53,7 +54,7 @@ public class GameTests
         Assert.Equal(0, testSystem.PostRenderCount);
         Assert.Equal(0, testSystem.DestroyCount);
 
-        game.UpdateStep(DT);
+        game.UpdateStep(dt);
 
         Assert.Equal(1, testSystem.InitializeCount);
         Assert.Equal(1, testSystem.PreUpdateCount);
@@ -64,7 +65,7 @@ public class GameTests
         Assert.Equal(0, testSystem.PostRenderCount);
         Assert.Equal(0, testSystem.DestroyCount);
 
-		game.UpdateStep(DT);
+		game.UpdateStep(dt);
 
         Assert.Equal(1, testSystem.InitializeCount);
         Assert.Equal(2, testSystem.PreUpdateCount);
@@ -90,6 +91,7 @@ public class GameTests
     [Fact, Trait(CATEGORY, E2E)]
     public void LifeCycle_Window()
     {
+		var dt = GameTime.FromDelta(0.01f);
 		using var _ = SetupWithSystems(false, out var services, out var game, typeof(TestSystem));
 
 		var testSystem = services.GetRequiredService<TestSystem>();
@@ -107,7 +109,7 @@ public class GameTests
 		Assert.Equal(0, testSystem.LastCount);
 		Assert.Equal(0, testSystem.DestroyCount);
 
-		game.Step(DT);
+		game.Step(dt);
 
 		Assert.Equal(1, testSystem.InitializeCount);
 		Assert.Equal(1, testSystem.FirstCount);
@@ -120,7 +122,7 @@ public class GameTests
 		Assert.Equal(1, testSystem.LastCount);
 		Assert.Equal(0, testSystem.DestroyCount);
 
-		game.Step(DT);
+		game.Step(dt);
 
 		Assert.Equal(1, testSystem.InitializeCount);
 		Assert.Equal(2, testSystem.FirstCount);

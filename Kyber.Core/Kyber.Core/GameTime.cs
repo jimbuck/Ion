@@ -27,4 +27,15 @@ public class GameTime
 	/// </summary>
 	/// <param name="time"></param>
 	public static implicit operator float(GameTime time) => time.Delta;
+
+	internal static GameTime FromDelta(float dt)
+	{
+		return new()
+		{
+			Frame = 0,
+			Delta = dt,
+			Alpha = 1f,
+			Elapsed = TimeSpan.Zero,
+		};
+	}
 }
