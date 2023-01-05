@@ -145,10 +145,11 @@ public class EventTests
 
         eventSystem.Emit(new DatafullEvent(60, 14));
 
-        Assert.True(eventListener1.On<DatafullEvent>(out var e));
-		e.Handled = true;
-        Assert.False(eventListener2.On<DatafullEvent>(out _));
-    }
+		Assert.True(eventListener1.On<DatafullEvent>(out var e));
+		Assert.NotNull(e);
+		e!.Handled = true;
+		Assert.False(eventListener2.On<DatafullEvent>(out _));
+	}
 
     [Fact, Trait(CATEGORY, UNIT)]
     public void EventListener_Throughput()
