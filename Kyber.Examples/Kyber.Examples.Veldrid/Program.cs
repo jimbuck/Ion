@@ -8,7 +8,7 @@ using Kyber.Examples.Veldrid;
 var gameHost = KyberHost.CreateDefaultBuilder()
 		.ConfigureKyber(static (game) =>
 		{
-			game.Config.WindowTitle = "Kyber Veldrid Example";
+			game.Config.Title = "Kyber Veldrid Example";
 			game.Config.WindowWidth = 900;
 			game.Config.WindowHeight = 900;
 			game.Config.VSync = false;

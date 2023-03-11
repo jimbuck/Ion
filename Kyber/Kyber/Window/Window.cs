@@ -157,7 +157,7 @@ internal class Window : IWindow
             WindowWidth = _config.WindowWidth ?? 960,
             WindowHeight = _config.WindowHeight ?? 540,
             WindowInitialState = _config.WindowState.ToInternal(),
-            WindowTitle = _title = _config.WindowTitle ?? "Kyber"
+            WindowTitle = _title = _config.Title ?? "Kyber"
         };
     }
 

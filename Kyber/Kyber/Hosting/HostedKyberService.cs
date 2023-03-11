@@ -26,7 +26,7 @@ internal class HostedKyberService : IHostedService
 
 		_mainGameThread = new Thread(_runGame)
 		{
-			Name = config.WindowTitle ?? "Kyber",
+			Name = config.Title ?? "Kyber",
 		};
 	}
 

@@ -8,7 +8,7 @@ using Kyber.Examples.Simple;
 
 var gameHost = KyberHost.CreateDefaultBuilder()
     .ConfigureKyber(static (game) => {
-		game.Config.WindowTitle = "Kyber Simple Example";
+		game.Config.Title = "Kyber Simple Example";
 
 		void NamedFunction(ISceneBuilder scene) { scene.AddSystem<TestLoggerSystem>(); }
 

@@ -55,7 +55,7 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 		_gd = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new Veldrid.GraphicsDeviceOptions()
 		{
 #if DEBUG
-			Debug = true,
+			//Debug = true,
 #endif
 			SwapchainDepthFormat = Veldrid.PixelFormat.D32_Float_S8_UInt,
 			ResourceBindingModel = Veldrid.ResourceBindingModel.Default,

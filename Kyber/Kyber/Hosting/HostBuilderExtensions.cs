@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 using Kyber.Graphics;
 using Kyber.Assets;
+using Kyber.Storage;
 
 namespace Kyber.Hosting;
 
@@ -20,7 +21,12 @@ public static class KyberHostBuilderExtensions
         {
 			services.AddSingleton<IWindow, Window>();
 			services.AddSingleton<IGraphicsDevice, GraphicsDevice>();
+			services.AddSingleton<IPersistentStorage, PersistentStorage>();
+
+
 			services.AddScoped<IAssetManager, AssetManager>();
+			services.AddSingleton<Texture2DLoader>();
+
 			services.AddSingleton<ISpriteRenderer, SpriteRenderer>();
 
 			services.AddSingleton<IEventEmitter, EventEmitter>();

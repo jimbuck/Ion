@@ -1,59 +1,51 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 
+using Kyber.Graphics;
+using Kyber.Storage;
+
+
 namespace Kyber.Assets;
 
 public interface IAssetManager
 {
-	T Load<T>(string name);
+	T Load<T>(params string[] path);
 }
 
 public class AssetManager : IAssetManager
 {
 	private readonly ILogger _logger;
+	private readonly IPersistentStorage _storage;
 	private readonly IServiceProvider _serviceProvider;
-	private readonly Dictionary<Type, Type> _serializers = new();
+	private readonly GraphicsDevice _graphicsDevice;
+	private readonly Dictionary<Type, Type> _loaders = new();
 
-	public AssetManager(ILogger<AssetManager> logger, IServiceProvider	serviceProvider)
+	public AssetManager(ILogger<AssetManager> logger, IServiceProvider serviceProvider, IPersistentStorage storage, IGraphicsDevice graphicsDevice)
 	{
 		_logger = logger;
 		_serviceProvider = serviceProvider;
+		_storage = storage;
+		_graphicsDevice = (GraphicsDevice)graphicsDevice;
 	}
 
 	public void Initialize()
 	{
-		_setupFolderStructure();
-
-		RegisterSerializer<ProcessedTexture, ProcessedTextureDataSerializer>();
-		RegisterSerializer<ProcessedModel, ProcessedModelSerializer>();
-		RegisterSerializer<byte[], ByteArraySerializer>();
+		RegisterLoader<Texture2D, Texture2DLoader>();
 	}
 
-	public void RegisterSerializer<TAsset, TSerializer>() where TSerializer : BinaryAssetSerializer
+	public void RegisterLoader<TAsset, TSerializer>() where TSerializer : IAssetLoader<TAsset>
 	{
-		_serializers.Add(typeof(TAsset), typeof(TSerializer));
+		_loaders.Add(typeof(TAsset), typeof(TSerializer));
 	}
 
-	public T Load<T>(string name)
+	public T Load<T>(params string[] path)
 	{
-		if (!_serializers.TryGetValue(typeof(T), out Type? serializerType) || serializerType == null) throw new InvalidOperationException("No serializer registered for type " + typeof(T).Name);
+		if (!_loaders.TryGetValue(typeof(T), out Type? loaderType) || loaderType == null) throw new InvalidOperationException("No loader registered for type " + typeof(T).Name);
 
-		var serializer = (BinaryAssetSerializer)_serviceProvider.GetRequiredService(serializerType);
+		var loader = (IAssetLoader<T>)_serviceProvider.GetRequiredService(loaderType);
 
-		using Stream? stream = GetType().Assembly.GetManifestResourceStream(name);
-		
-		if (stream == null) throw new InvalidOperationException("No embedded asset with the name " + name);
+		var name = Path.Combine(path);
+		using var stream = _storage.Assets.Read(path);
 
-		using BinaryReader reader = new(stream);
-		return (T)serializer.Read(reader);
-	}
-
-	private void _setupFolderStructure()
-	{
-		var cwd = Environment.CurrentDirectory;
-
-		_logger.LogInformation("Setting up folder structure...");
-		Directory.CreateDirectory("Assets");
-		Directory.CreateDirectory("Mods");
-		Directory.CreateDirectory("Cache");
+		return loader.Load(stream, name, _graphicsDevice.Internal);
 	}
 }

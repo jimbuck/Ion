@@ -1,4 +1,5 @@
-﻿using Kyber.Graphics;
+﻿using Kyber.Assets;
+using Kyber.Graphics;
 
 using System.Drawing;
 
@@ -13,21 +14,26 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 	private readonly ILogger _logger;
 	private readonly IInputState _input;
 	private readonly IGraphicsDevice _graphicsDevice;
+	private readonly IAssetManager _assetManager;
 	private readonly Random _rand;
 
 	private readonly Item[] _blocks;
 	private const float _saturation = 0.5f;
 	private const float _value = 1f;
+	private Texture2D _texture;
 
 	public bool IsEnabled { get; set; } = true;
 
-	public TestSpriteRendererSystem(IWindow window, ISpriteRenderer spriteRenderer, ILogger<TestSpriteRendererSystem> logger, IInputState input, IGraphicsDevice graphicsDevice)
+	public TestSpriteRendererSystem(
+		IWindow window, ISpriteRenderer spriteRenderer, ILogger<TestSpriteRendererSystem> logger, 
+		IInputState input, IGraphicsDevice graphicsDevice, IAssetManager assetManager)
 	{
 		_window = window;
 		_spriteRenderer = spriteRenderer;
 		_logger = logger;
 		_input = input;
 		_graphicsDevice = graphicsDevice;
+		_assetManager = assetManager;
 		_rand = new Random();
 
 		_blocks = new Item[10_000];
@@ -35,6 +41,8 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 
 	public void Initialize()
 	{
+		_texture = _assetManager.Load<Texture2D>("Tile.png");
+
 		var baseHue = _rand.NextSingle() * 360;
 		for (var i = 0; i < _blocks.Length; i++)
 		{
@@ -49,7 +57,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 				Color = Color.FromHSV(hue, _saturation, _value),
 				Hue = hue,
 				Rotation = 0,//MathHelper.TwoPi * _rand.NextSingle(),
-				Layer = 10,
+				Layer = _rand.Next(3)+10,
 				Velocity = new Vector2(MathF.Sin(angle), MathF.Cos(angle)) * speed
 			};
 		}
@@ -102,9 +110,13 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 
 	public void Render(GameTime dt)
 	{
+		var i = 0;
 		foreach (var block in _blocks)
 		{
-			_spriteRenderer.DrawRect(block.Color, block.Rect, depth: block.Layer, rotation: block.Rotation);
+			if (i++ % 2 == 0)
+				_spriteRenderer.Draw(_texture, block.Rect, color: block.Color, depth: block.Layer, rotation: block.Rotation);
+			else
+				_spriteRenderer.DrawRect(color: Color.White, block.Rect, depth: block.Layer, rotation: block.Rotation);
 		}
 	}
 

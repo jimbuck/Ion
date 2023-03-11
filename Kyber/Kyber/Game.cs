@@ -1,5 +1,6 @@
 ﻿using Kyber.Assets;
 using Kyber.Graphics;
+using Kyber.Storage;
 using Kyber.Utils;
 
 using System.Diagnostics;
@@ -24,6 +25,7 @@ internal class Game
 	private readonly AssetManager _assets;
 	private readonly InputState _input;
 	private readonly EventEmitter _eventEmitter;
+	private readonly PersistentStorage _storage;
 	private readonly IEventListener _events;
 
 	public GameTime GameTime { get; }
@@ -43,6 +45,7 @@ internal class Game
 		IInputState input,
 		IEventEmitter eventEmitter,
 		IEventListener events,
+		IPersistentStorage storage,
 		SystemGroup systems)
 	{
 		_gameConfig = gameConfig;
@@ -53,6 +56,7 @@ internal class Game
 		_input = (InputState)input;
 		_eventEmitter = (EventEmitter)eventEmitter;
 		_events = events;
+		_storage = (PersistentStorage)storage;
 		
 		Systems = systems;
 		GameTime = new();
@@ -66,6 +70,7 @@ internal class Game
 	public void Initialize()
 	{
 		using var _ = MicroTimer.Start("Game.Initialize", 1);
+		_storage.Initialize();
 		_window.Initialize();
 		_graphics.Initialize();
 		_assets.Initialize();

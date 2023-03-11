@@ -7,7 +7,7 @@ public interface IGameConfig
 {
 	#region Window Options
 
-	string WindowTitle { get; set; }
+	string Title { get; set; }
 	int? WindowHeight { get; set; }
 	int? WindowWidth { get; set; }
 	int? WindowX { get; set; }
@@ -31,7 +31,7 @@ public interface IGameConfig
 
 internal class GameConfig : IGameConfig
 {
-	public string WindowTitle { get; set; } = "Kyber";
+	public string Title { get; set; } = "Kyber";
 
 	public int? WindowHeight { get; set; } = 1080;
 

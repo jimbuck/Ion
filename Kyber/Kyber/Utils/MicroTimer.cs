@@ -45,7 +45,7 @@ public static class MicroTimer
 		_indicies[name] = (_indicies[name] + 1) % _timings[name].Length;
 	}
 
-	private struct MicroTimerInstance : IDisposable
+	private readonly struct MicroTimerInstance : IDisposable
 	{
 		private readonly string _name;
 
