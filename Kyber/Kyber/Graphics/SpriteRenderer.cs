@@ -123,7 +123,7 @@ internal class SpriteRenderer : ISpriteRenderer, IDisposable
 		}
 
 		public ReadOnlySpan<Instance> GetSpan() {
-			Array.Sort(_items, 0, Count);
+			//Array.Sort(_items, 0, Count);
 			return new(_items, 0, Count);
 		}
 	}
@@ -227,6 +227,7 @@ struct Instance
 layout(std430, binding = 0) readonly buffer Instances
 {
 	mat4 projection;
+	vec4 spacer;
     Instance instances[];
 };
 
@@ -254,10 +255,10 @@ void main()
     bounds = vec4(start, end);
 
     gl_Position = projection * vec4(pos, item.Location.z, 1);
-    pos = gl_Position.xy;
+	pos = gl_Position.xy;
 
     if(!InvertY)
-        gl_Position.y = -gl_Position.y;
+        gl_Position.y = -gl_Position.y;    
 
     fsin_Color = item.Color;
 }";
@@ -433,15 +434,15 @@ void main()
 
 		if (_batchManager.IsEmpty) return;
 
-		var matrixSize = (int)MemUtils.SizeOf<System.Numerics.Matrix4x4>();
+		var structSize = (int)MemUtils.SizeOf<Instance>();
 
 		_graphicsDevice.CommandList.SetPipeline(_pipeline);
 		foreach (var (texture, group) in _batchManager)
 		{
-			var pair = _getBuffer(texture, group.Count + matrixSize);
+			var pair = _getBuffer(texture, group.Count + 1);
 			var mapped = _graphicsDevice.Internal.Map(pair.Buffer, MapMode.Write);
 			MemUtils.Set(mapped.Data, _graphicsDevice.ProjectionMatrix, 1);
-			MemUtils.Copy(mapped.Data + matrixSize, group.GetSpan());
+			MemUtils.Copy(mapped.Data + structSize, group.GetSpan());
 
 			_graphicsDevice.Internal.Unmap(pair.Buffer);
 

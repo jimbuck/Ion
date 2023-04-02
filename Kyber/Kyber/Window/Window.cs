@@ -1,6 +1,9 @@
 ﻿using Kyber.Graphics;
 
+using Veldrid;
 using Veldrid.Sdl2;
+
+using Vulkan.Xlib;
 
 namespace Kyber;
 
@@ -14,8 +17,7 @@ public interface IWindow
 	int Width { get; set; }
 	int Height { get; set; }
 
-	Vector2 Size { get; set; }
-	
+	Vector2 Size { get; set; }	
 	bool HasClosed { get; }
 	bool IsActive { get; }
 
@@ -166,20 +168,43 @@ internal class Window : IWindow
         if (_config.Output != GraphicsOutput.Window) return;
 
 		_logger.LogInformation("Creating window...");
-        Sdl2Window = Veldrid.StartupUtilities.VeldridStartup.CreateWindow(ref _windowCreateInfo);
+		Sdl2Window = _createWindow(_windowCreateInfo);
 		Sdl2Window.SetCloseRequestedHandler(() => _closeHandled);
-
 		Sdl2Window.Closed += _onClosed;
-        Sdl2Window.FocusLost += _onFocusLost;
-        Sdl2Window.Resized += _onResize;
-        Sdl2Window.FocusGained += _onFocusGained;
+		Sdl2Window.FocusLost += _onFocusLost;
+		Sdl2Window.Resized += _onResize;
+		Sdl2Window.FocusGained += _onFocusGained;
 		_size = new(Sdl2Window.Width, Sdl2Window.Height);
 
 		//_onResize();
 		_logger.LogInformation($"Window created! ({Sdl2Window.Width}x{Sdl2Window.Height})");
 	}
 
-    public void Step()
+	private static Sdl2Window _createWindow(Veldrid.StartupUtilities.WindowCreateInfo windowCreateInfo)
+	{
+		SDL_WindowFlags sDL_WindowFlags = SDL_WindowFlags.OpenGL | SDL_WindowFlags.Resizable | GetWindowFlags(windowCreateInfo.WindowInitialState);
+		if (windowCreateInfo.WindowInitialState != Veldrid.WindowState.Hidden)
+		{
+			sDL_WindowFlags |= SDL_WindowFlags.Shown;
+		}
+		return new Sdl2Window(windowCreateInfo.WindowTitle, windowCreateInfo.X, windowCreateInfo.Y, windowCreateInfo.WindowWidth, windowCreateInfo.WindowHeight, sDL_WindowFlags, threadedProcessing: true);
+	}
+
+	private static SDL_WindowFlags GetWindowFlags(Veldrid.WindowState state)
+	{
+		return state switch
+		{
+			Veldrid.WindowState.Normal => (SDL_WindowFlags)0u,
+			Veldrid.WindowState.FullScreen => SDL_WindowFlags.Fullscreen,
+			Veldrid.WindowState.Maximized => SDL_WindowFlags.Maximized,
+			Veldrid.WindowState.Minimized => SDL_WindowFlags.Minimized,
+			Veldrid.WindowState.BorderlessFullScreen => SDL_WindowFlags.FullScreenDesktop,
+			Veldrid.WindowState.Hidden => SDL_WindowFlags.Hidden,
+			_ => throw new VeldridException("Invalid WindowState: " + state),
+		};
+	}
+
+	public void Step()
     {
 		if (_config.Output != GraphicsOutput.Window || Sdl2Window == null)
 		{
