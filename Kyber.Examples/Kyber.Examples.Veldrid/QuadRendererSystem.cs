@@ -11,9 +11,10 @@ namespace Kyber.Examples.Veldrid;
 public class QuadRendererSystem : IInitializeSystem, IRenderSystem, IDisposable
 {
 	private readonly IWindow _window;
-    private readonly Kyber.Graphics.GraphicsDevice _graphicsDevice;
+    private readonly GraphicsContext _graphicsContext;
     private readonly ILogger _logger;
 
+	private CommandList? _commandList;
     private DeviceBuffer? _vertexBuffer;
     private DeviceBuffer? _indexBuffer;
     private Shader[]? _shaders;
@@ -46,16 +47,20 @@ void main()
 
     public bool IsEnabled { get; set; } = true;
 
-    public QuadRendererSystem(IWindow window, IGraphicsDevice graphicsDevice, ILogger<QuadRendererSystem> logger)
+    public QuadRendererSystem(IWindow window, IGraphicsContext graphicsDevice, ILogger<QuadRendererSystem> logger)
     {
 		_window = window;
-		_graphicsDevice = (Kyber.Graphics.GraphicsDevice)graphicsDevice;
+		_graphicsContext = (GraphicsContext)graphicsDevice;
         _logger = logger;
     }
 
     public void Initialize()
     {
-        ResourceFactory factory = _graphicsDevice.Internal.ResourceFactory;
+		if (_graphicsContext.GraphicsDevice is null) return;
+
+		ResourceFactory factory = _graphicsContext.GraphicsDevice.ResourceFactory;
+
+		_commandList = factory.CreateCommandList();
 
 		(Vector2 position, Color color)[] points = {
 			(new(100f, 800f), Color.Red),   // TOP LEFT
@@ -71,8 +76,8 @@ void main()
         _vertexBuffer = factory.CreateBuffer(new BufferDescription(4 * VertexPositionColor.SizeInBytes, BufferUsage.VertexBuffer));
         _indexBuffer = factory.CreateBuffer(new BufferDescription(4 * sizeof(ushort), BufferUsage.IndexBuffer));
 
-        _graphicsDevice.Internal.UpdateBuffer(_vertexBuffer, 0, quadVertices);
-        _graphicsDevice.Internal.UpdateBuffer(_indexBuffer, 0, quadIndices);
+        _graphicsContext.GraphicsDevice.UpdateBuffer(_vertexBuffer, 0, quadVertices);
+        _graphicsContext.GraphicsDevice.UpdateBuffer(_indexBuffer, 0, quadIndices);
 
         VertexLayoutDescription vertexLayout = new(
             new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2),
@@ -91,20 +96,26 @@ void main()
 			PrimitiveTopology = PrimitiveTopology.TriangleStrip,
 			ResourceLayouts = Array.Empty<ResourceLayout>(),
 			ShaderSet = new ShaderSetDescription(new VertexLayoutDescription[] { vertexLayout }, _shaders),
-			Outputs = _graphicsDevice.Internal.SwapchainFramebuffer.OutputDescription
+			Outputs = _graphicsContext.GraphicsDevice.SwapchainFramebuffer.OutputDescription
 		});
     }
 
-
     public void Render(GameTime dt)
     {
-		_graphicsDevice.CommandList.SetVertexBuffer(0, _vertexBuffer);
-		_graphicsDevice.CommandList.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
+		if (_commandList is null || _graphicsContext.GraphicsDevice is null) return;
 
-		_graphicsDevice.CommandList.SetPipeline(_pipeline);
-		_graphicsDevice.CommandList.DrawIndexed(4, 1, 0, 0, 0);
+		_commandList.Begin();
+		_commandList.SetFramebuffer(_graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer);
+		_commandList.SetFullViewports();
+
+		_commandList.SetVertexBuffer(0, _vertexBuffer);
+		_commandList.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
+
+		_commandList.SetPipeline(_pipeline);
+		_commandList.DrawIndexed(4, 1, 0, 0, 0);
+		_commandList.End();
+		_graphicsContext.SubmitCommands(_commandList);
     }
-
 
 	public void Dispose()
 	{

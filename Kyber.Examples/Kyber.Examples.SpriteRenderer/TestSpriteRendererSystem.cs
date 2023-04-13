@@ -1,8 +1,6 @@
 ﻿using Kyber.Assets;
 using Kyber.Graphics;
 
-using System.Drawing;
-
 namespace Kyber.Examples.SpriteRenderer;
 
 public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRenderSystem
@@ -13,7 +11,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 	private readonly ISpriteRenderer _spriteRenderer;
 	private readonly ILogger _logger;
 	private readonly IInputState _input;
-	private readonly IGraphicsDevice _graphicsDevice;
+	private readonly IGraphicsContext _graphicsDevice;
 	private readonly IAssetManager _assetManager;
 	private readonly Random _rand;
 
@@ -28,7 +26,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 
 	public TestSpriteRendererSystem(
 		IWindow window, ISpriteRenderer spriteRenderer, ILogger<TestSpriteRendererSystem> logger, 
-		IInputState input, IGraphicsDevice graphicsDevice, IAssetManager assetManager)
+		IInputState input, IGraphicsContext graphicsDevice, IAssetManager assetManager)
 	{
 		_window = window;
 		_spriteRenderer = spriteRenderer;
@@ -38,7 +36,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 		_assetManager = assetManager;
 		_rand = new Random();
 
-		_bouncingSprites = new Item[1_000];
+		_bouncingSprites = new Item[20_000];
 		_depthBlocks = new Item[8];
 	}
 
@@ -61,7 +59,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 				Color = Color.FromHSV(hue, _saturation, _value),
 				Hue = hue,
 				Rotation = 0,
-				Layer = 10 + (float)(_rand.NextDouble() * 64),
+				Depth = 10 + (float)(_rand.NextDouble() * 64),
 			};
 		}
 
@@ -79,7 +77,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 				Color = Color.FromHSV(hue, _saturation, _value),
 				Hue = hue,
 				Rotation = 0,//MathHelper.TwoPi * _rand.NextSingle(),
-				Layer = 10 + (float)(_rand.NextDouble() * 64),
+				Depth = 10 + (float)(_rand.NextDouble() * 64),
 				Velocity = new Vector2(MathF.Sin(angle), MathF.Cos(angle)) * speed
 			};
 		}
@@ -104,9 +102,9 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 		foreach (var block in _depthBlocks)
 		{
 			if (i++ % 2 == 1)
-			_spriteRenderer.Draw(_texture, block.Rect, color: block.Color, depth: block.Layer, rotation: block.Rotation);
+			_spriteRenderer.Draw(_texture, block.Rect, color: block.Color, depth: block.Depth, rotation: block.Rotation);
 			else
-				_spriteRenderer.DrawRect(color: block.Color, block.Rect, depth: block.Layer, rotation: block.Rotation);
+				_spriteRenderer.DrawRect(color: block.Color, block.Rect, depth: block.Depth, rotation: block.Rotation);
 		}
 	}
 
@@ -163,9 +161,9 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 		foreach (var block in _bouncingSprites)
 		{
 			if (i++ % 2 == 1)
-				_spriteRenderer.Draw(_texture, block.Rect, color: block.Color, depth: block.Layer, rotation: block.Rotation);
+				_spriteRenderer.Draw(_texture, block.Rect, color: block.Color, depth: block.Depth, rotation: block.Rotation);
 			else
-				_spriteRenderer.DrawRect(color: block.Color, block.Rect, depth: block.Layer, rotation: block.Rotation);
+				_spriteRenderer.DrawRect(color: block.Color, block.Rect, depth: block.Depth, rotation: block.Rotation);
 		}
 	}
 
@@ -174,7 +172,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 		public RectangleF Rect;
 		public Color Color;
 		public float Rotation;
-		public float Layer;
+		public float Depth;
 		public Vector2 Velocity;
 		public float Hue;
 	}

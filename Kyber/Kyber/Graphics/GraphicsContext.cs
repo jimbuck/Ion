@@ -2,34 +2,30 @@
 
 namespace Kyber.Graphics;
 
-public interface IGraphicsDevice
+public interface IGraphicsContext
 {
 	Matrix4x4 ProjectionMatrix { get; }
 	bool NoRender { get; }
 }
 
-public class GraphicsDevice : IGraphicsDevice, IDisposable
+public class GraphicsContext : IGraphicsContext, IDisposable
 {
 	private readonly IGameConfig _config;
 	private readonly IEventListener _events;
 	private readonly ILogger _logger;
 	private readonly Window _window;
 
-	private Veldrid.GraphicsDevice? _gd;
-	private Veldrid.CommandList? _cl;
-
-	// TODO: Remove this once the graphics API is implemented.
 #pragma warning disable CS8603 // Possible null reference return.
-	public Veldrid.GraphicsDevice Internal => _gd;
-	public Veldrid.CommandList CommandList => _cl;
-	public Veldrid.ResourceFactory Factory => _gd?.ResourceFactory;
+	private CommandList? _commandList;
+	public GraphicsDevice? GraphicsDevice { get; private set; }
+	public ResourceFactory Factory => GraphicsDevice?.ResourceFactory;
 #pragma warning restore CS8603 // Possible null reference return.
 
 	public Matrix4x4 ProjectionMatrix { get; private set; } = Matrix4x4.Identity;
 
 	public bool NoRender { get; }
 
-	public GraphicsDevice(IGameConfig config, IEventListener events, ILogger<GraphicsDevice> logger, IWindow window)
+	public GraphicsContext(IGameConfig config, IEventListener events, ILogger<GraphicsContext> logger, IWindow window)
 	{
 		_config = config;
 		_events = events;
@@ -45,28 +41,26 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 
 		_logger.LogInformation("Creating graphics device...");
 
-		var preferredBackend = _config.PreferredBackend.ToInternal();
-
-		if (_config.PreferredBackend != GraphicsBackend.Unspecified && !Veldrid.GraphicsDevice.IsBackendSupported(preferredBackend))
+		if (!GraphicsDevice.IsBackendSupported(_config.PreferredBackend))
 		{
 			throw new KyberException($"Unsupported backend! ({_config.PreferredBackend}");
 		}
 
-		_gd = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new Veldrid.GraphicsDeviceOptions()
+		GraphicsDevice = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new GraphicsDeviceOptions()
 		{
 #if DEBUG
 			//Debug = true,
 #endif
-			SwapchainDepthFormat = Veldrid.PixelFormat.D32_Float_S8_UInt,
-			ResourceBindingModel = Veldrid.ResourceBindingModel.Default,
+			SwapchainDepthFormat = PixelFormat.D32_Float_S8_UInt,
+			ResourceBindingModel = ResourceBindingModel.Default,
 			PreferStandardClipSpaceYDirection = true,
 			PreferDepthRangeZeroToOne = true,
 			SyncToVerticalBlank = _config.VSync,
-		}, preferredBackend);
+		}, _config.PreferredBackend);
 
-		_cl = _gd.ResourceFactory.CreateCommandList();
+		_commandList = GraphicsDevice.ResourceFactory.CreateCommandList();
 
-		_logger.LogInformation($"Graphics device created ({_gd.BackendType})!");
+		_logger.LogInformation($"Graphics device created ({GraphicsDevice.BackendType})!");
 
 		UpdateProjection((uint)_window.Width, (uint)_window.Height);
 	}
@@ -78,40 +72,47 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 
 	public void BeginFrame(GameTime dt)
 	{
-		if (NoRender) return;
+		if (NoRender || GraphicsDevice is null || _commandList is null) return;
 
-		CommandList.Begin();
-		CommandList.SetFramebuffer(Internal.MainSwapchain.Framebuffer);
-		CommandList.SetFullViewports();
-		CommandList.ClearColorTarget(0, _config.ClearColor);
-		CommandList.ClearDepthStencil(Internal.IsDepthRangeZeroToOne ? 0f : 1f);
+		_commandList.Begin();
+		_commandList.SetFramebuffer(GraphicsDevice.MainSwapchain.Framebuffer);
+		_commandList.SetFullViewports();
+		_commandList.ClearColorTarget(0, _config.ClearColor);
+		_commandList.ClearDepthStencil(GraphicsDevice.IsDepthRangeZeroToOne ? 0f : 1f);
+		_commandList.End();
+		GraphicsDevice.SubmitCommands(_commandList);
 	}
 
 	public void EndFrame(GameTime dt)
 	{
-		if (NoRender) return;
+		if (NoRender || GraphicsDevice is null || _commandList is null) return;
 
-		CommandList.End();
-		Internal.SubmitCommands(CommandList);
+		//_cl.End();
+		//GraphicsDevice.SubmitCommands(_cl);
 
 		if (_window.HasClosed) return;
 
 		//Internal.WaitForIdle();
-		Internal.SwapBuffers(Internal.MainSwapchain);
+		GraphicsDevice.SwapBuffers(GraphicsDevice.MainSwapchain);
 
 		if (_events.OnLatest<WindowResizeEvent>(out var e))
 		{
-			Internal.ResizeMainWindow(e.Data.Width, e.Data.Height);
+			GraphicsDevice.ResizeMainWindow(e.Data.Width, e.Data.Height);
 		}
+	}
+
+	public void SubmitCommands(CommandList commandList)
+	{
+		GraphicsDevice?.SubmitCommands(commandList);
 	}
 
 	public Matrix4x4 CreateOrthographic(float left, float right, float bottom, float top, float near, float far)
 	{
 		Matrix4x4 ortho;
-		if (_gd?.IsDepthRangeZeroToOne ?? false) ortho = Matrix4x4.CreateOrthographicOffCenter(left, right, bottom, top, far, near);
+		if (GraphicsDevice?.IsDepthRangeZeroToOne ?? false) ortho = Matrix4x4.CreateOrthographicOffCenter(left, right, bottom, top, far, near);
 		else ortho = Matrix4x4.CreateOrthographicOffCenter(left, right, bottom, top, near, far);
 
-		if (_gd?.IsClipSpaceYInverted ?? false)
+		if (GraphicsDevice?.IsClipSpaceYInverted ?? false)
 		{
 			ortho *= new Matrix4x4(
 				1, 0, 0, 0,
@@ -126,7 +127,7 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 	public Matrix4x4 CreatePerspective(float fov, float aspectRatio, float near, float far)
 	{
 		Matrix4x4 persp;
-		if (_gd?.IsDepthRangeZeroToOne ?? false)
+		if (GraphicsDevice?.IsDepthRangeZeroToOne ?? false)
 		{
 			persp = _createPerspective(fov, aspectRatio, far, near);
 		}
@@ -135,7 +136,7 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 			persp = _createPerspective(fov, aspectRatio, near, far);
 		}
 
-		if (_gd?.IsClipSpaceYInverted ?? false)
+		if (GraphicsDevice?.IsClipSpaceYInverted ?? false)
 		{
 			persp *= new Matrix4x4(
 				1, 0, 0, 0,
@@ -182,7 +183,7 @@ public class GraphicsDevice : IGraphicsDevice, IDisposable
 
 	public void Dispose()
 	{
-		_cl?.Dispose();
-		_gd?.Dispose();
+		_commandList?.Dispose();
+		GraphicsDevice?.Dispose();
 	}
 }

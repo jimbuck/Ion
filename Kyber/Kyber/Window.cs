@@ -3,8 +3,6 @@
 using Veldrid;
 using Veldrid.Sdl2;
 
-using Vulkan.Xlib;
-
 namespace Kyber;
 
 public record struct WindowResizeEvent(uint Width, uint Height);
@@ -42,10 +40,10 @@ internal class Window : IWindow
     private readonly EventEmitter _eventEmitter;
 	private readonly IEventListener _events;
 
-	public Veldrid.InputSnapshot? InputSnapshot { get; private set; }
+	public InputSnapshot? InputSnapshot { get; private set; }
 
 	private Veldrid.StartupUtilities.WindowCreateInfo _windowCreateInfo;
-    internal Veldrid.Sdl2.Sdl2Window? Sdl2Window { get; private set; }
+    internal Sdl2Window? Sdl2Window { get; private set; }
 
 	private (int, int) _prevSize = (0, 0);
 	private bool _closeHandled = false;
@@ -158,7 +156,7 @@ internal class Window : IWindow
             Y = _config.WindowY ?? 100,
             WindowWidth = _config.WindowWidth ?? 960,
             WindowHeight = _config.WindowHeight ?? 540,
-            WindowInitialState = _config.WindowState.ToInternal(),
+            WindowInitialState = _config.WindowState,
             WindowTitle = _title = _config.Title ?? "Kyber"
         };
     }
@@ -183,7 +181,7 @@ internal class Window : IWindow
 	private static Sdl2Window _createWindow(Veldrid.StartupUtilities.WindowCreateInfo windowCreateInfo)
 	{
 		SDL_WindowFlags sDL_WindowFlags = SDL_WindowFlags.OpenGL | SDL_WindowFlags.Resizable | GetWindowFlags(windowCreateInfo.WindowInitialState);
-		if (windowCreateInfo.WindowInitialState != Veldrid.WindowState.Hidden)
+		if (windowCreateInfo.WindowInitialState != WindowState.Hidden)
 		{
 			sDL_WindowFlags |= SDL_WindowFlags.Shown;
 		}
@@ -194,12 +192,12 @@ internal class Window : IWindow
 	{
 		return state switch
 		{
-			Veldrid.WindowState.Normal => (SDL_WindowFlags)0u,
-			Veldrid.WindowState.FullScreen => SDL_WindowFlags.Fullscreen,
-			Veldrid.WindowState.Maximized => SDL_WindowFlags.Maximized,
-			Veldrid.WindowState.Minimized => SDL_WindowFlags.Minimized,
-			Veldrid.WindowState.BorderlessFullScreen => SDL_WindowFlags.FullScreenDesktop,
-			Veldrid.WindowState.Hidden => SDL_WindowFlags.Hidden,
+			WindowState.Normal => (SDL_WindowFlags)0u,
+			WindowState.FullScreen => SDL_WindowFlags.Fullscreen,
+			WindowState.Maximized => SDL_WindowFlags.Maximized,
+			WindowState.Minimized => SDL_WindowFlags.Minimized,
+			WindowState.BorderlessFullScreen => SDL_WindowFlags.FullScreenDesktop,
+			WindowState.Hidden => SDL_WindowFlags.Hidden,
 			_ => throw new VeldridException("Invalid WindowState: " + state),
 		};
 	}

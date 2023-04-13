@@ -1,15 +1,28 @@
-﻿using System.Drawing;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-
-using Assimp;
+﻿using Veldrid;
+using Veldrid.SPIRV;
 
 using Kyber.Assets;
 
-using Veldrid;
-using Veldrid.SPIRV;
-
 namespace Kyber.Graphics;
+
+[Flags]
+public enum SpriteOptions
+{
+	/// <summary>
+	/// Renders the sprite normally.
+	/// </summary>
+	None = 0,
+
+	/// <summary>
+	/// Horizontally flip the sprite.
+	/// </summary>
+	FlipHorizontally,
+
+	/// <summary>
+	/// Vertically flip the sprite.
+	/// </summary>
+	FlipVertically,
+}
 
 public interface ISpriteRenderer
 {
@@ -26,22 +39,20 @@ public interface ISpriteRenderer
 	void Draw(Texture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteOptions options = SpriteOptions.None);
 }
 
-internal class SpriteRenderer : ISpriteRenderer, IDisposable
+internal partial class SpriteRenderer : ISpriteRenderer, IDisposable
 {
-	private const int BATCH_STEP_SIZE = 64;
-	private const int BATCH_STEP_SIZE_MINUS_ONE = BATCH_STEP_SIZE - 1;
-	private const int BATCH_STEP_SIZE_BIT_COMP = ~BATCH_STEP_SIZE_MINUS_ONE;
 	private static readonly RectangleF _defaultScissor = new(-(1 << 22), -(1 << 22), 1 << 23, 1 << 23);
 	private static readonly Vector2 VEC2_HALF = Vector2.One / 2f;
 
 	private readonly IWindow _window;
-	private readonly GraphicsDevice _graphicsDevice;
+	private readonly GraphicsContext _graphicsContext;
 	private readonly ILogger _logger;
 	private readonly IEventListener _events;
 
 	private readonly SpriteBatchManager _batchManager;
 	private Assets.Texture? _whitePixel;
 
+	private CommandList _commandList;
 	private DeviceBuffer? _vertexBuffer;
 
 	private ResourceLayout? _instanceResourceLayout;
@@ -51,135 +62,6 @@ internal class SpriteRenderer : ISpriteRenderer, IDisposable
 	private Pipeline? _pipeline;
 
 	private bool _beginCalled = false;
-
-	private class SpriteBatchManager
-	{
-		private readonly Stack<SpriteBatch> _batchPool;
-		private readonly Dictionary<Assets.Texture, SpriteBatch> _batches;
-
-		public bool IsEmpty => !_batches.Any(b => b.Value.Count > 0);
-
-		public SpriteBatchManager()
-		{
-			_batches = new();
-			_batchPool = new();
-		}
-
-		public ref Instance Add(Assets.Texture texture)
-		{
-			if (!_batches.TryGetValue(texture, out var group))
-			{
-				group = _rentSpriteBatch();
-				group.Clear();
-				_batches[texture] = group;
-			}
-
-			return ref group.Add();
-		}
-
-		public void Clear()
-		{
-			foreach (var group in this) _releaseSpriteBatch(group.Value);
-			_batches.Clear();
-		}
-
-		public Dictionary<Assets.Texture, SpriteBatch>.Enumerator GetEnumerator() => _batches.GetEnumerator();
-
-		private SpriteBatch _rentSpriteBatch()
-		{
-			if (!_batchPool.TryPop(out var group)) group = new();
-			return group;
-		}
-
-		private void _releaseSpriteBatch(SpriteBatch group) => _batchPool.Push(group);
-	}
-
-	private class SpriteBatch
-	{
-		internal Instance[] _items;
-
-		public int Count { get; private set; }
-
-		public SpriteBatch()
-		{
-			_items = new Instance[BATCH_STEP_SIZE];
-		}
-
-		public ref Instance Add()
-		{
-			if (Count >= _items.Length)
-			{
-				var lastSize = _items.Length;
-				var newSize = (lastSize + lastSize / 2 + 63) & (~63);
-				Array.Resize(ref _items, newSize);
-			}
-
-			return ref _items[Count++];
-		}
-
-		public void Clear()
-		{
-			Count = 0;
-		}
-
-		public ReadOnlySpan<Instance> GetSpan() {
-			//Array.Sort(_items, 0, Count);
-			return new(_items, 0, Count);
-		}
-	}
-
-	private struct Instance : IComparable<Instance>
-	{
-		public Vector4 UV;
-		public Color Color;
-		public Vector2 Scale;
-		public Vector2 Origin;
-		public Vector3 Location;
-		public float Rotation;
-		public RectangleF Scissor;
-
-		public static uint SizeInBytes => MemUtils.SizeOf<Instance>();
-
-		public void Update(Vector2 textureSize, RectangleF destinationRectangle, RectangleF sourceRectangle, Color color, float rotation, Vector2 origin, float layerDepth, RectangleF scissor, SpriteOptions options)
-		{
-			var sourceSize = new Vector2(sourceRectangle.Width, sourceRectangle.Height) / textureSize;
-			var pos = new Vector2(sourceRectangle.X, sourceRectangle.Y) / textureSize;
-
-			UV = _createUV(options, sourceSize, pos);
-			Color = color;
-			Scale = destinationRectangle.Size.ToVector2();
-			Origin = origin * Scale;
-			Location = new(destinationRectangle.Location.ToVector2(), layerDepth);
-			Rotation = rotation;
-			Scissor = scissor;
-		}
-		private static Vector4 _createUV(SpriteOptions options, Vector2 sourceSize, Vector2 sourceLocation)
-		{
-			if (options != SpriteOptions.None)
-			{
-				// flipX
-				if (options.HasFlag(SpriteOptions.FlipHorizontally))
-				{
-					sourceLocation.X += sourceSize.X;
-					sourceSize.X *= -1;
-				}
-
-				// flipY
-				if (options.HasFlag(SpriteOptions.FlipVertically))
-				{
-					sourceLocation.Y += sourceSize.Y;
-					sourceSize.Y *= -1;
-				}
-			}
-
-			return new(sourceLocation.X, sourceLocation.Y, sourceSize.X, sourceSize.Y);
-		}
-
-		public int CompareTo(Instance other)
-		{
-			return (int)(other.Location.Z - this.Location.Z);
-		}
-	}
 
 	private class BufferContainer
 	{
@@ -201,6 +83,7 @@ internal class SpriteRenderer : ISpriteRenderer, IDisposable
 			TextureSet.Dispose(); // TODO: Check if this is needed...
 		}
 	}
+
 	private readonly Dictionary<Assets.Texture, BufferContainer> _buffers;
 
 	private const string VertexCode = @"
@@ -289,10 +172,10 @@ void main()
     fsout_Color = fsin_Color * texture(sampler2D(Tex, Sampler), tex_coord);
 }";
 
-	public SpriteRenderer(IWindow window, IGraphicsDevice graphicsDevice, ILogger<SpriteRenderer> logger, IEventListener events)
+	public SpriteRenderer(IWindow window, IGraphicsContext graphicsContext, ILogger<SpriteRenderer> logger, IEventListener events)
 	{
 		_window = window;
-		_graphicsDevice = (GraphicsDevice)graphicsDevice;
+		_graphicsContext = (GraphicsContext)graphicsContext;
 		_logger = logger;
 		_events = events;
 
@@ -302,18 +185,19 @@ void main()
 
 	public void Initialize()
 	{
-		if (_graphicsDevice.NoRender) return;
-		if (_graphicsDevice.Internal == null)
+		if (_graphicsContext.NoRender) return;
+		if (_graphicsContext.GraphicsDevice == null)
 		{
 			_logger.LogWarning($"{nameof(SpriteRenderer)} automically disabled due to GraphicsDevice not being set.");
 			return;
 		}
 
-		var factory = _graphicsDevice.Factory;
+		var factory = _graphicsContext.Factory;
+		_commandList = factory.CreateCommandList();
 
-		TextureDescription desc = new(1, 1, 1, 1, 1, Veldrid.PixelFormat.B8_G8_R8_A8_UNorm, TextureUsage.Sampled, Veldrid.TextureType.Texture2D);
+		TextureDescription desc = new(1, 1, 1, 1, 1, PixelFormat.B8_G8_R8_A8_UNorm, TextureUsage.Sampled, Veldrid.TextureType.Texture2D);
 		_whitePixel = factory.CreateTexture2D(desc, "white-pixel");
-		_graphicsDevice.Internal.UpdateTexture(_whitePixel, new byte[] { 255, 255, 255, 255 }, 0, 0, 0, 1, 1, 1, 0, 0);
+		_graphicsContext.GraphicsDevice.UpdateTexture(_whitePixel, new byte[] { 255, 255, 255, 255 }, 0, 0, 0, 1, 1, 1, 0, 0);
 
 		VertexLayoutDescription vertexLayout = new(new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2));
 
@@ -326,7 +210,7 @@ void main()
 		_logger.LogInformation("Created _vertexBuffer");
 		_vertexBuffer = factory.CreateBuffer(new(4 * MemUtils.SizeOf<Vector2>(), BufferUsage.VertexBuffer));
 		_logger.LogInformation("Updated _vertexBuffer");
-		_graphicsDevice.Internal.UpdateBuffer(_vertexBuffer, 0, new Vector2[] {
+		_graphicsContext.GraphicsDevice.UpdateBuffer(_vertexBuffer, 0, new Vector2[] {
 			new( 0,  0),
 			new( 1,  0),
 			new( 0,  1),
@@ -350,16 +234,16 @@ void main()
 			PrimitiveTopology = PrimitiveTopology.TriangleStrip,
 			ResourceLayouts = new ResourceLayout[] { _instanceResourceLayout, _fragmentResourceLayout },
 			ShaderSet = new(vertexLayouts: new[] { vertexLayout }, shaders: _shaders, specializations: new[] {
-				new SpecializationConstant(0, _graphicsDevice.Internal.IsClipSpaceYInverted)
+				new SpecializationConstant(0, _graphicsContext.GraphicsDevice.IsClipSpaceYInverted)
 			}),
-			Outputs = _graphicsDevice.Internal.MainSwapchain.Framebuffer.OutputDescription
+			Outputs = _graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer.OutputDescription
 		});
 	}
 
 	public void Begin(GameTime dt)
 	{
-		if (_graphicsDevice.NoRender) return;
-		if (_graphicsDevice.Internal == null || _graphicsDevice.CommandList == null) throw new InvalidOperationException("Begin cannot be called until the GraphicsDevice has been initialized.");
+		if (_graphicsContext.NoRender) return;
+		if (_graphicsContext.GraphicsDevice == null) throw new InvalidOperationException("Begin cannot be called until the GraphicsDevice has been initialized.");
 
 		if (_beginCalled) throw new InvalidOperationException("Begin cannot be called again until End has been successfully called.");
 
@@ -410,7 +294,7 @@ void main()
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
 		if (color == default) color = Color.White;
-		if (sourceRectangle.Size.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
+		if (sourceRectangle.Size.LengthSquared() == 0) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
 
 		_addSprite(texture, color, sourceRectangle, destinationRectangle, origin, rotation, depth, _defaultScissor, options);
 	}
@@ -420,51 +304,57 @@ void main()
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
 		if (color == default) color = Color.White;
-		if (sourceRectangle.Size.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
+		if (sourceRectangle.Size.LengthSquared() == 0) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
 
 		_addSprite(texture, color, sourceRectangle, new RectangleF(position.X, position.Y, scale.X * texture.Width, scale.Y * texture.Height), origin, rotation, depth, _defaultScissor, options);
 	}
 
 	public unsafe void End()
 	{
-		if (_graphicsDevice.NoRender) return;
+		if (_graphicsContext.NoRender) return;
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling End.");
 
 		_beginCalled = false;
 
-		if (_batchManager.IsEmpty) return;
+		if (_batchManager.IsEmpty || _graphicsContext.GraphicsDevice is null) return;
 
-		var structSize = (int)MemUtils.SizeOf<Instance>();
-
-		_graphicsDevice.CommandList.SetPipeline(_pipeline);
+		_commandList.Begin();
+		_commandList.SetFramebuffer(_graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer);
+		_commandList.SetFullViewports();
+		//_commandList.ClearColorTarget(0, Color.Transparent);
+		//_commandList.ClearDepthStencil(_graphicsContext.GraphicsDevice.IsDepthRangeZeroToOne ? 0f : 1f);
+		_commandList.SetPipeline(_pipeline);
 		foreach (var (texture, group) in _batchManager)
 		{
 			var pair = _getBuffer(texture, group.Count + 1);
-			var mapped = _graphicsDevice.Internal.Map(pair.Buffer, MapMode.Write);
-			MemUtils.Set(mapped.Data, _graphicsDevice.ProjectionMatrix, 1);
-			MemUtils.Copy(mapped.Data + structSize, group.GetSpan());
+			var mapped = _graphicsContext.GraphicsDevice.Map(pair.Buffer, MapMode.Write);
+			MemUtils.Set(mapped.Data, _graphicsContext.ProjectionMatrix, 1);
+			MemUtils.Copy(mapped.Data + SpriteBatchManager.INSTANCE_SIZE, group.GetSpan());
 
-			_graphicsDevice.Internal.Unmap(pair.Buffer);
+			_graphicsContext.GraphicsDevice.Unmap(pair.Buffer);
 
-			_graphicsDevice.CommandList.SetVertexBuffer(0, _vertexBuffer);
-			_graphicsDevice.CommandList.SetGraphicsResourceSet(0, pair.InstanceSet);
-			_graphicsDevice.CommandList.SetGraphicsResourceSet(1, pair.TextureSet);
-			_graphicsDevice.CommandList.Draw(4, (uint)group.Count, 0, 0);
+			_commandList.SetVertexBuffer(0, _vertexBuffer);
+			_commandList.SetGraphicsResourceSet(0, pair.InstanceSet);
+			_commandList.SetGraphicsResourceSet(1, pair.TextureSet);
+			_commandList.Draw(4, (uint)group.Count, 0, 0);
 		}
+
+		
+		_commandList.End();
+		_graphicsContext.SubmitCommands(_commandList);
 	}
 
 	private BufferContainer _getBuffer(Assets.Texture texture, int count)
 	{
-		var structSize = MemUtils.SizeOf<Instance>();
-		var size = ((count + BATCH_STEP_SIZE_MINUS_ONE) & BATCH_STEP_SIZE_BIT_COMP) * structSize;
-		var bci = new BufferDescription((uint)size, BufferUsage.StructuredBufferReadOnly | BufferUsage.Dynamic, structSize);
+		var size = SpriteBatchManager.GetBatchSize(count);
+		var bci = new BufferDescription(size, BufferUsage.StructuredBufferReadOnly | BufferUsage.Dynamic, SpriteBatchManager.Instance.SizeInBytes);
 
 		if (!_buffers.TryGetValue(texture, out var pair))
 		{
-			var buffer = _graphicsDevice.Factory.CreateBuffer(bci);
+			var buffer = _graphicsContext.Factory.CreateBuffer(bci);
 			pair = new(buffer,
-				_graphicsDevice.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, buffer)),
-				_graphicsDevice.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsDevice.Internal.LinearSampler))
+				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, buffer)),
+				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsContext.GraphicsDevice.LinearSampler))
 				);
 
 			_buffers[texture] = pair;
@@ -473,9 +363,9 @@ void main()
 		{
 			pair.Dispose();
 
-			pair.Buffer = _graphicsDevice.Factory.CreateBuffer(bci);
-			pair.InstanceSet = _graphicsDevice.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, pair.Buffer));
-			pair.TextureSet = _graphicsDevice.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsDevice.Internal.LinearSampler));
+			pair.Buffer = _graphicsContext.Factory.CreateBuffer(bci);
+			pair.InstanceSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, pair.Buffer));
+			pair.TextureSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsContext.GraphicsDevice.LinearSampler));
 			_buffers[texture] = pair;
 		}
 
@@ -494,7 +384,7 @@ void main()
 	{
 		ref var instance = ref _batchManager.Add(texture);
 
-		instance.Update(texture.Size, destinationRect, sourceRect, color, rotation, origin, depth, _transformRectF(scissor, _graphicsDevice.ProjectionMatrix), options);
+		instance.Update(texture.Size, destinationRect, sourceRect, color, rotation, origin, depth, _transformRectF(scissor, _graphicsContext.ProjectionMatrix), options);
 	}
 
 	private static RectangleF _transformRectF(RectangleF rect, System.Numerics.Matrix4x4 matrix)

@@ -20,7 +20,7 @@ internal class Game
 
 	private readonly IGameConfig _gameConfig;
 	private readonly Window _window;
-	private readonly GraphicsDevice _graphics;
+	private readonly GraphicsContext _graphics;
 	private readonly SpriteRenderer _spriteRenderer;
 	private readonly AssetManager _assets;
 	private readonly InputState _input;
@@ -39,7 +39,7 @@ internal class Game
 	public Game(
 		IGameConfig gameConfig,
 		IWindow window,
-		IGraphicsDevice graphics,
+		IGraphicsContext graphics,
 		ISpriteRenderer spriteRenderer,
 		IAssetManager assets,
 		IInputState input,
@@ -50,7 +50,7 @@ internal class Game
 	{
 		_gameConfig = gameConfig;
 		_window = (Window)window;
-		_graphics = (GraphicsDevice)graphics;
+		_graphics = (GraphicsContext)graphics;
 		_spriteRenderer = (SpriteRenderer)spriteRenderer;
 		_assets = (AssetManager)assets;
 		_input = (InputState)input;

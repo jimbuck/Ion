@@ -1,6 +1,5 @@
-﻿using Kyber.Graphics;
-
-
+﻿using Veldrid;
+using Kyber.Graphics;
 namespace Kyber;
 
 public interface IGameConfig
@@ -46,7 +45,7 @@ internal class GameConfig : IGameConfig
 
 	public WindowState WindowState { get; set; } = WindowState.Normal;
 
-	public GraphicsBackend PreferredBackend { get; set; } = GraphicsBackend.Unspecified;
+	public GraphicsBackend PreferredBackend { get; set; } = Veldrid.StartupUtilities.VeldridStartup.GetPlatformDefaultBackend();
 
 	public bool VSync { get; set; } = false;
 

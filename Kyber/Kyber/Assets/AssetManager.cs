@@ -16,15 +16,15 @@ public class AssetManager : IAssetManager
 	private readonly ILogger _logger;
 	private readonly IPersistentStorage _storage;
 	private readonly IServiceProvider _serviceProvider;
-	private readonly GraphicsDevice _graphicsDevice;
+	private readonly GraphicsContext _graphicsDevice;
 	private readonly Dictionary<Type, Type> _loaders = new();
 
-	public AssetManager(ILogger<AssetManager> logger, IServiceProvider serviceProvider, IPersistentStorage storage, IGraphicsDevice graphicsDevice)
+	public AssetManager(ILogger<AssetManager> logger, IServiceProvider serviceProvider, IPersistentStorage storage, IGraphicsContext graphicsDevice)
 	{
 		_logger = logger;
 		_serviceProvider = serviceProvider;
 		_storage = storage;
-		_graphicsDevice = (GraphicsDevice)graphicsDevice;
+		_graphicsDevice = (GraphicsContext)graphicsDevice;
 	}
 
 	public void Initialize()
@@ -46,6 +46,6 @@ public class AssetManager : IAssetManager
 		var name = Path.Combine(path);
 		using var stream = _storage.Assets.Read(path);
 
-		return loader.Load(stream, name, _graphicsDevice.Internal);
+		return loader.Load(stream, name, _graphicsDevice.GraphicsDevice);
 	}
 }

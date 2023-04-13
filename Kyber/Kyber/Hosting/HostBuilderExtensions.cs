@@ -20,7 +20,7 @@ public static class KyberHostBuilderExtensions
         return hostBuilder.ConfigureServices((hostContext, services) =>
         {
 			services.AddSingleton<IWindow, Window>();
-			services.AddSingleton<IGraphicsDevice, GraphicsDevice>();
+			services.AddSingleton<IGraphicsContext, GraphicsContext>();
 			services.AddSingleton<IPersistentStorage, PersistentStorage>();
 
 

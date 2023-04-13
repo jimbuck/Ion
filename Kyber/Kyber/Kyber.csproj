@@ -10,6 +10,10 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Graphics\ImGuiRenderer.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<Using Include="System.Collections" />
 		<Using Include="System.Collections.Concurrent" />
 		<Using Include="System.Numerics" />
@@ -20,6 +24,10 @@
 	<ItemGroup>
 		<InternalsVisibleToSuffix Include=".Tests" />
 		<InternalsVisibleTo Include="Kyber.Tests.E2E" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="Graphics\ImGuiRenderer.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
