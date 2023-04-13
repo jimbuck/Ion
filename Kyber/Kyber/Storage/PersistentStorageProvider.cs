@@ -24,7 +24,8 @@ internal class PersistentStorageProvider : IPersistentStorageProvider
 
 	public void Initialize()
 	{
-		Directory.CreateDirectory(_rootPath);
+		// TODO: Determine if we really want to do this.
+		//Directory.CreateDirectory(_rootPath);
 	}
 
 	public PersistentStorageProvider Subpath(params string[] path)
