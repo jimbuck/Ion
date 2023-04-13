@@ -27,10 +27,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Include="Graphics\ImGuiRenderer.cs" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<PackageReference Include="AssimpNet" Version="4.1.0" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
