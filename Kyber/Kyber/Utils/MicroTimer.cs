@@ -4,9 +4,9 @@ namespace Kyber.Utils;
 
 public static class MicroTimer
 {
-	private static readonly Dictionary<string, Stopwatch> _watches = new();
-	private static readonly Dictionary<string, float[]> _timings = new();
-	private static readonly Dictionary<string, int> _indicies = new();
+	private static readonly ConcurrentDictionary<string, Stopwatch> _watches = new();
+	private static readonly ConcurrentDictionary<string, float[]> _timings = new();
+	private static readonly ConcurrentDictionary<string, int> _indicies = new();
 
 	public static IDisposable Start(string name, int maxRecords = 32)
 	{
