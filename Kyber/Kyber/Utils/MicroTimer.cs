@@ -1,62 +1,133 @@
 ﻿using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Kyber.Utils;
 
+public record struct MicroTiming(int Id, double Start, double Stop, int ThreadId)
+{
+	public double Duration => Stop - Start;
+}
+
+public interface IMicroTimerInstance : IDisposable
+{
+	void Then(string name);
+}
+
 public static class MicroTimer
 {
-	private static readonly ConcurrentDictionary<string, Stopwatch> _watches = new();
-	private static readonly ConcurrentDictionary<string, float[]> _timings = new();
-	private static readonly ConcurrentDictionary<string, int> _indicies = new();
+	private static int _nextId = 0;
+	private static readonly double _toMicroSeconds;
 
-	public static IDisposable Start(string name, int maxRecords = 32)
+	private static readonly ConcurrentDictionary<int, string> _names = new();
+	private static readonly ConcurrentBag<MicroTiming> _timings = new();
+
+	static MicroTimer()
 	{
-		if (!_watches.ContainsKey(name))
-		{
-			_watches.TryAdd(name, new Stopwatch());
-			_timings.TryAdd(name, new float[maxRecords]);
-			_indicies.TryAdd(name, 0);
-		}
-		var instance = new MicroTimerInstance(name);
-
-		_watches[name].Restart();
-		return instance;
+		_toMicroSeconds = 1000000D / Stopwatch.Frequency;
 	}
 
-	public static void Timings(ref Dictionary<string, float> target)
+	public static IMicroTimerInstance Start(string name)
 	{
-		foreach(var key in _timings.Keys)
-		{
-			target[key] = _timings[key].Average();
-		}
+		var id = Interlocked.Increment(ref _nextId);
+		_names.TryAdd(id, name);
+		return new MicroTimerInstance(id, Stopwatch.GetTimestamp() * _toMicroSeconds);
 	}
 
 	public static void Clear()
 	{
-		_watches.Clear();
 		_timings.Clear();
-		_indicies.Clear();
+		_names.Clear();
 	}
 
-	private static void _stop(string name)
+	public static void Export(string path)
 	{
-		if (!_watches.TryGetValue(name, out var watch)) return;
-		watch.Stop();
-		_timings[name][_indicies[name]] = (float)watch.Elapsed.TotalSeconds;
-		_indicies[name] = (_indicies[name] + 1) % _timings[name].Length;
-	}
-
-	private readonly struct MicroTimerInstance : IDisposable
-	{
-		private readonly string _name;
-
-		public MicroTimerInstance(string name)
+		var traceExport = new TraceExport()
 		{
-			_name = name;
+			TraceEvents = _timings.Select(t => _names.TryGetValue(t.Id, out var name) ? new TraceEvent(name, t) : null).Where(t => t != null).ToList() as List<TraceEvent>,
+			Metadata = new()
+			{
+				//{ "clock-offset-since-epoch", $"{_start}" },
+			},
+		};
+		File.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(traceExport));
+	}
+
+	private static void _stop(int id, double start, int threadId)
+	{
+		var stop = Stopwatch.GetTimestamp() * _toMicroSeconds;
+		_timings.Add(new MicroTiming(id, start, stop, threadId));
+	}
+
+	private struct MicroTimerInstance : IMicroTimerInstance
+	{
+		private int _id;
+		private double _start;
+		private int _threadId;
+
+		public MicroTimerInstance(int id, double start)
+		{
+			_id = id;
+			_start = start;
+			_threadId = Environment.CurrentManagedThreadId;
+		}
+
+		public void Then(string name)
+		{
+			_stop(_id, _start, _threadId);
+			var newInstance = (MicroTimerInstance)Start(name);
+			_id = newInstance._id;
+			_start = newInstance._start;
+			_threadId = newInstance._threadId;
 		}
 
 		public void Dispose()
 		{
-			_stop(_name);
+			_stop(_id, _start, _threadId);
 		}
+	}
+
+	private class TraceEvent
+	{
+		[JsonPropertyName("name")]
+		public string Name { get; set; }
+
+		[JsonPropertyName("tid")]
+		public long ThreadId { get; set; }
+
+		[JsonPropertyName("ts")]
+		public double Timestamp { get; set; }
+
+		[JsonPropertyName(name: "dur")]
+		public double Duration { get; set; }
+
+		[JsonPropertyName("ph")]
+		public string Phase { get; set; } = "X";
+
+		//[JsonPropertyName("cat")]
+		//public string? Categories { get; set; }
+
+		//[JsonPropertyName("args")]
+		//public Dictionary<string, object>? Args { get; set; } = new();
+
+		public TraceEvent(string name, MicroTiming timing)
+		{
+			Name = name;
+			Timestamp = timing.Start;
+			Duration = timing.Duration;
+			ThreadId = timing.ThreadId;
+		}
+	}
+
+	private class TraceExport
+	{
+		[JsonPropertyName("controllerTraceDataKey")]
+		public string ControllerTraceDataKey { get; set; } = "systraceController";
+
+		[JsonPropertyName("metadata")]
+		public Dictionary<string, string> Metadata { get; set; } = new();
+
+		[JsonPropertyName("traceEvents")]
+		public List<TraceEvent> TraceEvents { get; set; } = new();
 	}
 }

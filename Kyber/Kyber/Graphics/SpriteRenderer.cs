@@ -2,6 +2,7 @@
 using Veldrid.SPIRV;
 
 using Kyber.Assets;
+using Kyber.Utils;
 
 namespace Kyber.Graphics;
 
@@ -192,6 +193,8 @@ void main()
 			return;
 		}
 
+		using var _ = MicroTimer.Start("SpriteRenderer::Initialize");
+
 		var factory = _graphicsContext.Factory;
 		_commandList = factory.CreateCommandList();
 
@@ -246,6 +249,8 @@ void main()
 		if (_graphicsContext.GraphicsDevice == null) throw new InvalidOperationException("Begin cannot be called until the GraphicsDevice has been initialized.");
 
 		if (_beginCalled) throw new InvalidOperationException("Begin cannot be called again until End has been successfully called.");
+
+		using var _ = MicroTimer.Start("SpriteRenderer::Begin");
 
 		_batchManager.Clear();
 		_beginCalled = true;
@@ -314,31 +319,37 @@ void main()
 		if (_graphicsContext.NoRender) return;
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling End.");
 
+		using var _ = MicroTimer.Start("SpriteRenderer::End");
+
 		_beginCalled = false;
 
 		if (_batchManager.IsEmpty || _graphicsContext.GraphicsDevice is null) return;
 
 		_commandList.Begin();
 		_commandList.SetFramebuffer(_graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer);
-		_commandList.SetFullViewports();
+		//_commandList.SetFullViewports();
 		//_commandList.ClearColorTarget(0, Color.Transparent);
 		//_commandList.ClearDepthStencil(_graphicsContext.GraphicsDevice.IsDepthRangeZeroToOne ? 0f : 1f);
 		_commandList.SetPipeline(_pipeline);
 		foreach (var (texture, group) in _batchManager)
 		{
 			var pair = _getBuffer(texture, group.Count + 1);
+			using var timer = MicroTimer.Start("SpriteRenderer::End::Texture::Map");
+			
 			var mapped = _graphicsContext.GraphicsDevice.Map(pair.Buffer, MapMode.Write);
+
+			timer.Then("SpriteRenderer::End::Texture::Copy");
 			MemUtils.Set(mapped.Data, _graphicsContext.ProjectionMatrix, 1);
 			MemUtils.Copy(mapped.Data + SpriteBatchManager.INSTANCE_SIZE, group.GetSpan());
 
+			timer.Then("SpriteRenderer::End::Texture::Unmap");
 			_graphicsContext.GraphicsDevice.Unmap(pair.Buffer);
-
+			timer.Then("SpriteRenderer::End::Texture::Commands");
 			_commandList.SetVertexBuffer(0, _vertexBuffer);
 			_commandList.SetGraphicsResourceSet(0, pair.InstanceSet);
 			_commandList.SetGraphicsResourceSet(1, pair.TextureSet);
 			_commandList.Draw(4, (uint)group.Count, 0, 0);
 		}
-
 		
 		_commandList.End();
 		_graphicsContext.SubmitCommands(_commandList);
@@ -346,26 +357,30 @@ void main()
 
 	private BufferContainer _getBuffer(Assets.Texture texture, int count)
 	{
+		using var _ = MicroTimer.Start("SpriteRenderer::_getBuffer");
+
 		var size = SpriteBatchManager.GetBatchSize(count);
 		var bci = new BufferDescription(size, BufferUsage.StructuredBufferReadOnly | BufferUsage.Dynamic, SpriteBatchManager.Instance.SizeInBytes);
 
 		if (!_buffers.TryGetValue(texture, out var pair))
 		{
+			using var _nb = MicroTimer.Start("SpriteRenderer::_getBuffer::NewBuffer");
 			var buffer = _graphicsContext.Factory.CreateBuffer(bci);
 			pair = new(buffer,
 				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, buffer)),
-				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsContext.GraphicsDevice.LinearSampler))
+				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsContext.GraphicsDevice!.LinearSampler))
 				);
 
 			_buffers[texture] = pair;
 		}
 		else if (size > pair.Buffer.SizeInBytes)
 		{
+			using var _rb = MicroTimer.Start("SpriteRenderer::_getBuffer::ResizeBuffer");
 			pair.Dispose();
 
 			pair.Buffer = _graphicsContext.Factory.CreateBuffer(bci);
 			pair.InstanceSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, pair.Buffer));
-			pair.TextureSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsContext.GraphicsDevice.LinearSampler));
+			pair.TextureSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsContext.GraphicsDevice!.LinearSampler));
 			_buffers[texture] = pair;
 		}
 

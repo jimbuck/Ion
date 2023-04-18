@@ -99,23 +99,23 @@ internal class Window : IWindow
 
 	public bool IsMaximized
 	{
-		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.Maximized;
-		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.Maximized : Veldrid.WindowState.Normal; }
+		get => (Sdl2Window?.WindowState ?? WindowState.Hidden) == WindowState.Maximized;
+		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? WindowState.Maximized : WindowState.Normal; }
 	}
 	public bool IsMinimized
 	{
-		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.Minimized;
-		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.Minimized : Veldrid.WindowState.Normal; }
+		get => (Sdl2Window?.WindowState ?? WindowState.Hidden) == WindowState.Minimized;
+		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? WindowState.Minimized : WindowState.Normal; }
 	}
 	public bool IsFullscreen
 	{
-		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.FullScreen;
-		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.FullScreen : Veldrid.WindowState.Normal; }
+		get => (Sdl2Window?.WindowState ?? WindowState.Hidden) == WindowState.FullScreen;
+		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? WindowState.FullScreen : WindowState.Normal; }
 	}
 	public bool IsBorderlessFullscreen
 	{
-		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.BorderlessFullScreen;
-		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.BorderlessFullScreen : Veldrid.WindowState.Normal; }
+		get => (Sdl2Window?.WindowState ?? WindowState.Hidden) == WindowState.BorderlessFullScreen;
+		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? WindowState.BorderlessFullScreen : WindowState.Normal; }
 	}
 
 	private string _title;
@@ -188,7 +188,7 @@ internal class Window : IWindow
 		return new Sdl2Window(windowCreateInfo.WindowTitle, windowCreateInfo.X, windowCreateInfo.Y, windowCreateInfo.WindowWidth, windowCreateInfo.WindowHeight, sDL_WindowFlags, threadedProcessing: true);
 	}
 
-	private static SDL_WindowFlags GetWindowFlags(Veldrid.WindowState state)
+	private static SDL_WindowFlags GetWindowFlags(WindowState state)
 	{
 		return state switch
 		{

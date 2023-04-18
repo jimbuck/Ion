@@ -1,5 +1,6 @@
 ﻿using Kyber.Assets;
 using Kyber.Graphics;
+using Kyber.Utils;
 
 namespace Kyber.Examples.SpriteRenderer;
 
@@ -42,6 +43,8 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 
 	public void Initialize()
 	{
+		using var _ = MicroTimer.Start("TestSpriteRendererSystem::Initialize");
+
 		_texture = _assetManager.Load<Texture2D>("Tile.png");
 
 		var depthBlockSize = 100;
@@ -85,11 +88,15 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 
 	public void Update(GameTime dt)
 	{
+		using var _ = MicroTimer.Start(name: "TestSpriteRenderSystem::Update");
+
 		_updateBouncingSprites(dt);
 	}
 
 	public void Render(GameTime dt)
 	{
+		using var _ = MicroTimer.Start(name: "TestSpriteRenderSystem::Render");
+
 		_renderDepthTest(dt);
 		_renderBouncingSprites(dt);
 	}

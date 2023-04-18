@@ -29,9 +29,9 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 		_totalDt += dt;
 		_frameCount++;
 
-		if (_totalDt > 1f)
+		if (_totalDt > 0.5f)
 		{
-			_logger.LogInformation($"FPS: {_frameCount / _totalDt:###.0}");
+			_logger.LogInformation($"Frame Time: {1000 * _totalDt / _frameCount: 00.00}, FPS: {_frameCount / _totalDt:###.0}");
 			_totalDt = 0f;
 			_frameCount = 0;
 		}

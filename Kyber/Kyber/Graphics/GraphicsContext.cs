@@ -1,4 +1,6 @@
-﻿using Veldrid;
+﻿using Kyber.Utils;
+
+using Veldrid;
 
 namespace Kyber.Graphics;
 
@@ -39,6 +41,7 @@ public class GraphicsContext : IGraphicsContext, IDisposable
 	{
 		if (NoRender) return;
 
+		using var _ = MicroTimer.Start("GraphicsContext::Initialize");
 		_logger.LogInformation("Creating graphics device...");
 
 		if (!GraphicsDevice.IsBackendSupported(_config.PreferredBackend))
@@ -74,6 +77,8 @@ public class GraphicsContext : IGraphicsContext, IDisposable
 	{
 		if (NoRender || GraphicsDevice is null || _commandList is null) return;
 
+		using var _ = MicroTimer.Start("GraphicsContext::BeginFrame");
+
 		_commandList.Begin();
 		_commandList.SetFramebuffer(GraphicsDevice.MainSwapchain.Framebuffer);
 		_commandList.SetFullViewports();
@@ -87,13 +92,19 @@ public class GraphicsContext : IGraphicsContext, IDisposable
 	{
 		if (NoRender || GraphicsDevice is null || _commandList is null) return;
 
+		using var timer = MicroTimer.Start("GraphicsContext::EndFrame::WaitForIdle");
+
 		//_cl.End();
 		//GraphicsDevice.SubmitCommands(_cl);
+		GraphicsDevice.WaitForIdle();
+
+		timer.Then("GraphicsContext::EndFrame::SwapBuffers");
 
 		if (_window.HasClosed) return;
 
-		//Internal.WaitForIdle();
-		GraphicsDevice.SwapBuffers(GraphicsDevice.MainSwapchain);
+		GraphicsDevice.SwapBuffers();
+
+		timer.Then("GraphicsContext::EndFrame::HandleResize");
 
 		if (_events.OnLatest<WindowResizeEvent>(out var e))
 		{
@@ -103,6 +114,7 @@ public class GraphicsContext : IGraphicsContext, IDisposable
 
 	public void SubmitCommands(CommandList commandList)
 	{
+		using var _ = MicroTimer.Start("GraphicsContext::SubmitCommands");
 		GraphicsDevice?.SubmitCommands(commandList);
 	}
 
