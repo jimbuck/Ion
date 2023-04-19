@@ -2,7 +2,7 @@
 
 public class EntityTests
 {
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void CreateEntity_Create()
     {
         using var world = new World();
@@ -11,7 +11,7 @@ public class EntityTests
         Assert.True(entity.IsAlive);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void CreateEntity_Tag()
     {
         using var world = new World();
@@ -28,7 +28,7 @@ public class EntityTests
         Assert.NotEqual(entity1.Archetype, entity2.Archetype);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void CreateEntity_Untag()
     {
         using var world = new World();
@@ -48,7 +48,7 @@ public class EntityTests
         Assert.Equal(entity1.Archetype, entity2.Archetype);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void CreateEntity_Set()
     {
         using var world = new World();
@@ -65,7 +65,7 @@ public class EntityTests
         Assert.NotEqual(entity1.Archetype, entity2.Archetype);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void CreateEntity_SetRef()
     {
         using var world = new World();
@@ -79,7 +79,7 @@ public class EntityTests
         Assert.Equal(6014, entity.Get<int>());
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void CreateEntity_Unset()
     {
         using var world = new World();
@@ -99,7 +99,7 @@ public class EntityTests
         Assert.Equal(entity1.Archetype, entity2.Archetype);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void CreateEntity_Destroy()
     {
         using var world = new World();

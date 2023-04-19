@@ -2,7 +2,7 @@
 
 public class QueryTests
 {
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void SingleQuery_SingleComponentEntities()
     {
         using var world = new World();
@@ -27,7 +27,7 @@ public class QueryTests
         Assert.Contains(ints, i => i == 1 || i == 4);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void DoubleQuery_DoubleComponentEntities()
     {
         using var world = new World();
@@ -58,7 +58,7 @@ public class QueryTests
         Assert.Contains(ints, i => i == 1 || i == 4 || i == 3);
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void DoubleQuery_DoubleComponentEntities_IncorrectQuery()
     {
         using var world = new World();
@@ -85,7 +85,7 @@ public class QueryTests
         });
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void ManyComponents()
     {
         using var world = new World();

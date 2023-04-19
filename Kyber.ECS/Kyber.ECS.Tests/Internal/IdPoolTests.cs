@@ -2,7 +2,7 @@
 
 public class IdPoolTests
 {
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void IntPool_StartsAt()
     {
         var intPool0 = new IntPool(0);
@@ -12,7 +12,7 @@ public class IdPoolTests
         Assert.Equal(1, intPool1.Next());
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void IntPool_Incremental()
     {
         var intPool = new IntPool(1);
@@ -22,7 +22,7 @@ public class IdPoolTests
         Assert.Equal(3, intPool.Next());
     }
 
-    [Fact]
+    [Fact, Trait(CATEGORY, UNIT)]
     public void IntPool_Recycle()
     {
         var intPool = new IntPool(1);

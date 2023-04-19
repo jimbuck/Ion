@@ -5,8 +5,10 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{91104B3E-FB76-4C83-A255-4D7A765E766F}"
 	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
 		.gitignore = .gitignore
 		.versionize = .versionize
+		coverage.runsettings = coverage.runsettings
 		Directory.Build.targets = Directory.Build.targets
 		.config\dotnet-tools.json = .config\dotnet-tools.json
 		LICENSE = LICENSE
@@ -21,12 +23,32 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.ECS.Tests", "Kyber.EC
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Workflows", "Workflows", "{C0F5BCF3-2CCD-48BE-826B-FA7CE6EC6090}"
 	ProjectSection(SolutionItems) = preProject
-		.github\workflows\cc.yml = .github\workflows\cc.yml
-		.github\workflows\main.yml = .github\workflows\main.yml
-		.github\workflows\pr.yml = .github\workflows\pr.yml
+		.github\workflows\check-pr.yml = .github\workflows\check-pr.yml
+		.github\workflows\conventional-commits.yml = .github\workflows\conventional-commits.yml
+		.github\workflows\create-release.yml = .github\workflows\create-release.yml
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.ECS.Generators", "Kyber.ECS\Kyber.ECS.Generators\Kyber.ECS.Generators.csproj", "{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.ECS.Generators", "Kyber.ECS\Kyber.ECS.Generators\Kyber.ECS.Generators.csproj", "{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Kyber", "Kyber", "{04FAD615-3827-4ED3-8114-08B39D448145}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber", "Kyber\Kyber\Kyber.csproj", "{7A7926FB-B7D6-4992-AD14-DA2F900F1F9A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Tests", "Kyber\Kyber.Tests\Kyber.Tests.csproj", "{7EB7822D-D710-459D-B04E-E8600EC02E9A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Kyber.Examples", "Kyber.Examples", "{4D2CCFA7-A07F-4101-B7F8-351DDFE783F3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.Simple", "Kyber.Examples\Kyber.Examples.Simple\Kyber.Examples.Simple.csproj", "{8042821C-776D-47A8-AB66-ECB485480624}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Kyber.Core", "Kyber.Core", "{EA7196A2-54ED-4E68-8090-18E68E6322CB}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Core", "Kyber.Core\Kyber.Core\Kyber.Core.csproj", "{45F3420A-8269-4DE9-B750-14F49B2C86A3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.Veldrid", "Kyber.Examples\Kyber.Examples.Veldrid\Kyber.Examples.Veldrid.csproj", "{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Core.Tests", "Kyber.Core\Kyber.Core.Tests\Kyber.Core.Tests.csproj", "{7FEAA613-D48B-4947-8AA0-2DD60876F5CD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.SpriteRenderer", "Kyber.Examples\Kyber.Examples.SpriteRenderer\Kyber.Examples.SpriteRenderer.csproj", "{F6A420FF-459E-425C-98C4-F7E25E5996D3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -46,6 +68,34 @@ Global
 		{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1811C48-3E99-40EC-9417-7FE8B0DE05B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7A7926FB-B7D6-4992-AD14-DA2F900F1F9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A7926FB-B7D6-4992-AD14-DA2F900F1F9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A7926FB-B7D6-4992-AD14-DA2F900F1F9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A7926FB-B7D6-4992-AD14-DA2F900F1F9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7EB7822D-D710-459D-B04E-E8600EC02E9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7EB7822D-D710-459D-B04E-E8600EC02E9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7EB7822D-D710-459D-B04E-E8600EC02E9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7EB7822D-D710-459D-B04E-E8600EC02E9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8042821C-776D-47A8-AB66-ECB485480624}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8042821C-776D-47A8-AB66-ECB485480624}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8042821C-776D-47A8-AB66-ECB485480624}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8042821C-776D-47A8-AB66-ECB485480624}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45F3420A-8269-4DE9-B750-14F49B2C86A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45F3420A-8269-4DE9-B750-14F49B2C86A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45F3420A-8269-4DE9-B750-14F49B2C86A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45F3420A-8269-4DE9-B750-14F49B2C86A3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7FEAA613-D48B-4947-8AA0-2DD60876F5CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7FEAA613-D48B-4947-8AA0-2DD60876F5CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7FEAA613-D48B-4947-8AA0-2DD60876F5CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7FEAA613-D48B-4947-8AA0-2DD60876F5CD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -55,6 +105,13 @@ Global
 		{95DF00F2-65E4-4D9E-B7EF-BB27FAB2A76E} = {FFA11FD9-B060-4F55-93E8-DF067E652C5E}
 		{C0F5BCF3-2CCD-48BE-826B-FA7CE6EC6090} = {91104B3E-FB76-4C83-A255-4D7A765E766F}
 		{A1811C48-3E99-40EC-9417-7FE8B0DE05B5} = {FFA11FD9-B060-4F55-93E8-DF067E652C5E}
+		{7A7926FB-B7D6-4992-AD14-DA2F900F1F9A} = {04FAD615-3827-4ED3-8114-08B39D448145}
+		{7EB7822D-D710-459D-B04E-E8600EC02E9A} = {04FAD615-3827-4ED3-8114-08B39D448145}
+		{8042821C-776D-47A8-AB66-ECB485480624} = {4D2CCFA7-A07F-4101-B7F8-351DDFE783F3}
+		{45F3420A-8269-4DE9-B750-14F49B2C86A3} = {EA7196A2-54ED-4E68-8090-18E68E6322CB}
+		{A6ACEC97-73E6-4BB2-943B-49B8A00391DE} = {4D2CCFA7-A07F-4101-B7F8-351DDFE783F3}
+		{7FEAA613-D48B-4947-8AA0-2DD60876F5CD} = {EA7196A2-54ED-4E68-8090-18E68E6322CB}
+		{F6A420FF-459E-425C-98C4-F7E25E5996D3} = {4D2CCFA7-A07F-4101-B7F8-351DDFE783F3}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CCF839E2-AF6A-4444-95F2-76F60225DC55}

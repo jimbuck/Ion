@@ -1,0 +1,50 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<Version>0.1.1</Version>
+		<TargetFramework>net6.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <Compile Remove="Graphics\ImGuiRenderer.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="System.Collections" />
+		<Using Include="System.Collections.Concurrent" />
+		<Using Include="System.Numerics" />
+		<Using Include="System.Diagnostics.CodeAnalysis" />
+		<Using Include="Microsoft.Extensions.Logging" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleToSuffix Include=".Tests" />
+		<InternalsVisibleTo Include="Kyber.Tests.E2E" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="AssimpNet" Version="4.1.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />
+		<PackageReference Include="Veldrid" Version="4.8.0">
+			<PrivateAssets>true</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Veldrid.ImageSharp" Version="4.8.0" />
+		<PackageReference Include="Veldrid.SPIRV" Version="1.0.15">
+			<PrivateAssets>true</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Veldrid.StartupUtilities" Version="4.8.0">
+			<PrivateAssets>true</PrivateAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\Kyber.Core\Kyber.Core\Kyber.Core.csproj" />
+	</ItemGroup>
+	
+</Project>
