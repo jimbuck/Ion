@@ -217,10 +217,11 @@ internal class Window : IWindow
 
     public void Close()
     {
-        if (_config.Output != GraphicsOutput.Window) return;
-        _logger.LogDebug("Closing window...");
-        Sdl2Window?.Close();
-    }
+		_logger.LogDebug("Closing...");
+
+		if (_config.Output == GraphicsOutput.Window) Sdl2Window?.Close();
+		else _onClosed();
+	}
 
 	private void _onResize()
 	{

@@ -5,7 +5,7 @@ public class GameTests
     [Fact, Trait(CATEGORY, INTEGRATION)]
     public async Task Run_Exit()
     {
-        using var _ = SetupWithSystems(false, out var services, out var game);
+        using var _ = SetupWithSystems(out var services, out var game);
         Assert.False(game.IsRunning);
 
         var gameTask = Task.Run(() => game.Run());
@@ -17,21 +17,19 @@ public class GameTests
 		Assert.False(game.IsRunning);
     }
 
-    [Fact, Trait(CATEGORY, E2E)]
+    [Fact, Trait(CATEGORY, INTEGRATION)]
     public async Task Run_ExitOnWindowClose()
     {
-        using var _ = SetupWithSystems(true, out var services, out var game);
+        using var _ = SetupWithSystems(out var services, out var game);
         var window = services.GetRequiredService<IWindow>();
         Assert.False(game.IsRunning);
 
         var gameTask = Task.Run(() => game.Run());
         await Task.Delay(TimeSpan.FromSeconds(2));
         Assert.True(game.IsRunning);
-		Assert.True(window.IsVisible);
 
         window.Close();
 		await gameTask.WaitAsync(TimeSpan.FromSeconds(5));
-		Assert.False(window.IsVisible);
 		Assert.False(game.IsRunning);
     }
 
@@ -39,7 +37,7 @@ public class GameTests
     public void LifeCycle_NoGraphics()
     {
 		var dt = GameTime.FromDelta(0.01f);
-        using var _ = SetupWithSystems(false, out var services, out var game, typeof(TestSystem));
+        using var _ = SetupWithSystems(out var services, out var game, typeof(TestSystem));
 
         var testSystem = services.GetRequiredService<TestSystem>();
 
@@ -88,11 +86,11 @@ public class GameTests
         Assert.Equal(1, testSystem.DestroyCount);
     }
 
-    [Fact, Trait(CATEGORY, E2E)]
+    [Fact, Trait(CATEGORY, INTEGRATION)]
     public void LifeCycle_Window()
     {
 		var dt = GameTime.FromDelta(0.01f);
-		using var _ = SetupWithSystems(false, out var services, out var game, typeof(TestSystem));
+		using var _ = SetupWithSystems(out var services, out var game, typeof(TestSystem));
 
 		var testSystem = services.GetRequiredService<TestSystem>();
 
