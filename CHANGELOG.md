@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.1.2"></a>
+## [0.1.2](https://www.github.com/jimbuck/Kyber/releases/tag/v0.1.2) (2023-4-19)
+
+### ✨ Features
+
+* Core Engine (#17) ([d9f1f98](https://www.github.com/jimbuck/Kyber/commit/d9f1f98838d8c83ac9d6b5ce4be9abb41cec3dd4))
+
 <a name="0.1.1"></a>
 ## [0.1.1](https://www.github.com/jimbuck/Kyber/releases/tag/v0.1.1) (2022-10-10)
 
