@@ -1,18 +1,22 @@
 # Kyber
-Modern game engine framework for C#.
+A modern, low level C# game engine for Windows, Linux, and MacOS.
 
 ## Modules
 
-### Kyber Engine
-A simple, modern code-first game engine inspired by Monogame and Bevy.
+### Kyber
+A simple, modern code-first game engine inspired by Monogame and Bevy. Supports 2D and 3D rendering using Vulkan, DirectX, and OpenGL.
 
-### Kyber ECS
-A fast and intuitive archetype-based ECS. Custom built, based on flecs with inspiration from SimpleECS and Bevy.
+## Planned Features
+ - Built-in 2D and 3D renderers
+ - Built-in physics engine
+ - Web-based UI Framework
+ - Network multiplayer by default
+ - Headless renderer (image/gif/video output).
 
-### Kyber UI
-An ergonomic web-based user interface layer. 
-
-### 
+## Built Using
+  - Veldrid (Graphics API)
+  - AssimpNet (Asset Loading)
+  - Peridot (Sprite Batch inspiration)
 
 ## Useful Links
 
