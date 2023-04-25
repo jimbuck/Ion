@@ -21,5 +21,9 @@
 		<InternalsVisibleToSuffix Include=".Tests" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <PackageReference Include="Veldrid" Version="4.8.0" />
+	</ItemGroup>
+
 </Project>
 

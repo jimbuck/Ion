@@ -21,7 +21,7 @@ internal class Game
 	private readonly IGameConfig _gameConfig;
 	private readonly Window _window;
 	private readonly GraphicsContext _graphics;
-	private readonly SpriteRenderer _spriteRenderer;
+	private readonly SpriteBatch _spriteRenderer;
 	private readonly AssetManager _assets;
 	private readonly InputState _input;
 	private readonly EventEmitter _eventEmitter;
@@ -40,7 +40,7 @@ internal class Game
 		IGameConfig gameConfig,
 		IWindow window,
 		IGraphicsContext graphics,
-		ISpriteRenderer spriteRenderer,
+		ISpriteBatch spriteRenderer,
 		IAssetManager assets,
 		IInputState input,
 		IEventEmitter eventEmitter,
@@ -51,7 +51,7 @@ internal class Game
 		_gameConfig = gameConfig;
 		_window = (Window)window;
 		_graphics = (GraphicsContext)graphics;
-		_spriteRenderer = (SpriteRenderer)spriteRenderer;
+		_spriteRenderer = (SpriteBatch)spriteRenderer;
 		_assets = (AssetManager)assets;
 		_input = (InputState)input;
 		_eventEmitter = (EventEmitter)eventEmitter;

@@ -4,7 +4,7 @@ global using Kyber.Scenes;
 using Kyber.Hosting;
 using Kyber.Hosting.Scenes;
 
-using Kyber.Examples.Simple;
+using Kyber.Examples.Scenes;
 
 var gameHost = KyberHost.CreateDefaultBuilder()
     .ConfigureKyber(static (game) => {
@@ -13,12 +13,12 @@ var gameHost = KyberHost.CreateDefaultBuilder()
 		void NamedFunction(ISceneBuilder scene) { scene.AddSystem<TestLoggerSystem>(); }
 
 		game.AddSystem<TestLoggerSystem>()
-			//.AddSystem<SceneSwitcherSystem>()
+			.AddSystem<SceneSwitcherSystem>()
 			.AddScene<Scenes.Main>() // Class with interface
 			.AddScene(Scenes.Gameplay) // Named method
 			.AddScene(NamedFunction)
 			.AddScene("Inline", static (scene) => scene.AddSystem<TestLoggerSystem>());
-    })    
+    })  
     .Build();
 
 gameHost.StartAsync().Wait();

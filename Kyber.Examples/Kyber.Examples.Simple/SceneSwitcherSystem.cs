@@ -1,4 +1,4 @@
-﻿namespace Kyber.Examples.Simple;
+﻿namespace Kyber.Examples.Scenes;
 
 public class SceneSwitcherSystem : IUpdateSystem
 {

@@ -1,9 +1,12 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
+using Arch.Core;
+
 using Kyber.Graphics;
 using Kyber.Assets;
 using Kyber.Storage;
+
 
 namespace Kyber.Hosting;
 
@@ -23,15 +26,16 @@ public static class KyberHostBuilderExtensions
 			services.AddSingleton<IGraphicsContext, GraphicsContext>();
 			services.AddSingleton<IPersistentStorage, PersistentStorage>();
 
-
 			services.AddScoped<IAssetManager, AssetManager>();
 			services.AddSingleton<Texture2DLoader>();
 
-			services.AddSingleton<ISpriteRenderer, SpriteRenderer>();
+			services.AddSingleton<ISpriteBatch, SpriteBatch>();
 
 			services.AddSingleton<IEventEmitter, EventEmitter>();
             services.AddTransient<IEventListener>(svcs => ((EventEmitter)svcs.GetRequiredService<IEventEmitter>()).CreateListener());
             services.AddSingleton<IInputState, InputState>();
+
+			services.AddScoped<World>(svcs => World.Create());
 
 			var gameBuilder = new GameBuilder(services);
 			configure(gameBuilder);

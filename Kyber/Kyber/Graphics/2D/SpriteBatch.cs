@@ -7,7 +7,7 @@ using Kyber.Utils;
 namespace Kyber.Graphics;
 
 [Flags]
-public enum SpriteOptions
+public enum SpriteEffect
 {
 	/// <summary>
 	/// Renders the sprite normally.
@@ -25,7 +25,7 @@ public enum SpriteOptions
 	FlipVertically,
 }
 
-public interface ISpriteRenderer
+public interface ISpriteBatch
 {
 	void DrawRect(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float depth = 0);
 	void DrawRect(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0);
@@ -36,17 +36,17 @@ public interface ISpriteRenderer
 	void DrawLine(Color color, Vector2 pointA, Vector2 pointB, float thickness = 1f, float depth = 0);
 	void DrawLine(Color color, Vector2 start, float length, float angle, float thickness = 1, float depth = 0);
 
-	void Draw(Texture2D texture, RectangleF destinationRectangle, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteOptions options = SpriteOptions.None);
-	void Draw(Texture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteOptions options = SpriteOptions.None);
+	void Draw(Texture2D texture, RectangleF destinationRectangle, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None);
+	void Draw(Texture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None);
 }
 
-internal partial class SpriteRenderer : ISpriteRenderer, IDisposable
+internal class SpriteBatch : ISpriteBatch, IDisposable
 {
 	private static readonly RectangleF _defaultScissor = new(-(1 << 22), -(1 << 22), 1 << 23, 1 << 23);
 	private static readonly Vector2 VEC2_HALF = Vector2.One / 2f;
 
 	private readonly IWindow _window;
-	private readonly GraphicsContext _graphicsContext;
+	private readonly IGraphicsContext _graphicsContext;
 	private readonly ILogger _logger;
 	private readonly IEventListener _events;
 
@@ -173,10 +173,10 @@ void main()
     fsout_Color = fsin_Color * texture(sampler2D(Tex, Sampler), tex_coord);
 }";
 
-	public SpriteRenderer(IWindow window, IGraphicsContext graphicsContext, ILogger<SpriteRenderer> logger, IEventListener events)
+	public SpriteBatch(IWindow window, IGraphicsContext graphicsContext, ILogger<SpriteBatch> logger, IEventListener events)
 	{
 		_window = window;
-		_graphicsContext = (GraphicsContext)graphicsContext;
+		_graphicsContext = graphicsContext;
 		_logger = logger;
 		_events = events;
 
@@ -189,7 +189,7 @@ void main()
 		if (_graphicsContext.NoRender) return;
 		if (_graphicsContext.GraphicsDevice == null)
 		{
-			_logger.LogWarning($"{nameof(SpriteRenderer)} automically disabled due to GraphicsDevice not being set.");
+			_logger.LogWarning($"{nameof(SpriteBatch)} automically disabled due to GraphicsDevice not being set.");
 			return;
 		}
 
@@ -260,14 +260,14 @@ void main()
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
-		_addSprite(_whitePixel!, color, new RectangleF(0, 0, 1, 1), destinationRectangle, origin, rotation, depth, _defaultScissor, SpriteOptions.None);
+		_addSprite(_whitePixel!, color, new RectangleF(0, 0, 1, 1), destinationRectangle, origin, rotation, depth, _defaultScissor, SpriteEffect.None);
 	}
 
 	public void DrawRect(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0f)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
-		_addSprite(_whitePixel!, color, new RectangleF(0, 0, 1, 1), new RectangleF(position.X, position.Y, size.X, size.Y), origin, rotation, depth, _defaultScissor, SpriteOptions.None);
+		_addSprite(_whitePixel!, color, new RectangleF(0, 0, 1, 1), new RectangleF(position.X, position.Y, size.X, size.Y), origin, rotation, depth, _defaultScissor, SpriteEffect.None);
 	}
 
 	public void DrawPoint(Color color, Vector2 position, Vector2 size, float depth = 0)
@@ -294,7 +294,7 @@ void main()
 		DrawRect(color, rect, new Vector2(0, 0.5f), rotation: angle, depth: depth);
 	}
 
-	public void Draw(Texture2D texture, RectangleF destinationRectangle, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteOptions options = SpriteOptions.None)
+	public void Draw(Texture2D texture, RectangleF destinationRectangle, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
@@ -304,7 +304,7 @@ void main()
 		_addSprite(texture, color, sourceRectangle, destinationRectangle, origin, rotation, depth, _defaultScissor, options);
 	}
 
-	public void Draw(Texture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteOptions options = SpriteOptions.None)
+	public void Draw(Texture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
@@ -395,7 +395,7 @@ void main()
 		_vertexBuffer?.Dispose();
 	}
 
-	private void _addSprite(Assets.Texture texture, Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteOptions options)
+	private void _addSprite(Assets.Texture texture, Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteEffect options)
 	{
 		ref var instance = ref _batchManager.Add(texture);
 

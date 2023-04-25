@@ -5,12 +5,15 @@ namespace Kyber.Assets;
 
 public interface IAsset : IDisposable
 {
+	int Id { get; }
 	string Name { get; }
 }
 
 public abstract class Texture : IAsset
 {
 	protected readonly VeldridTexture _texture;
+
+	public int Id => _texture.GetHashCode();
 
 	public uint Width => _texture.Width;
 	public uint Height => _texture.Height;

@@ -1,7 +1,7 @@
 ﻿
 using Kyber.Hosting.Scenes;
 
-namespace Kyber.Examples.Simple;
+namespace Kyber.Examples.Scenes;
 
 public static class Scenes
 {

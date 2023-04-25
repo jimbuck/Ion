@@ -1,6 +1,6 @@
 ﻿using Kyber.Scenes;
 
-namespace Kyber.Examples.Simple;
+namespace Kyber.Examples.Scenes;
 
 public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 {

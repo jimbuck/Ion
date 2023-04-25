@@ -99,7 +99,7 @@ internal class SpriteBatchManager
 
 		public static uint SizeInBytes => MemUtils.SizeOf<Instance>();
 
-		public void Update(Vector2 textureSize, RectangleF destinationRectangle, RectangleF sourceRectangle, Color color, float rotation, Vector2 origin, float layerDepth, RectangleF scissor, SpriteOptions options)
+		public void Update(Vector2 textureSize, RectangleF destinationRectangle, RectangleF sourceRectangle, Color color, float rotation, Vector2 origin, float layerDepth, RectangleF scissor, SpriteEffect options)
 		{
 			var sourceSize = new Vector2(sourceRectangle.Width, sourceRectangle.Height) / textureSize;
 			var pos = new Vector2(sourceRectangle.X, sourceRectangle.Y) / textureSize;
@@ -112,19 +112,19 @@ internal class SpriteBatchManager
 			Rotation = rotation;
 			Scissor = scissor;
 		}
-		private static Vector4 _createUV(SpriteOptions options, Vector2 sourceSize, Vector2 sourceLocation)
+		private static Vector4 _createUV(SpriteEffect options, Vector2 sourceSize, Vector2 sourceLocation)
 		{
-			if (options != SpriteOptions.None)
+			if (options != SpriteEffect.None)
 			{
 				// flipX
-				if (options.HasFlag(SpriteOptions.FlipHorizontally))
+				if (options.HasFlag(SpriteEffect.FlipHorizontally))
 				{
 					sourceLocation.X += sourceSize.X;
 					sourceSize.X *= -1;
 				}
 
 				// flipY
-				if (options.HasFlag(SpriteOptions.FlipVertically))
+				if (options.HasFlag(SpriteEffect.FlipVertically))
 				{
 					sourceLocation.Y += sourceSize.Y;
 					sourceSize.Y *= -1;

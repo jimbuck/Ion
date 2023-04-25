@@ -1,25 +1,5 @@
 ﻿namespace Kyber;
 
-public interface IInputState
-{
-	Vector2 MousePosition { get; }
-	float WheelDelta { get; }
-
-	bool Down(Key key);
-	bool Down(MouseButton btn);
-	bool Pressed(Key key);
-	bool Pressed(Key key, ModifierKeys modifiers);
-	bool Pressed(MouseButton btn);
-	bool Released(Key key);
-	bool Released(Key key, ModifierKeys modifiers);
-	bool Released(MouseButton btn);
-	bool Up(Key key);
-	bool Up(MouseButton btn);
-
-	void SetMousePosition(Vector2 position);
-	void SetMousePosition(int x, int y);
-}
-
 internal class InputState : IInputState
 {
 	private readonly Window _window;
@@ -52,11 +32,11 @@ internal class InputState : IInputState
 
 		foreach (var k in _inputSnapshot.KeyEvents)
 		{
-			var key = (Key)k.Key;
-			_keyEvents[key] = k;
+			var key = k.Key;
+			_keyEvents[(Key)key] = k;
 
-			if (!k.Down) _downKeys.Remove(key);
-			else if (!k.Repeat) _downKeys.Add(key);
+			if (!k.Down) _downKeys.Remove((Key)key);
+			else if (!k.Repeat) _downKeys.Add((Key)key);
 		}
 
 		foreach (var m in _inputSnapshot.MouseEvents) _mouseEvents[(MouseButton)m.MouseButton] = m;

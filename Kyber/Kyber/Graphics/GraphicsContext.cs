@@ -4,12 +4,6 @@ using Veldrid;
 
 namespace Kyber.Graphics;
 
-public interface IGraphicsContext
-{
-	Matrix4x4 ProjectionMatrix { get; }
-	bool NoRender { get; }
-}
-
 public class GraphicsContext : IGraphicsContext, IDisposable
 {
 	private readonly IGameConfig _config;
@@ -94,8 +88,6 @@ public class GraphicsContext : IGraphicsContext, IDisposable
 
 		using var timer = MicroTimer.Start("GraphicsContext::EndFrame::WaitForIdle");
 
-		//_cl.End();
-		//GraphicsDevice.SubmitCommands(_cl);
 		GraphicsDevice.WaitForIdle();
 
 		timer.Then("GraphicsContext::EndFrame::SwapBuffers");

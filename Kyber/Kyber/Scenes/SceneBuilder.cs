@@ -5,11 +5,6 @@ using Kyber.Scenes;
 
 namespace Kyber.Hosting.Scenes;
 
-public interface ISceneBuilder
-{
-    ISceneBuilder AddSystem<T>() where T : class;
-}
-
 internal class SceneBuilder : ISceneBuilder
 {
     public string Name { get; }
