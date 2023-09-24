@@ -20,8 +20,8 @@ internal class Game
 
 	private readonly IGameConfig _gameConfig;
 	private readonly Window _window;
-	private readonly GraphicsContext _graphics;
-	private readonly SpriteBatch _spriteRenderer;
+	private readonly GraphicsContext _graphicsContext;
+	private readonly SpriteBatch _spriteBatch;
 	private readonly AssetManager _assets;
 	private readonly InputState _input;
 	private readonly EventEmitter _eventEmitter;
@@ -39,8 +39,8 @@ internal class Game
 	public Game(
 		IGameConfig gameConfig,
 		IWindow window,
-		IGraphicsContext graphics,
-		ISpriteBatch spriteRenderer,
+		IGraphicsContext graphicsContext,
+		ISpriteBatch spriteBatch,
 		IAssetManager assets,
 		IInputState input,
 		IEventEmitter eventEmitter,
@@ -50,8 +50,8 @@ internal class Game
 	{
 		_gameConfig = gameConfig;
 		_window = (Window)window;
-		_graphics = (GraphicsContext)graphics;
-		_spriteRenderer = (SpriteBatch)spriteRenderer;
+		_graphicsContext = (GraphicsContext)graphicsContext;
+		_spriteBatch = (SpriteBatch)spriteBatch;
 		_assets = (AssetManager)assets;
 		_input = (InputState)input;
 		_eventEmitter = (EventEmitter)eventEmitter;
@@ -72,12 +72,10 @@ internal class Game
 		using var _ = MicroTimer.Start("Initialize");
 		_storage.Initialize();
 		_window.Initialize();
-		_graphics.Initialize();
+		_graphicsContext.Initialize();
 		_assets.Initialize();
-		_spriteRenderer.Initialize();
+		_spriteBatch.Initialize();
 		Systems.Initialize();
-
-		_graphics.UpdateProjection((uint)_window.Width, (uint)_window.Height);
 	}
 
 	public void First(GameTime time)
@@ -85,14 +83,15 @@ internal class Game
 		using var _ = MicroTimer.Start("First");
 		_window.Step();
 		_input.Step();
-		if (_events.OnLatest<WindowResizeEvent>(out var e)) _graphics.UpdateProjection(e.Data.Width, e.Data.Height);
+		_graphicsContext.First();
+
+		//if (_events.OnLatest<WindowResizeEvent>(out var e)) _graphicsContext.UpdateProjection(e.Data.Width, e.Data.Height);
 		Systems.First(time);
 	}
 
 	public void PreUpdate(GameTime time)
 	{
 		using var _ = MicroTimer.Start("PreUpdate");
-		_eventEmitter.Step();
 		Systems.PreUpdate(time);
 	}
 
@@ -118,8 +117,8 @@ internal class Game
 	public void PreRender(GameTime time)
 	{
 		using var _ = MicroTimer.Start("PreRender");
-		_graphics.BeginFrame(time);
-		_spriteRenderer.Begin(time);
+		_graphicsContext.BeginFrame(time);
+		_spriteBatch.Begin(time);
 		Systems.PreRender(time);
 	}
 
@@ -133,14 +132,15 @@ internal class Game
 	{
 		using var _ = MicroTimer.Start("PostRender");
 		Systems.PostRender(time);
-		_spriteRenderer.End();
-		_graphics.EndFrame(time);
+		_spriteBatch.End();
+		_graphicsContext.EndFrame(time);
 	}
 
 	public void Last(GameTime time)
 	{
 		using var _ = MicroTimer.Start("Last");
 		Systems.Last(time);
+		_eventEmitter.Step();
 	}
 
 	public void Destroy()
@@ -172,29 +172,42 @@ internal class Game
 
 			accumulator += GameTime.Delta;
 
+			using var timer = MicroTimer.Start("First");
+
 			First(GameTime);
 
-			using (MicroTimer.Start("Update"))
+			timer.Then("Update");
+
+			PreUpdate(GameTime);
+
+			while (accumulator >= FixedGameTime.Delta)
 			{
-				PreUpdate(GameTime);
-
-				while (accumulator >= FixedGameTime.Delta)
-				{
-					FixedUpdate(FixedGameTime);
-					accumulator -= FixedGameTime.Delta;
-				}
-
-				GameTime.Alpha = accumulator / FixedGameTime.Delta;
-
-				Update(GameTime);
-				PostUpdate(GameTime);
+				FixedUpdate(FixedGameTime);
+				accumulator -= FixedGameTime.Delta;
 			}
 
-			if (_gameConfig.Output != GraphicsOutput.None) RenderStep(GameTime);
+			GameTime.Alpha = accumulator / FixedGameTime.Delta;
+
+			Update(GameTime);
+			PostUpdate(GameTime);
+
+			if (_gameConfig.Output != GraphicsOutput.None)
+			{
+				timer.Then("Render");
+				PreRender(GameTime);
+				Render(GameTime);
+				PostRender(GameTime);
+			}
+
+			timer.Then("Last");
 			Last(GameTime);
 
 			var delayTime = targetFrameTime - (int)((stopwatch.Elapsed.TotalSeconds - currentTime) * 1000);
-			if (delayTime > 0) Thread.Sleep(delayTime);
+			if (delayTime > 0)
+			{
+				timer.Then("(idle)");
+				Thread.Sleep(delayTime);
+			}
 
 			GameTime.Frame = FixedGameTime.Frame = (GameTime.Frame + 1);
 		}
@@ -210,32 +223,30 @@ internal class Game
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Step(GameTime time)
     {
-		First(time);
-		UpdateStep(time);
-		RenderStep(time);
-		Last(time);
-    }
+		using var timer = MicroTimer.Start("First");
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void UpdateStep(GameTime time)
-	{
+		First(time);
+
+		timer.Then("Update");
+
 		PreUpdate(time);
 		FixedUpdate(time);
 		Update(time);
 		PostUpdate(time);
-	}
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void RenderStep(GameTime time)
-	{
 		if (_shouldExit || _window.HasClosed) return;
 
-		using var _ = MicroTimer.Start("Render");
+		if (_gameConfig.Output != GraphicsOutput.None)
+		{
+			timer.Then("Render");
+			PreRender(time);
+			Render(time);
+			PostRender(time);
+		}
 
-		PreRender(time);
-		Render(time);
-		PostRender(time);
-	}
+		timer.Then("Last");
+		Last(time);
+    }
 
 	public void Exit()
     {

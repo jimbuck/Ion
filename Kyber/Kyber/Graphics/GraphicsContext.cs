@@ -4,7 +4,7 @@ using Veldrid;
 
 namespace Kyber.Graphics;
 
-public class GraphicsContext : IGraphicsContext, IDisposable
+internal class GraphicsContext : IGraphicsContext, IDisposable
 {
 	private readonly IGameConfig _config;
 	private readonly IEventListener _events;
@@ -60,6 +60,15 @@ public class GraphicsContext : IGraphicsContext, IDisposable
 		_logger.LogInformation($"Graphics device created ({GraphicsDevice.BackendType})!");
 
 		UpdateProjection((uint)_window.Width, (uint)_window.Height);
+	}
+
+	public void First()
+	{
+		if (_events.OnLatest<WindowResizeEvent>(out var e))
+		{
+			_logger.LogInformation($"Updating projection {e.Data.Width}x{e.Data.Height}!");
+			UpdateProjection(e.Data.Width, e.Data.Height);
+		}
 	}
 
 	public void UpdateProjection(uint width, uint height)

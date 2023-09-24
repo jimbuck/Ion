@@ -2,7 +2,7 @@
 
 internal class SpriteBatchManager
 {
-	public const int BATCH_STEP_SIZE = 16;
+	public const int BATCH_STEP_SIZE = 64;
 	public const int BATCH_STEP_SIZE_MINUS_ONE = BATCH_STEP_SIZE - 1;
 	public const int BATCH_STEP_SIZE_BIT_COMP = ~BATCH_STEP_SIZE_MINUS_ONE;
 

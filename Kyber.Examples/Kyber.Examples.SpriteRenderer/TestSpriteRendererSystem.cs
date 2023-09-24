@@ -54,7 +54,7 @@ public class TestSpriteRendererSystem : IInitializeSystem, IUpdateSystem, IRende
 		_world = world;
 		_rand = new Random();
 
-		_bouncingSpriteCount = 500_000;
+		_bouncingSpriteCount = 50_000;
 
 		_depthBlockCount = 8;
 		_spriteQuery = new QueryDescription().WithAll<TestBlockComponent>();

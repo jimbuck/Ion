@@ -11,7 +11,7 @@ internal class EventEmitter : IEventEmitter
 	private readonly ConcurrentQueue<IEvent> _currFrame = new();
 	private IEvent[] _prevFrame = Array.Empty<IEvent>();
 	private readonly List<EventListener> _listeners = new();
-	private ulong _nextId = 0;
+	private ulong _nextId = 1;
 
     public void Step()
     {
@@ -31,19 +31,17 @@ internal class EventEmitter : IEventEmitter
 		_currFrame.Enqueue(new Event<T>(Interlocked.Increment(ref _nextId), data));
 	}
 
-	internal IEventListener CreateListener()
+	public void AttachListener(EventListener listener)
 	{
-		var listener = new EventListener(this);
 		_listeners.Add(listener);
-		return listener;
 	}
 
-	internal void DetachListener(EventListener listener)
+	public void DetachListener(EventListener listener)
     {
         _listeners.Remove(listener);
     }
 
-	internal IEnumerable<IEvent<T>> GetEvents<T>()
+	public IEnumerable<IEvent<T>> GetEvents<T>()
 	{
 		var type = typeof(T);
 		foreach (var e in _getEvents<T>(_prevFrame, type)) yield return e;

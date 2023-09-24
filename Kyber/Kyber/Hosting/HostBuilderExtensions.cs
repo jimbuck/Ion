@@ -32,7 +32,7 @@ public static class KyberHostBuilderExtensions
 			services.AddSingleton<ISpriteBatch, SpriteBatch>();
 
 			services.AddSingleton<IEventEmitter, EventEmitter>();
-            services.AddTransient<IEventListener>(svcs => ((EventEmitter)svcs.GetRequiredService<IEventEmitter>()).CreateListener());
+            services.AddTransient<IEventListener, EventListener>();
             services.AddSingleton<IInputState, InputState>();
 
 			services.AddScoped<World>(svcs => World.Create());

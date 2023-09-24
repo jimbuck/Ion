@@ -9,16 +9,17 @@ public interface IEventListener
 	bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? data);
 }
 
-public class EventListener : IEventListener, IDisposable
+internal class EventListener : IEventListener, IDisposable
 {
-    private readonly EventEmitter _eventSystem;
+    public readonly EventEmitter _eventEmitter;
 
     private HashSet<ulong> _currFrameSeenEvents = new();
     private HashSet<ulong> _prevFrameKnownEvents = new();
 
-    internal EventListener(EventEmitter eventSystem)
+    public EventListener(IEventEmitter eventEmitter)
     {
-        _eventSystem = eventSystem;
+        _eventEmitter = (EventEmitter)eventEmitter;
+		_eventEmitter.AttachListener(this);
     }
 
     public bool On<T>()
@@ -28,11 +29,11 @@ public class EventListener : IEventListener, IDisposable
 
     public bool On<T>([NotNullWhen(true)]out IEvent<T>? @event)
     {
-        foreach(var e in _eventSystem.GetEvents<T>())
+        foreach(var e in _eventEmitter.GetEvents<T>())
         {
             if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
 
-            @event = e;
+			@event = e;
             _currFrameSeenEvents.Add(e.Id);
             return true;
         }
@@ -49,7 +50,7 @@ public class EventListener : IEventListener, IDisposable
 	public bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? @event)
     {
         @event = default;
-        foreach (var e in _eventSystem.GetEvents<T>())
+        foreach (var e in _eventEmitter.GetEvents<T>())
         {
             if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
 
@@ -60,13 +61,14 @@ public class EventListener : IEventListener, IDisposable
         return @event != default;
     }
 
-    internal void UpdateKnownEvents()
+    public void UpdateKnownEvents()
     {
-        (_prevFrameKnownEvents, _currFrameSeenEvents) = (_currFrameSeenEvents, new HashSet<ulong>());
+		_prevFrameKnownEvents = _currFrameSeenEvents;
+		_currFrameSeenEvents = new HashSet<ulong>();
     }
 
     public void Dispose()
     {
-        _eventSystem.DetachListener(this);
+        _eventEmitter.DetachListener(this);
     }
 }
