@@ -77,55 +77,67 @@ public class GameGenerator : IIncrementalGenerator
 		IEnumerable<ClassDeclarationSyntax> distinctClasses = classes.Distinct();
 
 		// Convert each EnumDeclarationSyntax to an EnumToGenerate
-		List<SceneToGenerate> scenesToGenerate = GetTypesToGenerate(compilation, distinctClasses, context.CancellationToken);
+		List<SceneClass> scenesToGenerate = GetTypesToGenerate(compilation, distinctClasses, context.CancellationToken);
 
-		if (scenesToGenerate.Any())
+		// generate the source code and add it to the output
+		foreach (var scene in scenesToGenerate)
 		{
-			// generate the source code and add it to the output
-			string result = SourceGenerationHelper.GenerateExtensionClass(scenesToGenerate);
-			context.AddSource("Scenes.g.cs", SourceText.From(result, Encoding.UTF8));
+			var source = SourceGenerationHelper.GenerateSceneClass(scene);
+			context.AddSource($"{scene.ClassName}.g.cs", source);
 		}
 	}
 
-	static List<SceneToGenerate> GetTypesToGenerate(Compilation compilation, IEnumerable<ClassDeclarationSyntax> classes, CancellationToken ct)
+	static List<SceneClass> GetTypesToGenerate(Compilation compilation, IEnumerable<ClassDeclarationSyntax> classes, CancellationToken ct)
 	{
 		// Create a list to hold our output
-		var scenesToGenerate = new List<SceneToGenerate>();
+		var scenesToGenerate = new List<SceneClass>();
 		// Get the semantic representation of our marker attribute 
 		INamedTypeSymbol? systemAttribute = compilation.GetTypeByMetadataName("Kyber.SystemAttribute`1");
 
 		if (systemAttribute == null) return scenesToGenerate;
 
-		foreach (var classDeclarationSyntax in classes)
+		foreach (var sceneClassDeclarationSyntax in classes)
 		{
 			// stop if we're asked to
 			ct.ThrowIfCancellationRequested();
 
-			// Get the semantic representation of the enum syntax
-			SemanticModel semanticModel = compilation.GetSemanticModel(classDeclarationSyntax.SyntaxTree);
-			if (semanticModel.GetDeclaredSymbol(classDeclarationSyntax) is not INamedTypeSymbol classSymbol) continue;
+			SemanticModel semanticModel = compilation.GetSemanticModel(sceneClassDeclarationSyntax.SyntaxTree);
+			if (semanticModel.GetDeclaredSymbol(sceneClassDeclarationSyntax) is not INamedTypeSymbol sceneClassSymbol) continue;
 
-			string className = classSymbol.ToString();
+			string sceneClassNamespace = sceneClassSymbol.ContainingNamespace.ToString();
+			string sceneClassName = sceneClassSymbol.Name;
 
-			// Get all the members in the enum
-			ImmutableArray<ISymbol> classMembers = classSymbol.GetMembers();
-			var updateCalls = new List<string>(classMembers.Length / 2);
-			var drawCalls = new List<string>(classMembers.Length / 2);
+			var systemAttributes = sceneClassSymbol.GetAttributes().Where(a => a.AttributeClass?.MetadataName == "Kyber.SystemAttribute`1").ToList();
 
-			// Get all the fields from the enum, and add their name to the list
-			foreach (ISymbol member in classMembers)
+			// TODO: Get each registered system then loop over them...
+			var systemSymbols = new List<ISymbol>();
+
+			var systems = new List<SystemClass>();
+			var updateCalls = new List<LifecycleMethodCall>();
+			var drawCalls = new List<LifecycleMethodCall>();
+
+			foreach (var systemSymbol in systemSymbols)
 			{
-				if (member is IMethodSymbol method)
+				var systemClass = new SystemClass(sceneClassNamespace, sceneClassName, SourceGenerationHelper.ToPrivateName(sceneClassName));
+				systems.Add(systemClass);
+
+				ImmutableArray<ISymbol> classMembers = sceneClassSymbol.GetMembers();
+
+				// Get all the fields from the enum, and add their name to the list
+				foreach (ISymbol member in classMembers)
 				{
-					var attributes = method.GetAttributes();
-					if (!attributes.Any(a => a.AttributeClass?.ContainingNamespace.Name == "Kyber")) continue;
-					if (attributes.Any(a => a.AttributeClass?.Name == "UpdateAttribute")) updateCalls.Add(member.MetadataName);
-					if (attributes.Any(a => a.AttributeClass?.Name == "DrawAttribute")) drawCalls.Add(member.MetadataName);
+					if (member is IMethodSymbol method)
+					{
+						var attributes = method.GetAttributes();
+						if (!attributes.Any(a => a.AttributeClass?.ContainingNamespace.Name == "Kyber")) continue;
+						if (attributes.Any(a => a.AttributeClass?.Name == "UpdateAttribute")) updateCalls.Add(new LifecycleMethodCall(systemClass, method.Name, 0));
+						if (attributes.Any(a => a.AttributeClass?.Name == "DrawAttribute")) drawCalls.Add(new LifecycleMethodCall(systemClass, method.Name, 0));
+					}
 				}
 			}
 
 			// Create an EnumToGenerate for use in the generation phase
-			scenesToGenerate.Add(new SceneToGenerate(className, updateCalls, drawCalls));
+			scenesToGenerate.Add(new SceneClass(sceneClassNamespace, sceneClassName, systems, updateCalls, drawCalls));
 		}
 
 		return scenesToGenerate;

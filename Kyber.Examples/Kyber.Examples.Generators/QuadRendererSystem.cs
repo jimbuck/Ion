@@ -100,6 +100,7 @@ void main()
 		});
     }
 
+	[Draw]
     public void Render(GameTime dt)
     {
 		if (_commandList is null || _graphicsContext.GraphicsDevice is null) return;

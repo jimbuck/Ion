@@ -1,15 +1,16 @@
-﻿using System.Text;
+﻿using Microsoft.CodeAnalysis.Text;
+using SourceGeneratorUtils;
 
 namespace Kyber.Generators;
 
-public static class SourceGenerationHelper
+internal static class SourceGenerationHelper
 {
 	public const string Attributes = @$"namespace Kyber;
 
-[System.AttributeUsage(System.AttributeTargets.Class)]
+[System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
 public class SceneAttribute<T> : System.Attribute {{ }}
 
-[System.AttributeUsage(System.AttributeTargets.Class)]
+[System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
 public class SystemAttribute<T> : System.Attribute {{ }}
 
 [System.AttributeUsage(System.AttributeTargets.Method)]
@@ -18,86 +19,73 @@ public class UpdateAttribute : System.Attribute {{ }}
 [System.AttributeUsage(System.AttributeTargets.Method)]
 public class DrawAttribute : System.Attribute {{ }}
 ";
-
-	public static string GenerateExtensionClass(List<SceneToGenerate> scenesToGenerate)
+	public static SourceText GenerateSceneClass(SceneClass scene)
 	{
-		var sb = new StringBuilder();
-		sb.Append(@"
-namespace Kyber;
-");
-		foreach (var sceneToGenerate in scenesToGenerate)
+		var source = new SourceWriter();
+
+		source.WriteLine($"namespace {scene.Namespace};");
+
+		source.WriteLine($"public partial class {scene.ClassName}");
+		source.OpenBlock();
+
+		_propsAndCtor(source, scene.ClassName, scene.Systems);
+
+		#region Update Calls
+		source.WriteLine($"public void Update(GameTime dt)");
+		source.OpenBlock();
+
+		foreach (var updateCall in scene.UpdateCalls)
 		{
-			sb.Append($@"
-public partial class {sceneToGenerate.Name}
-{{
-	public void Update(GameTime dt)
-	{{");
-			foreach(var system in sceneToGenerate.UpdateCalls)
-			{
-				sb.Append($@"
-		this.{system}(dt);");
-			}
-			sb.Append($@"
-	}}
-}}");
+			source.WriteLine($"{updateCall.System.InstanceName}.{updateCall.MethodName}(dt);");
 		}
 
-		sb.Append(@"
-    }
-}");
+		source.CloseBlock();
+		#endregion
 
-		return sb.ToString();
-	}
+		#region Draw Calls
+		source.WriteLine($"public void Draw(GameTime dt)");
+		source.OpenBlock();
 
-	private static string _propsAndCtor(string name, List<string> services)
-	{
-		var sb = new StringBuilder();
-
-		foreach (var service in services)
+		foreach (var drawCall in scene.DrawCalls)
 		{
-			sb.AppendLine("protected readonly " + service + " " + _toPrivateName(service) + ";");
+			source.WriteLine($"this.{drawCall.System.InstanceName}.{drawCall.MethodName}(dt);");
 		}
 
-		sb.Append(@$"
-public ${name} (
-");
+		source.CloseBlock();
+		#endregion
 
-		foreach(var service in services)
+		source.CloseBlock();
+
+		return source.ToSourceText();
+	}
+
+	private static void _propsAndCtor(SourceWriter source, string className, ICollection<SystemClass> systems)
+	{
+		foreach (var system in systems)
 		{
-			sb.AppendLine(service + " " + _toCamelCase(service) + ",");
+			source.WriteLine($"protected readonly {system.FullName} {system.InstanceName};");
 		}
 
-		sb.AppendLine(") {");
+		source.WriteLine($"public {className}(");
+		source.Indentation++;
 
-		foreach (var service in services)
+		foreach (var system in systems)
 		{
-			sb.AppendLine(service + " " + _toCamelCase(service) + ",");
+			source.WriteLine($"{system.FullName} {ToCamelCase(system.ClassName)},");
 		}
 
-		sb.AppendLine("}");
+		source.Indentation--;
+		source.WriteLine(")");
+		source.OpenBlock();
 
-		return sb.ToString();
+		foreach (var system in systems)
+		{
+			source.WriteLine($"{system.InstanceName} = {ToCamelCase(system.ClassName)};");
+		}
+
+		source.CloseBlock();
 	}
 
-	private static string _toCamelCase(string name) => name.ToLower()[0] + name.Substring(1);
-	private static string _toPrivateName(string name) => "_" + _toCamelCase(name);
-}
-
-
-public partial class Example
-{
-	public Example()
-	{
-
-	}
-
-	public void Update(float dt)
-	{
-
-	}
-
-	public void Draw(float dt)
-	{
-
-	}
+	public static string ToCamelCase(string name) => name.ToLower()[0] + name.Substring(1);
+	public static string ToPrivateName(string name) => "_" + ToCamelCase(name);
 }
