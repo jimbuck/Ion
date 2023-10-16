@@ -48,7 +48,7 @@ public class DrawAttribute : System.Attribute {{ }}
 
 		foreach (var drawCall in scene.DrawCalls)
 		{
-			source.WriteLine($"this.{drawCall.System.InstanceName}.{drawCall.MethodName}(dt);");
+			source.WriteLine($"{drawCall.System.InstanceName}.{drawCall.MethodName}(dt);");
 		}
 
 		source.CloseBlock();
@@ -69,9 +69,11 @@ public class DrawAttribute : System.Attribute {{ }}
 		source.WriteLine($"public {className}(");
 		source.Indentation++;
 
-		foreach (var system in systems)
+		for (var i=0;i<systems.Count;i++)
 		{
-			source.WriteLine($"{system.FullName} {ToCamelCase(system.ClassName)},");
+			var system = systems.ElementAt(i);
+			var notLast = i < systems.Count - 1;
+			source.WriteLine($"{system.FullName} {ToCamelCase(system.ClassName)}{(notLast ? "," : string.Empty)}");
 		}
 
 		source.Indentation--;

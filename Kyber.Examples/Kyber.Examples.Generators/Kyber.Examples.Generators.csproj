@@ -9,6 +9,7 @@
 	  <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 	  <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
 	  <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+	  <Configurations>Debug;Release;DebugGenerators</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

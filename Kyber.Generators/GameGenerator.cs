@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Kyber.Generators;
 
@@ -13,7 +14,7 @@ public class GameGenerator : IIncrementalGenerator
 {
 	public void Initialize(IncrementalGeneratorInitializationContext context)
 	{
-#if DEBUG
+#if DEBUGGENERATORS
 		if (!Debugger.IsAttached)
 		{
 			Debugger.Launch();
@@ -98,7 +99,6 @@ public class GameGenerator : IIncrementalGenerator
 
 		foreach (var sceneClassDeclarationSyntax in classes)
 		{
-			// stop if we're asked to
 			ct.ThrowIfCancellationRequested();
 
 			SemanticModel semanticModel = compilation.GetSemanticModel(sceneClassDeclarationSyntax.SyntaxTree);
@@ -107,10 +107,15 @@ public class GameGenerator : IIncrementalGenerator
 			string sceneClassNamespace = sceneClassSymbol.ContainingNamespace.ToString();
 			string sceneClassName = sceneClassSymbol.Name;
 
-			var systemAttributes = sceneClassSymbol.GetAttributes().Where(a => a.AttributeClass?.MetadataName == "Kyber.SystemAttribute`1").ToList();
-
-			// TODO: Get each registered system then loop over them...
-			var systemSymbols = new List<ISymbol>();
+			var systemSymbols = sceneClassSymbol.GetAttributes()
+				.Select(a => a.AttributeClass?.ToString() ?? string.Empty)
+				.Where(ac => ac?.StartsWith("Kyber.SystemAttribute<") ?? false)
+				.Select(ac =>
+				{
+					var systemTypeName = Regex.Match(ac, @"^Kyber\.SystemAttribute<(.*)>$").Groups[1].Value;
+					if (systemTypeName is null) return null;
+					return compilation.GetTypeByMetadataName(systemTypeName);
+				}).ToArray() ?? new INamedTypeSymbol[0];
 
 			var systems = new List<SystemClass>();
 			var updateCalls = new List<LifecycleMethodCall>();
@@ -118,20 +123,22 @@ public class GameGenerator : IIncrementalGenerator
 
 			foreach (var systemSymbol in systemSymbols)
 			{
-				var systemClass = new SystemClass(sceneClassNamespace, sceneClassName, SourceGenerationHelper.ToPrivateName(sceneClassName));
+				if (systemSymbol is null) continue;
+
+				var systemNamespace = systemSymbol.ContainingNamespace.ToString();
+				var systemClassName = systemSymbol.Name;
+
+				var systemClass = new SystemClass(systemNamespace, systemClassName, SourceGenerationHelper.ToPrivateName(systemClassName));
 				systems.Add(systemClass);
 
-				ImmutableArray<ISymbol> classMembers = sceneClassSymbol.GetMembers();
-
-				// Get all the fields from the enum, and add their name to the list
-				foreach (ISymbol member in classMembers)
+				foreach (ISymbol member in systemSymbol.GetMembers())
 				{
 					if (member is IMethodSymbol method)
 					{
-						var attributes = method.GetAttributes();
-						if (!attributes.Any(a => a.AttributeClass?.ContainingNamespace.Name == "Kyber")) continue;
-						if (attributes.Any(a => a.AttributeClass?.Name == "UpdateAttribute")) updateCalls.Add(new LifecycleMethodCall(systemClass, method.Name, 0));
-						if (attributes.Any(a => a.AttributeClass?.Name == "DrawAttribute")) drawCalls.Add(new LifecycleMethodCall(systemClass, method.Name, 0));
+						var methodAttributes = method.GetAttributes();
+						if (!methodAttributes.Any(a => a.AttributeClass?.ContainingNamespace.Name == "Kyber")) continue;
+						if (methodAttributes.Any(a => a.AttributeClass?.Name == "UpdateAttribute")) updateCalls.Add(new LifecycleMethodCall(systemClass, method.Name, 0));
+						if (methodAttributes.Any(a => a.AttributeClass?.Name == "DrawAttribute")) drawCalls.Add(new LifecycleMethodCall(systemClass, method.Name, 0));
 					}
 				}
 			}

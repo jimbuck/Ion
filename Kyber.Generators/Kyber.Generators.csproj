@@ -10,6 +10,7 @@
 		<IsRoslynComponent>True</IsRoslynComponent>
 		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+		<Configurations>Debug;Release;DebugGenerators</Configurations>
 	</PropertyGroup>
 
 	<ItemGroup>
