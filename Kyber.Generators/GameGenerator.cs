@@ -112,6 +112,7 @@ public class GameGenerator : IIncrementalGenerator
 				.Where(ac => ac?.StartsWith("Kyber.SystemAttribute<") ?? false)
 				.Select(ac =>
 				{
+					// TODO: Move the getting of the generic type out into a helper method.
 					var systemTypeName = Regex.Match(ac, @"^Kyber\.SystemAttribute<(.*)>$").Groups[1].Value;
 					if (systemTypeName is null) return null;
 					return compilation.GetTypeByMetadataName(systemTypeName);
@@ -137,8 +138,9 @@ public class GameGenerator : IIncrementalGenerator
 					{
 						var methodAttributes = method.GetAttributes();
 						if (!methodAttributes.Any(a => a.AttributeClass?.ContainingNamespace.Name == "Kyber")) continue;
-						if (methodAttributes.Any(a => a.AttributeClass?.Name == "UpdateAttribute")) updateCalls.Add(new LifecycleMethodCall(systemClass, method.Name, 0));
-						if (methodAttributes.Any(a => a.AttributeClass?.Name == "DrawAttribute")) drawCalls.Add(new LifecycleMethodCall(systemClass, method.Name, 0));
+						// TODO: Check for UpdateDependsOnAttribute<T> and DrawDependsOnAttribute<T>.
+						if (methodAttributes.Any(a => a.AttributeClass?.Name == "UpdateAttribute")) updateCalls.Add(new LifecycleMethodCall(systemClass, method.Name, int.MaxValue));
+						if (methodAttributes.Any(a => a.AttributeClass?.Name == "DrawAttribute")) drawCalls.Add(new LifecycleMethodCall(systemClass, method.Name, int.MaxValue));
 					}
 				}
 			}

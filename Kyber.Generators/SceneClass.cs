@@ -15,4 +15,4 @@ internal record struct SystemClass(string Namespace, string ClassName, string In
 	public string FullName = $"{Namespace}.{ClassName}";
 }
 
-internal record struct LifecycleMethodCall(SystemClass System, string MethodName, int? Order);
+internal record struct LifecycleMethodCall(SystemClass System, string MethodName, int Order);

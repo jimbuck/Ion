@@ -14,10 +14,24 @@ public class SceneAttribute<T> : System.Attribute {{ }}
 public class SystemAttribute<T> : System.Attribute {{ }}
 
 [System.AttributeUsage(System.AttributeTargets.Method)]
-public class UpdateAttribute : System.Attribute {{ }}
+public class UpdateAttribute : System.Attribute {{
+}}
 
 [System.AttributeUsage(System.AttributeTargets.Method)]
-public class DrawAttribute : System.Attribute {{ }}
+public class UpdateDependsOnAttribute<T> : System.Attribute
+{{
+	public UpdateDependsOnAttribute() {{  }}
+}}
+
+[System.AttributeUsage(System.AttributeTargets.Method)]
+public class DrawAttribute : System.Attribute {{
+}}
+
+[System.AttributeUsage(System.AttributeTargets.Method)]
+public class DrawDependsOnAttribute<T> : System.Attribute
+{{
+	public DrawDependsOnAttribute() {{  }}
+}}
 ";
 	public static SourceText GenerateSceneClass(SceneClass scene)
 	{

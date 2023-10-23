@@ -14,6 +14,7 @@ var gameHost = KyberHost.CreateDefaultBuilder()
 
 		game.AddSystem<TestLoggerSystem>()
 			.AddSystem<SceneSwitcherSystem>()
+			.AddScene<LoadingScene>()
 			.AddScene<Scenes.Main>() // Class with interface
 			.AddScene(Scenes.Gameplay) // Named method
 			.AddScene(NamedFunction)

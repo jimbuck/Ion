@@ -8,7 +8,9 @@ public interface IGameBuilder
 	IGameConfig Config { get; }
     IServiceCollection Services { get; }
     IGameBuilder AddSystem<T>() where T : class;
-    IGameBuilder AddSystem(Type type);
+	IGameBuilder AddSystem<TService, TImplementation>() where TService : class where TImplementation : class, TService;
+
+	IGameBuilder AddSystem(Type type);
 }
 
 public class GameBuilder : IGameBuilder
@@ -27,6 +29,13 @@ public class GameBuilder : IGameBuilder
 	{
 		_systems.AddSystem(typeof(T));
 		Services.TryAddScoped<T>();
+		return this;
+	}
+
+	public IGameBuilder AddSystem<TService, TImplementation>() where TService : class where TImplementation : class, TService
+	{
+		_systems.AddSystem(typeof(TImplementation));
+		Services.TryAddScoped<TService, TImplementation>();
 		return this;
 	}
 

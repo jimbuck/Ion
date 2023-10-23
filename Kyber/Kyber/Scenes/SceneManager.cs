@@ -5,7 +5,7 @@ using Kyber.Scenes.Transitions;
 
 namespace Kyber;
 
-public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateSystem, IFixedUpdateSystem, IPostUpdateSystem, IPreRenderSystem, IRenderSystem, IPostRenderSystem, IDestroySystem, IDisposable, ISceneManager
+public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdateSystem, IRenderSystem, IDestroySystem, IDisposable, ISceneManager
 {
 	private readonly IServiceProvider _serviceProvider;
 	private readonly ILogger _logger;
@@ -91,7 +91,6 @@ public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateS
 
 		_logger.LogInformation("Loading {0} Scene.", _nextScene);
 		_activeScope = _serviceProvider.CreateScope();
-		var rootScene = (CurrentScene)_serviceProvider.GetRequiredService<ICurrentScene>();
 		var currScene = (CurrentScene)_activeScope.ServiceProvider.GetRequiredService<ICurrentScene>();
 		currScene.Set(_nextScene);
 
@@ -99,15 +98,6 @@ public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateS
 		_activeScene.Initialize();
 		_logger.LogInformation("Loaded {0} Scene.", _nextScene);
 		_nextScene = null;
-	}
-
-	/// <summary>
-	/// Unloads the current scene and loads a new scene immediately.
-	/// </summary>
-	/// <param name="configure">The predefined method used to configure the scene during startup.</param>
-	public void LoadScene(Action<ISceneBuilder> configure)
-	{
-		LoadScene(configure.Method.Name);
 	}
 
 	/// <summary>
@@ -138,13 +128,6 @@ public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateS
 	}
 
 
-	public void PreUpdate(GameTime dt)
-	{
-		_logger.LogDebug("PreUpdate ({0}) {1}", CurrentScene, dt);
-		_loadNextScene();
-		_activeScene?.PreUpdate(dt);
-	}
-
 	public void FixedUpdate(GameTime dt)
 	{
 		_logger.LogDebug("FixedUpdate ({0}) {1}", CurrentScene, dt);
@@ -162,12 +145,6 @@ public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateS
 		_activeTransition?.Update(dt);
 	}
 
-	public void PostUpdate(GameTime dt)
-	{
-		_logger.LogDebug("PostUpdate ({0}) {1}", CurrentScene, dt);
-		_activeScene?.PostUpdate(dt);
-	}
-
 	public void PreRender(GameTime dt)
 	{
 		_logger.LogDebug("PreRender ({0}) {1}", CurrentScene, dt);
@@ -183,12 +160,6 @@ public sealed class SceneManager : IInitializeSystem, IPreUpdateSystem, IUpdateS
 		_logger.LogDebug("Render ({0}) {1}", CurrentScene, dt);
 		_activeScene?.Render(dt);
 		_activeTransition?.Render(dt);
-	}
-
-	public void PostRender(GameTime dt)
-	{
-		_logger.LogDebug("PostRender ({0}) {1}", CurrentScene, dt);
-		_activeScene?.PostRender(dt);
 	}
 
 	/// <summary>
