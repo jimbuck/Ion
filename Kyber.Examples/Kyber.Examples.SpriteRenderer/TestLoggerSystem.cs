@@ -2,7 +2,7 @@
 
 namespace Kyber.Examples.SpriteRenderer;
 
-public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem, IFirstSystem, ILastSystem
+public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 {
 	private readonly ILogger _logger;
 	private readonly IInputState _input;
@@ -11,7 +11,7 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 	private bool _wasDown = false;
 	private double _totalDt = 0;
 	private int _frameCount = 0;
-	private Stopwatch _stopwatch = new();
+	private readonly Stopwatch _stopwatch = new();
 
 	public bool IsEnabled { get; set; } = true;
 
@@ -27,13 +27,10 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 		_logger.LogInformation("Simple Example Started");
 	}
 
-	public void First(GameTime dt)
-	{
-		_stopwatch.Restart();
-	}
-
 	public void Update(GameTime dt)
 	{
+		_stopwatch.Restart();
+
 		if (_events.On<WindowResizeEvent>()) _logger.LogInformation("Window Resized!");
 		if (_events.On<WindowFocusGainedEvent>()) _logger.LogInformation("Window Focus Gained!");
 		if (_events.On<WindowFocusLostEvent>()) _logger.LogInformation("Window Focus Lost!");
@@ -63,10 +60,10 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 
 		if (_input.Pressed(MouseButton.Left)) _logger.LogInformation("LEFT MOUSE DOWN!");
 		if (_input.Released(MouseButton.Left)) _logger.LogInformation("LEFT MOUSE UP!");
-	}
 
-	public void Last(GameTime dt)
-	{
+
+		// next();
+
 		_stopwatch.Stop();
 		var duration = _stopwatch.Elapsed.TotalSeconds;
 		_totalDt += duration;

@@ -29,7 +29,7 @@ internal static class TestUtils
     }
 }
 
-public class TestSystem : ISystem, IFirstSystem, ILastSystem
+public class TestSystem : ISystem
 {
 	public bool IsEnabled { get; set; } = true;
 
@@ -46,15 +46,9 @@ public class TestSystem : ISystem, IFirstSystem, ILastSystem
 	public int DestroyCount { get; private set; } = 0;
 
 	public void Initialize() { InitializeCount++; }
-	public void First(GameTime dt) { FirstCount++; }
-	public void PreUpdate(GameTime dt) { PreUpdateCount++; }
 	public void FixedUpdate(GameTime dt) { FixedUpdateCount++; }
 	public void Update(GameTime dt) { UpdateCount++; }
-	public void PostUpdate(GameTime dt) { PostUpdateCount++; }
-	public void PreRender(GameTime dt) { PreRenderCount++; }
 	public void Render(GameTime dt) { RenderCount++; }
-	public void PostRender(GameTime dt) { PostRenderCount++; }
-	public void Last(GameTime dt) { LastCount++; }
 	public void Destroy() { DestroyCount++; }
 
 	public void Reset()

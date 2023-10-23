@@ -145,11 +145,6 @@ public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdat
 		_activeTransition?.Update(dt);
 	}
 
-	public void PreRender(GameTime dt)
-	{
-		_logger.LogDebug("PreRender ({0}) {1}", CurrentScene, dt);
-		_activeScene?.PreRender(dt);
-	}
 
 	/// <summary>
 	/// Draws the active scene (and transition, if in progress).

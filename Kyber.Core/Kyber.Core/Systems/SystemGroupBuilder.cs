@@ -3,7 +3,7 @@
 internal class SystemGroupBuilder
 {
     private readonly HashSet<Type> _systemTypes = new();
-    private readonly Type[] _validSystemTypes = new[] { typeof(IInitializeSystem), typeof(IDestroySystem), typeof(IUpdateSystem), typeof(IRenderSystem), typeof(IPreUpdateSystem), typeof(IPostUpdateSystem), typeof(IPreRenderSystem), typeof(IPostRenderSystem) };
+    private readonly Type[] _validSystemTypes = new[] { typeof(IInitializeSystem), typeof(IDestroySystem), typeof(IUpdateSystem), typeof(IRenderSystem) };
 
     public SystemGroupBuilder AddSystem<T>() where T : class
     {
