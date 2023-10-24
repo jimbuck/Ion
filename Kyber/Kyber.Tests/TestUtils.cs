@@ -35,33 +35,27 @@ public class TestSystem : ISystem
 
 	public int InitializeCount { get; private set; } = 0;
 	public int FirstCount { get; private set; } = 0;
-	public int PreUpdateCount { get; private set; } = 0;
 	public int FixedUpdateCount { get; private set; } = 0;
 	public int UpdateCount { get; private set; } = 0;
-	public int PostUpdateCount { get; private set; } = 0;
-	public int PreRenderCount { get; private set; } = 0;
 	public int RenderCount { get; private set; } = 0;
-	public int PostRenderCount { get; private set; } = 0;
 	public int LastCount { get; private set; } = 0;
 	public int DestroyCount { get; private set; } = 0;
 
 	public void Initialize() { InitializeCount++; }
+	public void First(GameTime dt) { FirstCount++; }
 	public void FixedUpdate(GameTime dt) { FixedUpdateCount++; }
 	public void Update(GameTime dt) { UpdateCount++; }
 	public void Render(GameTime dt) { RenderCount++; }
+	public void Last(GameTime dt) { LastCount++; }
 	public void Destroy() { DestroyCount++; }
 
 	public void Reset()
 	{
 		InitializeCount = 0;
 		FirstCount = 0;
-		PreUpdateCount = 0;
 		FixedUpdateCount = 0;
 		UpdateCount = 0;
-		PostUpdateCount = 0;
-		PreRenderCount = 0;
 		RenderCount = 0;
-		PostRenderCount = 0;
 		LastCount = 0;
 		DestroyCount = 0;
 	}

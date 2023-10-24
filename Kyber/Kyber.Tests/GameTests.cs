@@ -44,45 +44,29 @@ public class GameTests
 		game.Initialize();
 
         Assert.Equal(1, testSystem.InitializeCount);
-        Assert.Equal(0, testSystem.PreUpdateCount);
         Assert.Equal(0, testSystem.UpdateCount);
-        Assert.Equal(0, testSystem.PostUpdateCount);
-        Assert.Equal(0, testSystem.PreRenderCount);
         Assert.Equal(0, testSystem.RenderCount);
-        Assert.Equal(0, testSystem.PostRenderCount);
         Assert.Equal(0, testSystem.DestroyCount);
 
         game.Step(dt);
 
         Assert.Equal(1, testSystem.InitializeCount);
-        Assert.Equal(1, testSystem.PreUpdateCount);
         Assert.Equal(1, testSystem.UpdateCount);
-        Assert.Equal(1, testSystem.PostUpdateCount);
-        Assert.Equal(0, testSystem.PreRenderCount);
         Assert.Equal(0, testSystem.RenderCount);
-        Assert.Equal(0, testSystem.PostRenderCount);
         Assert.Equal(0, testSystem.DestroyCount);
 
 		game.Step(dt);
 
         Assert.Equal(1, testSystem.InitializeCount);
-        Assert.Equal(2, testSystem.PreUpdateCount);
         Assert.Equal(2, testSystem.UpdateCount);
-        Assert.Equal(2, testSystem.PostUpdateCount);
-        Assert.Equal(0, testSystem.PreRenderCount);
         Assert.Equal(0, testSystem.RenderCount);
-        Assert.Equal(0, testSystem.PostRenderCount);
         Assert.Equal(0, testSystem.DestroyCount);
 
         game.Destroy();
 
         Assert.Equal(1, testSystem.InitializeCount);
-        Assert.Equal(2, testSystem.PreUpdateCount);
         Assert.Equal(2, testSystem.UpdateCount);
-        Assert.Equal(2, testSystem.PostUpdateCount);
-        Assert.Equal(0, testSystem.PreRenderCount);
         Assert.Equal(0, testSystem.RenderCount);
-        Assert.Equal(0, testSystem.PostRenderCount);
         Assert.Equal(1, testSystem.DestroyCount);
     }
 
@@ -98,12 +82,8 @@ public class GameTests
 
 		Assert.Equal(1, testSystem.InitializeCount);
 		Assert.Equal(0, testSystem.FirstCount);
-		Assert.Equal(0, testSystem.PreUpdateCount);
 		Assert.Equal(0, testSystem.UpdateCount);
-		Assert.Equal(0, testSystem.PostUpdateCount);
-		Assert.Equal(0, testSystem.PreRenderCount);
 		Assert.Equal(0, testSystem.RenderCount);
-		Assert.Equal(0, testSystem.PostRenderCount);
 		Assert.Equal(0, testSystem.LastCount);
 		Assert.Equal(0, testSystem.DestroyCount);
 
@@ -111,12 +91,8 @@ public class GameTests
 
 		Assert.Equal(1, testSystem.InitializeCount);
 		Assert.Equal(1, testSystem.FirstCount);
-		Assert.Equal(1, testSystem.PreUpdateCount);
 		Assert.Equal(1, testSystem.UpdateCount);
-		Assert.Equal(1, testSystem.PostUpdateCount);
-		Assert.Equal(1, testSystem.PreRenderCount);
 		Assert.Equal(1, testSystem.RenderCount);
-		Assert.Equal(1, testSystem.PostRenderCount);
 		Assert.Equal(1, testSystem.LastCount);
 		Assert.Equal(0, testSystem.DestroyCount);
 
@@ -124,12 +100,8 @@ public class GameTests
 
 		Assert.Equal(1, testSystem.InitializeCount);
 		Assert.Equal(2, testSystem.FirstCount);
-		Assert.Equal(2, testSystem.PreUpdateCount);
 		Assert.Equal(2, testSystem.UpdateCount);
-		Assert.Equal(2, testSystem.PostUpdateCount);
-		Assert.Equal(2, testSystem.PreRenderCount);
 		Assert.Equal(2, testSystem.RenderCount);
-		Assert.Equal(2, testSystem.PostRenderCount);
 		Assert.Equal(2, testSystem.LastCount);
 		Assert.Equal(0, testSystem.DestroyCount);
 
@@ -137,12 +109,8 @@ public class GameTests
 
 		Assert.Equal(1, testSystem.InitializeCount);
 		Assert.Equal(2, testSystem.FirstCount);
-		Assert.Equal(2, testSystem.PreUpdateCount);
 		Assert.Equal(2, testSystem.UpdateCount);
-		Assert.Equal(2, testSystem.PostUpdateCount);
-		Assert.Equal(2, testSystem.PreRenderCount);
 		Assert.Equal(2, testSystem.RenderCount);
-		Assert.Equal(2, testSystem.PostRenderCount);
 		Assert.Equal(2, testSystem.LastCount);
 		Assert.Equal(1, testSystem.DestroyCount);
 	}
