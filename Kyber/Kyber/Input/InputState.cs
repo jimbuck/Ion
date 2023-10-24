@@ -5,15 +5,15 @@ internal class InputState : IInputState
 	private readonly Window _window;
 	private readonly ILogger _logger;
 
-	private readonly Dictionary<Key, KeyEvent> _keyEvents = new();
-	private readonly Dictionary<MouseButton, MouseEvent> _mouseEvents = new();
-	private readonly HashSet<Key> _downKeys = new();
+	private readonly Dictionary<Key, KeyEvent> _keyEvents = new(64);
+	private readonly Dictionary<MouseButton, MouseEvent> _mouseEvents = new(13);
+	private readonly HashSet<Key> _downKeys = new(8);
 
 	private Veldrid.InputSnapshot? _inputSnapshot;
 
-	public Vector2 MousePosition => _inputSnapshot?.MousePosition ?? Vector2.Zero;
+	public Vector2 MousePosition { get; private set; } = Vector2.Zero;
 
-	public float WheelDelta => _inputSnapshot?.WheelDelta ?? 0;
+	public float WheelDelta { get; private set; } = 0;
 
 	public InputState(IWindow window, ILogger<InputState> logger)
 	{
@@ -27,6 +27,9 @@ internal class InputState : IInputState
 
 		_keyEvents.Clear();
 		_mouseEvents.Clear();
+
+		MousePosition = _inputSnapshot?.MousePosition ?? Vector2.Zero;
+		WheelDelta = _inputSnapshot?.WheelDelta ?? 0;
 
 		if (_inputSnapshot == default) return;
 
@@ -52,7 +55,7 @@ internal class InputState : IInputState
 
 	public bool Released(Key key) => _keyEvents.TryGetValue(key, out var keyEvent) && !keyEvent.Down;
 	public bool Released(Key key, ModifierKeys modifiers) => _keyEvents.TryGetValue(key, out var keyEvent) && ((keyEvent.Modifiers & modifiers) != ModifierKeys.None) && !keyEvent.Down;
-
+	
 	public bool Down(Key key) => _downKeys.Contains(key);
 	public bool Up(Key key) => !Down(key);
 
