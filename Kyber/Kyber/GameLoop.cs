@@ -13,7 +13,7 @@ public record struct GameExitEvent();
 /// <summary>
 /// Top-level class representing the runnable game.
 /// </summary>
-internal class Game
+internal class GameLoop
 {
 	private bool _shouldExit;
 	private readonly float _maxFrameTime = 0.1f; // 100ms
@@ -36,12 +36,14 @@ internal class Game
 
 	public event EventHandler<EventArgs>? Exiting;
 
-	public Game(
+	public GameLoop(
 		IGameConfig gameConfig,
+
 		IWindow window,
 		IGraphicsContext graphicsContext,
 		ISpriteBatch spriteBatch,
 		IAssetManager assetManager,
+
 		IInputState input,
 		IEventEmitter eventEmitter,
 		IEventListener events,

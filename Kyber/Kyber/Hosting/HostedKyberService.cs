@@ -4,7 +4,7 @@ namespace Kyber.Hosting;
 
 internal class HostedKyberService : IHostedService
 {
-	private readonly Game _game;
+	private readonly GameLoop _gameLoop;
 	private readonly ILogger _logger;
 	private readonly IHostApplicationLifetime _hostAppLifetime;
 
@@ -12,12 +12,12 @@ internal class HostedKyberService : IHostedService
 	private readonly CancellationTokenSource _mainGameThreadCancellationToken = new();
 
 	public HostedKyberService(
-			Game internalGame,
+			GameLoop gameLoop,
 			IGameConfig config,
 			ILogger<HostedKyberService> logger,
 			IHostApplicationLifetime applicationLifetime)
 	{
-		_game = internalGame;
+		_gameLoop = gameLoop;
 
 		_logger = logger;
 		_hostAppLifetime = applicationLifetime;
@@ -43,9 +43,9 @@ internal class HostedKyberService : IHostedService
 		if (data == null) throw new ArgumentNullException(nameof(data));
 
 		var cancellationToken = (CancellationToken)data;
-		cancellationToken.Register(() => _game.Exit());
-		_game.Exiting += _onGameExiting;
-		_game.Run();
+		cancellationToken.Register(() => _gameLoop.Exit());
+		_gameLoop.Exiting += _onGameExiting;
+		_gameLoop.Run();
 	}
 
 	private void _onGameExiting(object? sender, EventArgs e)
@@ -55,13 +55,13 @@ internal class HostedKyberService : IHostedService
 
 	private void _onAppHostExiting()
 	{
-		_game?.Exit();
+		_gameLoop?.Exit();
 	}
 
 	public Task StopAsync(CancellationToken cancellationToken)
 	{
 		_logger.LogDebug("Stopping Kyber service...");
-		_game.Exiting -= _onGameExiting;
+		_gameLoop.Exiting -= _onGameExiting;
 		_mainGameThreadCancellationToken.Cancel();
 		_logger.LogDebug("Kyber service stopped!");
 		return Task.CompletedTask;

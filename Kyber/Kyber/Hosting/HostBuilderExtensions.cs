@@ -41,7 +41,7 @@ public static class KyberHostBuilderExtensions
 			configure(gameBuilder);
 
 			services.AddSingleton<IGameConfig>(gameBuilder.Config);
-			services.AddSingleton<Game>(services => ActivatorUtilities.CreateInstance<Game>(services, gameBuilder.Build(services)));
+			services.AddSingleton<GameLoop>(services => ActivatorUtilities.CreateInstance<GameLoop>(services, gameBuilder.Build(services)));
 
 			services.AddHostedService<HostedKyberService>();
 		});
