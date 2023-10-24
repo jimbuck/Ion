@@ -6,9 +6,11 @@ public sealed class SystemGroup : ISystem
     private readonly HashSet<Type> _systems;
 
     private readonly List<IInitializeSystem> _initializeSystems = new();
+	private readonly List<IFirstSystem> _firstSystems = new();
 	private readonly List<IFixedUpdateSystem> _fixedUpdateSystems = new();
 	private readonly List<IUpdateSystem> _updateSystems = new();
     private readonly List<IRenderSystem> _renderSystems = new();
+	private readonly List<ILastSystem> _lastSystems = new();
 	private readonly List<IDestroySystem> _destroySystems = new();
 
     public bool IsEnabled { get; set; } = true;
@@ -26,6 +28,10 @@ public sealed class SystemGroup : ISystem
         foreach (var system in _initializeSystems) if (system.IsEnabled) system.Initialize();
     }
 
+	public void First(GameTime dt)
+	{
+		foreach (var system in _firstSystems) if (system.IsEnabled) system.First(dt);
+	}
 
 	public void FixedUpdate(GameTime dt)
 	{
@@ -41,6 +47,12 @@ public sealed class SystemGroup : ISystem
     {
         foreach (var system in _renderSystems) if (system.IsEnabled) system.Render(dt);
     }
+
+	public void Last(GameTime dt)
+	{
+		foreach (var system in _lastSystems) if (system.IsEnabled) system.Last(dt);
+	}
+
 	public void Destroy()
     {
         foreach (var system in _destroySystems) if (system.IsEnabled) system.Destroy();
@@ -83,6 +95,12 @@ public sealed class SystemGroup : ISystem
 			added = true;
 		}
 
+		if (system is IFirstSystem firstSystem)
+		{
+			_firstSystems.Add(firstSystem);
+			added = true;
+		}
+
 		if (system is IFixedUpdateSystem fixedUpdateSystem)
 		{
 			_fixedUpdateSystems.Add(fixedUpdateSystem);
@@ -101,6 +119,12 @@ public sealed class SystemGroup : ISystem
 			added = true;
 		}
 
+		if (system is ILastSystem lastSystem)
+		{
+			_lastSystems.Add(lastSystem);
+			added = true;
+		}
+
 		if (system is IDestroySystem shutdownSystem)
 		{
 			_destroySystems.Add(shutdownSystem);
@@ -113,6 +137,7 @@ public sealed class SystemGroup : ISystem
 	public void RemoveSystem<T>()
 	{
 		_initializeSystems.RemoveAll(s => s is T);
+		_firstSystems.RemoveAll(s => s is T);
 		_fixedUpdateSystems.RemoveAll(s => s is T);
 		_updateSystems.RemoveAll(s => s is T);
 		_renderSystems.RemoveAll(s => s is T);
