@@ -1,18 +1,14 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<Version>0.1.2</Version>
-		<TargetFramework>net6.0</TargetFramework>
+		<TargetFramework>net7.0</TargetFramework>
 		<LangVersion>latest</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 		<Configurations>Debug;Release;DebugGenerators</Configurations>
 	</PropertyGroup>
-
-	<ItemGroup>
-	  <Compile Remove="Graphics\ImGuiRenderer.cs" />
-	</ItemGroup>
 
 	<ItemGroup>
 		<Using Include="System.Collections" />
@@ -28,19 +24,19 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Arch" Version="1.2.4" />
+		<PackageReference Include="Arch" Version="1.2.7" />
 		<PackageReference Include="AssimpNet" Version="4.1.0" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
-		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />
-		<PackageReference Include="Veldrid" Version="4.8.0">
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
+		<PackageReference Include="Veldrid" Version="4.9.0">
 			<PrivateAssets>true</PrivateAssets>
 		</PackageReference>
-		<PackageReference Include="Veldrid.ImageSharp" Version="4.8.0" />
+		<PackageReference Include="Veldrid.ImageSharp" Version="4.9.0" />
 		<PackageReference Include="Veldrid.SPIRV" Version="1.0.15">
 			<PrivateAssets>true</PrivateAssets>
 		</PackageReference>
-		<PackageReference Include="Veldrid.StartupUtilities" Version="4.8.0">
+		<PackageReference Include="Veldrid.StartupUtilities" Version="4.9.0">
 			<PrivateAssets>true</PrivateAssets>
 		</PackageReference>
 	</ItemGroup>

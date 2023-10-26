@@ -1,10 +1,8 @@
-﻿using Kyber.Assets;
+﻿using Kyber.Builder;
 using Kyber.Graphics;
-using Kyber.Storage;
 using Kyber.Utils;
 
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 
 namespace Kyber;
 
@@ -19,48 +17,27 @@ internal class GameLoop
 	private readonly float _maxFrameTime = 0.1f; // 100ms
 
 	private readonly IGameConfig _gameConfig;
-	private readonly Window _window;
-	private readonly GraphicsContext _graphicsContext;
-	private readonly SpriteBatch _spriteBatch;
-	private readonly AssetManager _assetManager;
-	private readonly InputState _input;
-	private readonly EventEmitter _eventEmitter;
-	private readonly PersistentStorage _storage;
-	private readonly IEventListener _events;
 
 	public GameTime GameTime { get; }
 	public GameTime FixedGameTime { get; }
-	public SystemGroup Systems { get; }
 
 	public bool IsRunning { get; private set; } = false;
 
 	public event EventHandler<EventArgs>? Exiting;
 
+	public GameLoopDelegate Initialize { get; set; } = (dt) => { };
+	public GameLoopDelegate First { get; set; } = (dt) => { };
+	public GameLoopDelegate Update { get; set; } = (dt) => { };
+	public GameLoopDelegate FixedUpdate { get; set; } = (dt) => { };
+	public GameLoopDelegate Render { get; set; } = (dt) => { };
+	public GameLoopDelegate Last { get; set; } = (dt) => { };
+	public GameLoopDelegate Destroy { get; set; } = (dt) => { };
+
 	public GameLoop(
-		IGameConfig gameConfig,
-
-		IWindow window,
-		IGraphicsContext graphicsContext,
-		ISpriteBatch spriteBatch,
-		IAssetManager assetManager,
-
-		IInputState input,
-		IEventEmitter eventEmitter,
-		IEventListener events,
-		IPersistentStorage storage,
-		SystemGroup systems)
-	{
+		IGameConfig gameConfig
+	) {
 		_gameConfig = gameConfig;
-		_window = (Window)window;
-		_graphicsContext = (GraphicsContext)graphicsContext;
-		_spriteBatch = (SpriteBatch)spriteBatch;
-		_assetManager = (AssetManager)assetManager;
-		_input = (InputState)input;
-		_eventEmitter = (EventEmitter)eventEmitter;
-		_events = events;
-		_storage = (PersistentStorage)storage;
 		
-		Systems = systems;
 		GameTime = new();
 		FixedGameTime = new()
 		{
@@ -69,76 +46,10 @@ internal class GameLoop
 		};
 	}
 
-	public void Initialize()
-	{
-		using var _ = MicroTimer.Start("Initialize");
-		_storage.Initialize();
-		_window.Initialize();
-		_graphicsContext.Initialize();
-		_assetManager.Initialize();
-		_spriteBatch.Initialize();
-		Systems.Initialize();
-	}
-
-	//public void First(GameTime time)
-	//{
-	//	using var _ = MicroTimer.Start("First");
-	//	_window.Step();
-	//	_input.Step();
-	//	_graphicsContext.First();
-
-	//	//if (_events.OnLatest<WindowResizeEvent>(out var e)) _graphicsContext.UpdateProjection(e.Data.Width, e.Data.Height);
-	//	Systems.First(time);
-	//}
-	public void FixedUpdate(GameTime time)
-	{
-		using var _ = MicroTimer.Start("FixedUpdate");
-		Systems.FixedUpdate(time);
-	}
-
-	public void Update(GameTime time)
-	{
-		using var _ = MicroTimer.Start("Update");
-		_window.Step();
-		_input.Step();
-		_graphicsContext.First();
-
-		Systems.Update(time);
-
-		if (_events.On<WindowClosedEvent>() || _events.On<GameExitEvent>()) Exit();
-	}
-
-	public void Render(GameTime time)
-	{
-		using var _ = MicroTimer.Start("Render");
-		_graphicsContext.BeginFrame(time);
-		_spriteBatch.Begin(time);
-		
-		Systems.Render(time);
-
-		_spriteBatch.End();
-		_graphicsContext.EndFrame(time);
-
-		_eventEmitter.Step();
-	}
-
-	//public void Last(GameTime time)
-	//{
-	//	using var _ = MicroTimer.Start("Last");
-	//	Systems.Last(time);
-	//	_eventEmitter.Step();
-	//}
-
-	public void Destroy()
-	{
-		using var _ = MicroTimer.Start("Destroy");
-		Systems.Destroy();
-	}
-
 	public void Run()
     {
 		IsRunning = true;
-		Initialize();
+		Initialize(GameTime);
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -160,9 +71,8 @@ internal class GameLoop
 
 			using var timer = MicroTimer.Start("First");
 
-			//First(GameTime);
+			First(GameTime);
 			timer.Then("Update");
-
 
 			while (accumulator >= FixedGameTime.Delta)
 			{
@@ -181,7 +91,7 @@ internal class GameLoop
 			}
 
 			timer.Then("Last");
-			//Last(GameTime);
+			Last(GameTime);
 
 			var delayTime = targetFrameTime - (int)((stopwatch.Elapsed.TotalSeconds - currentTime) * 1000);
 			if (delayTime > 0)
@@ -195,25 +105,24 @@ internal class GameLoop
 
 		MicroTimer.Export("./trace.json");
 
-		Destroy();
+		Destroy(GameTime);
 		IsRunning = false;
 
 		Exiting?.Invoke(this, EventArgs.Empty);
 	}
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Step(GameTime time)
     {
 		using var timer = MicroTimer.Start("First");
 
-		//First(time);
+		First(time);
 
 		timer.Then("Update");
 
 		FixedUpdate(time);
 		Update(time);
 
-		if (_shouldExit || _window.HasClosed) return;
+		if (_shouldExit) return; //if (_shouldExit || _window.HasClosed) return;
 
 		if (_gameConfig.Output != GraphicsOutput.None)
 		{
@@ -222,7 +131,7 @@ internal class GameLoop
 		}
 
 		timer.Then("Last");
-		//Last(time);
+		Last(time);
     }
 
 	public void Exit()

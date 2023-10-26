@@ -30,7 +30,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Tests", "Kyber\Kyber.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Kyber.Examples", "Kyber.Examples", "{4D2CCFA7-A07F-4101-B7F8-351DDFE783F3}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.Scenes", "Kyber.Examples\Kyber.Examples.Simple\Kyber.Examples.Scenes.csproj", "{8042821C-776D-47A8-AB66-ECB485480624}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.Scenes", "Kyber.Examples\Kyber.Examples.Scenes\Kyber.Examples.Scenes.csproj", "{8042821C-776D-47A8-AB66-ECB485480624}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Kyber.Core", "Kyber.Core", "{EA7196A2-54ED-4E68-8090-18E68E6322CB}"
 EndProject

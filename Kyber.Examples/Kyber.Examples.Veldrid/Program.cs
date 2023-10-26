@@ -14,9 +14,9 @@ var gameHost = KyberHost.CreateDefaultBuilder()
 			game.Config.VSync = false;
 			game.Config.MaxFPS = 300;
 
-			game.AddSystem<TestLoggerSystem>()
-				.AddSystem<QuadRendererSystem>()
-				.AddSystem<UserInputSystem>();
+			//game.AddSystem<TestLoggerSystem>()
+			//	.AddSystem<QuadRendererSystem>()
+			//	.AddSystem<UserInputSystem>();
 		})
 		.Build();
 

@@ -6,7 +6,7 @@ internal static class TestUtils
     {
         var gameHost = KyberHost.CreateDefaultBuilder().ConfigureKyber((game) => {
 			game.Config.Output = GraphicsOutput.None;
-			foreach (var type in systems) game.AddSystem(type);
+			//foreach (var type in systems) game.AddSystem(type);
         }).Build();
 
         services = gameHost.Services;
