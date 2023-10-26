@@ -1,11 +1,5 @@
-﻿global using Microsoft.Extensions.Logging;
-global using Kyber.Scenes;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 
-using Kyber.Hosting;
-using Kyber.Hosting.Scenes;
-
-using Kyber.Examples.Scenes;
 using Kyber.Builder;
 
 
@@ -24,15 +18,10 @@ using Kyber.Builder;
 //    .Build();
 
 
-var builder = GameApplication.CreateBuilder(args);
+var builder = KyberApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton<TestLoggerSystem>();
-builder.Services.AddSingleton<SceneSwitcherSystem>();
-
-builder.Services.AddGameConfig(config =>
-{
-	config.Title = "Kyber Scene Example";
-});
+//builder.Services.AddSingleton<TestLoggerSystem>();
+//builder.Services.AddSingleton<SceneSwitcherSystem>();
 
 var game = builder.Build();
 
