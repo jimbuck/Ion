@@ -42,7 +42,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\..\Kyber.Core\Kyber.Core\Kyber.Core.csproj" />
+	  <ProjectReference Include="..\Kyber.Core_old\Kyber.Core.csproj" />
 	</ItemGroup>
 	
 </Project>
