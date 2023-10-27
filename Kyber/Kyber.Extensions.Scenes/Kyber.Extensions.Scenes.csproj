@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kyber.Core.Abstractions\Kyber.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Kyber.Extensions.Scenes.Abstractions\Kyber.Extensions.Scenes.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

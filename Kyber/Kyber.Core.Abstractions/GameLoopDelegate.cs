@@ -1,4 +1,4 @@
 ﻿
-namespace Kyber.Core;
+namespace Kyber;
 
 public delegate void GameLoopDelegate(GameTime dt);

@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Kyber.Core;
+
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -30,7 +32,7 @@ public class KyberApplicationBuilder
 		Services.Configure<GameConfig>(Configuration.GetSection("Kyber"));
 	}
 
-	public IKyberApplication Build()
+	public KyberApplication Build()
 	{
 		var host = _hostBuilder.Build();
 		var builtGame = new KyberApplication(host);

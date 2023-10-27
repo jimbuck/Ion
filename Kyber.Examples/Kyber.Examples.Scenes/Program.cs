@@ -1,6 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-
+﻿using Kyber;
 using Kyber.Builder;
+
+using Microsoft.Extensions.DependencyInjection;
 
 
 //var gameHost = KyberHost.CreateDefaultBuilder()
@@ -20,51 +21,156 @@ using Kyber.Builder;
 
 var builder = KyberApplication.CreateBuilder(args);
 
-//builder.Services.AddSingleton<TestLoggerSystem>();
-//builder.Services.AddSingleton<SceneSwitcherSystem>();
+builder.Services.AddSingleton<TestMiddleware>();
 
 var game = builder.Build();
 
-game.UseInit((next) => (dt) =>
+game.UseSystem<TestMiddleware>();
+
+game.UseFirst((dt, next) =>
 {
-	Console.WriteLine("Init");
+	Console.WriteLine("Inline First");
 	next(dt);
 });
 
-game.UseFirst(next => dt =>
+game.UseFirst(dt =>
 {
-	Console.WriteLine("First");
-	next(dt);
+	Console.WriteLine("Inline First");
 });
 
 game.UseFixedUpdate(next => dt =>
 {
-	Console.WriteLine("FixedUpdate");
+	Console.WriteLine("Inline FixedUpdate");
 	next(dt);
 });
 
 game.UseUpdate(next => dt =>
 {
-	Console.WriteLine("Update");
+	Console.WriteLine("Inline Update");
 	next(dt);
 });
 
 game.UseRender(next => dt =>
 {
-	Console.WriteLine("Render");
+	Console.WriteLine("Inline Render");
 	next(dt);
 });
 
-game.UseLast(next => dt =>
-{
-	Console.WriteLine("Last");
-	next(dt);
-});
-
-game.UseDestroy(next => (dt) =>
-{
-	Console.WriteLine("Destroy");
-	next(dt);
-});
 
 game.Run();
+
+public class TestMiddleware
+{
+	public TestMiddleware()
+	{
+		Console.WriteLine("TestMiddleware Constructor");
+	}
+
+	[First]
+	public void CoolFirstMiddleware(GameTime dt, GameLoopDelegate next)
+	{
+		Console.WriteLine($"Class First {dt.Frame}");
+		next(dt);
+	}
+
+	[FixedUpdate]
+	public GameLoopDelegate FancyFixedUpdate(GameLoopDelegate next)
+	{
+		Console.WriteLine("Class Fixed Update outside");
+		uint count = 0;
+		return dt =>
+		{
+			Console.WriteLine($"Class Fixed Update inside {count++}");
+			next(dt);
+		};
+	}
+}
+
+public class SceneBuilder
+{
+
+}
+
+public class Scenes
+{
+	public void TestScene(SceneBuilder builder)
+	{
+
+	}
+}
+
+public class SceneLoop
+{
+
+	[Init]
+	public void Init(GameTime dt, GameLoopDelegate next)
+	{
+		// TODO: Run on current scene.
+		next(dt);
+	}
+
+	[First]
+	public void First(GameTime dt, GameLoopDelegate next)
+	{
+		// TODO: Run on current scene.
+		next(dt);
+	}
+
+	[FixedUpdate]
+	public void FixedUpdate(GameTime dt, GameLoopDelegate next)
+	{
+		// TODO: Run on current scene.
+		next(dt);
+	}
+
+	[Update]
+	public void Update(GameTime dt, GameLoopDelegate next)
+	{
+		// TODO: Run on current scene.
+		next(dt);
+	}
+
+	[Render]
+	public void Render(GameTime dt, GameLoopDelegate next)
+	{
+		// TODO: Run on current scene.
+		next(dt);
+	}
+
+	[Last]
+	public void Last(GameTime dt, GameLoopDelegate next)
+	{
+		// TODO: Run on current scene.
+		next(dt);
+	}
+
+	[Destroy]
+	public void Destroy(GameTime dt, GameLoopDelegate next)
+	{
+		// TODO: Run on current scene.
+		next(dt);
+	}
+}
+
+public static class KyberApplicationExtensions_Scenes
+{
+	public static KyberApplication UseScene<T>(this KyberApplication app)
+	{
+
+		return app;
+	}
+}
+
+public interface IScene
+{
+	void Configure(KyberApplication app);
+}
+
+
+public class TestScene : IScene
+{
+	public void Configure(KyberApplication app)
+	{
+		
+	}
+}

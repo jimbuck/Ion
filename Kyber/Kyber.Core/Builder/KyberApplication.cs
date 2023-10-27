@@ -10,13 +10,13 @@ public class KyberApplication : IKyberApplication, IDisposable
 {
 	private readonly IHost _host;
 
-	private readonly IGameLoopBuilder _init = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _first = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _fixedUpdate = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _update = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _render = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _last = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _destroy = new GameLoopBuilder();
+	private readonly IPipelineBuilder _init = new PipelineBuilder();
+	private readonly IPipelineBuilder _first = new PipelineBuilder();
+	private readonly IPipelineBuilder _fixedUpdate = new PipelineBuilder();
+	private readonly IPipelineBuilder _update = new PipelineBuilder();
+	private readonly IPipelineBuilder _render = new PipelineBuilder();
+	private readonly IPipelineBuilder _last = new PipelineBuilder();
+	private readonly IPipelineBuilder _destroy = new PipelineBuilder();
 
 	/// <summary>
 	/// The application's configured services.
@@ -64,9 +64,10 @@ public class KyberApplication : IKyberApplication, IDisposable
 
 	public IKyberApplication UseRender(Func<GameLoopDelegate, GameLoopDelegate> middleware)
 	{
-		_update.Use(middleware);
+		_render.Use(middleware);
 		return this;
 	}
+
 
 	public IKyberApplication UseLast(Func<GameLoopDelegate, GameLoopDelegate> middleware)
 	{
