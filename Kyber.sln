@@ -30,13 +30,17 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Examples.Scenes", "Ky
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Core", "Kyber\Kyber.Core\Kyber.Core.csproj", "{FF7891A1-606D-413D-B9F2-918D2DB5F266}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Core.Abstractions", "Kyber\Kyber.Core.Abstractions\Kyber.Core.Abstractions.csproj", "{74342FF5-BD87-4F81-A783-1A13ADE5F052}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Core.Abstractions", "Kyber\Kyber.Core.Abstractions\Kyber.Core.Abstractions.csproj", "{74342FF5-BD87-4F81-A783-1A13ADE5F052}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber", "Kyber\Kyber\Kyber.csproj", "{B6044750-A205-4D10-AD02-02707AE9FC0A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber", "Kyber\Kyber\Kyber.csproj", "{B6044750-A205-4D10-AD02-02707AE9FC0A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Extensions.Scenes", "Kyber\Kyber.Extensions.Scenes\Kyber.Extensions.Scenes.csproj", "{700C404D-596B-4F79-9E4A-1B49355059D5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Extensions.Scenes", "Kyber\Kyber.Extensions.Scenes\Kyber.Extensions.Scenes.csproj", "{700C404D-596B-4F79-9E4A-1B49355059D5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Extensions.Scenes.Abstractions", "Kyber\Kyber.Extensions.Scenes.Abstractions\Kyber.Extensions.Scenes.Abstractions.csproj", "{59A49B7B-62B2-4343-838E-AE7E883BDB52}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Extensions.Scenes.Abstractions", "Kyber\Kyber.Extensions.Scenes.Abstractions\Kyber.Extensions.Scenes.Abstractions.csproj", "{59A49B7B-62B2-4343-838E-AE7E883BDB52}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Extensions.Graphics", "Kyber\Kyber.Extensions.Graphics\Kyber.Extensions.Graphics.csproj", "{484401A0-695F-4252-8CEE-5BDD5D87D2CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Extensions.Graphics.Abstractions", "Kyber\Kyber.Extensions.Graphics.Abstractions\Kyber.Extensions.Graphics.Abstractions.csproj", "{BC64E83E-4034-407F-810C-671EC13AD1D7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -81,6 +85,18 @@ Global
 		{59A49B7B-62B2-4343-838E-AE7E883BDB52}.DebugGenerators|Any CPU.Build.0 = Debug|Any CPU
 		{59A49B7B-62B2-4343-838E-AE7E883BDB52}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{59A49B7B-62B2-4343-838E-AE7E883BDB52}.Release|Any CPU.Build.0 = Release|Any CPU
+		{484401A0-695F-4252-8CEE-5BDD5D87D2CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{484401A0-695F-4252-8CEE-5BDD5D87D2CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{484401A0-695F-4252-8CEE-5BDD5D87D2CE}.DebugGenerators|Any CPU.ActiveCfg = Debug|Any CPU
+		{484401A0-695F-4252-8CEE-5BDD5D87D2CE}.DebugGenerators|Any CPU.Build.0 = Debug|Any CPU
+		{484401A0-695F-4252-8CEE-5BDD5D87D2CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{484401A0-695F-4252-8CEE-5BDD5D87D2CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BC64E83E-4034-407F-810C-671EC13AD1D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC64E83E-4034-407F-810C-671EC13AD1D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC64E83E-4034-407F-810C-671EC13AD1D7}.DebugGenerators|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC64E83E-4034-407F-810C-671EC13AD1D7}.DebugGenerators|Any CPU.Build.0 = Debug|Any CPU
+		{BC64E83E-4034-407F-810C-671EC13AD1D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC64E83E-4034-407F-810C-671EC13AD1D7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -93,6 +109,8 @@ Global
 		{B6044750-A205-4D10-AD02-02707AE9FC0A} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 		{700C404D-596B-4F79-9E4A-1B49355059D5} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 		{59A49B7B-62B2-4343-838E-AE7E883BDB52} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
+		{484401A0-695F-4252-8CEE-5BDD5D87D2CE} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
+		{BC64E83E-4034-407F-810C-671EC13AD1D7} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CCF839E2-AF6A-4444-95F2-76F60225DC55}

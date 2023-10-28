@@ -4,20 +4,20 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Kyber.Builder;
 
-public static class IKyberApplicationExtensions
+public static class BuilderExtensions
 {
 	private static bool _scenesAdded = false;
 
 	public static IServiceCollection AddScenes(this IServiceCollection services)
 	{
 		return services
-			.AddSingleton<ISceneManager, SceneManager>()
+			.AddSingleton<SceneSystem>()
 			.AddSingleton<ICurrentScene, CurrentScene>();
 	}
 
 	public static IKyberApplication UseScene(this IKyberApplication app, string name, Action<ISceneBuilder> configure)
 	{
-		var sceneManager = (SceneManager)app.Services.GetRequiredService<ISceneManager>();
+		var sceneManager = app.Services.GetRequiredService<SceneSystem>();
 		sceneManager.Register(name, (config, services) =>
 		{
 			var sceneBuilder = new SceneBuilder(name, config, services);
@@ -28,7 +28,7 @@ public static class IKyberApplicationExtensions
 		if (!_scenesAdded)
 		{
 			_scenesAdded = true;
-			app.UseSystem<ISceneManager, SceneManager>();
+			app.UseSystem<SceneSystem>();
 		}
 
 		return app;

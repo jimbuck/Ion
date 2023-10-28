@@ -8,7 +8,7 @@ namespace Kyber;
 
 internal delegate Scene SceneBuilderFactory(IConfiguration config, IServiceProvider services);
 
-internal sealed class SceneManager : ISceneManager, IDisposable
+internal sealed class SceneSystem : IDisposable
 {
 	private readonly IServiceProvider _serviceProvider;
 	private readonly ILogger _logger;
@@ -28,7 +28,7 @@ internal sealed class SceneManager : ISceneManager, IDisposable
 	/// Creates a new SceneManager instance, keeping a reference to the service provider.
 	/// </summary>
 	/// <param name="serviceProvider">The root service provider.</param>
-	public SceneManager(IServiceProvider serviceProvider, ILogger<SceneManager> logger, IConfiguration config, IEventListener events)
+	public SceneSystem(IServiceProvider serviceProvider, ILogger<SceneSystem> logger, IConfiguration config, IEventListener events)
 	{
 		_serviceProvider = serviceProvider;
 		_logger = logger;
