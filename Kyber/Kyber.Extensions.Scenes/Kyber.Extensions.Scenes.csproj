@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Kyber.Core.Abstractions\Kyber.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Kyber.Extensions.Scenes.Abstractions\Kyber.Extensions.Scenes.Abstractions.csproj" />
   </ItemGroup>

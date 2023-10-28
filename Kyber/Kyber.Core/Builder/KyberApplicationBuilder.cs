@@ -1,6 +1,4 @@
-﻿using Kyber.Core;
-
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -13,7 +11,7 @@ public class KyberApplicationBuilder
 	public ConfigurationManager Configuration => _hostBuilder.Configuration;
 	public IServiceCollection Services => _hostBuilder.Services;
 
-	public KyberApplicationBuilder(string[] args)
+	internal KyberApplicationBuilder(string[] args)
 	{
 		_hostBuilder = Host.CreateApplicationBuilder(args);
 

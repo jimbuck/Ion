@@ -1,26 +1,25 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Kyber.Hosting.Scenes;
+using Microsoft.Extensions.Logging;
+
 using Kyber.Scenes;
-using Kyber.Scenes.Transitions;
+using Microsoft.Extensions.Configuration;
 
 namespace Kyber;
 
-public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdateSystem, IRenderSystem, IDestroySystem, IDisposable, ISceneManager
+internal delegate Scene SceneBuilderFactory(IConfiguration config, IServiceProvider services);
+
+internal sealed class SceneManager : ISceneManager, IDisposable
 {
 	private readonly IServiceProvider _serviceProvider;
 	private readonly ILogger _logger;
-	private readonly Dictionary<string, SceneBuilder> _scenesBuilders;
+	private readonly IConfiguration _config;
+	private readonly Dictionary<string, SceneBuilderFactory> _scenesBuilders = new();
 
 	private Scene? _activeScene;
-	private Transition? _activeTransition;
 	private IServiceScope? _activeScope;
 	private string? _nextScene = null;
 
 	public Guid Id { get; } = Guid.NewGuid();
-
-	public bool IsEnabled { get; set; } = true;
-
-	public string[] Scenes { get; private set; }
 
 	public string CurrentScene => _activeScene?.Name ?? "<Root>";
 
@@ -28,36 +27,16 @@ public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdat
 	/// Creates a new SceneManager instance, keeping a reference to the service provider.
 	/// </summary>
 	/// <param name="serviceProvider">The root service provider.</param>
-	internal SceneManager(IServiceProvider serviceProvider, ILogger<SceneManager> logger, IEnumerable<SceneBuilder> sceneBuilders)
+	public SceneManager(IServiceProvider serviceProvider, ILogger<SceneManager> logger, IConfiguration config)
 	{
 		_serviceProvider = serviceProvider;
 		_logger = logger;
-
-		var sb = sceneBuilders.ToArray();
-		Scenes = sb.Select(s => s.Name).ToArray();
-		_scenesBuilders = sb.ToDictionary(s => s.Name, s => s);
+		_config = config;
 	}
 
-	/// <summary>
-	/// Begins initializes and begins the transition which will then load the new scene.
-	/// </summary>
-	/// <typeparam name="TScene">The scene type to load.</typeparam>
-	/// <typeparam name="TTransition">The transition effect.</typeparam>
-	/// <param name="duration">The duration of the transition.</param>
-	public void LoadScene<TScene, TTransition>(float duration) where TScene : ISceneConfiguration where TTransition : Transition
+	public void Register(string name, SceneBuilderFactory sceneBuilderFactory)
 	{
-		if (_activeTransition != null) return;
-
-		var transitionType = typeof(TTransition);
-
-		_activeTransition = (Transition)ActivatorUtilities.CreateInstance(_serviceProvider, transitionType);
-		_activeTransition.Duration = duration;
-		_activeTransition.StateChanged += (sender, args) => LoadScene<TScene>();
-		_activeTransition.Completed += (sender, args) =>
-		{
-			_activeTransition.Dispose();
-			_activeTransition = null;
-		};
+		_scenesBuilders[name] = sceneBuilderFactory;
 	}
 
 	/// <summary>
@@ -67,12 +46,13 @@ public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdat
 	/// <exception cref="Exception"></exception>
 	public void LoadScene(string name)
 	{
+		// TODO: Use events rather than this method call.
 		if (!_scenesBuilders.ContainsKey(name)) throw new Exception($"Unknown scene '{name}'!");
 
 		_nextScene = name;
 	}
 
-	private void _loadNextScene()
+	private void _loadNextScene(GameTime dt)
 	{
 		if (_nextScene == null || _nextScene == CurrentScene)
 		{
@@ -83,7 +63,7 @@ public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdat
 		if (_activeScene != null)
 		{
 			_logger.LogInformation("Unloading {0} Scene.", CurrentScene);
-			_activeScene?.Destroy();
+			_activeScene?.Destroy(dt);
 			_activeScope?.Dispose();
 			_logger.LogInformation("Unloaded {0} Scene.", CurrentScene);
 			_activeScene = null;
@@ -94,8 +74,8 @@ public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdat
 		var currScene = (CurrentScene)_activeScope.ServiceProvider.GetRequiredService<ICurrentScene>();
 		currScene.Set(_nextScene);
 
-		_activeScene = _scenesBuilders[_nextScene].Build(_activeScope.ServiceProvider);
-		_activeScene.Initialize();
+		_activeScene = _scenesBuilders[_nextScene](_config, _activeScope.ServiceProvider);
+		_activeScene.Init(dt);
 		_logger.LogInformation("Loaded {0} Scene.", _nextScene);
 		_nextScene = null;
 	}
@@ -104,7 +84,7 @@ public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdat
 	/// Unloads the current scene and loads a new scene immediately.
 	/// </summary>
 	/// <typeparam name="TScene">The scene type to load.</typeparam>
-	public void LoadScene<TScene>() where TScene : ISceneConfiguration
+	public void LoadScene<TScene>() where TScene : Scene
 	{
 		LoadScene(typeof(TScene).Name);
 	}
@@ -112,25 +92,34 @@ public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdat
 	/// <summary>
 	/// Initializes the active scene.
 	/// </summary>
-	public void Initialize()
+	[Init]
+	public void Init(GameTime dt, GameLoopDelegate _)
 	{
-		_logger.LogDebug($"Startup");
+		_logger.LogDebug("Init ({0}) {1}", CurrentScene, dt);
 
 		if (_activeScene != null)
 		{
-			_activeScene.Initialize();
+			_activeScene.Init(dt);
 		}
 		else
 		{
-			_nextScene = Scenes[0];
-			_loadNextScene();
+			_nextScene = _scenesBuilders.First().Key;
+			_loadNextScene(dt);
 		}
 	}
 
-
-	public void FixedUpdate(GameTime dt)
+	[First]
+	public void First(GameTime dt, GameLoopDelegate _)
 	{
-		_logger.LogDebug("FixedUpdate ({0}) {1}", CurrentScene, dt);
+		//_logger.LogDebug("First ({0}) {1}", CurrentScene, dt);
+		_loadNextScene(dt);
+		_activeScene?.First(dt);
+	}
+
+	[FixedUpdate]
+	public void FixedUpdate(GameTime dt, GameLoopDelegate _)
+	{
+		//_logger.LogDebug("FixedUpdate ({0}) {1}", CurrentScene, dt);
 		_activeScene?.FixedUpdate(dt);
 	}
 
@@ -138,32 +127,39 @@ public sealed class SceneManager : IInitializeSystem, IUpdateSystem, IFixedUpdat
 	/// Updates the active scene (and transition, if in progress).
 	/// </summary>
 	/// <param name="dt">The elapsed time since the last call to Update.</param>
-	public void Update(GameTime dt)
+	[Update]
+	public void Update(GameTime dt, GameLoopDelegate _)
 	{
-		_logger.LogDebug("Update ({0}) {1}", CurrentScene, dt);
+		//_logger.LogDebug("Update ({0}) {1}", CurrentScene, dt);
 		_activeScene?.Update(dt);
-		_activeTransition?.Update(dt);
 	}
-
 
 	/// <summary>
 	/// Draws the active scene (and transition, if in progress).
 	/// </summary>
 	/// <param name="dt">The elapsed time since the last call to Draw.</param>
-	public void Render(GameTime dt)
+	[Render]
+	public void Render(GameTime dt, GameLoopDelegate _)
 	{
-		_logger.LogDebug("Render ({0}) {1}", CurrentScene, dt);
+		//_logger.LogDebug("Render ({0}) {1}", CurrentScene, dt);
 		_activeScene?.Render(dt);
-		_activeTransition?.Render(dt);
+	}
+
+	[Last]
+	public void Last(GameTime dt, GameLoopDelegate _)
+	{
+		//_logger.LogDebug("Last ({0}) {1}", CurrentScene, dt);
+		_activeScene?.Last(dt);
 	}
 
 	/// <summary>
 	/// Unloads content for the active scene.
 	/// </summary>
-	public void Destroy()
+	[Destroy]
+	public void Destroy(GameTime dt, GameLoopDelegate _)
 	{
-		_logger.LogDebug("Shutdown");
-		_activeScene?.Destroy();
+		_logger.LogDebug("Destroy");
+		_activeScene?.Destroy(dt);
 	}
 
 	public void Dispose()

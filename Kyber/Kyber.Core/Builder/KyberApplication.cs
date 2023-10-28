@@ -10,13 +10,13 @@ public class KyberApplication : IKyberApplication, IDisposable
 {
 	private readonly IHost _host;
 
-	private readonly IPipelineBuilder _init = new PipelineBuilder();
-	private readonly IPipelineBuilder _first = new PipelineBuilder();
-	private readonly IPipelineBuilder _fixedUpdate = new PipelineBuilder();
-	private readonly IPipelineBuilder _update = new PipelineBuilder();
-	private readonly IPipelineBuilder _render = new PipelineBuilder();
-	private readonly IPipelineBuilder _last = new PipelineBuilder();
-	private readonly IPipelineBuilder _destroy = new PipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _init = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _first = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _fixedUpdate = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _update = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _render = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _last = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _destroy = new MiddlewarePipelineBuilder();
 
 	/// <summary>
 	/// The application's configured services.
@@ -85,7 +85,7 @@ public class KyberApplication : IKyberApplication, IDisposable
 	{
 		var gameLoop = ActivatorUtilities.CreateInstance<GameLoop>(Services);
 
-		gameLoop.Initialize = _init.Build();
+		gameLoop.Init = _init.Build();
 		gameLoop.First = _first.Build();
 		gameLoop.FixedUpdate = _fixedUpdate.Build();
 		gameLoop.Update = _update.Build();

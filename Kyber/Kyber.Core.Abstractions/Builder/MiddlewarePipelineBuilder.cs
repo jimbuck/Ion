@@ -2,18 +2,18 @@
 namespace Kyber.Builder;
 
 
-public interface IPipelineBuilder
+public interface IMiddlewarePipelineBuilder
 {
-	IPipelineBuilder Use(Func<GameLoopDelegate, GameLoopDelegate> middleware);
+	IMiddlewarePipelineBuilder Use(Func<GameLoopDelegate, GameLoopDelegate> middleware);
 	GameLoopDelegate Build();
 }
 
-internal class PipelineBuilder : IPipelineBuilder
+public class MiddlewarePipelineBuilder : IMiddlewarePipelineBuilder
 {
 	private readonly List<Func<GameLoopDelegate, GameLoopDelegate>> _systems = new();
 	private readonly List<string> _descriptions = new();
 
-	public IPipelineBuilder Use(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	public IMiddlewarePipelineBuilder Use(Func<GameLoopDelegate, GameLoopDelegate> middleware)
 	{
 		_systems.Add(middleware);
 		_descriptions.Add(_createMiddlewareDescription(middleware));

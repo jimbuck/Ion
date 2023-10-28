@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Kyber\Kyber.Extensions.Scenes\Kyber.Extensions.Scenes.csproj" />
     <ProjectReference Include="..\..\Kyber\Kyber\Kyber.csproj" />
   </ItemGroup>
 

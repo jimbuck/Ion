@@ -6,7 +6,7 @@ namespace Kyber.Core;
 /// <summary>
 /// Top-level class representing the runnable game.
 /// </summary>
-internal class GameLoop
+public class GameLoop
 {
 	private bool _shouldExit;
 	private readonly float _maxFrameTime = 0.1f; // 100ms
@@ -22,7 +22,7 @@ internal class GameLoop
 
 	public event EventHandler<EventArgs>? Exiting;
 
-	public GameLoopDelegate Initialize { get; set; } = (dt) => { };
+	public GameLoopDelegate Init { get; set; } = (dt) => { };
 	public GameLoopDelegate First { get; set; } = (dt) => { };
 	public GameLoopDelegate Update { get; set; } = (dt) => { };
 	public GameLoopDelegate FixedUpdate { get; set; } = (dt) => { };
@@ -44,7 +44,7 @@ internal class GameLoop
 	public void Run()
     {
 		IsRunning = true;
-		Initialize(GameTime);
+		Init(GameTime);
 
         var stopwatch = Stopwatch.StartNew();
 

@@ -1,39 +1,86 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
+﻿using Kyber.Scenes;
 
-using Kyber.Scenes;
+using Microsoft.Extensions.Configuration;
 
-namespace Kyber.Hosting.Scenes;
+namespace Kyber.Builder;
 
 internal class SceneBuilder : ISceneBuilder
 {
-    public string Name { get; }
+	private readonly IMiddlewarePipelineBuilder _init = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _first = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _fixedUpdate = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _update = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _render = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _last = new MiddlewarePipelineBuilder();
+	private readonly IMiddlewarePipelineBuilder _destroy = new MiddlewarePipelineBuilder();
 
-	private readonly IGameLoopBuilder _init = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _first = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _fixedUpdate = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _update = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _render = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _last = new GameLoopBuilder();
-	private readonly IGameLoopBuilder _destroy = new GameLoopBuilder();
+	public string Name { get; }
 
-	public SceneBuilder(string name, IServiceCollection services)
+	public IConfiguration Configuration { get; }
+
+	public IServiceProvider Services { get; }
+
+	public SceneBuilder(string name, IConfiguration config, IServiceProvider services)
     {
         Name = name;
-        _services = services;
+		Configuration = config;
+		Services = services;
     }
 
-    public ISceneBuilder AddSystem<T>() where T : class
+	public ISceneBuilder UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	{
+		_init.Use(middleware);
+		return this;
+	}
+
+	public ISceneBuilder UseFirst(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	{
+		_first.Use(middleware);
+		return this;
+	}
+
+	public ISceneBuilder UseFixedUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	{
+		_fixedUpdate.Use(middleware);
+		return this;
+	}
+
+	public ISceneBuilder UseUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	{
+		_update.Use(middleware);
+		return this;
+	}
+
+	public ISceneBuilder UseRender(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	{
+		_render.Use(middleware);
+		return this;
+	}
+
+
+	public ISceneBuilder UseLast(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	{
+		_last.Use(middleware);
+		return this;
+	}
+
+	public ISceneBuilder UseDestroy(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	{
+		_destroy.Use(middleware);
+		return this;
+	}
+
+	internal Scene Build()
     {
-        _systems.AddSystem<T>();
-        _services.TryAddScoped<T>();
-        return this;
-    }
-
-    internal Scene Build(IServiceProvider serviceProvider)
-    {
-        //var aggSys = _systems.Build(serviceProvider);
-
-        return new Scene(Name, aggSys);
-    }
+		return new Scene(Name)
+		{
+			Init = _init.Build(),
+			First = _first.Build(),
+			FixedUpdate = _fixedUpdate.Build(),
+			Update = _update.Build(),
+			Render = _render.Build(),
+			Last = _last.Build(),
+			Destroy = _destroy.Build()
+		};
+	}
 }

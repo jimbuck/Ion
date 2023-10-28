@@ -6,4 +6,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="Kyber.Extensions.Scenes" />
+	</ItemGroup>
+
+	<ItemGroup>
+    <ProjectReference Include="..\Kyber.Core.Abstractions\Kyber.Core.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>
