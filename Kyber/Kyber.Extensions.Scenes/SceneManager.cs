@@ -13,6 +13,7 @@ internal sealed class SceneManager : ISceneManager, IDisposable
 	private readonly IServiceProvider _serviceProvider;
 	private readonly ILogger _logger;
 	private readonly IConfiguration _config;
+	private readonly IEventListener _events;
 	private readonly Dictionary<string, SceneBuilderFactory> _scenesBuilders = new();
 
 	private Scene? _activeScene;
@@ -27,29 +28,17 @@ internal sealed class SceneManager : ISceneManager, IDisposable
 	/// Creates a new SceneManager instance, keeping a reference to the service provider.
 	/// </summary>
 	/// <param name="serviceProvider">The root service provider.</param>
-	public SceneManager(IServiceProvider serviceProvider, ILogger<SceneManager> logger, IConfiguration config)
+	public SceneManager(IServiceProvider serviceProvider, ILogger<SceneManager> logger, IConfiguration config, IEventListener events)
 	{
 		_serviceProvider = serviceProvider;
 		_logger = logger;
 		_config = config;
+		_events = events;
 	}
 
 	public void Register(string name, SceneBuilderFactory sceneBuilderFactory)
 	{
 		_scenesBuilders[name] = sceneBuilderFactory;
-	}
-
-	/// <summary>
-	/// Unloads the current scene and loads a new scene immediately.
-	/// </summary>
-	/// <param name="name">The scene name to load.</param>
-	/// <exception cref="Exception"></exception>
-	public void LoadScene(string name)
-	{
-		// TODO: Use events rather than this method call.
-		if (!_scenesBuilders.ContainsKey(name)) throw new Exception($"Unknown scene '{name}'!");
-
-		_nextScene = name;
 	}
 
 	private void _loadNextScene(GameTime dt)
@@ -81,21 +70,14 @@ internal sealed class SceneManager : ISceneManager, IDisposable
 	}
 
 	/// <summary>
-	/// Unloads the current scene and loads a new scene immediately.
-	/// </summary>
-	/// <typeparam name="TScene">The scene type to load.</typeparam>
-	public void LoadScene<TScene>() where TScene : Scene
-	{
-		LoadScene(typeof(TScene).Name);
-	}
-
-	/// <summary>
 	/// Initializes the active scene.
 	/// </summary>
 	[Init]
 	public void Init(GameTime dt, GameLoopDelegate _)
 	{
 		_logger.LogDebug("Init ({0}) {1}", CurrentScene, dt);
+
+		_handleChangeSceneEvents();
 
 		if (_activeScene != null)
 		{
@@ -112,6 +94,9 @@ internal sealed class SceneManager : ISceneManager, IDisposable
 	public void First(GameTime dt, GameLoopDelegate _)
 	{
 		//_logger.LogDebug("First ({0}) {1}", CurrentScene, dt);
+
+		_handleChangeSceneEvents();
+
 		_loadNextScene(dt);
 		_activeScene?.First(dt);
 	}
@@ -167,5 +152,16 @@ internal sealed class SceneManager : ISceneManager, IDisposable
 		_activeScene = null;
 		_activeScope?.Dispose();
 		_activeScope = null;
+	}
+
+	private void _handleChangeSceneEvents()
+	{
+		if (_events.OnLatest<ChangeSceneEvent>(out var e))
+		{
+			if (!_scenesBuilders.ContainsKey(e.Data.NextScene)) _logger.LogWarning($"Tried to load unknown scene '{e.Data.NextScene}'.");
+
+			_nextScene = e.Data.NextScene;
+			e.Handled = true;
+		}
 	}
 }

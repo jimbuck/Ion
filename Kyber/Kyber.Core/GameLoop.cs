@@ -12,6 +12,7 @@ public class GameLoop
 	private readonly float _maxFrameTime = 0.1f; // 100ms
 
 	private readonly IOptionsMonitor<GameConfig> _gameConfig;
+	private readonly IEventListener _events;
 
 	private float MaxFPS => _gameConfig.CurrentValue.MaxFPS < 1 ? 120 : _gameConfig.CurrentValue.MaxFPS;
 
@@ -19,8 +20,6 @@ public class GameLoop
 	public GameTime FixedGameTime { get; }
 
 	public bool IsRunning { get; private set; } = false;
-
-	public event EventHandler<EventArgs>? Exiting;
 
 	public GameLoopDelegate Init { get; set; } = (dt) => { };
 	public GameLoopDelegate First { get; set; } = (dt) => { };
@@ -30,8 +29,9 @@ public class GameLoop
 	public GameLoopDelegate Last { get; set; } = (dt) => { };
 	public GameLoopDelegate Destroy { get; set; } = (dt) => { };
 
-	public GameLoop(IOptionsMonitor<GameConfig> gameConfig) {
+	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events) {
 		_gameConfig = gameConfig;
+		_events = events;
 		
 		GameTime = new();
 		FixedGameTime = new()
@@ -77,7 +77,9 @@ public class GameLoop
 			Update(GameTime);
 
 			Render(GameTime);
-		
+
+			if (_events.On<ExitGameEvent>()) _shouldExit = true;
+
 			Last(GameTime);
 
 			var delayTime = targetFrameTime - (int)((stopwatch.Elapsed.TotalSeconds - currentTime) * 1000);
@@ -91,8 +93,6 @@ public class GameLoop
 
 		Destroy(GameTime);
 		IsRunning = false;
-
-		Exiting?.Invoke(this, EventArgs.Empty);
 	}
 
     public void Step(GameTime time)
@@ -107,10 +107,5 @@ public class GameLoop
 		Render(time);
 
 		Last(time);
-    }
-
-	public void Exit()
-    {
-        _shouldExit = true;
     }
 }

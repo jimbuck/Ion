@@ -14,48 +14,56 @@ var game = builder.Build();
 
 //game.UseSystem<TestMiddleware>();
 
-//game.UseFirst(next =>
-//{
-//	Console.WriteLine("Game First Setup");
-//	return dt =>
-//	{
-//		Console.WriteLine("Game First");
-//		next(dt);
-//	};
-//});
+game.UseFirst(next =>
+{
+	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(1), (dt) => {
+		Console.WriteLine($"Frame: {dt.Frame}");
+	});
+	return dt =>
+	{
+		logFrameNumber(dt);
+		next(dt);
+	};
+});
 
 game.UseUpdate(next =>
 {
 	var sceneManager = game.Services.GetRequiredService<ISceneManager>();
-	var total = 0f;
+	var eventEmitter = game.Services.GetRequiredService<IEventEmitter>();
 	var flip = false;
+	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(3), (dt) => {
+		eventEmitter.Emit(new ChangeSceneEvent(flip ? "MainMenu" : "Gameplay"));
+		flip = !flip;
+	});
+
 	return dt =>
 	{
 		next(dt);
-		total += dt.Delta;
-		if (total > 3)
-		{
-			flip = !flip;
-			total = 0;
-			sceneManager.LoadScene(flip ? "MainMenu" : "Gameplay");
-		}
+		switchScene(dt);
 	};
 });
 
-game.UseRender(next => dt =>
+game.UseRender(next =>
 {
-	//Console.WriteLine("Game Render");
-	next(dt);
+	var eventEmitter = game.Services.GetRequiredService<IEventEmitter>();
+
+	return dt =>
+	{
+		//Console.WriteLine("Game Render");
+		next(dt);
+
+		if (dt.Frame > 500) eventEmitter.Emit<ExitGameEvent>();
+	};
 });
 
 game.UseScene("MainMenu", scene =>
 {
 	scene.UseRender(next =>
 	{
-		Console.WriteLine("MainMenu Scene Setup Render");
+		//Console.WriteLine("MainMenu Scene Setup Render");
 		return dt =>
 		{
-			Console.WriteLine("MainMenu Scene Render");
+			//Console.WriteLine("MainMenu Scene Render");
 			next(dt);
 		};
 	});
@@ -67,10 +75,10 @@ game.UseScene("Gameplay", scene =>
 {
 	scene.UseRender(next =>
 	{
-		Console.WriteLine("Gameplay Scene Setup Render");
+		//Console.WriteLine("Gameplay Scene Setup Render");
 		return dt =>
 		{
-			Console.WriteLine("Gameplay Scene Render");
+			//Console.WriteLine("Gameplay Scene Render");
 			next(dt);
 		};
 	});
@@ -103,6 +111,24 @@ public class TestMiddleware
 		{
 			Console.WriteLine($"Class Fixed Update inside {count++}");
 			next(dt);
+		};
+	}
+}
+
+static class Throttler
+{
+	public static Action<GameTime> Wrap(TimeSpan interval, Action<GameTime> action)
+	{
+		var total = 0f;
+
+		return (dt) =>
+		{
+			total += dt.Delta;
+			if (total > interval.TotalSeconds)
+			{
+				total = 0;
+				action(dt);
+			}
 		};
 	}
 }

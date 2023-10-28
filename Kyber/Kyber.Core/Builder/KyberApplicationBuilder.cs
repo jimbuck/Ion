@@ -28,12 +28,19 @@ public class KyberApplicationBuilder
 		});
 
 		Services.Configure<GameConfig>(Configuration.GetSection("Kyber"));
+
+		Services.AddSingleton<IEventEmitter, EventEmitter>();
+		Services.AddTransient<IEventListener, EventListener>();
+		Services.AddSingleton<EventSystem>();
 	}
 
 	public KyberApplication Build()
 	{
 		var host = _hostBuilder.Build();
-		var builtGame = new KyberApplication(host);
-		return builtGame;
+		var game = new KyberApplication(host);
+
+		game.UseSystem<EventSystem>();
+
+		return game;
 	}
 }
