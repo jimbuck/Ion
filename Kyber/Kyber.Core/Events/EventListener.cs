@@ -1,6 +1,6 @@
 ﻿namespace Kyber;
 
-internal class EventListener : IEventListener, IDisposable
+public class EventListener : IEventListener, IDisposable
 {
     public readonly EventEmitter _eventEmitter;
 

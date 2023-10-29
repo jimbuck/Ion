@@ -1,6 +1,6 @@
 ﻿namespace Kyber;
 
-internal class EventEmitter : IEventEmitter
+public class EventEmitter : IEventEmitter
 {
 	private readonly ConcurrentQueue<IEvent> _currFrame = new();
 	private IEvent[] _prevFrame = Array.Empty<IEvent>();

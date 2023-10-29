@@ -42,6 +42,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Extensions.Graphics",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Extensions.Graphics.Abstractions", "Kyber\Kyber.Extensions.Graphics.Abstractions\Kyber.Extensions.Graphics.Abstractions.csproj", "{BC64E83E-4034-407F-810C-671EC13AD1D7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kyber.Extensions.Debug", "Kyber\Kyber.Extensions.Debug\Kyber.Extensions.Debug.csproj", "{C6AE892E-ED53-4CF9-B3D4-5F904E6E352D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -97,6 +99,12 @@ Global
 		{BC64E83E-4034-407F-810C-671EC13AD1D7}.DebugGenerators|Any CPU.Build.0 = Debug|Any CPU
 		{BC64E83E-4034-407F-810C-671EC13AD1D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BC64E83E-4034-407F-810C-671EC13AD1D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6AE892E-ED53-4CF9-B3D4-5F904E6E352D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6AE892E-ED53-4CF9-B3D4-5F904E6E352D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6AE892E-ED53-4CF9-B3D4-5F904E6E352D}.DebugGenerators|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6AE892E-ED53-4CF9-B3D4-5F904E6E352D}.DebugGenerators|Any CPU.Build.0 = Debug|Any CPU
+		{C6AE892E-ED53-4CF9-B3D4-5F904E6E352D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6AE892E-ED53-4CF9-B3D4-5F904E6E352D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -111,6 +119,7 @@ Global
 		{59A49B7B-62B2-4343-838E-AE7E883BDB52} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 		{484401A0-695F-4252-8CEE-5BDD5D87D2CE} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 		{BC64E83E-4034-407F-810C-671EC13AD1D7} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
+		{C6AE892E-ED53-4CF9-B3D4-5F904E6E352D} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CCF839E2-AF6A-4444-95F2-76F60225DC55}

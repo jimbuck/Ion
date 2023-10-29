@@ -3,6 +3,8 @@ namespace Kyber.Builder;
 
 public static class UseExtensions
 {
+	// TODO: Replace this with Func<GameTime, T1, T2, T3, ..., GameLoopDelegate> instead.
+
 	public static IKyberApplication UseInit(this IKyberApplication app, Action<GameTime, GameLoopDelegate> middleware) => app.UseInit(next => dt => middleware(dt, next));
 
 	public static IKyberApplication UseFirst(this IKyberApplication app, Action<GameTime, GameLoopDelegate> middleware) => app.UseFirst(next => dt => middleware(dt, next));

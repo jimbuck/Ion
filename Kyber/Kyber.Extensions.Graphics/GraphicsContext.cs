@@ -3,12 +3,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using Veldrid;
+using Kyber.Extensions.Debug;
+using Kyber.Extensions.Graphics;
 
 namespace Kyber;
 
 internal class GraphicsContext : IGraphicsContext, IDisposable
 {
-	private readonly IOptionsMonitor<GameConfig> _config;
+	private readonly IOptionsMonitor<GraphicsConfig> _config;
 	private readonly IEventListener _events;
 	private readonly ILogger _logger;
 	private readonly Window _window;
@@ -23,7 +25,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 	public bool NoRender { get; }
 
-	public GraphicsContext(IOptionsMonitor<GameConfig> config, IEventListener events, ILogger<GraphicsContext> logger, IWindow window)
+	public GraphicsContext(IOptionsMonitor<GraphicsConfig> config, IEventListener events, ILogger<GraphicsContext> logger, IWindow window)
 	{
 		_config = config;
 		_events = events;
@@ -40,9 +42,9 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 		using var _ = MicroTimer.Start("GraphicsContext::Initialize");
 		_logger.LogInformation("Creating graphics device...");
 
-		if (!GraphicsDevice.IsBackendSupported(_config.PreferredBackend))
+		if (!GraphicsDevice.IsBackendSupported(_config.CurrentValue.PreferredBackend))
 		{
-			throw new KyberException($"Unsupported backend! ({_config.PreferredBackend}");
+			throw new Exception($"Unsupported backend! ({_config.CurrentValue.PreferredBackend}");
 		}
 
 		GraphicsDevice = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new GraphicsDeviceOptions()
@@ -54,8 +56,8 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 			ResourceBindingModel = ResourceBindingModel.Default,
 			PreferStandardClipSpaceYDirection = true,
 			PreferDepthRangeZeroToOne = true,
-			SyncToVerticalBlank = _config.VSync,
-		}, _config.PreferredBackend);
+			SyncToVerticalBlank = _config.CurrentValue.VSync,
+		}, _config.CurrentValue.PreferredBackend);
 
 		_commandList = GraphicsDevice.ResourceFactory.CreateCommandList();
 
@@ -87,7 +89,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 		_commandList.Begin();
 		_commandList.SetFramebuffer(GraphicsDevice.MainSwapchain.Framebuffer);
 		_commandList.SetFullViewports();
-		_commandList.ClearColorTarget(0, _config.ClearColor);
+		_commandList.ClearColorTarget(0, _config.CurrentValue.ClearColor);
 		_commandList.ClearDepthStencil(GraphicsDevice.IsDepthRangeZeroToOne ? 0f : 1f);
 		_commandList.End();
 		GraphicsDevice.SubmitCommands(_commandList);

@@ -26,6 +26,4 @@ public interface IWindow
 	bool IsResizable { get; set; }
 	bool IsCursorVisible { get; set; }
 	bool IsBorderVisible { get; set; }
-
-	void Close();
 }

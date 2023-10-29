@@ -1,5 +1,5 @@
 ﻿
-using Kyber.Graphics;
+using Kyber.Extensions.Graphics;
 
 namespace Kyber.Builder;
 

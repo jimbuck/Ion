@@ -6,13 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 var builder = KyberApplication.CreateBuilder(args);
 
+builder.Services.AddGraphics(builder.Configuration);
 builder.Services.AddScenes();
+
 builder.Services.AddSingleton<TestMiddleware>();
 
 
 var game = builder.Build();
-
-//game.UseSystem<TestMiddleware>();
 
 game.UseFirst(next =>
 {
@@ -28,7 +28,6 @@ game.UseFirst(next =>
 
 game.UseUpdate(next =>
 {
-	var sceneManager = game.Services.GetRequiredService<ISceneManager>();
 	var eventEmitter = game.Services.GetRequiredService<IEventEmitter>();
 	var flip = false;
 	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(3), (dt) => {

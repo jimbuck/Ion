@@ -1,14 +1,17 @@
 ﻿
-using Kyber.Graphics;
+using Kyber.Extensions.Graphics;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kyber.Builder;
 
 public static class BuilderExtensions
 {
-	public static IServiceCollection AddGraphics(this IServiceCollection services)
+	public static IServiceCollection AddGraphics(this IServiceCollection services, IConfiguration config)
 	{
+		services.Configure<GraphicsConfig>(config.GetSection("Kyber").GetSection("Graphics"));
+
 		return services
 			.AddSingleton<IWindow, Window>()
 			.AddSingleton<IGraphicsContext, GraphicsContext>()

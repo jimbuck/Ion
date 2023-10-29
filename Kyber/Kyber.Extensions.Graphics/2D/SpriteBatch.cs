@@ -5,7 +5,7 @@ using Veldrid.SPIRV;
 
 using Kyber.Assets;
 using Microsoft.Extensions.Logging;
-using Kyber.Extensions.Graphics;
+using Kyber.Extensions.Debug;
 
 namespace Kyber.Extensions.Graphics;
 

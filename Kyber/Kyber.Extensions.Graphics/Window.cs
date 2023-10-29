@@ -1,4 +1,9 @@
-﻿using System.Numerics;
+﻿using Kyber.Extensions.Graphics;
+
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+using System.Numerics;
 
 using Veldrid;
 using Veldrid.Sdl2;
@@ -7,8 +12,10 @@ namespace Kyber;
 
 internal class Window : IWindow
 {
-    private readonly IGameConfig _config;
-    private readonly ILogger _logger;
+    private readonly IOptionsMonitor<GameConfig> _gameConfig;
+	private readonly IOptionsMonitor<GraphicsConfig> _graphicsConfig;
+	private readonly IOptionsMonitor<WindowConfig> _windowConfig;
+	private readonly ILogger _logger;
     private readonly EventEmitter _eventEmitter;
 	private readonly IEventListener _events;
 
@@ -115,27 +122,30 @@ internal class Window : IWindow
 		set { if (Sdl2Window != null) Sdl2Window.BorderVisible = value; }
 	}
 
-	public Window(IGameConfig config, ILogger<Window> logger, IEventEmitter eventEmitter, IEventListener events)
+	public Window(IOptionsMonitor<GameConfig> gameConfig, IOptionsMonitor<GraphicsConfig> graphicsConfig, IOptionsMonitor<WindowConfig> windowConfig, ILogger<Window> logger, IEventEmitter eventEmitter, IEventListener events)
     {
-        _config = config;
-        _logger = logger;
+		_gameConfig = gameConfig;
+		_graphicsConfig = graphicsConfig;
+		_windowConfig = windowConfig;
+
+		_logger = logger;
         _eventEmitter = (EventEmitter)eventEmitter;
 		_events = events;
 
 		_windowCreateInfo = new()
         {
-            X = _config.WindowX ?? 100,
-            Y = _config.WindowY ?? 100,
-            WindowWidth = _config.WindowWidth ?? 960,
-            WindowHeight = _config.WindowHeight ?? 540,
-            WindowInitialState = _config.WindowState,
-            WindowTitle = _title = _config.Title ?? "Kyber"
+            X = windowConfig.CurrentValue.WindowX ?? 100,
+            Y = windowConfig.CurrentValue.WindowY ?? 100,
+            WindowWidth = windowConfig.CurrentValue.WindowWidth ?? 960,
+            WindowHeight = windowConfig.CurrentValue.WindowHeight ?? 540,
+            WindowInitialState = windowConfig.CurrentValue.WindowState,
+            WindowTitle = _title = _gameConfig.CurrentValue.Title
         };
     }
 
     public void Initialize()
     {
-        if (_config.Output != GraphicsOutput.Window) return;
+        if (_graphicsConfig.CurrentValue.Output != GraphicsOutput.Window) return;
 
 		_logger.LogInformation("Creating window...");
 		Sdl2Window = _createWindow(_windowCreateInfo);
@@ -176,7 +186,7 @@ internal class Window : IWindow
 
 	public void Step()
     {
-		if (_config.Output != GraphicsOutput.Window || Sdl2Window == null)
+		if (_graphicsConfig.CurrentValue.Output != GraphicsOutput.Window || Sdl2Window == null)
 		{
 			InputSnapshot = default;
 			return;
@@ -185,14 +195,6 @@ internal class Window : IWindow
 		if (_events.OnLatest<WindowClosedEvent>()) _closeHandled = true;
 
 		InputSnapshot = Sdl2Window.PumpEvents();
-	}
-
-    public void Close()
-    {
-		_logger.LogDebug("Closing...");
-
-		if (_config.Output == GraphicsOutput.Window) Sdl2Window?.Close();
-		else _onClosed();
 	}
 
 	private void _onResize()
