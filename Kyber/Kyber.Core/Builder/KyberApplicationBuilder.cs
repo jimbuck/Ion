@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Kyber.Builder;
 
-public class KyberApplicationBuilder
+public class KyberApplicationBuilder : IKyberApplicationBuilder
 {
 	private HostApplicationBuilder _hostBuilder;
 
@@ -26,7 +26,7 @@ public class KyberApplicationBuilder
 				})
 				.AddDebug();
 		});
-
+		
 		Services.Configure<GameConfig>(Configuration.GetSection("Kyber"));
 
 		Services.AddSingleton<IEventEmitter, EventEmitter>();

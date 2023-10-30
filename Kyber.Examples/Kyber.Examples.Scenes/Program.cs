@@ -1,18 +1,24 @@
 ﻿using Kyber;
 using Kyber.Builder;
+using Kyber.Extensions.Graphics;
 using Kyber.Scenes;
 
 using Microsoft.Extensions.DependencyInjection;
 
 var builder = KyberApplication.CreateBuilder(args);
 
-builder.Services.AddGraphics(builder.Configuration);
+builder.Services.AddGraphics(builder.Configuration, graphics =>
+{
+	graphics.Output = GraphicsOutput.Window;
+	graphics.ClearColor = Color.CornflowerBlue;
+});
 builder.Services.AddScenes();
 
 builder.Services.AddSingleton<TestMiddleware>();
 
-
 var game = builder.Build();
+
+game.UseGraphics();
 
 game.UseFirst(next =>
 {
