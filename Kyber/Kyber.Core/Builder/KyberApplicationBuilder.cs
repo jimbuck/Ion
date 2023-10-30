@@ -39,8 +39,6 @@ public class KyberApplicationBuilder : IKyberApplicationBuilder
 		var host = _hostBuilder.Build();
 		var game = new KyberApplication(host);
 
-		game.UseSystem<EventSystem>();
-
 		return game;
 	}
 }

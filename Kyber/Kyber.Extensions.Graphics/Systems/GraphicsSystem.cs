@@ -1,17 +1,13 @@
 ﻿
-using Kyber.Extensions.Graphics;
-
 namespace Kyber.Builder;
 
 public class GraphicsSystem
 {
 	private readonly GraphicsContext _graphics;
-	private readonly SpriteBatch _spriteBatch;
 
-	public GraphicsSystem(IGraphicsContext graphics, ISpriteBatch spriteBatch)
+	public GraphicsSystem(IGraphicsContext graphics)
 	{
 		_graphics = (GraphicsContext)graphics;
-		_spriteBatch = (SpriteBatch)spriteBatch;
 	}
 
 	[Init]
@@ -19,7 +15,6 @@ public class GraphicsSystem
 	{
 		_graphics.Initialize();
 		// ASSET MANAGER INIT
-		_spriteBatch.Initialize();
 
 		next(dt);
 	}

@@ -38,6 +38,11 @@ public class KyberApplication : IKyberApplication, IDisposable
 		return new KyberApplicationBuilder(args);
 	}
 
+	public IKyberApplication UseEvents()
+	{
+		return this.UseSystem<IEventEmitter, EventEmitter>();
+	}
+
 	public IKyberApplication UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware)
 	{
 		_init.Use(middleware);
