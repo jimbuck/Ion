@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 
 namespace Kyber;
@@ -250,6 +251,7 @@ public struct Color : IEquatable<Color>
 	/// Gets a <see cref="Vector3"/> representation for this object.
 	/// </summary>
 	/// <returns>A <see cref="Vector3"/> representation for this object.</returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public Vector3 ToVector3()
 	{
 		return new Vector3(_channels.X, _channels.Y, _channels.Z);
@@ -259,16 +261,11 @@ public struct Color : IEquatable<Color>
 	/// Gets a <see cref="Vector4"/> representation for this object.
 	/// </summary>
 	/// <returns>A <see cref="Vector4"/> representation for this object.</returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public Vector4 ToVector4()
 	{
 		return _channels;
 	}
-
-	/// <summary>
-	/// Converts Color to RgbaFloat.
-	/// </summary>
-	/// <param name="color">The color to convert.</param>
-	public static implicit operator Veldrid.RgbaFloat(Color color) => new(color._channels);
 
 	internal string DebugDisplayString
 	{
@@ -288,6 +285,7 @@ public struct Color : IEquatable<Color>
 	/// {R:[red] G:[green] B:[blue] A:[alpha]}
 	/// </summary>
 	/// <returns><see cref="string"/> representation of this <see cref="Color"/>.</returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public override string ToString()
 	{
 		return $"#{(uint)(R * 255):X2}{(uint)(G * 255):X2}{(uint)(B * 255):X2} {A:0.##}";
@@ -313,6 +311,7 @@ public struct Color : IEquatable<Color>
 	/// <param name="r">Red component value from 0 to 255.</param>
 	/// <param name="g">Green component value from 0 to 255.</param>
 	/// <param name="b">Blue component value from 0 to 255.</param>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Deconstruct(out byte r, out byte g, out byte b)
 	{
 		r = (byte)(R * 255);
@@ -327,6 +326,7 @@ public struct Color : IEquatable<Color>
 	/// <param name="g">Green component value from 0 to 255.</param>
 	/// <param name="b">Blue component value from 0 to 255.</param>
 	/// <param name="a">Alpha component value from 0 to 255.</param>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Deconstruct(out byte r, out byte g, out byte b, out byte a)
 	{
 		r = (byte)(R * 255);
@@ -355,6 +355,7 @@ public struct Color : IEquatable<Color>
 	/// <param name="g">Green component value from 0.0f to 1.0f.</param>
 	/// <param name="b">Blue component value from 0.0f to 1.0f.</param>
 	/// <param name="a">Alpha component value from 0.0f to 1.0f.</param>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Deconstruct(out float r, out float g, out float b, out float a)
 	{
 		r = R / 255f;

@@ -49,7 +49,7 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 	private static readonly Vector2 VEC2_HALF = Vector2.One / 2f;
 
 	private readonly IWindow _window;
-	private readonly IGraphicsContext _graphicsContext;
+	private readonly IVeldridGraphicsContext _graphicsContext;
 	private readonly ILogger _logger;
 	private readonly IEventListener _events;
 
@@ -176,7 +176,7 @@ void main()
     fsout_Color = fsin_Color * texture(sampler2D(Tex, Sampler), tex_coord);
 }";
 
-	public SpriteBatch(IWindow window, IGraphicsContext graphicsContext, ILogger<SpriteBatch> logger, IEventListener events)
+	public SpriteBatch(IWindow window, IVeldridGraphicsContext graphicsContext, ILogger<SpriteBatch> logger, IEventListener events)
 	{
 		_window = window;
 		_graphicsContext = graphicsContext;

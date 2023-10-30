@@ -1,5 +1,5 @@
 ﻿
-using Veldrid;
+
 
 namespace Kyber.Extensions.Graphics;
 
@@ -30,4 +30,28 @@ public enum GraphicsOutput : byte
 	/// Indicates that graphics will be rendered to a window. Default value for games.
 	/// </summary>
 	Window,
+}
+
+public enum GraphicsBackend : byte
+{
+	/// <summary>
+	/// Direct3D 11.
+	/// </summary>
+	Direct3D11,
+	/// <summary>
+	/// Vulkan.
+	/// </summary>
+	Vulkan,
+	/// <summary>
+	/// OpenGL.
+	/// </summary>
+	OpenGL,
+	/// <summary>
+	/// Metal.
+	/// </summary>
+	Metal,
+	/// <summary>
+	/// OpenGL ES.
+	/// </summary>
+	OpenGLES,
 }

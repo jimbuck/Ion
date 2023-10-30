@@ -17,7 +17,8 @@ public static class BuilderExtensions
 		services
 			.Configure<GraphicsConfig>(config)
 			.AddSingleton<IWindow, Window>()
-			.AddSingleton<IGraphicsContext, GraphicsContext>()
+			.AddSingleton<IVeldridGraphicsContext, GraphicsContext>()
+			.AddSingleton<IGraphicsContext>(svc => svc.GetRequiredService<IVeldridGraphicsContext>())
 			.AddSingleton<ISpriteBatch, SpriteBatch>()
 			//.AddScoped<IAssetManager, AssetManager>()
 			//.AddSingleton<Texture2DLoader>()

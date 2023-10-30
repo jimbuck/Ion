@@ -8,7 +8,15 @@ using Kyber.Extensions.Graphics;
 
 namespace Kyber;
 
-internal class GraphicsContext : IGraphicsContext, IDisposable
+public interface IVeldridGraphicsContext : IGraphicsContext
+{
+	public GraphicsDevice? GraphicsDevice { get; }
+	public ResourceFactory Factory { get; }
+
+	void SubmitCommands(CommandList cl);
+}
+
+internal class GraphicsContext : IVeldridGraphicsContext, IDisposable
 {
 	private readonly IOptionsMonitor<GraphicsConfig> _config;
 	private readonly IEventListener _events;
@@ -42,7 +50,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 		using var _ = MicroTimer.Start("GraphicsContext::Initialize");
 		_logger.LogInformation("Creating graphics device...");
 
-		if (!GraphicsDevice.IsBackendSupported(_config.CurrentValue.PreferredBackend))
+		if (!GraphicsDevice.IsBackendSupported((Veldrid.GraphicsBackend)_config.CurrentValue.PreferredBackend))
 		{
 			throw new Exception($"Unsupported backend! ({_config.CurrentValue.PreferredBackend}");
 		}
@@ -57,7 +65,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 			PreferStandardClipSpaceYDirection = true,
 			PreferDepthRangeZeroToOne = true,
 			SyncToVerticalBlank = _config.CurrentValue.VSync,
-		}, _config.CurrentValue.PreferredBackend);
+		}, (Veldrid.GraphicsBackend)_config.CurrentValue.PreferredBackend);
 
 		_commandList = GraphicsDevice.ResourceFactory.CreateCommandList();
 
@@ -89,7 +97,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 		_commandList.Begin();
 		_commandList.SetFramebuffer(GraphicsDevice.MainSwapchain.Framebuffer);
 		_commandList.SetFullViewports();
-		_commandList.ClearColorTarget(0, _config.CurrentValue.ClearColor);
+		_commandList.ClearColorTarget(0, new(_config.CurrentValue.ClearColor.ToVector4()));
 		_commandList.ClearDepthStencil(GraphicsDevice.IsDepthRangeZeroToOne ? 0f : 1f);
 		_commandList.End();
 		GraphicsDevice.SubmitCommands(_commandList);

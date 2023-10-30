@@ -1,5 +1,4 @@
-﻿using Veldrid;
-
+﻿
 namespace Kyber.Extensions.Graphics;
 
 public class WindowConfig
