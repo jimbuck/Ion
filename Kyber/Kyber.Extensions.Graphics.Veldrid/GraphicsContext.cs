@@ -4,9 +4,8 @@ using Microsoft.Extensions.Options;
 
 using Veldrid;
 using Kyber.Extensions.Debug;
-using Kyber.Extensions.Graphics;
 
-namespace Kyber;
+namespace Kyber.Extensions.Graphics;
 
 public interface IVeldridGraphicsContext : IGraphicsContext
 {

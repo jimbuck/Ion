@@ -1,4 +1,4 @@
-﻿namespace Kyber.Builder;
+﻿namespace Kyber;
 
 internal class EventSystem
 {

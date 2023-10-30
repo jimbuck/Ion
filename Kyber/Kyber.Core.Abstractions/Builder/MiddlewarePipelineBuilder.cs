@@ -1,5 +1,5 @@
 ﻿
-namespace Kyber.Builder;
+namespace Kyber;
 
 
 public interface IMiddlewarePipelineBuilder

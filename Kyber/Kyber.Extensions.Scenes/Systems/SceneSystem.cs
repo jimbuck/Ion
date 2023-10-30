@@ -1,10 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-using Kyber.Scenes;
 using Microsoft.Extensions.Configuration;
 
-namespace Kyber;
+namespace Kyber.Extensions.Scenes;
 
 internal delegate Scene SceneBuilderFactory(IConfiguration config, IServiceProvider services);
 

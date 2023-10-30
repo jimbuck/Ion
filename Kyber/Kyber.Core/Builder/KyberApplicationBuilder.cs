@@ -2,7 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Kyber.Builder;
+namespace Kyber;
 
 public class KyberApplicationBuilder : IKyberApplicationBuilder
 {

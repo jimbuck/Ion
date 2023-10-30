@@ -1,10 +1,7 @@
 ﻿using System.Numerics;
-
+using Microsoft.Extensions.Logging;
 using Veldrid;
 using Veldrid.SPIRV;
-
-using Kyber.Assets;
-using Microsoft.Extensions.Logging;
 using Kyber.Extensions.Debug;
 
 namespace Kyber.Extensions.Graphics;
@@ -54,7 +51,7 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 	private readonly IEventListener _events;
 
 	private readonly SpriteBatchManager _batchManager;
-	private Assets.Texture? _whitePixel;
+	private Texture? _whitePixel;
 
 	private CommandList _commandList;
 	private DeviceBuffer? _vertexBuffer;
@@ -88,7 +85,7 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 		}
 	}
 
-	private readonly Dictionary<Assets.Texture, BufferContainer> _buffers;
+	private readonly Dictionary<Texture, BufferContainer> _buffers;
 
 	private const string VertexCode = @"
 #version 450
@@ -358,7 +355,7 @@ void main()
 		_graphicsContext.SubmitCommands(_commandList);
 	}
 
-	private BufferContainer _getBuffer(Assets.Texture texture, int count)
+	private BufferContainer _getBuffer(Texture texture, int count)
 	{
 		using var _ = MicroTimer.Start("SpriteRenderer::_getBuffer");
 
@@ -398,7 +395,7 @@ void main()
 		_vertexBuffer?.Dispose();
 	}
 
-	private void _addSprite(Assets.Texture texture, Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteEffect options)
+	private void _addSprite(Texture texture, Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteEffect options)
 	{
 		ref var instance = ref _batchManager.Add(texture);
 

@@ -1,14 +1,11 @@
-﻿using Kyber.Extensions.Graphics;
-
+﻿using System.Numerics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using System.Numerics;
-
-using Veldrid;
+using VeldridLib = Veldrid;
 using Veldrid.Sdl2;
 
-namespace Kyber;
+namespace Kyber.Extensions.Graphics;
 
 internal class Window : IWindow
 {
@@ -19,9 +16,9 @@ internal class Window : IWindow
     private readonly EventEmitter _eventEmitter;
 	private readonly IEventListener _events;
 
-	public InputSnapshot? InputSnapshot { get; private set; }
+	public VeldridLib.InputSnapshot? InputSnapshot { get; private set; }
 
-	private Veldrid.StartupUtilities.WindowCreateInfo _windowCreateInfo;
+	private VeldridLib.StartupUtilities.WindowCreateInfo _windowCreateInfo;
     internal Sdl2Window? Sdl2Window { get; private set; }
 
 	private (int, int) _prevSize = (0, 0);
@@ -78,23 +75,23 @@ internal class Window : IWindow
 
 	public bool IsMaximized
 	{
-		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.Maximized;
-		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.Maximized : Veldrid.WindowState.Normal; }
+		get => (Sdl2Window?.WindowState ?? VeldridLib.WindowState.Hidden) == VeldridLib.WindowState.Maximized;
+		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? VeldridLib.WindowState.Maximized : VeldridLib.WindowState.Normal; }
 	}
 	public bool IsMinimized
 	{
-		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.Minimized;
-		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.Minimized : Veldrid.WindowState.Normal; }
+		get => (Sdl2Window?.WindowState ?? VeldridLib.WindowState.Hidden) == VeldridLib.WindowState.Minimized;
+		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? VeldridLib.WindowState.Minimized : VeldridLib.WindowState.Normal; }
 	}
 	public bool IsFullscreen
 	{
-		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.FullScreen;
-		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.FullScreen : Veldrid.WindowState.Normal; }
+		get => (Sdl2Window?.WindowState ?? VeldridLib.WindowState.Hidden) == VeldridLib.WindowState.FullScreen;
+		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? VeldridLib.WindowState.FullScreen : VeldridLib.WindowState.Normal; }
 	}
 	public bool IsBorderlessFullscreen
 	{
-		get => (Sdl2Window?.WindowState ?? Veldrid.WindowState.Hidden) == Veldrid.WindowState.BorderlessFullScreen;
-		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? Veldrid.WindowState.BorderlessFullScreen : Veldrid.WindowState.Normal; }
+		get => (Sdl2Window?.WindowState ?? VeldridLib.WindowState.Hidden) == VeldridLib.WindowState.BorderlessFullScreen;
+		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? VeldridLib.WindowState.BorderlessFullScreen : VeldridLib.WindowState.Normal; }
 	}
 
 	private string _title;
@@ -138,7 +135,7 @@ internal class Window : IWindow
             Y = windowConfig.CurrentValue.WindowY ?? 100,
             WindowWidth = windowConfig.CurrentValue.WindowWidth ?? 960,
             WindowHeight = windowConfig.CurrentValue.WindowHeight ?? 540,
-            WindowInitialState = (Veldrid.WindowState)windowConfig.CurrentValue.WindowState,
+            WindowInitialState = (VeldridLib.WindowState)windowConfig.CurrentValue.WindowState,
             WindowTitle = _title = _gameConfig.CurrentValue.Title
         };
     }
@@ -160,27 +157,27 @@ internal class Window : IWindow
 		_logger.LogInformation($"Window created! ({Sdl2Window.Width}x{Sdl2Window.Height})");
 	}
 
-	private static Sdl2Window _createWindow(Veldrid.StartupUtilities.WindowCreateInfo windowCreateInfo)
+	private static Sdl2Window _createWindow(VeldridLib.StartupUtilities.WindowCreateInfo windowCreateInfo)
 	{
 		SDL_WindowFlags sDL_WindowFlags = SDL_WindowFlags.OpenGL | SDL_WindowFlags.Resizable | GetWindowFlags(windowCreateInfo.WindowInitialState);
-		if (windowCreateInfo.WindowInitialState != Veldrid.WindowState.Hidden)
+		if (windowCreateInfo.WindowInitialState != VeldridLib.WindowState.Hidden)
 		{
 			sDL_WindowFlags |= SDL_WindowFlags.Shown;
 		}
 		return new Sdl2Window(windowCreateInfo.WindowTitle, windowCreateInfo.X, windowCreateInfo.Y, windowCreateInfo.WindowWidth, windowCreateInfo.WindowHeight, sDL_WindowFlags, threadedProcessing: true);
 	}
 
-	private static SDL_WindowFlags GetWindowFlags(Veldrid.WindowState state)
+	private static SDL_WindowFlags GetWindowFlags(VeldridLib.WindowState state)
 	{
 		return state switch
 		{
-			Veldrid.WindowState.Normal => (SDL_WindowFlags)0u,
-			Veldrid.WindowState.FullScreen => SDL_WindowFlags.Fullscreen,
-			Veldrid.WindowState.Maximized => SDL_WindowFlags.Maximized,
-			Veldrid.WindowState.Minimized => SDL_WindowFlags.Minimized,
-			Veldrid.WindowState.BorderlessFullScreen => SDL_WindowFlags.FullScreenDesktop,
-			Veldrid.WindowState.Hidden => SDL_WindowFlags.Hidden,
-			_ => throw new VeldridException("Invalid WindowState: " + state),
+			VeldridLib.WindowState.Normal => (SDL_WindowFlags)0u,
+			VeldridLib.WindowState.FullScreen => SDL_WindowFlags.Fullscreen,
+			VeldridLib.WindowState.Maximized => SDL_WindowFlags.Maximized,
+			VeldridLib.WindowState.Minimized => SDL_WindowFlags.Minimized,
+			VeldridLib.WindowState.BorderlessFullScreen => SDL_WindowFlags.FullScreenDesktop,
+			VeldridLib.WindowState.Hidden => SDL_WindowFlags.Hidden,
+			_ => throw new VeldridLib.VeldridException("Invalid WindowState: " + state),
 		};
 	}
 

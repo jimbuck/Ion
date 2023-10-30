@@ -1,6 +1,6 @@
 ﻿using System.Collections.Immutable;
 
-namespace Kyber.Assets;
+namespace Kyber.Extensions.Graphics;
 
 public interface IAssetService
 {

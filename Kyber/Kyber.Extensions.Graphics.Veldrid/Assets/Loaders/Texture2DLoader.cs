@@ -1,22 +1,22 @@
-﻿using System.Diagnostics;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using Veldrid;
 
-namespace Kyber.Assets;
+using VeldridLib = Veldrid;
+
+namespace Kyber.Extensions.Graphics;
 
 public interface IAssetLoader<T>
 {
-	T Load(Stream stream, string name, Veldrid.GraphicsDevice graphicsDevice);
+	T Load(Stream stream, string name, VeldridLib.GraphicsDevice graphicsDevice);
 }
 
 internal class Texture2DLoader : IAssetLoader<Texture2D>
 {
-	public unsafe Texture2D Load(Stream stream, string name, Veldrid.GraphicsDevice graphicsDevice)
+	public unsafe Texture2D Load(Stream stream, string name, VeldridLib.GraphicsDevice graphicsDevice)
 	{
 		var image = Image.Load<Rgba32>(stream);
 		var mipmaps = _generateMipmaps(image, out int totalSize);
@@ -39,11 +39,11 @@ internal class Texture2DLoader : IAssetLoader<Texture2D>
 		}
 
 		var texture = _createDeviceTexture(
-				PixelFormat.R8_G8_B8_A8_UNorm, Veldrid.TextureType.Texture2D,
+				VeldridLib.PixelFormat.R8_G8_B8_A8_UNorm, VeldridLib.TextureType.Texture2D,
 				(uint)image.Width, (uint)image.Height, 1,
 				(uint)mipmaps.Length, 1,
 				allTexData,
-				graphicsDevice, TextureUsage.Sampled);
+				graphicsDevice, VeldridLib.TextureUsage.Sampled);
 
 		return new Texture2D(name, texture);
 	}
@@ -65,7 +65,7 @@ internal class Texture2DLoader : IAssetLoader<Texture2D>
 			int newWidth = Math.Max(1, currentWidth / 2);
 			int newHeight = Math.Max(1, currentHeight / 2);
 			Image<T> newImage = baseImage.Clone(context => context.Resize(newWidth, newHeight, KnownResamplers.Lanczos3));
-			Debug.Assert(i < mipLevelCount);
+			System.Diagnostics.Debug.Assert(i < mipLevelCount);
 			mipLevels[i] = newImage;
 
 			totalSize += newWidth * newHeight * Unsafe.SizeOf<T>();
@@ -74,7 +74,7 @@ internal class Texture2DLoader : IAssetLoader<Texture2D>
 			currentHeight = newHeight;
 		}
 
-		Debug.Assert(i == mipLevelCount);
+		System.Diagnostics.Debug.Assert(i == mipLevelCount);
 
 		return mipLevels;
 	}
@@ -85,19 +85,19 @@ internal class Texture2DLoader : IAssetLoader<Texture2D>
 	}
 
 	private unsafe Veldrid.Texture _createDeviceTexture(
-		PixelFormat format,
-		Veldrid.TextureType type,
+		VeldridLib.PixelFormat format,
+		VeldridLib.TextureType type,
 		uint width,
 		uint height,
 		uint depth,
 		uint mipLevels,
 		uint arrayLayers,
 		byte[] textureData,
-		Veldrid.GraphicsDevice gd, TextureUsage usage)
+		VeldridLib.GraphicsDevice gd, VeldridLib.TextureUsage usage)
 	{
-		Veldrid.Texture texture = gd.ResourceFactory.CreateTexture(new TextureDescription(width, height, depth, mipLevels, arrayLayers, format, usage, type));
+		VeldridLib.Texture texture = gd.ResourceFactory.CreateTexture(new VeldridLib.TextureDescription(width, height, depth, mipLevels, arrayLayers, format, usage, type));
 
-		Veldrid.Texture staging = gd.ResourceFactory.CreateTexture(new TextureDescription(width, height, depth, mipLevels, arrayLayers, format, TextureUsage.Staging, type));
+		VeldridLib.Texture staging = gd.ResourceFactory.CreateTexture(new VeldridLib.TextureDescription(width, height, depth, mipLevels, arrayLayers, format, VeldridLib.TextureUsage.Staging, type));
 
 		ulong offset = 0;
 		fixed (byte* texDataPtr = &textureData[0])
@@ -117,7 +117,7 @@ internal class Texture2DLoader : IAssetLoader<Texture2D>
 			}
 		}
 
-		CommandList cl = gd.ResourceFactory.CreateCommandList();
+		VeldridLib.CommandList cl = gd.ResourceFactory.CreateCommandList();
 		cl.Begin();
 		cl.CopyTexture(staging, texture);
 		cl.End();
@@ -126,12 +126,12 @@ internal class Texture2DLoader : IAssetLoader<Texture2D>
 		return texture;
 	}
 
-	private static uint _getFormatSize(PixelFormat format)
+	private static uint _getFormatSize(VeldridLib.PixelFormat format)
 	{
 		return format switch
 		{
-			PixelFormat.R8_G8_B8_A8_UNorm => 4,
-			PixelFormat.BC3_UNorm => 1,
+			VeldridLib.PixelFormat.R8_G8_B8_A8_UNorm => 4,
+			VeldridLib.PixelFormat.BC3_UNorm => 1,
 			_ => throw new NotImplementedException(),
 		};
 	}

@@ -1,15 +1,14 @@
 ﻿using Kyber;
-using Kyber.Builder;
 using Kyber.Extensions.Debug;
 using Kyber.Extensions.Graphics;
-using Kyber.Scenes;
+using Kyber.Extensions.Scenes;
 
 using Microsoft.Extensions.DependencyInjection;
 
 var builder = KyberApplication.CreateBuilder(args);
 
 
-builder.Services.AddGraphics(builder.Configuration, graphics =>
+builder.Services.AddVeldridGraphics(builder.Configuration, graphics =>
 {
 	graphics.Output = GraphicsOutput.Window;
 	graphics.ClearColor = Color.CornflowerBlue;
@@ -22,7 +21,7 @@ builder.Services.AddSingleton<MicroTimerSystem>();
 var game = builder.Build();
 game.UseSystem<MicroTimerSystem>();
 game.UseEvents();
-game.UseGraphics();
+game.UseVeldridGraphics();
 
 game.UseFirst(next =>
 {

@@ -2,7 +2,7 @@
 using System.Reflection;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Kyber.Builder;
+namespace Kyber;
 
 public static class UseSystemExtensions
 {

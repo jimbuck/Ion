@@ -1,18 +1,16 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-
-using Kyber.Extensions.Graphics;
 using Microsoft.Extensions.Configuration;
 
-namespace Kyber.Builder;
+namespace Kyber.Extensions.Graphics;
 
 public static class BuilderExtensions
 {
-	public static IServiceCollection AddGraphics(this IServiceCollection services, IConfiguration config, Action<GraphicsConfig> configureOptions = null)
+	public static IServiceCollection AddVeldridGraphics(this IServiceCollection services, IConfiguration config, Action<GraphicsConfig> configureOptions = null)
 	{
-		return AddGraphics(services, config.GetSection("Kyber").GetSection("Graphics"), configureOptions);
+		return AddVeldridGraphics(services, config.GetSection("Kyber").GetSection("Graphics"), configureOptions);
 	}
 
-	public static IServiceCollection AddGraphics(this IServiceCollection services, IConfigurationSection config, Action<GraphicsConfig> configureOptions = null)
+	public static IServiceCollection AddVeldridGraphics(this IServiceCollection services, IConfigurationSection config, Action<GraphicsConfig> configureOptions = null)
 	{
 		services
 			.Configure<GraphicsConfig>(config)
@@ -33,7 +31,7 @@ public static class BuilderExtensions
 		return services;
 	}
 
-	public static IKyberApplication UseGraphics(this IKyberApplication app)
+	public static IKyberApplication UseVeldridGraphics(this IKyberApplication app)
 	{
 		return app
 			.UseSystem<WindowSystem>()

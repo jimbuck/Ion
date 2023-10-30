@@ -1,7 +1,4 @@
-﻿
-using Kyber.Extensions.Graphics;
-
-namespace Kyber.Builder;
+﻿namespace Kyber.Extensions.Graphics;
 
 public class SpriteBatchSystem
 {

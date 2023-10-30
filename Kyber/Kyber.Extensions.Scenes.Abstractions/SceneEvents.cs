@@ -1,6 +1,5 @@
-﻿namespace Kyber.Scenes
-{
-	public record struct ChangeSceneEvent(string NextScene);
+﻿namespace Kyber.Extensions.Scenes;
 
-	public record struct SceneChangedEvent(string CurrentScene, string PreviousScene);
-}
+public record struct ChangeSceneEvent(string NextScene);
+
+public record struct SceneChangedEvent(string CurrentScene, string PreviousScene);

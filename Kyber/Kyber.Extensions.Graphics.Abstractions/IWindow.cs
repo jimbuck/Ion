@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace Kyber;
+namespace Kyber.Extensions.Graphics;
 
 public record struct WindowResizeEvent(uint Width, uint Height);
 public record struct WindowClosedEvent;

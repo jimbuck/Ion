@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 
-namespace Kyber.Builder;
+namespace Kyber;
 
 public interface IKyberApplication
 {

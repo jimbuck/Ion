@@ -2,7 +2,7 @@
 
 using VeldridTexture = Veldrid.Texture;
 
-namespace Kyber.Assets;
+namespace Kyber.Extensions.Graphics;
 
 internal class ProcessedTexture
 {

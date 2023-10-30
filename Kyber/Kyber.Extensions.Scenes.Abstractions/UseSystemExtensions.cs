@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Kyber.Builder;
+namespace Kyber.Extensions.Scenes;
 
 public static class UseSystemExtensions
 {

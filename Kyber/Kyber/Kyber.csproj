@@ -13,7 +13,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Kyber.Core\Kyber.Core.csproj" />
-    <ProjectReference Include="..\Kyber.Extensions.Graphics\Kyber.Extensions.Graphics.csproj" />
+    <ProjectReference Include="..\Kyber.Extensions.Debug\Kyber.Extensions.Debug.csproj" />
+    <ProjectReference Include="..\Kyber.Extensions.Graphics.Veldrid\Kyber.Extensions.Graphics.Veldrid.csproj" />
     <ProjectReference Include="..\Kyber.Extensions.Scenes\Kyber.Extensions.Scenes.csproj" />
   </ItemGroup>
 

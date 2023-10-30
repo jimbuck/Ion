@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace Kyber;
+namespace Kyber.Extensions.Graphics;
 
 public interface IGraphicsContext
 {

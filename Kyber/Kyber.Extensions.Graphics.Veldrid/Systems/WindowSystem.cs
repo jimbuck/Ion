@@ -1,4 +1,5 @@
-﻿namespace Kyber.Builder;
+﻿
+namespace Kyber.Extensions.Graphics;
 
 public class WindowSystem
 {

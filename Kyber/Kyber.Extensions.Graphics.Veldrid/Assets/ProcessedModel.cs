@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 using Veldrid;
 
-namespace Kyber.Assets;
+namespace Kyber.Extensions.Graphics;
 
 internal class ProcessedModel
 {

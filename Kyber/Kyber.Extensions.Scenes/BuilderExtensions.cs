@@ -1,8 +1,6 @@
-﻿using Kyber.Scenes;
+﻿using Microsoft.Extensions.DependencyInjection;
 
-using Microsoft.Extensions.DependencyInjection;
-
-namespace Kyber.Builder;
+namespace Kyber.Extensions.Scenes;
 
 public static class BuilderExtensions
 {

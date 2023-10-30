@@ -1,8 +1,8 @@
 ﻿using System.Numerics;
-using VeldridTexture = Veldrid.Texture;
+using VeldridLib = Veldrid;
 
 
-namespace Kyber.Assets;
+namespace Kyber.Extensions.Graphics;
 
 public interface IAsset : IDisposable
 {
@@ -12,7 +12,7 @@ public interface IAsset : IDisposable
 
 public abstract class Texture : IAsset
 {
-	protected readonly VeldridTexture _texture;
+	protected readonly VeldridLib.Texture _texture;
 
 	public int Id => _texture.GetHashCode();
 
@@ -23,7 +23,7 @@ public abstract class Texture : IAsset
 
 	public string Name => _texture.Name;
 
-	internal Texture(string name, VeldridTexture texture)
+	internal Texture(string name, VeldridLib.Texture texture)
 	{
 		texture.Name = name;
 		_texture = texture;
@@ -35,21 +35,21 @@ public abstract class Texture : IAsset
 		_texture.Dispose();
 	}
 
-	public static implicit operator VeldridTexture(Texture texture) => texture._texture;
+	public static implicit operator VeldridLib.Texture(Texture texture) => texture._texture;
 }
 
 public class Texture2D : Texture
 {
-	public Texture2D(string name, VeldridTexture texture) : base(name, texture) { }
+	public Texture2D(string name, VeldridLib.Texture texture) : base(name, texture) { }
 
-	public static implicit operator VeldridTexture(Texture2D texture) => texture._texture;
+	public static implicit operator VeldridLib.Texture(Texture2D texture) => texture._texture;
 }
 
 public static class TextureFactoryExtensions
 {
-	public static Texture2D CreateTexture2D(this Veldrid.ResourceFactory factory, Veldrid.TextureDescription textureDescription, string name)
+	public static Texture2D CreateTexture2D(this VeldridLib.ResourceFactory factory, VeldridLib.TextureDescription textureDescription, string name)
 	{
-		textureDescription.Type = Veldrid.TextureType.Texture2D;
+		textureDescription.Type = VeldridLib.TextureType.Texture2D;
 		var texture = factory.CreateTexture(textureDescription);
 		return new Texture2D(name, texture);
 	}

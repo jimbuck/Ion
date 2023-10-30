@@ -1,8 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
-
-namespace Kyber.Assets;
+namespace Kyber.Extensions.Graphics;
 
 public interface IAssetManager
 {

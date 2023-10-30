@@ -8,6 +8,7 @@
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 		<Configurations>Debug;Release;DebugGenerators</Configurations>
+		<RootNamespace>Kyber</RootNamespace>
 	</PropertyGroup>
 
 	<ItemGroup>

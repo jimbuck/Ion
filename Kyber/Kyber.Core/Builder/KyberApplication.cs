@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 
 using Kyber.Core;
 
-namespace Kyber.Builder;
+namespace Kyber;
 
 public class KyberApplication : IKyberApplication, IDisposable
 {

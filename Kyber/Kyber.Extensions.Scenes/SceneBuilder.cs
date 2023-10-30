@@ -1,8 +1,6 @@
-﻿using Kyber.Scenes;
+﻿using Microsoft.Extensions.Configuration;
 
-using Microsoft.Extensions.Configuration;
-
-namespace Kyber.Builder;
+namespace Kyber.Extensions.Scenes;
 
 internal class SceneBuilder : ISceneBuilder
 {

@@ -1,5 +1,7 @@
 ﻿
-namespace Kyber.Builder;
+using Kyber.Extensions.Graphics;
+
+namespace Kyber.Extensions.Graphics;
 
 public class GraphicsSystem
 {

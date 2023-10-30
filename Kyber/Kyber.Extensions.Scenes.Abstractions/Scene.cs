@@ -1,4 +1,4 @@
-﻿namespace Kyber.Scenes;
+﻿namespace Kyber.Extensions.Scenes;
 
 public class Scene
 {
