@@ -22,7 +22,7 @@ game.UseGraphics();
 
 game.UseFirst(next =>
 {
-	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(1), (dt) => {
+	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) => {
 		Console.WriteLine($"Frame: {dt.Frame}");
 	});
 	return dt =>
@@ -57,7 +57,11 @@ game.UseRender(next =>
 		//Console.WriteLine("Game Render");
 		next(dt);
 
-		if (dt.Frame > 500) eventEmitter.Emit<ExitGameEvent>();
+		if (dt.Frame > 1000)
+		{
+			Console.WriteLine($"Frames exceeded ({dt.Frame}), exiting!");
+			eventEmitter.Emit<ExitGameEvent>();
+		}
 	};
 });
 
