@@ -1,4 +1,6 @@
-﻿namespace Kyber;
+﻿using System.Runtime.CompilerServices;
+
+namespace Kyber;
 
 public class EventListener : IEventListener, IDisposable
 {
@@ -62,4 +64,16 @@ public class EventListener : IEventListener, IDisposable
     {
         _eventEmitter.DetachListener(this);
     }
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Emit<T>()
+	{
+		_eventEmitter.Emit<T>();
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Emit<T>(T data)
+	{
+		_eventEmitter.Emit(data);
+	}
 }

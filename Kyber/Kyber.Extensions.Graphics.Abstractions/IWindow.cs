@@ -2,11 +2,6 @@
 
 namespace Kyber.Extensions.Graphics;
 
-public record struct WindowResizeEvent(uint Width, uint Height);
-public record struct WindowClosedEvent;
-public record struct WindowFocusGainedEvent;
-public record struct WindowFocusLostEvent;
-
 public interface IWindow
 {
 	int Width { get; set; }

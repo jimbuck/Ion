@@ -6,40 +6,6 @@ using Kyber.Extensions.Debug;
 
 namespace Kyber.Extensions.Graphics;
 
-[Flags]
-public enum SpriteEffect
-{
-	/// <summary>
-	/// Renders the sprite normally.
-	/// </summary>
-	None = 0,
-
-	/// <summary>
-	/// Horizontally flip the sprite.
-	/// </summary>
-	FlipHorizontally,
-
-	/// <summary>
-	/// Vertically flip the sprite.
-	/// </summary>
-	FlipVertically,
-}
-
-public interface ISpriteBatch
-{
-	void DrawRect(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float depth = 0);
-	void DrawRect(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0);
-
-	void DrawPoint(Color color, Vector2 position, float depth = 0);
-	void DrawPoint(Color color, Vector2 position, Vector2 size, float depth = 0);
-
-	void DrawLine(Color color, Vector2 pointA, Vector2 pointB, float thickness = 1f, float depth = 0);
-	void DrawLine(Color color, Vector2 start, float length, float angle, float thickness = 1, float depth = 0);
-
-	void Draw(Texture2D texture, RectangleF destinationRectangle, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None);
-	void Draw(Texture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None);
-}
-
 internal class SpriteBatch : ISpriteBatch, IDisposable
 {
 	private static readonly RectangleF _defaultScissor = new(-(1 << 22), -(1 << 22), 1 << 23, 1 << 23);
@@ -53,7 +19,7 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 	private readonly SpriteBatchManager _batchManager;
 	private Texture? _whitePixel;
 
-	private CommandList _commandList;
+	private CommandList? _commandList;
 	private DeviceBuffer? _vertexBuffer;
 
 	private ResourceLayout? _instanceResourceLayout;
@@ -85,7 +51,7 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 		}
 	}
 
-	private readonly Dictionary<Texture, BufferContainer> _buffers;
+	private readonly Dictionary<ITexture2D, BufferContainer> _buffers;
 
 	private const string VertexCode = @"
 #version 450
@@ -294,24 +260,24 @@ void main()
 		DrawRect(color, rect, new Vector2(0, 0.5f), rotation: angle, depth: depth);
 	}
 
-	public void Draw(Texture2D texture, RectangleF destinationRectangle, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
+	public void Draw(ITexture2D texture, RectangleF destinationRectangle, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
 		if (color == default) color = Color.White;
-		if (sourceRectangle.Size.LengthSquared() == 0) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
+		if (sourceRectangle.Size.LengthSquared() == 0) sourceRectangle = new RectangleF(0f, 0f, texture.Size.X, texture.Size.Y);
 
 		_addSprite(texture, color, sourceRectangle, destinationRectangle, origin, rotation, depth, _defaultScissor, options);
 	}
 
-	public void Draw(Texture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
+	public void Draw(ITexture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
 		if (color == default) color = Color.White;
-		if (sourceRectangle.Size.LengthSquared() == 0) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
+		if (sourceRectangle.Size.LengthSquared() == 0) sourceRectangle = new RectangleF(0f, 0f, texture.Size.X, texture.Size.Y);
 
-		_addSprite(texture, color, sourceRectangle, new RectangleF(position.X, position.Y, scale.X * texture.Width, scale.Y * texture.Height), origin, rotation, depth, _defaultScissor, options);
+		_addSprite(texture, color, sourceRectangle, new RectangleF(position.X, position.Y, scale.X * texture.Size.X, scale.Y * texture.Size.Y), origin, rotation, depth, _defaultScissor, options);
 	}
 
 	public unsafe void End()
@@ -323,7 +289,7 @@ void main()
 
 		_beginCalled = false;
 
-		if (_batchManager.IsEmpty || _graphicsContext.GraphicsDevice is null) return;
+		if (_batchManager.IsEmpty || _graphicsContext.GraphicsDevice is null || _commandList is null) return;
 
 		_commandList.Begin();
 		_commandList.SetFramebuffer(_graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer);
@@ -355,7 +321,7 @@ void main()
 		_graphicsContext.SubmitCommands(_commandList);
 	}
 
-	private BufferContainer _getBuffer(Texture texture, int count)
+	private BufferContainer _getBuffer(ITexture2D texture, int count)
 	{
 		using var _ = MicroTimer.Start("SpriteRenderer::_getBuffer");
 
@@ -368,7 +334,7 @@ void main()
 			var buffer = _graphicsContext.Factory.CreateBuffer(bci);
 			pair = new(buffer,
 				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, buffer)),
-				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsContext.GraphicsDevice!.LinearSampler))
+				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)(Texture2D)texture, _graphicsContext.GraphicsDevice!.LinearSampler))
 				);
 
 			_buffers[texture] = pair;
@@ -380,7 +346,7 @@ void main()
 
 			pair.Buffer = _graphicsContext.Factory.CreateBuffer(bci);
 			pair.InstanceSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, pair.Buffer));
-			pair.TextureSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)texture, _graphicsContext.GraphicsDevice!.LinearSampler));
+			pair.TextureSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)(Texture2D)texture, _graphicsContext.GraphicsDevice!.LinearSampler));
 			_buffers[texture] = pair;
 		}
 
@@ -395,14 +361,14 @@ void main()
 		_vertexBuffer?.Dispose();
 	}
 
-	private void _addSprite(Texture texture, Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteEffect options)
+	private void _addSprite(ITexture2D texture, Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteEffect options)
 	{
 		ref var instance = ref _batchManager.Add(texture);
 
 		instance.Update(texture.Size, destinationRect, sourceRect, color, rotation, origin, depth, _transformRectF(scissor, _graphicsContext.ProjectionMatrix), options);
 	}
 
-	private static RectangleF _transformRectF(RectangleF rect, System.Numerics.Matrix4x4 matrix)
+	private static RectangleF _transformRectF(RectangleF rect, Matrix4x4 matrix)
 	{
 		var pos = Vector4.Transform(new Vector4(rect.X, rect.Y, 0, 1), matrix);
 		var size = Vector4.Transform(new Vector4(rect.X + rect.Width, rect.Y + rect.Height, 0, 1), matrix);

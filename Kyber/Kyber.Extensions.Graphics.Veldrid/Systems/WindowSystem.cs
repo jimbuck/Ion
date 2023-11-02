@@ -4,10 +4,12 @@ namespace Kyber.Extensions.Graphics;
 public class WindowSystem
 {
 	private readonly Window _window;
+	private readonly IEventListener _events;
 
-	public WindowSystem(IWindow window)
+	public WindowSystem(IWindow window, IEventListener events)
 	{
 		_window = (Window)window;
+		_events = events;
 	}
 
 	[Init]
@@ -22,5 +24,12 @@ public class WindowSystem
 	{
 		_window.Step();
 		next(dt);
+	}
+
+	[Render]
+	public void Render(GameTime dt, GameLoopDelegate next)
+	{
+		next(dt);
+		if (_events.On<WindowClosedEvent>()) _events.Emit<ExitGameEvent>();
 	}
 }

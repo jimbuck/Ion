@@ -5,9 +5,9 @@ namespace Kyber.Extensions.Graphics;
 
 internal class ProcessedModel
 {
-	public ProcessedMeshPart[] MeshParts { get; set; }
-	public ProcessedNodeSet Nodes { get; set; }
-	public ProcessedAnimation[] Animations { get; set; }
+	public required ProcessedMeshPart[] MeshParts { get; set; }
+	public required ProcessedNodeSet Nodes { get; set; }
+	public required ProcessedAnimation[] Animations { get; set; }
 }
 
 internal class ProcessedMeshPart

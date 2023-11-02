@@ -1,7 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Kyber.Extensions.Graphics;
+namespace System.IO;
 
 internal static class BinaryExtensions
 {

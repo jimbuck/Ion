@@ -1,7 +1,5 @@
 ﻿using Veldrid;
 
-using VeldridTexture = Veldrid.Texture;
-
 namespace Kyber.Extensions.Graphics;
 
 internal class ProcessedTexture

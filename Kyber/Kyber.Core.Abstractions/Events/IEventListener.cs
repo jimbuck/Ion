@@ -2,7 +2,7 @@
 
 namespace Kyber;
 
-public interface IEventListener
+public interface IEventListener : IEventEmitter
 {
 	bool On<T>();
 	bool On<T>([NotNullWhen(true)] out IEvent<T>? data);

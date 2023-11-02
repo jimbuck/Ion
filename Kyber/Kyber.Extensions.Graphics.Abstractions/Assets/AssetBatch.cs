@@ -2,58 +2,13 @@
 
 namespace Kyber.Extensions.Graphics;
 
-public interface IAssetService
+public enum AssetStatus
 {
-	IAssetBatch Load(Action<IAssetBatchBuilder> batchBuilder);
-	IAssetBatch LoadGlobal(Action<IAssetBatchBuilder> batchBuilder);
-
-	T? Get<T>(string virtualPath) where T : IAsset;
-}
-
-internal class ScopedAssetService : GlobalAssetService
-{
-	private readonly GlobalAssetService _globalAssetService;
-
-	public ScopedAssetService(GlobalAssetService globalAssetService)
-	{
-		_globalAssetService = globalAssetService;
-	}
-
-	public override IAssetBatch LoadGlobal(Action<IAssetBatchBuilder> batchBuilder)
-	{
-		return _globalAssetService.Load(batchBuilder);
-	}
-}
-
-internal class GlobalAssetService : IAssetService, IDisposable
-{
-	protected readonly Dictionary<string, IAsset> _assets = new();
-
-	public IAssetBatch Load(Action<IAssetBatchBuilder> batchBuilder)
-	{
-		var builder = new AssetBatchBuilder();
-		batchBuilder(builder);
-		return builder.Load(_assets);
-	}
-
-	public virtual IAssetBatch LoadGlobal(Action<IAssetBatchBuilder> batchBuilder)
-	{
-		return Load(batchBuilder);
-	}
-
-	public T? Get<T>(string virtualPath) where T : IAsset
-	{
-		if (_assets.TryGetValue(virtualPath, out var texture)) return (T)texture;
-
-		return default;
-	}
-
-	public void Dispose()
-	{
-		foreach (var asset in _assets.Values) asset.Dispose();
-
-		_assets.Clear();
-	}
+	Unknown = 0,
+	Unloaded,
+	Loading,
+	Loaded,
+	Failed
 }
 
 public interface IAssetBatchBuilder
@@ -97,15 +52,6 @@ public class AssetBatchBuilder : IAssetBatchBuilder
 	}
 }
 
-public enum AssetStatus
-{
-	Unknown = 0,
-	Unloaded,
-	Loading,
-	Loaded,
-	Failed
-}
-
 public interface IAssetBatch
 {
 	float Progress { get; }
@@ -129,7 +75,7 @@ public class AssetBatch : IAssetBatch
 		Assets = Assets.SetItem(virtualPath, status);
 		IsComplete = Assets.All(kvp => kvp.Value == AssetStatus.Loaded || kvp.Value == AssetStatus.Failed);
 		if (status == AssetStatus.Failed) FailedCount++;
-		
+
 		Progress = Assets.Count == 0 ? 0 : (float)Assets.Count(x => x.Value == AssetStatus.Loaded || x.Value == AssetStatus.Failed) / Assets.Count;
 	}
 }

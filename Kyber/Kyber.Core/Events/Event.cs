@@ -1,7 +1,7 @@
 ﻿namespace Kyber;
 
-internal record struct Event<T>(ulong Id, T? Data, bool Handled) : IEvent<T>
+internal record struct Event<T>(uint Id, T? Data, bool Handled) : IEvent<T>
 {
-	public Event(ulong id) : this(id, default, false) { }
-	public Event(ulong id, T data) : this(id, data, false) { }
+	public Event(uint id) : this(id, default, false) { }
+	public Event(uint id, T data) : this(id, data, false) { }
 }

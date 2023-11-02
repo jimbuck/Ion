@@ -2,7 +2,7 @@
 
 public interface IEvent
 {
-	ulong Id { get; }
+	uint Id { get; }
 	bool Handled { get; set; }
 }
 

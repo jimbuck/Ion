@@ -11,7 +11,7 @@ internal class SpriteBatchManager
 	public static int INSTANCE_SIZE = (int)MemUtils.SizeOf<Instance>();
 
 	private readonly Stack<SpriteBatch> _batchPool;
-	private readonly Dictionary<Texture, SpriteBatch> _batches;
+	private readonly Dictionary<ITexture2D, SpriteBatch> _batches;
 
 	public bool IsEmpty => !_batches.Any(b => b.Value.Count > 0);
 
@@ -21,7 +21,7 @@ internal class SpriteBatchManager
 		_batchPool = new();
 	}
 
-	public ref Instance Add(Texture texture)
+	public ref Instance Add(ITexture2D texture)
 	{
 		if (!_batches.TryGetValue(texture, out var group))
 		{
@@ -39,7 +39,7 @@ internal class SpriteBatchManager
 		_batches.Clear();
 	}
 
-	public Dictionary<Texture, SpriteBatch>.Enumerator GetEnumerator() => _batches.GetEnumerator();
+	public Dictionary<ITexture2D, SpriteBatch>.Enumerator GetEnumerator() => _batches.GetEnumerator();
 
 	private SpriteBatch _rentSpriteBatch()
 	{

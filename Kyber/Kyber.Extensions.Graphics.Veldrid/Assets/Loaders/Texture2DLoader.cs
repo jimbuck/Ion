@@ -9,15 +9,28 @@ using VeldridLib = Veldrid;
 
 namespace Kyber.Extensions.Graphics;
 
-public interface IAssetLoader<T>
+internal class Texture2DLoader : IAssetLoader
 {
-	T Load(Stream stream, string name, VeldridLib.GraphicsDevice graphicsDevice);
-}
+	private readonly IVeldridGraphicsContext _graphicsContext;
 
-internal class Texture2DLoader : IAssetLoader<Texture2D>
-{
-	public unsafe Texture2D Load(Stream stream, string name, VeldridLib.GraphicsDevice graphicsDevice)
+	public Type AssetType { get; } = typeof(Texture2D);
+
+	public Texture2DLoader(IVeldridGraphicsContext graphicsContext)
 	{
+		_graphicsContext = graphicsContext;
+	}
+
+	public T Load<T>(Stream stream, string name) where T : class, IAsset
+	{
+		if (typeof(T) == typeof(Texture2D)) return (T)_loadTexture2D(stream, name);
+
+		throw new ArgumentException("Incorrect type specified for loading!", nameof(T));
+	}
+
+	private unsafe IAsset _loadTexture2D(Stream stream, string name)
+	{
+		if (_graphicsContext.GraphicsDevice is null) throw new Exception("GraphicsDevice is not initialized yet!");
+
 		var image = Image.Load<Rgba32>(stream);
 		var mipmaps = _generateMipmaps(image, out int totalSize);
 
@@ -43,7 +56,7 @@ internal class Texture2DLoader : IAssetLoader<Texture2D>
 				(uint)image.Width, (uint)image.Height, 1,
 				(uint)mipmaps.Length, 1,
 				allTexData,
-				graphicsDevice, VeldridLib.TextureUsage.Sampled);
+				_graphicsContext.GraphicsDevice, VeldridLib.TextureUsage.Sampled);
 
 		return new Texture2D(name, texture);
 	}
@@ -84,7 +97,7 @@ internal class Texture2DLoader : IAssetLoader<Texture2D>
 		return 1 + (int)Math.Floor(Math.Log(Math.Max(width, height), 2));
 	}
 
-	private unsafe Veldrid.Texture _createDeviceTexture(
+	private unsafe VeldridLib.Texture _createDeviceTexture(
 		VeldridLib.PixelFormat format,
 		VeldridLib.TextureType type,
 		uint width,

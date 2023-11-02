@@ -39,7 +39,7 @@ game.UseUpdate(next =>
 {
 	var eventEmitter = game.Services.GetRequiredService<IEventEmitter>();
 	var flip = false;
-	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(3), (dt) => {
+	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(1), (dt) => {
 		eventEmitter.Emit(new ChangeSceneEvent(flip ? "MainMenu" : "Gameplay"));
 		flip = !flip;
 	});
@@ -60,7 +60,7 @@ game.UseRender(next =>
 		//Console.WriteLine("Game Render");
 		next(dt);
 
-		if (dt.Frame > 1000)
+		if (dt.Frame > 5000)
 		{
 			Console.WriteLine($"Frames exceeded ({dt.Frame}), exiting!");
 			eventEmitter.Emit<ExitGameEvent>();
@@ -72,10 +72,11 @@ game.UseScene("MainMenu", scene =>
 {
 	scene.UseRender(next =>
 	{
-		//Console.WriteLine("MainMenu Scene Setup Render");
+		var spriteBatch = scene.Services.GetRequiredService<ISpriteBatch>();
+
 		return dt =>
 		{
-			//Console.WriteLine("MainMenu Scene Render");
+			spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
 			next(dt);
 		};
 	});
@@ -87,10 +88,11 @@ game.UseScene("Gameplay", scene =>
 {
 	scene.UseRender(next =>
 	{
-		//Console.WriteLine("Gameplay Scene Setup Render");
+		var spriteBatch = scene.Services.GetRequiredService<ISpriteBatch>();
+
 		return dt =>
 		{
-			//Console.WriteLine("Gameplay Scene Render");
+			spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
 			next(dt);
 		};
 	});

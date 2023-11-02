@@ -5,22 +5,28 @@ namespace Kyber.Extensions.Graphics;
 
 public static class BuilderExtensions
 {
-	public static IServiceCollection AddVeldridGraphics(this IServiceCollection services, IConfiguration config, Action<GraphicsConfig> configureOptions = null)
+	public static IServiceCollection AddVeldridGraphics(this IServiceCollection services, IConfiguration config, Action<GraphicsConfig>? configureOptions = null)
 	{
 		return AddVeldridGraphics(services, config.GetSection("Kyber").GetSection("Graphics"), configureOptions);
 	}
 
-	public static IServiceCollection AddVeldridGraphics(this IServiceCollection services, IConfigurationSection config, Action<GraphicsConfig> configureOptions = null)
+	public static IServiceCollection AddVeldridGraphics(this IServiceCollection services, IConfigurationSection config, Action<GraphicsConfig>? configureOptions = null)
 	{
 		services
+			// Standard
 			.Configure<GraphicsConfig>(config)
+			.AddScoped<IAssetManager, AssetManager>()
+
+			// Implementation-specific
 			.AddSingleton<IWindow, Window>()
 			.AddSingleton<IVeldridGraphicsContext, GraphicsContext>()
 			.AddSingleton<IGraphicsContext>(svc => svc.GetRequiredService<IVeldridGraphicsContext>())
 			.AddSingleton<ISpriteBatch, SpriteBatch>()
-			//.AddScoped<IAssetManager, AssetManager>()
-			//.AddSingleton<Texture2DLoader>()
+			
+			// Loaders
+			.AddSingleton<IAssetLoader, Texture2DLoader>()
 
+			// Implementation-specific Systems
 			.AddSingleton<WindowSystem>()
 			.AddSingleton<GraphicsSystem>()
 			.AddSingleton<SpriteBatchSystem>();

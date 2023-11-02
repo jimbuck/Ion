@@ -1,5 +1,5 @@
-﻿using Microsoft.Extensions.Options;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using Microsoft.Extensions.Options;
 
 namespace Kyber.Core;
 
