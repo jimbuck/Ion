@@ -7,15 +7,20 @@ using Kyber.Extensions.Debug;
 
 namespace Kyber.Extensions.Graphics;
 
-public interface IVeldridGraphicsContext : IGraphicsContext
+public interface IGraphicsContext
 {
+	Matrix4x4 ProjectionMatrix { get; }
+	bool NoRender { get; }
 	public GraphicsDevice? GraphicsDevice { get; }
 	public ResourceFactory Factory { get; }
 
 	void SubmitCommands(CommandList cl);
+
+	Matrix4x4 CreateOrthographic(float left, float right, float bottom, float top, float near, float far);
+	Matrix4x4 CreatePerspective(float fov, float aspectRatio, float near, float far);
 }
 
-internal class GraphicsContext : IVeldridGraphicsContext, IDisposable
+internal class GraphicsContext : IGraphicsContext, IDisposable
 {
 	private readonly IOptionsMonitor<GraphicsConfig> _config;
 	private readonly IEventListener _events;

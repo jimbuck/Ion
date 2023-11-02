@@ -11,11 +11,11 @@ namespace Kyber.Extensions.Graphics;
 
 internal class Texture2DLoader : IAssetLoader
 {
-	private readonly IVeldridGraphicsContext _graphicsContext;
+	private readonly IGraphicsContext _graphicsContext;
 
 	public Type AssetType { get; } = typeof(Texture2D);
 
-	public Texture2DLoader(IVeldridGraphicsContext graphicsContext)
+	public Texture2DLoader(IGraphicsContext graphicsContext)
 	{
 		_graphicsContext = graphicsContext;
 	}
