@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 var builder = KyberApplication.CreateBuilder(args);
 
-
+builder.Services.AddDebugUtils(builder.Configuration);
 builder.Services.AddVeldridGraphics(builder.Configuration, graphics =>
 {
 	graphics.Output = GraphicsOutput.Window;
@@ -16,10 +16,10 @@ builder.Services.AddVeldridGraphics(builder.Configuration, graphics =>
 builder.Services.AddScenes();
 
 builder.Services.AddSingleton<TestMiddleware>();
-builder.Services.AddSingleton<MicroTimerSystem>();
+builder.Services.AddSingleton<TraceTimerSystem>();
 
 var game = builder.Build();
-game.UseSystem<MicroTimerSystem>();
+game.UseDebugUtils();
 game.UseEvents();
 game.UseVeldridGraphics();
 
@@ -31,13 +31,20 @@ game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter) =>
 	};
 });
 
-game.UseFirst(next =>
+game.UseFirst((GameLoopDelegate next, IInputState input, ITraceManager traceManager) =>
 {
 	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) => {
 		Console.WriteLine($"Frame: {dt.Frame}");
 	});
 	return dt =>
 	{
+		if (input.Pressed(Key.F5)) traceManager.Start();
+		if (input.Pressed(Key.F6))
+		{
+			traceManager.Stop();
+			traceManager.OutputTrace();
+		}
+
 		logFrameNumber(dt);
 		next(dt);
 	};
@@ -59,16 +66,16 @@ game.UseUpdate((GameLoopDelegate next, IEventEmitter eventEmitter, IEventListene
 	};
 });
 
-game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter) =>
+game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter, IInputState input) =>
 {
 	return dt =>
 	{
 		//Console.WriteLine("Game Render");
 		next(dt);
 
-		if (dt.Frame > 5000)
+		if (input.Down(Key.Escape))
 		{
-			Console.WriteLine($"Frames exceeded ({dt.Frame}), exiting!");
+			Console.WriteLine("Escape Pressed!");
 			eventEmitter.Emit<ExitGameEvent>();
 		}
 	};

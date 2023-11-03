@@ -32,5 +32,6 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\Kyber.Core.Abstractions\Kyber.Core.Abstractions.csproj" />
+	  <ProjectReference Include="..\Kyber.Extensions.Debug.Abstractions\Kyber.Extensions.Debug.Abstractions.csproj" />
 	</ItemGroup>	
 </Project>

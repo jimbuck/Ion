@@ -21,15 +21,16 @@ public static class BuilderExtensions
 			.AddSingleton<IWindow, Window>()
 			.AddSingleton<IGraphicsContext, GraphicsContext>()
 			.AddSingleton<ISpriteBatch, SpriteBatch>()
-			
+
 			// Loaders
 			.AddSingleton<IAssetLoader, Texture2DLoader>()
 
 			// Implementation-specific Systems
 			.AddSingleton<WindowSystem>()
+			.AddSingleton<InputSystem>()
 			.AddSingleton<GraphicsSystem>()
-			.AddSingleton<SpriteBatchSystem>();
-		//.AddSingleton<IInputState, InputState>();
+			.AddSingleton<SpriteBatchSystem>()
+			.AddSingleton<IInputState, InputState>();
 
 		if (configureOptions != null) services.Configure(configureOptions);
 
@@ -40,6 +41,7 @@ public static class BuilderExtensions
 	{
 		return app
 			.UseSystem<WindowSystem>()
+			.UseSystem<InputSystem>()
 			.UseSystem<GraphicsSystem>()
 			.UseSystem<SpriteBatchSystem>();
 	}

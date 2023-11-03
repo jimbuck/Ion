@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 
 using Microsoft.Extensions.Configuration;
+using Kyber.Extensions.Debug;
 
 namespace Kyber.Extensions.Scenes;
 
@@ -13,6 +14,7 @@ internal sealed class SceneSystem : IDisposable
 	private readonly ILogger _logger;
 	private readonly IConfiguration _config;
 	private readonly IEventListener _events;
+	private readonly ITraceTimer _trace;
 	private readonly Dictionary<string, SceneBuilderFactory> _scenesBuilders = new();
 
 	private Scene? _activeScene;
@@ -27,12 +29,13 @@ internal sealed class SceneSystem : IDisposable
 	/// Creates a new SceneManager instance, keeping a reference to the service provider.
 	/// </summary>
 	/// <param name="serviceProvider">The root service provider.</param>
-	public SceneSystem(IServiceProvider serviceProvider, ILogger<SceneSystem> logger, IConfiguration config, IEventListener events)
+	public SceneSystem(IServiceProvider serviceProvider, ILogger<SceneSystem> logger, IConfiguration config, IEventListener events, ITraceTimer<SceneSystem> trace)
 	{
 		_serviceProvider = serviceProvider;
 		_logger = logger;
 		_config = config;
 		_events = events;
+		_trace = trace;
 	}
 
 	public void Register(string name, SceneBuilderFactory sceneBuilderFactory)
@@ -74,6 +77,8 @@ internal sealed class SceneSystem : IDisposable
 	[Init]
 	public void Init(GameTime dt, GameLoopDelegate _)
 	{
+		var timer = _trace.Start("Init");
+
 		_logger.LogDebug("Init ({0}) {1}", CurrentScene, dt);
 
 		_handleChangeSceneEvents();
@@ -87,24 +92,32 @@ internal sealed class SceneSystem : IDisposable
 			_nextScene = _scenesBuilders.First().Key;
 			_loadNextScene(dt);
 		}
+
+		timer.Stop();
 	}
 
 	[First]
 	public void First(GameTime dt, GameLoopDelegate _)
 	{
+		var timer = _trace.Start("First");
 		//_logger.LogDebug("First ({0}) {1}", CurrentScene, dt);
 
 		_handleChangeSceneEvents();
 
 		_loadNextScene(dt);
 		_activeScene?.First(dt);
+
+		timer.Stop();
 	}
 
 	[FixedUpdate]
 	public void FixedUpdate(GameTime dt, GameLoopDelegate _)
 	{
-		//_logger.LogDebug("FixedUpdate ({0}) {1}", CurrentScene, dt);
+		var timer = _trace.Start("FixedUpdate");
+
 		_activeScene?.FixedUpdate(dt);
+
+		timer.Stop();
 	}
 
 	/// <summary>
@@ -114,8 +127,11 @@ internal sealed class SceneSystem : IDisposable
 	[Update]
 	public void Update(GameTime dt, GameLoopDelegate _)
 	{
-		//_logger.LogDebug("Update ({0}) {1}", CurrentScene, dt);
+		var timer = _trace.Start("Update");
+
 		_activeScene?.Update(dt);
+
+		timer.Stop();
 	}
 
 	/// <summary>
@@ -125,15 +141,21 @@ internal sealed class SceneSystem : IDisposable
 	[Render]
 	public void Render(GameTime dt, GameLoopDelegate _)
 	{
-		//_logger.LogDebug("Render ({0}) {1}", CurrentScene, dt);
+		var timer = _trace.Start("Render");
+
 		_activeScene?.Render(dt);
+
+		timer.Stop();
 	}
 
 	[Last]
 	public void Last(GameTime dt, GameLoopDelegate _)
 	{
-		//_logger.LogDebug("Last ({0}) {1}", CurrentScene, dt);
+		var timer = _trace.Start("Last");
+
 		_activeScene?.Last(dt);
+
+		timer.Stop();
 	}
 
 	/// <summary>
@@ -142,8 +164,12 @@ internal sealed class SceneSystem : IDisposable
 	[Destroy]
 	public void Destroy(GameTime dt, GameLoopDelegate _)
 	{
+		var timer = _trace.Start("Destroy");
+
 		_logger.LogDebug("Destroy");
 		_activeScene?.Destroy(dt);
+
+		timer.Stop();
 	}
 
 	public void Dispose()

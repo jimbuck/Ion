@@ -26,6 +26,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 	private readonly IEventListener _events;
 	private readonly ILogger _logger;
 	private readonly Window _window;
+	private readonly ITraceTimer<GraphicsContext> _trace;
 
 #pragma warning disable CS8603 // Possible null reference return.
 	private CommandList? _commandList;
@@ -37,12 +38,13 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 	public bool NoRender { get; }
 
-	public GraphicsContext(IOptionsMonitor<GraphicsConfig> config, IEventListener events, ILogger<GraphicsContext> logger, IWindow window)
+	public GraphicsContext(IOptionsMonitor<GraphicsConfig> config, IEventListener events, ILogger<GraphicsContext> logger, IWindow window, ITraceTimer<GraphicsContext> trace)
 	{
 		_config = config;
 		_events = events;
 		_logger = logger;
 		_window = (Window)window;
+		_trace = trace;
 
 		NoRender = _config.CurrentValue.Output == GraphicsOutput.None;
 	}
@@ -51,13 +53,14 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 	{
 		if (NoRender) return;
 
-		using var _ = MicroTimer.Start("GraphicsContext::Initialize");
 		_logger.LogInformation("Creating graphics device...");
 
 		if (!GraphicsDevice.IsBackendSupported((Veldrid.GraphicsBackend)_config.CurrentValue.PreferredBackend))
 		{
 			throw new Exception($"Unsupported backend! ({_config.CurrentValue.PreferredBackend}");
 		}
+
+		var timer = _trace.Start("Initialize");
 
 		GraphicsDevice = Veldrid.StartupUtilities.VeldridStartup.CreateGraphicsDevice(_window.Sdl2Window, new GraphicsDeviceOptions()
 		{
@@ -76,6 +79,8 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 		_logger.LogInformation($"Graphics device created ({GraphicsDevice.BackendType})!");
 
 		UpdateProjection((uint)_window.Width, (uint)_window.Height);
+
+		timer.Stop();
 	}
 
 	public void First()
@@ -96,7 +101,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 	{
 		if (NoRender || GraphicsDevice is null || _commandList is null) return;
 
-		using var _ = MicroTimer.Start("GraphicsContext::BeginFrame");
+		var timer = _trace.Start("BeginFrame");
 
 		_commandList.Begin();
 		_commandList.SetFramebuffer(GraphicsDevice.MainSwapchain.Framebuffer);
@@ -105,23 +110,24 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 		_commandList.ClearDepthStencil(GraphicsDevice.IsDepthRangeZeroToOne ? 0f : 1f);
 		_commandList.End();
 		GraphicsDevice.SubmitCommands(_commandList);
+		timer.Stop();
 	}
 
 	public void EndFrame(GameTime dt)
 	{
 		if (NoRender || GraphicsDevice is null || _commandList is null) return;
 
-		using var timer = MicroTimer.Start("GraphicsContext::EndFrame::WaitForIdle");
+		var timer = _trace.Start("EndFrame::WaitForIdle");
 
 		GraphicsDevice.WaitForIdle();
 
-		timer.Then("GraphicsContext::EndFrame::SwapBuffers");
+		timer.Then("EndFrame::SwapBuffers");
 
 		if (_window.HasClosed) return;
 
 		GraphicsDevice.SwapBuffers();
 
-		timer.Then("GraphicsContext::EndFrame::HandleResize");
+		timer.Then("EndFrame::HandleResize");
 
 		if (_events.OnLatest<WindowResizeEvent>(out var e))
 		{
@@ -131,8 +137,9 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 	public void SubmitCommands(CommandList commandList)
 	{
-		using var _ = MicroTimer.Start("GraphicsContext::SubmitCommands");
+		var timer = _trace.Start("SubmitCommands");
 		GraphicsDevice?.SubmitCommands(commandList);
+		timer.Stop();
 	}
 
 	public Matrix4x4 CreateOrthographic(float left, float right, float bottom, float top, float near, float far)

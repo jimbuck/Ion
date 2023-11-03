@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Veldrid;
 using Veldrid.SPIRV;
 using Kyber.Extensions.Debug;
+using System.Diagnostics;
 
 namespace Kyber.Extensions.Graphics;
 
@@ -15,6 +16,7 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 	private readonly IGraphicsContext _graphicsContext;
 	private readonly ILogger _logger;
 	private readonly IEventListener _events;
+	private readonly ITraceTimer<SpriteBatch> _trace;
 
 	private readonly SpriteBatchManager _batchManager;
 	private Texture? _whitePixel;
@@ -139,12 +141,13 @@ void main()
     fsout_Color = fsin_Color * texture(sampler2D(Tex, Sampler), tex_coord);
 }";
 
-	public SpriteBatch(IWindow window, IGraphicsContext graphicsContext, ILogger<SpriteBatch> logger, IEventListener events)
+	public SpriteBatch(IWindow window, IGraphicsContext graphicsContext, ILogger<SpriteBatch> logger, IEventListener events, ITraceTimer<SpriteBatch> trace)
 	{
 		_window = window;
 		_graphicsContext = graphicsContext;
 		_logger = logger;
 		_events = events;
+		_trace = trace;
 
 		_batchManager = new();
 		_buffers = new();
@@ -159,14 +162,18 @@ void main()
 			return;
 		}
 
-		using var _ = MicroTimer.Start("SpriteRenderer::Initialize");
+		var timer = _trace.Start("SpriteRenderer::Initialize");
 
 		var factory = _graphicsContext.Factory;
 		_commandList = factory.CreateCommandList();
 
+		timer.Then("CreateWhitePixel");
+
 		TextureDescription desc = new(1, 1, 1, 1, 1, PixelFormat.B8_G8_R8_A8_UNorm, TextureUsage.Sampled, Veldrid.TextureType.Texture2D);
 		_whitePixel = factory.CreateTexture2D(desc, "white-pixel");
 		_graphicsContext.GraphicsDevice.UpdateTexture(_whitePixel, new byte[] { 255, 255, 255, 255 }, 0, 0, 0, 1, 1, 1, 0, 0);
+
+		timer.Then("CreateShaders");
 
 		VertexLayoutDescription vertexLayout = new(new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2));
 
@@ -175,6 +182,8 @@ void main()
 
 		_logger.LogInformation("Created shaders");
 		_shaders = factory.CreateFromSpirv(vertexShaderDesc, fragmentShaderDesc);
+
+		timer.Then("CreateVertexBuffer");
 
 		_logger.LogInformation("Created _vertexBuffer");
 		_vertexBuffer = factory.CreateBuffer(new(4 * MemUtils.SizeOf<Vector2>(), BufferUsage.VertexBuffer));
@@ -185,6 +194,8 @@ void main()
 			new( 0,  1),
 			new( 1,  1),
 		});
+
+		timer.Then("CreateResourceLayouts");
 
 		_instanceResourceLayout = factory.CreateResourceLayout(new(new ResourceLayoutElementDescription[] {
 			new("Instances", ResourceKind.StructuredBufferReadOnly, ShaderStages.Vertex)
@@ -207,6 +218,8 @@ void main()
 			}),
 			Outputs = _graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer.OutputDescription
 		});
+
+		timer.Stop();
 	}
 
 	public void Begin(GameTime dt)
@@ -216,10 +229,12 @@ void main()
 
 		if (_beginCalled) throw new InvalidOperationException("Begin cannot be called again until End has been successfully called.");
 
-		using var _ = MicroTimer.Start("SpriteRenderer::Begin");
+		var timer = _trace.Start("Begin");
 
 		_batchManager.Clear();
 		_beginCalled = true;
+
+		timer.Stop();
 	}
 
 	public void DrawRect(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float depth = 0f)
@@ -285,11 +300,11 @@ void main()
 		if (_graphicsContext.NoRender) return;
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling End.");
 
-		using var _ = MicroTimer.Start("SpriteRenderer::End");
-
 		_beginCalled = false;
 
 		if (_batchManager.IsEmpty || _graphicsContext.GraphicsDevice is null || _commandList is null) return;
+
+		var timer = _trace.Start("End");
 
 		_commandList.Begin();
 		_commandList.SetFramebuffer(_graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer);
@@ -300,37 +315,40 @@ void main()
 		foreach (var (texture, group) in _batchManager)
 		{
 			var pair = _getBuffer(texture, group.Count + 1);
-			using var timer = MicroTimer.Start("SpriteRenderer::End::Texture::Map");
+			var innerTimer = _trace.Start("End::Texture::Map");
 			
 			var mapped = _graphicsContext.GraphicsDevice.Map(pair.Buffer, MapMode.Write);
 
-			timer.Then("SpriteRenderer::End::Texture::Copy");
+			innerTimer.Then("End::Texture::Copy");
 			MemUtils.Set(mapped.Data, _graphicsContext.ProjectionMatrix, 1);
 			MemUtils.Copy(mapped.Data + SpriteBatchManager.INSTANCE_SIZE, group.GetSpan());
 
-			timer.Then("SpriteRenderer::End::Texture::Unmap");
+			innerTimer.Then("End::Texture::Unmap");
 			_graphicsContext.GraphicsDevice.Unmap(pair.Buffer);
-			timer.Then("SpriteRenderer::End::Texture::Commands");
+			innerTimer.Then("End::Texture::Commands");
 			_commandList.SetVertexBuffer(0, _vertexBuffer);
 			_commandList.SetGraphicsResourceSet(0, pair.InstanceSet);
 			_commandList.SetGraphicsResourceSet(1, pair.TextureSet);
 			_commandList.Draw(4, (uint)group.Count, 0, 0);
+			innerTimer.Stop();
 		}
 		
 		_commandList.End();
 		_graphicsContext.SubmitCommands(_commandList);
+
+		timer.Stop();
 	}
 
 	private BufferContainer _getBuffer(ITexture2D texture, int count)
 	{
-		using var _ = MicroTimer.Start("SpriteRenderer::_getBuffer");
+		var timer = _trace.Start("_getBuffer");
 
 		var size = SpriteBatchManager.GetBatchSize(count);
 		var bci = new BufferDescription(size, BufferUsage.StructuredBufferReadOnly | BufferUsage.Dynamic, SpriteBatchManager.Instance.SizeInBytes);
 
 		if (!_buffers.TryGetValue(texture, out var pair))
 		{
-			using var _nb = MicroTimer.Start("SpriteRenderer::_getBuffer::NewBuffer");
+			var nb = _trace.Start("_getBuffer::NewBuffer");
 			var buffer = _graphicsContext.Factory.CreateBuffer(bci);
 			pair = new(buffer,
 				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, buffer)),
@@ -338,18 +356,21 @@ void main()
 				);
 
 			_buffers[texture] = pair;
+			nb.Stop();
 		}
 		else if (size > pair.Buffer.SizeInBytes)
 		{
-			using var _rb = MicroTimer.Start("SpriteRenderer::_getBuffer::ResizeBuffer");
+			var rb = _trace.Start("_getBuffer::ResizeBuffer");
 			pair.Dispose();
 
 			pair.Buffer = _graphicsContext.Factory.CreateBuffer(bci);
 			pair.InstanceSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, pair.Buffer));
 			pair.TextureSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)(Texture2D)texture, _graphicsContext.GraphicsDevice!.LinearSampler));
 			_buffers[texture] = pair;
+			rb.Stop();
 		}
 
+		timer.Stop();
 		return pair;
 	}
 

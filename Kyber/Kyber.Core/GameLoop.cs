@@ -1,4 +1,7 @@
 ﻿using System.Diagnostics;
+
+using Kyber.Extensions.Debug;
+
 using Microsoft.Extensions.Options;
 
 namespace Kyber.Core;
@@ -13,6 +16,7 @@ public class GameLoop
 
 	private readonly IOptionsMonitor<GameConfig> _gameConfig;
 	private readonly IEventListener _events;
+	private readonly ITraceTimer<GameLoop> _trace;
 
 	private float MaxFPS => _gameConfig.CurrentValue.MaxFPS < 1 ? 120 : _gameConfig.CurrentValue.MaxFPS;
 
@@ -29,9 +33,10 @@ public class GameLoop
 	public GameLoopDelegate Last { get; set; } = (dt) => { };
 	public GameLoopDelegate Destroy { get; set; } = (dt) => { };
 
-	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events) {
+	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events, ITraceTimer<GameLoop> trace) {
 		_gameConfig = gameConfig;
 		_events = events;
+		_trace = trace;
 		
 		GameTime = new();
 		FixedGameTime = new()
@@ -85,7 +90,9 @@ public class GameLoop
 			var delayTime = targetFrameTime - (int)((stopwatch.Elapsed.TotalSeconds - currentTime) * 1000);
 			if (delayTime > 0)
 			{
+				var timer = _trace.Start("Idle");
 				Thread.Sleep(delayTime);
+				timer.Stop();
 			}
 
 			GameTime.Frame = FixedGameTime.Frame = (GameTime.Frame + 1);
