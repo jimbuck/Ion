@@ -44,6 +44,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Extensions.Debug", "K
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Extensions.Graphics.Veldrid", "Kyber\Kyber.Extensions.Graphics.Veldrid\Kyber.Extensions.Graphics.Veldrid.csproj", "{B3B07001-6598-48DF-8320-C65870A9E0F5}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Core.InternalGenerators", "Kyber\Kyber.Core.InternalGenerators\Kyber.Core.InternalGenerators.csproj", "{DFD31B44-8064-4143-9B38-572729A89071}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kyber.Extensions.Scenes.InternalGenerators", "Kyber\Kyber.Extensions.Scenes.InternalGenerators\Kyber.Extensions.Scenes.InternalGenerators.csproj", "{0B90C501-3304-40D0-B099-CF89A6DF37E0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -105,6 +109,18 @@ Global
 		{B3B07001-6598-48DF-8320-C65870A9E0F5}.DebugGenerators|Any CPU.Build.0 = Debug|Any CPU
 		{B3B07001-6598-48DF-8320-C65870A9E0F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B3B07001-6598-48DF-8320-C65870A9E0F5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DFD31B44-8064-4143-9B38-572729A89071}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DFD31B44-8064-4143-9B38-572729A89071}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DFD31B44-8064-4143-9B38-572729A89071}.DebugGenerators|Any CPU.ActiveCfg = Debug|Any CPU
+		{DFD31B44-8064-4143-9B38-572729A89071}.DebugGenerators|Any CPU.Build.0 = Debug|Any CPU
+		{DFD31B44-8064-4143-9B38-572729A89071}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DFD31B44-8064-4143-9B38-572729A89071}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0B90C501-3304-40D0-B099-CF89A6DF37E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0B90C501-3304-40D0-B099-CF89A6DF37E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0B90C501-3304-40D0-B099-CF89A6DF37E0}.DebugGenerators|Any CPU.ActiveCfg = DebugGenerators|Any CPU
+		{0B90C501-3304-40D0-B099-CF89A6DF37E0}.DebugGenerators|Any CPU.Build.0 = DebugGenerators|Any CPU
+		{0B90C501-3304-40D0-B099-CF89A6DF37E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0B90C501-3304-40D0-B099-CF89A6DF37E0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -120,6 +136,8 @@ Global
 		{BC64E83E-4034-407F-810C-671EC13AD1D7} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 		{C6AE892E-ED53-4CF9-B3D4-5F904E6E352D} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 		{B3B07001-6598-48DF-8320-C65870A9E0F5} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
+		{DFD31B44-8064-4143-9B38-572729A89071} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
+		{0B90C501-3304-40D0-B099-CF89A6DF37E0} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CCF839E2-AF6A-4444-95F2-76F60225DC55}

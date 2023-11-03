@@ -20,7 +20,6 @@ public static class BuilderExtensions
 			// Implementation-specific
 			.AddSingleton<IWindow, Window>()
 			.AddSingleton<IGraphicsContext, GraphicsContext>()
-			.AddSingleton<IGraphicsContext>(svc => svc.GetRequiredService<IGraphicsContext>())
 			.AddSingleton<ISpriteBatch, SpriteBatch>()
 			
 			// Loaders

@@ -12,6 +12,7 @@
 
 	<ItemGroup>
     <ProjectReference Include="..\Kyber.Core.Abstractions\Kyber.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Kyber.Extensions.Scenes.InternalGenerators\Kyber.Extensions.Scenes.InternalGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

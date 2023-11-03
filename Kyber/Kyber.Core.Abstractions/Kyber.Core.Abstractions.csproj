@@ -16,5 +16,9 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0" />
   </ItemGroup>
+	
+  <ItemGroup>
+    <ProjectReference Include="..\Kyber.Core.InternalGenerators\Kyber.Core.InternalGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
 
 </Project>

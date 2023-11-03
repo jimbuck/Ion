@@ -5,6 +5,7 @@ namespace Kyber.Extensions.Scenes;
 public interface ISceneBuilder
 {
 	string Name { get; }
+
 	IConfiguration Configuration { get; }
 	IServiceProvider Services { get; }
 

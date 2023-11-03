@@ -23,6 +23,14 @@ game.UseSystem<MicroTimerSystem>();
 game.UseEvents();
 game.UseVeldridGraphics();
 
+game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter) =>
+{
+	return dt => {
+		eventEmitter.Emit<int>(42);
+		next(dt);
+	};
+});
+
 game.UseFirst(next =>
 {
 	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) => {
@@ -35,9 +43,8 @@ game.UseFirst(next =>
 	};
 });
 
-game.UseUpdate(next =>
+game.UseUpdate((GameLoopDelegate next, IEventEmitter eventEmitter, IEventListener events) =>
 {
-	var eventEmitter = game.Services.GetRequiredService<IEventEmitter>();
 	var flip = false;
 	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(1), (dt) => {
 		eventEmitter.Emit(new ChangeSceneEvent(flip ? "MainMenu" : "Gameplay"));
@@ -46,15 +53,14 @@ game.UseUpdate(next =>
 
 	return dt =>
 	{
+		if (events.On<int>(out var e)) Console.WriteLine($"Int event! {e.Data}");
 		next(dt);
 		switchScene(dt);
 	};
 });
 
-game.UseRender(next =>
+game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter) =>
 {
-	var eventEmitter = game.Services.GetRequiredService<IEventEmitter>();
-
 	return dt =>
 	{
 		//Console.WriteLine("Game Render");
@@ -70,10 +76,8 @@ game.UseRender(next =>
 
 game.UseScene("MainMenu", scene =>
 {
-	scene.UseRender(next =>
+	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
 	{
-		var spriteBatch = scene.Services.GetRequiredService<ISpriteBatch>();
-
 		return dt =>
 		{
 			spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
@@ -86,10 +90,8 @@ game.UseScene("MainMenu", scene =>
 
 game.UseScene("Gameplay", scene =>
 {
-	scene.UseRender(next =>
+	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
 	{
-		var spriteBatch = scene.Services.GetRequiredService<ISpriteBatch>();
-
 		return dt =>
 		{
 			spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
