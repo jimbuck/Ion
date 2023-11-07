@@ -9,9 +9,7 @@ public class CoroutineRunner : ICoroutineRunner
 	private readonly List<CoroutineHandle> _routines = new();
 	private readonly IServiceProvider _services;
 
-	/// <summary>
-	/// How many coroutines are currently active.
-	/// </summary>
+	/// <inheritdoc/>
 	public int Count => _routines.Count;
 
 	public CoroutineRunner(IServiceProvider services)
@@ -19,22 +17,13 @@ public class CoroutineRunner : ICoroutineRunner
 		_services = services;
 	}
 
-	/// <summary>
-	/// Run a coroutine.
-	/// </summary>
-	/// <returns>A handle to the new coroutine.</returns>
-	/// <param name="delay">How many seconds to delay before starting.</param>
-	/// <param name="routine">The routine to run.</param>
+	/// <inheritdoc/>
 	public void Start(IEnumerator routine)
 	{
 		_routines.Add(new CoroutineHandle(routine, _services.GetRequiredService<IEventListener>()));
 	}
 
-	/// <summary>
-	/// Stop the specified routine.
-	/// </summary>
-	/// <returns>True if the routine was actually stopped.</returns>
-	/// <param name="routine">The routine to stop.</param>
+	/// <inheritdoc/>
 	public void Stop(IEnumerator routine)
 	{
 		var index = _routines.FindIndex(ch => ch.Enumerator == routine);
@@ -42,30 +31,20 @@ public class CoroutineRunner : ICoroutineRunner
 		_routines.RemoveAt(index);
 	}
 
-	/// <summary>
-	/// Stop all running routines.
-	/// </summary>
+	/// <inheritdoc/>
 	public void StopAll()
 	{
 		foreach(var routine in _routines) routine.EventListener?.Dispose();
 		_routines.Clear();
 	}
 
-	/// <summary>
-	/// Check if the routine is currently active.
-	/// </summary>
-	/// <returns>True if the routine is active.</returns>
-	/// <param name="routine">The routine to check.</param>
+	/// <inheritdoc/>
 	public bool IsActive(IEnumerator routine)
 	{
 		return _routines.Any(ch => ch.Enumerator == routine);
 	}
 
-	/// <summary>
-	/// Update all running coroutines.
-	/// </summary>
-	/// <returns>True if any routines were updated.</returns>
-	/// <param name="deltaTime">How many seconds have passed sinced the last update.</param>
+	/// <inheritdoc/>
 	public void Update(GameTime dt)
 	{
 		if (_routines.Count == 0) return;

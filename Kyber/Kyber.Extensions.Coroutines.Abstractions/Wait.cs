@@ -7,6 +7,7 @@ public static class Wait
 	public static IWait For<TEvent>() => new WaitForEvent<TEvent>();
 
 	public static IWait Until(Func<bool> predicate) => new WaitUntil(predicate);
+	public static IWait While(Func<bool> predicate) => new WaitUntil(() => !predicate());
 }
 
 public record struct WaitFor(float Delay) : IWait

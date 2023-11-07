@@ -1,13 +1,13 @@
-﻿using Kyber;
+﻿using System.Collections;
+using System.Diagnostics;
+
+using Microsoft.Extensions.DependencyInjection;
+
+using Kyber;
 using Kyber.Extensions.Debug;
 using Kyber.Extensions.Graphics;
 using Kyber.Extensions.Scenes;
 using Kyber.Extensions.Coroutines;
-
-using Microsoft.Extensions.DependencyInjection;
-
-using System.Collections;
-using System.Diagnostics;
 
 var builder = KyberApplication.CreateBuilder(args);
 
@@ -32,22 +32,22 @@ game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner corout
 {
 	IEnumerator CountDown(int from)
 	{
-		Console.WriteLine("Ready?");
-		yield return Wait.For<int>();
-
-		int i = from;
-		while (i >= 0)
+		while (from >= 0)
 		{
-			Console.WriteLine("Countdown: " + i--);
-			yield return Wait.For(1);
+			Console.WriteLine("Countdown: " + from--);
+			yield return Wait.Until(() => input.Pressed(Key.Space));
 		}
 	}
 
-	coroutine.Start(CountDown(5));
 	return dt =>
 	{
-		coroutine.Update(dt);
+		if (input.Pressed(Key.Enter))
+		{
+			coroutine.Start(CountDown(5));
+		}
 
+		coroutine.Update(dt);
+		
 		next(dt);
 	};
 });
