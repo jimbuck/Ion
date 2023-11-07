@@ -15,6 +15,18 @@ public static class UseSystemExtensions
 	/// <param name="app">The <see cref="IApplicationBuilder"/> instance.</param>
 	/// <param name="args">The arguments to pass to the middleware type instance's constructor.</param>
 	/// <returns>The <see cref="IApplicationBuilder"/> instance.</returns>
+	public static IKyberApplication UseSystem(this IKyberApplication app, Type middlewareType)
+	{
+		return UseSystem(app, middlewareType, middlewareType);
+	}
+
+	/// <summary>
+	/// Adds a middleware type to the application's request pipeline.
+	/// </summary>
+	/// <typeparam name="TMiddleware">The middleware type.</typeparam>
+	/// <param name="app">The <see cref="IApplicationBuilder"/> instance.</param>
+	/// <param name="args">The arguments to pass to the middleware type instance's constructor.</param>
+	/// <returns>The <see cref="IApplicationBuilder"/> instance.</returns>
 	public static IKyberApplication UseSystem<[DynamicallyAccessedMembers(MiddlewareAccessibility)] TMiddleware>(this IKyberApplication app)
 	{
 		return UseSystem(app, typeof(TMiddleware), typeof(TMiddleware));

@@ -8,7 +8,7 @@ public class GameTime
 	public uint Frame { get; set; }
 
 	/// <summary>
-	/// The time in seconds since the last update. Typically a fixed timestep.
+	/// The time in seconds since the last update.
 	/// </summary>
 	public float Delta { get; set; }
 
@@ -27,15 +27,4 @@ public class GameTime
 	/// </summary>
 	/// <param name="time"></param>
 	public static implicit operator float(GameTime time) => time.Delta;
-
-	internal static GameTime FromDelta(float dt)
-	{
-		return new()
-		{
-			Frame = 0,
-			Delta = dt,
-			Alpha = 1f,
-			Elapsed = TimeSpan.Zero,
-		};
-	}
 }

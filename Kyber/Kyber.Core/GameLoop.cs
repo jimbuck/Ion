@@ -2,6 +2,7 @@
 
 using Kyber.Extensions.Debug;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Kyber.Core;
@@ -16,7 +17,7 @@ public class GameLoop
 
 	private readonly IOptionsMonitor<GameConfig> _gameConfig;
 	private readonly IEventListener _events;
-	private readonly ITraceTimer<GameLoop> _trace;
+	private readonly ITraceTimer _trace;
 
 	private float MaxFPS => _gameConfig.CurrentValue.MaxFPS < 1 ? 120 : _gameConfig.CurrentValue.MaxFPS;
 

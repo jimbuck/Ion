@@ -2,7 +2,7 @@
 
 namespace Kyber.Extensions.Debug;
 
-internal struct NullTimerInstance : ITraceTimerInstance
+public struct NullTimerInstance : ITraceTimerInstance
 {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Then(string name) { }

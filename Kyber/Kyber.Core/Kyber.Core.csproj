@@ -21,7 +21,6 @@
 
 	<ItemGroup>
 		<InternalsVisibleToSuffix Include=".Tests" />
-		<InternalsVisibleTo Include="Kyber.Tests.E2E" />
 	</ItemGroup>
 
 	<ItemGroup>

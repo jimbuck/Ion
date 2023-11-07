@@ -38,6 +38,11 @@ public class KyberApplication : IKyberApplication, IDisposable
 		return new KyberApplicationBuilder(args);
 	}
 
+	public static KyberApplicationBuilder CreateBuilder()
+	{
+		return CreateBuilder(Array.Empty<string>());
+	}
+
 	public IKyberApplication UseEvents()
 	{
 		return this.UseSystem<IEventEmitter, EventEmitter>();
@@ -86,7 +91,7 @@ public class KyberApplication : IKyberApplication, IDisposable
 		return this;
 	}
 
-	public void Run()
+	public GameLoop RunManually()
 	{
 		var gameLoop = ActivatorUtilities.CreateInstance<GameLoop>(Services);
 
@@ -97,6 +102,13 @@ public class KyberApplication : IKyberApplication, IDisposable
 		gameLoop.Render = _render.Build();
 		gameLoop.Last = _last.Build();
 		gameLoop.Destroy = _destroy.Build();
+
+		return gameLoop;
+	}
+
+	public void Run()
+	{
+		var gameLoop = RunManually();
 
 		gameLoop.Run();
 	}

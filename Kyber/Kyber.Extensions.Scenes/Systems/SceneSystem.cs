@@ -53,21 +53,21 @@ internal sealed class SceneSystem : IDisposable
 
 		if (_activeScene != null)
 		{
-			_logger.LogInformation("Unloading {0} Scene.", CurrentScene);
+			_logger.LogInformation("Unloading {CurrentScene} Scene.", CurrentScene);
 			_activeScene?.Destroy(dt);
 			_activeScope?.Dispose();
-			_logger.LogInformation("Unloaded {0} Scene.", CurrentScene);
+			_logger.LogInformation("Unloaded {CurrentScene} Scene.", CurrentScene);
 			_activeScene = null;
 		}
 
-		_logger.LogInformation("Loading {0} Scene.", _nextScene);
+		_logger.LogInformation("Loading {NextScene} Scene.", _nextScene);
 		_activeScope = _serviceProvider.CreateScope();
 		var currScene = (CurrentScene)_activeScope.ServiceProvider.GetRequiredService<ICurrentScene>();
 		currScene.Set(_nextScene);
 
 		_activeScene = _scenesBuilders[_nextScene](_config, _activeScope.ServiceProvider);
 		_activeScene.Init(dt);
-		_logger.LogInformation("Loaded {0} Scene.", _nextScene);
+		_logger.LogInformation("Loaded {NextScene} Scene.", _nextScene);
 		_nextScene = null;
 	}
 
@@ -79,7 +79,7 @@ internal sealed class SceneSystem : IDisposable
 	{
 		var timer = _trace.Start("Init");
 
-		_logger.LogDebug("Init ({0}) {1}", CurrentScene, dt);
+		_logger.LogDebug("Init ({CurrentScene}) {dt}", CurrentScene, dt);
 
 		_handleChangeSceneEvents();
 
@@ -183,7 +183,7 @@ internal sealed class SceneSystem : IDisposable
 	{
 		if (_events.OnLatest<ChangeSceneEvent>(out var e))
 		{
-			if (!_scenesBuilders.ContainsKey(e.Data.NextScene)) _logger.LogWarning($"Tried to load unknown scene '{e.Data.NextScene}'.");
+			if (!_scenesBuilders.ContainsKey(e.Data.NextScene)) _logger.LogWarning("Tried to load unknown scene '{NextScene}'.", e.Data.NextScene);
 
 			_nextScene = e.Data.NextScene;
 			e.Handled = true;

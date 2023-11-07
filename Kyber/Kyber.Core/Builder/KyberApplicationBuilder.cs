@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Kyber.Debug;
+using Kyber.Extensions.Debug;
+
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -29,6 +32,7 @@ public class KyberApplicationBuilder : IKyberApplicationBuilder
 		
 		Services.Configure<GameConfig>(Configuration.GetSection("Kyber"));
 
+		Services.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(NullTraceTimer<>)));
 		Services.AddSingleton<IEventEmitter, EventEmitter>();
 		Services.AddTransient<IEventListener, EventListener>();
 		Services.AddSingleton<EventSystem>();

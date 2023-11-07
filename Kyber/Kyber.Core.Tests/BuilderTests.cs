@@ -1,11 +1,11 @@
 namespace Kyber.Tests
 {
-    public class HostingTests
+    public class BuilderTests
     {
         [Fact, Trait(CATEGORY, UNIT)]
         public void CreateDefaultBuilder()
         {
-            var builder = KyberHost.CreateDefaultBuilder();
+            var builder = KyberApplication.CreateBuilder();
             Assert.NotNull(builder);
             var host = builder.Build();
             Assert.NotNull(host);

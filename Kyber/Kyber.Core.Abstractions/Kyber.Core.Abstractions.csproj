@@ -9,6 +9,8 @@
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="Kyber.Core" />
+		<InternalsVisibleTo Include="Kyber.Core.Tests" />
+		<InternalsVisibleTo Include="Kyber.Extensions.Scenes.Tests" />
 	</ItemGroup>
 	
   <ItemGroup>
