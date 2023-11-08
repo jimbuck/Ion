@@ -55,10 +55,16 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 		_logger.LogInformation("Creating graphics device...");
 
-		if (!GraphicsDevice.IsBackendSupported((Veldrid.GraphicsBackend)_config.CurrentValue.PreferredBackend))
+		var config = _config.CurrentValue;
+
+		var veldridBackend = (Veldrid.GraphicsBackend)config.PreferredBackend;
+
+		if (!GraphicsDevice.IsBackendSupported(veldridBackend))
 		{
-			throw new Exception($"Unsupported backend! ({_config.CurrentValue.PreferredBackend}");
+			throw new Exception($"Unsupported backend! ({config.PreferredBackend}");
 		}
+
+		_logger.LogInformation("Initializing {graphicsBackend}", veldridBackend.ToString("G"));
 
 		var timer = _trace.Start("Initialize");
 
@@ -71,8 +77,8 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 			ResourceBindingModel = ResourceBindingModel.Default,
 			PreferStandardClipSpaceYDirection = true,
 			PreferDepthRangeZeroToOne = true,
-			SyncToVerticalBlank = _config.CurrentValue.VSync,
-		}, (Veldrid.GraphicsBackend)_config.CurrentValue.PreferredBackend);
+			SyncToVerticalBlank = config.VSync,
+		}, veldridBackend);
 
 		_commandList = GraphicsDevice.ResourceFactory.CreateCommandList();
 
@@ -81,15 +87,6 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 		UpdateProjection((uint)_window.Width, (uint)_window.Height);
 
 		timer.Stop();
-	}
-
-	public void First()
-	{
-		if (_events.OnLatest<WindowResizeEvent>(out var e))
-		{
-			_logger.LogInformation($"Updating projection {e.Data.Width}x{e.Data.Height}!");
-			UpdateProjection(e.Data.Width, e.Data.Height);
-		}
 	}
 
 	public void UpdateProjection(uint width, uint height)
@@ -131,7 +128,9 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 		if (_events.OnLatest<WindowResizeEvent>(out var e))
 		{
+			_logger.LogInformation($"Updating projection {e.Data.Width}x{e.Data.Height}!");
 			GraphicsDevice.ResizeMainWindow(e.Data.Width, e.Data.Height);
+			UpdateProjection(e.Data.Width, e.Data.Height);
 		}
 	}
 

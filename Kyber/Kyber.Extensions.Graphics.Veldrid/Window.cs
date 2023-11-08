@@ -21,7 +21,7 @@ internal class Window : IWindow
 	private VeldridLib.StartupUtilities.WindowCreateInfo _windowCreateInfo;
     internal Sdl2Window? Sdl2Window { get; private set; }
 
-	private (int, int) _prevSize = (0, 0);
+	private (int Width, int Height) _prevSize = (0, 0);
 	private bool _closeHandled = false;
 
 	public int Width
@@ -133,8 +133,8 @@ internal class Window : IWindow
         {
             X = windowConfig.CurrentValue.WindowX ?? 100,
             Y = windowConfig.CurrentValue.WindowY ?? 100,
-            WindowWidth = windowConfig.CurrentValue.WindowWidth ?? 960,
-            WindowHeight = windowConfig.CurrentValue.WindowHeight ?? 540,
+            WindowWidth = windowConfig.CurrentValue.Width ?? 960,
+            WindowHeight = windowConfig.CurrentValue.Height ?? 540,
             WindowInitialState = (VeldridLib.WindowState)windowConfig.CurrentValue.WindowState,
             WindowTitle = _title = _gameConfig.CurrentValue.Title
         };
@@ -152,6 +152,9 @@ internal class Window : IWindow
 		Sdl2Window.Resized += _onResize;
 		Sdl2Window.FocusGained += _onFocusGained;
 		_size = new(Sdl2Window.Width, Sdl2Window.Height);
+		_prevSize = (Sdl2Window.Width, Sdl2Window.Height);
+
+		Sdl2Window.CursorVisible = _windowConfig.CurrentValue.ShowCursor;
 
 		//_onResize();
 		_logger.LogInformation($"Window created! ({Sdl2Window.Width}x{Sdl2Window.Height})");
@@ -196,12 +199,18 @@ internal class Window : IWindow
 
 	private void _onResize()
 	{
-		if (Sdl2Window == null) return;
-		if (_prevSize == (Sdl2Window.Width, Sdl2Window.Height)) return;
+		if (Sdl2Window == null)
+		{
+			_logger.LogDebug("Null window was resized.");
+			return;
+		}
+
+		if (_prevSize.Width == Sdl2Window.Width && _prevSize.Height == Sdl2Window.Height) return;
 
 		_size = new(Sdl2Window.Width, Sdl2Window.Height);
 		_prevSize = (Sdl2Window.Width, Sdl2Window.Height);
 		_eventEmitter.Emit(new WindowResizeEvent((uint)Sdl2Window.Width, (uint)Sdl2Window.Height));
+		_logger.LogDebug(message: "Window resized...");
 	}
 
 	private void _onFocusGained() => _eventEmitter.Emit<WindowFocusGainedEvent>();

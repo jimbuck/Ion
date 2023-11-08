@@ -4,15 +4,18 @@ namespace Kyber;
 
 public class EventListener : IEventListener
 {
-    public readonly EventEmitter _eventEmitter;
+    private readonly EventEmitter _eventEmitter;
+	private readonly ILogger _logger;
 
-    private HashSet<ulong> _currFrameSeenEvents = new();
+
+	private HashSet<ulong> _currFrameSeenEvents = new();
     private HashSet<ulong> _prevFrameKnownEvents = new();
 
-    public EventListener(IEventEmitter eventEmitter)
+    public EventListener(IEventEmitter eventEmitter, ILogger<EventListener> logger)
     {
         _eventEmitter = (EventEmitter)eventEmitter;
 		_eventEmitter.AttachListener(this);
+		_logger = logger;
     }
 
     public bool On<T>()
@@ -45,7 +48,7 @@ public class EventListener : IEventListener
         @event = default;
         foreach (var e in _eventEmitter.GetEvents<T>())
         {
-            if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
 
             @event = e;
             _currFrameSeenEvents.Add(e.Id);
@@ -58,7 +61,7 @@ public class EventListener : IEventListener
     {
 		_prevFrameKnownEvents = _currFrameSeenEvents;
 		_currFrameSeenEvents = new HashSet<ulong>();
-    }
+	}
 
     public void Dispose()
     {

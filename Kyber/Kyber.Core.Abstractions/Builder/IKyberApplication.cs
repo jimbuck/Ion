@@ -14,4 +14,6 @@ public interface IKyberApplication
 	IKyberApplication UseRender(Func<GameLoopDelegate, GameLoopDelegate> middleware);
 	IKyberApplication UseLast(Func<GameLoopDelegate, GameLoopDelegate> middleware);
 	IKyberApplication UseDestroy(Func<GameLoopDelegate, GameLoopDelegate> middleware);
+
+	void Run();
 }

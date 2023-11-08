@@ -16,12 +16,12 @@ builder.Services.AddVeldridGraphics(builder.Configuration, graphics =>
 {
 	graphics.Output = GraphicsOutput.Window;
 	graphics.ClearColor = Color.CornflowerBlue;
+	graphics.PreferredBackend = GraphicsBackend.Vulkan;
 });
 builder.Services.AddScenes();
 builder.Services.AddCoroutines();
 
 builder.Services.AddSingleton<TestMiddleware>();
-builder.Services.AddSingleton<TraceTimerSystem>();
 
 var game = builder.Build();
 game.UseDebugUtils();

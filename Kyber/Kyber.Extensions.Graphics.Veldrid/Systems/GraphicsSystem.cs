@@ -25,15 +25,6 @@ public class GraphicsSystem
 		next(dt);
 	}
 
-	[First]
-	public void First(GameTime dt, GameLoopDelegate next)
-	{
-		var timer = _trace.Start("First");
-		_graphics.First();
-		timer.Stop();
-		next(dt);
-	}
-
 	[Render]
 	public void Render(GameTime dt, GameLoopDelegate next)
 	{

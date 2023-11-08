@@ -7,11 +7,11 @@ namespace Kyber.Extensions.Graphics;
 
 public class GraphicsConfig
 {
-	public GraphicsBackend PreferredBackend { get; set; }
+	public GraphicsBackend PreferredBackend { get; set; } = GraphicsBackend.Vulkan;
 	public bool VSync { get; set; }
 	public uint MaxFPS { get; set; }
-	public GraphicsOutput Output { get; set; }
-	public Color ClearColor { get; set; }
+	public GraphicsOutput Output { get; set; } = GraphicsOutput.Window;
+	public Color ClearColor { get; set; } = Color.Black;
 }
 
 public enum GraphicsOutput : byte

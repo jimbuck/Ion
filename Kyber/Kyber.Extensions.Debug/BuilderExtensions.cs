@@ -15,6 +15,7 @@ public static class BuilderExtensions
 		services
 			.Configure<DebugConfig>(config)
 			.AddSingleton<ITraceManager, TraceManager>()
+			.AddSingleton<TraceTimerSystem>()
 			.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(TraceTimer<>)));
 
 		if (configureOptions != null) services.Configure(configureOptions);
