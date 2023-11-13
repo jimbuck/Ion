@@ -4,7 +4,7 @@ public static class Wait
 {
 	public static IWait For(float delay) => new WaitFor(delay);
 
-	public static IWait For<TEvent>() => new WaitForEvent<TEvent>();
+	public static IWait For<TEvent>() where TEvent : unmanaged => new WaitForEvent<TEvent>();
 
 	public static IWait Until(Func<bool> predicate) => new WaitUntil(predicate);
 	public static IWait While(Func<bool> predicate) => new WaitUntil(() => !predicate());
@@ -22,7 +22,7 @@ public record struct WaitUntil(Func<bool> Predicate) : IWait
 	public void Update(GameTime dt, IEventListener eventListener) { }
 }
 
-public record struct WaitForEvent<TEvent>() : IWait
+public record struct WaitForEvent<TEvent>() : IWait where TEvent : unmanaged
 {
 	private bool _isReady = false;
 	public bool IsReady => _isReady;

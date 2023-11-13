@@ -9,17 +9,17 @@ namespace Kyber.Extensions.Graphics;
 
 internal class Window : IWindow
 {
-    private readonly IOptionsMonitor<GameConfig> _gameConfig;
+	private readonly IOptionsMonitor<GameConfig> _gameConfig;
 	private readonly IOptionsMonitor<GraphicsConfig> _graphicsConfig;
 	private readonly IOptionsMonitor<WindowConfig> _windowConfig;
 	private readonly ILogger _logger;
-    private readonly EventEmitter _eventEmitter;
+	private readonly EventEmitter _eventEmitter;
 	private readonly IEventListener _events;
 
 	public VeldridLib.InputSnapshot? InputSnapshot { get; private set; }
 
 	private VeldridLib.StartupUtilities.WindowCreateInfo _windowCreateInfo;
-    internal Sdl2Window? Sdl2Window { get; private set; }
+	internal Sdl2Window? Sdl2Window { get; private set; }
 
 	private (int Width, int Height) _prevSize = (0, 0);
 	private bool _closeHandled = false;
@@ -53,14 +53,14 @@ internal class Window : IWindow
 	public Vector2 Size
 	{
 		get => _size;
-		set { 
+		set {
 			if (Sdl2Window != null)
 			{
 				_size = value;
 				Sdl2Window.Width = (int)value.X;
 				Sdl2Window.Height = (int)value.Y;
 			}
-				
+
 		}
 	}
 

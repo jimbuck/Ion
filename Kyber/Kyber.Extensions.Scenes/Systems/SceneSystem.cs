@@ -15,15 +15,15 @@ internal sealed class SceneSystem : IDisposable
 	private readonly IConfiguration _config;
 	private readonly IEventListener _events;
 	private readonly ITraceTimer _trace;
-	private readonly Dictionary<string, SceneBuilderFactory> _scenesBuilders = new();
+	private readonly Dictionary<int, SceneBuilderFactory> _scenesBuilders = new();
 
 	private Scene? _activeScene;
 	private IServiceScope? _activeScope;
-	private string? _nextScene = null;
+	private int _nextScene = 0;
 
 	public Guid Id { get; } = Guid.NewGuid();
 
-	public string CurrentScene => _activeScene?.Name ?? "<Root>";
+	public int CurrentScene => _activeScene?.Id ?? 0;
 
 	/// <summary>
 	/// Creates a new SceneManager instance, keeping a reference to the service provider.
@@ -38,18 +38,14 @@ internal sealed class SceneSystem : IDisposable
 		_trace = trace;
 	}
 
-	public void Register(string name, SceneBuilderFactory sceneBuilderFactory)
+	public void Register(int sceneId, SceneBuilderFactory sceneBuilderFactory)
 	{
-		_scenesBuilders[name] = sceneBuilderFactory;
+		_scenesBuilders[sceneId] = sceneBuilderFactory;
 	}
 
 	private void _loadNextScene(GameTime dt)
 	{
-		if (_nextScene == null || _nextScene == CurrentScene)
-		{
-			_nextScene = null;
-			return;
-		}
+		if (_nextScene == CurrentScene) return;
 
 		if (_activeScene != null)
 		{
@@ -68,7 +64,6 @@ internal sealed class SceneSystem : IDisposable
 		_activeScene = _scenesBuilders[_nextScene](_config, _activeScope.ServiceProvider);
 		_activeScene.Init(dt);
 		_logger.LogInformation("Loaded {NextScene} Scene.", _nextScene);
-		_nextScene = null;
 	}
 
 	/// <summary>
@@ -104,7 +99,7 @@ internal sealed class SceneSystem : IDisposable
 
 		_handleChangeSceneEvents();
 
-		_loadNextScene(dt);
+		if (_nextScene != CurrentScene) _loadNextScene(dt);
 		_activeScene?.First(dt);
 
 		timer.Stop();

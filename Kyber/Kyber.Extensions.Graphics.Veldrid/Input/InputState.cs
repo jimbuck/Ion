@@ -35,16 +35,21 @@ internal class InputState : IInputState
 
 		if (_inputSnapshot == default) return;
 
-		foreach (var k in _inputSnapshot.KeyEvents)
+		for (var i = 0; i < _inputSnapshot.KeyEvents.Count; i++)
 		{
-			var key = k.Key;
-			_keyEvents[(Key)key] = k;
+			var k = _inputSnapshot.KeyEvents[i];
+			var key = (Key)k.Key;
+			_keyEvents[key] = k;
 
-			if (!k.Down) _downKeys.Remove((Key)key);
-			else if (!k.Repeat) _downKeys.Add((Key)key);
+			if (!k.Down) _downKeys.Remove(key);
+			else if (!k.Repeat) _downKeys.Add(key);
 		}
 
-		foreach (var m in _inputSnapshot.MouseEvents) _mouseEvents[(MouseButton)m.MouseButton] = m;
+		for (var i = 0; i < _inputSnapshot.MouseEvents.Count; i++)
+		{
+			var m = _inputSnapshot.MouseEvents[i];
+			_mouseEvents[(MouseButton)m.MouseButton] = m;
+		}
 	}
 
 	public bool Pressed(MouseButton btn) => _mouseEvents.TryGetValue(btn, out var mouseEvent) && mouseEvent.Down;

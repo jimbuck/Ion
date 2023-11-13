@@ -13,7 +13,7 @@ internal class SpriteBatchManager
 	private readonly Stack<SpriteBatch> _batchPool;
 	private readonly Dictionary<ITexture2D, SpriteBatch> _batches;
 
-	public bool IsEmpty => !_batches.Any(b => b.Value.Count > 0);
+	public bool IsEmpty { get; private set; }
 
 	public SpriteBatchManager()
 	{
@@ -30,13 +30,15 @@ internal class SpriteBatchManager
 			_batches[texture] = group;
 		}
 
+		IsEmpty = false;
 		return ref group.Add();
 	}
 
 	public void Clear()
 	{
-		foreach (var group in this) _releaseSpriteBatch(group.Value);
+		foreach (var group in _batches.Values) _releaseSpriteBatch(group);
 		_batches.Clear();
+		IsEmpty = true;
 	}
 
 	public Dictionary<ITexture2D, SpriteBatch>.Enumerator GetEnumerator() => _batches.GetEnumerator();

@@ -3,30 +3,30 @@
 public interface ICurrentScene
 {
 	bool IsRoot { get; }
-	string Name { get; }
+	int SceneId { get; }
 }
 
 public sealed class CurrentScene : ICurrentScene
 {
-	public static readonly string Root = "<ROOT>";
+	public static readonly int Root = 0;
 
-	public string Name { get; private set; }
+	public int SceneId { get; private set; }
 	public bool IsRoot { get; private set; }
 
 	public CurrentScene()
 	{
-		Name = Root;
+		SceneId = Root;
 		IsRoot = true;
 	}
 
-	internal void Set(string name)
+	internal void Set(int? sceneId)
 	{
-		Name = name;
-		IsRoot = Name == Root;
+		SceneId = sceneId ?? Root;
+		IsRoot = SceneId == Root;
 	}
 
 	public override string ToString()
 	{
-		return Name ?? Root;
+		return $"Scene{SceneId}";
 	}
 }

@@ -112,7 +112,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 	public void EndFrame(GameTime dt)
 	{
-		if (NoRender || GraphicsDevice is null || _commandList is null) return;
+		if (NoRender || GraphicsDevice is null || _commandList is null || _window.Sdl2Window is null) return;
 
 		var timer = _trace.Start("EndFrame::WaitForIdle");
 
@@ -122,7 +122,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 		if (_window.HasClosed) return;
 
-		GraphicsDevice.SwapBuffers();
+		if (_window.Sdl2Window.Exists) GraphicsDevice.SwapBuffers();
 
 		timer.Then("EndFrame::HandleResize");
 

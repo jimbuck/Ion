@@ -2,6 +2,7 @@
 
 public class Scene
 {
+	public int Id { get; }
     public string Name { get; }
 
 	public GameLoopDelegate Init { get; set; } = (dt) => { };
@@ -12,9 +13,9 @@ public class Scene
 	public GameLoopDelegate Last { get; set; } = (dt) => { };
 	public GameLoopDelegate Destroy { get; set; } = (dt) => { };
 
-
-	internal Scene(string name)
+	internal Scene(int id)
     {
-        Name = name;
+		Id = id;
+		Name = $"Scene{id}";
     }
 }

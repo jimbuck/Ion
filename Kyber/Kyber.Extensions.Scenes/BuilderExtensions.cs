@@ -13,12 +13,12 @@ public static class BuilderExtensions
 			.AddSingleton<ICurrentScene, CurrentScene>();
 	}
 
-	public static IKyberApplication UseScene(this IKyberApplication app, string name, Action<ISceneBuilder> configure)
+	public static IKyberApplication UseScene(this IKyberApplication app, int sceneId, Action<ISceneBuilder> configure)
 	{
 		var sceneManager = app.Services.GetRequiredService<SceneSystem>();
-		sceneManager.Register(name, (config, services) =>
+		sceneManager.Register(sceneId, (config, services) =>
 		{
-			var sceneBuilder = new SceneBuilder(name, config, services);
+			var sceneBuilder = new SceneBuilder(sceneId, config, services);
 			configure(sceneBuilder);
 			return sceneBuilder.Build();
 		});

@@ -5,62 +5,126 @@ namespace Kyber;
 public class EventListener : IEventListener
 {
     private readonly EventEmitter _eventEmitter;
-	private readonly ILogger _logger;
 
 
-	private HashSet<ulong> _currFrameSeenEvents = new();
-    private HashSet<ulong> _prevFrameKnownEvents = new();
+	private HashSet<ulong> _currFrameSeenEvents = new(8);
+    private HashSet<ulong> _prevFrameKnownEvents = new(8);
 
-    public EventListener(IEventEmitter eventEmitter, ILogger<EventListener> logger)
+    public EventListener(IEventEmitter eventEmitter)
     {
         _eventEmitter = (EventEmitter)eventEmitter;
 		_eventEmitter.AttachListener(this);
-		_logger = logger;
     }
 
-    public bool On<T>()
-    {
-        return On<T>(out _);
-    }
-
-    public bool On<T>([NotNullWhen(true)]out IEvent<T>? @event)
-    {
-        foreach(var e in _eventEmitter.GetEvents<T>())
-        {
-            if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
-
-			@event = e;
-            _currFrameSeenEvents.Add(e.Id);
-            return true;
-        }
-
-        @event = default;
-        return false;
-    }
-
-	public bool OnLatest<T>()
+    public bool On<T>() where T : unmanaged
 	{
-		return OnLatest<T>(out _);
-	}
-
-	public bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? @event)
-    {
-        @event = default;
-        foreach (var e in _eventEmitter.GetEvents<T>())
-        {
+		for (var i = 0; i < _eventEmitter.PreviousFrameEvents.Count; i++)
+		{
+			var e = _eventEmitter.PreviousFrameEvents[i];
+			if (e.Handled || e is not IEvent<T>) continue;
 			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
 
-            @event = e;
-            _currFrameSeenEvents.Add(e.Id);
-        }
+			_currFrameSeenEvents.Add(e.Id);
+			return true;
+		}
 
-        return @event != default;
+		for (var i = 0; i < _eventEmitter.CurrentFrameEvents.Count; i++)
+		{
+			var e = _eventEmitter.CurrentFrameEvents[i];
+			if (e.Handled || e is not IEvent<T>) continue;
+			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+
+			_currFrameSeenEvents.Add(e.Id);
+			return true;
+		}
+
+		return false;
+	}
+
+    public bool On<T>([NotNullWhen(true)]out IEvent<T>? @event) where T : unmanaged
+	{
+		for (var i = 0; i < _eventEmitter.PreviousFrameEvents.Count; i++)
+		{
+			var e = _eventEmitter.PreviousFrameEvents[i];
+			if (e.Handled || e is not IEvent<T>) continue;
+			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+
+			_currFrameSeenEvents.Add(e.Id);
+			@event = (IEvent<T>)e;
+			return true;
+		}
+
+		for (var i = 0; i < _eventEmitter.CurrentFrameEvents.Count; i++)
+		{
+			var e = _eventEmitter.CurrentFrameEvents[i];
+			if (e.Handled || e is not IEvent<T>) continue;
+			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+
+			_currFrameSeenEvents.Add(e.Id);
+			@event = (IEvent<T>)e;
+			return true;
+		}
+
+		@event = default;
+		return false;
+	}
+
+	public bool OnLatest<T>() where T : unmanaged
+	{
+		var found = false;
+		for (var i = 0; i < _eventEmitter.PreviousFrameEvents.Count; i++)
+		{
+			var e = _eventEmitter.PreviousFrameEvents[i];
+			if (e.Handled || e is not IEvent<T>) continue;
+			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+
+			_currFrameSeenEvents.Add(e.Id);
+			found = true;
+		}
+
+		for (var i = 0; i < _eventEmitter.CurrentFrameEvents.Count; i++)
+		{
+			var e = _eventEmitter.CurrentFrameEvents[i];
+			if (e.Handled || e is not IEvent<T>) continue;
+			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+
+			_currFrameSeenEvents.Add(e.Id);
+			found = true;
+		}
+
+		return found;
+	}
+
+	public bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? @event) where T : unmanaged
+	{
+		@event = default;
+		for (var i = 0; i < _eventEmitter.PreviousFrameEvents.Count; i++)
+		{
+			var e = _eventEmitter.PreviousFrameEvents[i];
+			if (e.Handled || e is not IEvent<T>) continue;
+			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+
+			_currFrameSeenEvents.Add(e.Id);
+			@event = (IEvent<T>)e;
+		}
+
+		for (var i = 0; i < _eventEmitter.CurrentFrameEvents.Count; i++)
+		{
+			var e = _eventEmitter.CurrentFrameEvents[i];
+			if (e.Handled || e is not IEvent<T>) continue;
+			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+
+			_currFrameSeenEvents.Add(e.Id);
+			@event = (IEvent<T>)e;
+		}
+
+		return @event != default;
     }
 
     public void UpdateKnownEvents()
     {
-		_prevFrameKnownEvents = _currFrameSeenEvents;
-		_currFrameSeenEvents = new HashSet<ulong>();
+		(_currFrameSeenEvents, _prevFrameKnownEvents) = (_prevFrameKnownEvents, _currFrameSeenEvents);
+		_currFrameSeenEvents.Clear();
 	}
 
     public void Dispose()
@@ -69,13 +133,13 @@ public class EventListener : IEventListener
     }
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Emit<T>()
+	public void Emit<T>() where T : unmanaged
 	{
 		_eventEmitter.Emit<T>();
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Emit<T>(T data)
+	public void Emit<T>(T data) where T : unmanaged
 	{
 		_eventEmitter.Emit(data);
 	}

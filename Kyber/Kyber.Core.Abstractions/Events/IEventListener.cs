@@ -4,9 +4,9 @@ namespace Kyber;
 
 public interface IEventListener : IEventEmitter, IDisposable
 {
-	bool On<T>();
-	bool On<T>([NotNullWhen(true)] out IEvent<T>? data);
+	bool On<T>() where T : unmanaged;
+	bool On<T>([NotNullWhen(true)] out IEvent<T>? data) where T : unmanaged;
 
-	bool OnLatest<T>();
-	bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? data);
+	bool OnLatest<T>() where T : unmanaged;
+	bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? data) where T : unmanaged;
 }

@@ -27,18 +27,18 @@ public class SceneTests
 
 		gameLoop.Init(dt);
 
-		Assert.Equal("Scene0", currentScene.Name);
+		Assert.Equal(1, currentScene.SceneId);
 
 		gameLoop.Step(dt);
-		eventEmitter.Emit(new ChangeSceneEvent("Scene1"));
+		eventEmitter.Emit(new ChangeSceneEvent(2));
 		gameLoop.Step(dt);
 
-        Assert.Equal("Scene1", currentScene.Name);
+        Assert.Equal(2, currentScene.SceneId);
 
-		eventEmitter.Emit(new ChangeSceneEvent("Scene0"));
+		eventEmitter.Emit(new ChangeSceneEvent(1));
 		gameLoop.Step(dt);
 
-		Assert.Equal("Scene0", currentScene.Name);
+		Assert.Equal(1, currentScene.SceneId);
 
 		gameLoop.Destroy(dt);
     }

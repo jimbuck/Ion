@@ -84,7 +84,7 @@ game.UseUpdate((GameLoopDelegate next, IEventEmitter eventEmitter, IEventListene
 {
 	var flip = false;
 	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(1), (dt) => {
-		eventEmitter.Emit(new ChangeSceneEvent(flip ? "MainMenu" : "Gameplay"));
+		eventEmitter.Emit(new ChangeSceneEvent(flip ? (int)Scenes.MainMenu : (int)Scenes.Gameplay));
 		flip = !flip;
 	});
 
@@ -111,7 +111,7 @@ game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter, IInputState i
 	};
 });
 
-game.UseScene("MainMenu", scene =>
+game.UseScene((int)Scenes.MainMenu, scene =>
 {
 	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
 	{
@@ -125,7 +125,7 @@ game.UseScene("MainMenu", scene =>
 	//scene.UseSystem<TestMiddleware>();
 });
 
-game.UseScene("Gameplay", scene =>
+game.UseScene((int)Scenes.Gameplay, scene =>
 {
 	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
 	{
@@ -140,6 +140,12 @@ game.UseScene("Gameplay", scene =>
 game.UseRender(next => dt => Console.WriteLine("NEVER GETTING CALLED!"));
 
 game.Run();
+
+enum Scenes
+{
+	MainMenu = 1,
+	Gameplay,
+}
 
 public partial class TestMiddleware
 {

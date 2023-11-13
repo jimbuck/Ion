@@ -12,7 +12,7 @@ internal static class TestUtils
 		game = builder.Build();
 		game.UseEvents();
 
-		for (var i = 0; i < sceneCount; i++) game.UseScene($"Scene{i}", (scene) => { });
+		for (var i = 0; i < sceneCount; i++) game.UseScene(i + 1, (scene) => { });
 
 		services = game.Services;
 

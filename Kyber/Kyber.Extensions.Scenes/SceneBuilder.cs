@@ -12,15 +12,15 @@ internal class SceneBuilder : ISceneBuilder
 	private readonly IMiddlewarePipelineBuilder _last = new MiddlewarePipelineBuilder();
 	private readonly IMiddlewarePipelineBuilder _destroy = new MiddlewarePipelineBuilder();
 
-	public string Name { get; }
+	public int SceneId { get; }
 
 	public IConfiguration Configuration { get; }
 
 	public IServiceProvider Services { get; }
 
-	public SceneBuilder(string name, IConfiguration config, IServiceProvider services)
+	public SceneBuilder(int sceneId, IConfiguration config, IServiceProvider services)
     {
-        Name = name;
+		SceneId = sceneId;
 		Configuration = config;
 		Services = services;
     }
@@ -70,7 +70,7 @@ internal class SceneBuilder : ISceneBuilder
 
 	internal Scene Build()
     {
-		return new Scene(Name)
+		return new Scene(SceneId)
 		{
 			Init = _init.Build(),
 			First = _first.Build(),

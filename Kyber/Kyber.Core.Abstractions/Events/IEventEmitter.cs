@@ -3,6 +3,6 @@ namespace Kyber;
 
 public interface IEventEmitter
 {
-	void Emit<T>();
-	void Emit<T>(T data);
+	void Emit<T>() where T : unmanaged;
+	void Emit<T>(T data) where T : unmanaged;
 }
