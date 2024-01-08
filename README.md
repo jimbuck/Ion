@@ -1,39 +1,39 @@
-# Kyber
-A modern, modular, middleware-based game engine for C#.
+# Ion Engine
+A small, positively-charged, middleware-based game engine for C#.
 
-- **Modern:** Built using modern C# features and design patterns, Kyber setup closely resembles ASP.NET Core setup.
-- **Modular:** Kyber is a collection of modules that build on the `Kyber.Core` module. You can use as many or as few modules as you want.
+- **Modern:** Built using modern C# features and design patterns, Ion setup closely resembles ASP.NET Core setup.
+- **Modular:** Ion is a collection of modules that build on the `Ion.Core` module. You can use as many or as few modules as you want.
 - **Middleware:** Using middleware, you can easily add functionality to the engine without having to modify the engine itself. This allows for easy extensibility and customization.
 
 ----
 
 ## Modules
 
-### Kyber.Core
+### Ion.Core
 A simple, modern code-first game engine inspired by Monogame and Bevy with an API like ASP.NET Core. This core module contains the core engine and all of the core features:
   - Application builder
   - Game loop
   - Events
   - Storage
 
-### Kyber.Extensions.Scenes
+### Ion.Extensions.Scenes
 Adds support for scenes that each have thier own scope for dependency injection!
 
-### Kyber.Extensions.Coroutines
+### Ion.Extensions.Coroutines
 Adds support for coroutines, allowing for async code to be run in a synchronous manner.
 
-### Kyber.Extensions.Debug
+### Ion.Extensions.Debug
 Adds support for debug utils such as a trace profiler and debug renderer.
 
-### Kyber.Extensions.Graphics.Veldrid
+### Ion.Extensions.Graphics.Veldrid
 Adds window, input, and graphics support using the Veldrid API. Includes a built-in sprite batch for easy 2D rendering.
 
 ----
 
 ## Planned Modules
- - **Kyber.Extensions.UI**
- - **Kyber.Extensions.Networking**
- - **Kyber.Extensions.Physics**
+ - **Ion.Extensions.UI**
+ - **Ion.Extensions.Networking**
+ - **Ion.Extensions.Physics**
  - Multi-platform support
 
 ## Built Using
@@ -53,4 +53,4 @@ WIP
 ----
 
 ## License
-Kyber is [MIT licensed](./LICENSE).
+Ion Engine is [MIT licensed](./LICENSE).

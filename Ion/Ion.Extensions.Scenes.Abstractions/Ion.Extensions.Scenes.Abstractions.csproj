@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+<InternalsVisibleTo Include="Ion.Extensions.Scenes" />
+
+  </ItemGroup>
+
+  <ItemGroup>
+<ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+<ProjectReference Include="..\Ion.Extensions.Scenes.InternalGenerators\Ion.Extensions.Scenes.InternalGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+
+  </ItemGroup>
+
+</Project>

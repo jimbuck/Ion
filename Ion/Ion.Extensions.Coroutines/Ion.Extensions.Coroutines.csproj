@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+<ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+<ProjectReference Include="..\Ion.Extensions.Coroutines.Abstractions\Ion.Extensions.Coroutines.Abstractions.csproj" />
+
+  </ItemGroup>
+
+</Project>
