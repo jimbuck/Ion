@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.1.3"></a>
+## [0.1.3](https://www.github.com/jimbuck/Kyber/releases/tag/v0.1.3) (2024-1-8)
+
+### ✨ Features
+
+* Middleware Architecture (#18) ([8781b04](https://www.github.com/jimbuck/Kyber/commit/8781b04943ec067e9dcab80f5d3ba7c1ec1f1ad8))
+
 <a name="0.1.2"></a>
 ## [0.1.2](https://www.github.com/jimbuck/Kyber/releases/tag/v0.1.2) (2023-4-19)
 
