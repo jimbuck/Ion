@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "Ion.Generators": {
+      "commandName": "Project"
+    }
+  }
+}

@@ -7,7 +7,7 @@
 			"type": "process",
 			"args": [
 				"build",
-				"${workspaceFolder}/Kyber.ECS/Kyber.ECS.Tests/Kyber.ECS.Tests.csproj",
+				"${workspaceFolder}/Ion.ECS/Ion.ECS.Tests/Ion.ECS.Tests.csproj",
 				"/property:GenerateFullPaths=true",
 				"/consoleloggerparameters:NoSummary"
 			],
@@ -19,7 +19,7 @@
 			"type": "process",
 			"args": [
 				"publish",
-				"${workspaceFolder}/Kyber.ECS/Kyber.ECS.Tests/Kyber.ECS.Tests.csproj",
+				"${workspaceFolder}/Ion.ECS/Ion.ECS.Tests/Ion.ECS.Tests.csproj",
 				"/property:GenerateFullPaths=true",
 				"/consoleloggerparameters:NoSummary"
 			],
@@ -33,7 +33,7 @@
 				"watch",
 				"run",
 				"--project",
-				"${workspaceFolder}/Kyber.ECS/Kyber.ECS.Tests/Kyber.ECS.Tests.csproj"
+				"${workspaceFolder}/Ion.ECS/Ion.ECS.Tests/Ion.ECS.Tests.csproj"
 			],
 			"problemMatcher": "$msCompile"
 		}

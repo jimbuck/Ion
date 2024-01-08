@@ -1,9 +1,9 @@
 {
-	"name": "kyber",
+	"name": "ion-engine",
 	"version": "0.0.0",
-	"description": "Tasks for the Kyber solution.",
+	"description": "Tasks for the Ion solution.",
 	"scripts": {
-		"open-trace": "npx perfetto-trace-viewer .\\Kyber.Examples\\Kyber.Examples.SpriteRenderer\\bin\\Release\\net6.0\\trace.json"
+		"open-trace": "npx perfetto-trace-viewer .\\Ion.Examples\\Ion.Examples.SpriteRenderer\\bin\\Release\\net6.0\\trace.json"
 	},
 	"license": "ISC"
 , "-vs-binding":{"ProjectOpened":["open-trace"]}
