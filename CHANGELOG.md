@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.1.4"></a>
+## [0.1.4](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.4) (2024-1-8)
+
+### Other
+
+* Renamed project to Ion. (#19) ([1a98ad2](https://www.github.com/jimbuck/Ion/commit/1a98ad2a890c726e9367b17e61bc77fbe7d373d0))
+
 <a name="0.1.3"></a>
 ## [0.1.3](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.3) (2024-1-8)
 
