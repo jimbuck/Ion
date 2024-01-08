@@ -86,7 +86,7 @@ public class KyberApplication : IKyberApplication, IDisposable
 		return this;
 	}
 
-	public GameLoop RunManually()
+	public GameLoop Build()
 	{
 		var gameLoop = ActivatorUtilities.CreateInstance<GameLoop>(Services);
 
@@ -103,7 +103,7 @@ public class KyberApplication : IKyberApplication, IDisposable
 
 	public void Run()
 	{
-		var gameLoop = RunManually();
+		var gameLoop = Build();
 
 		gameLoop.Run();
 	}

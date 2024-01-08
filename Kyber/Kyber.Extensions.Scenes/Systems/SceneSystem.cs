@@ -21,8 +21,6 @@ internal sealed class SceneSystem : IDisposable
 	private IServiceScope? _activeScope;
 	private int _nextScene = 0;
 
-	public Guid Id { get; } = Guid.NewGuid();
-
 	public int CurrentScene => _activeScene?.Id ?? 0;
 
 	/// <summary>

@@ -17,9 +17,9 @@ public class GameTests
 
         var testSystem = services.GetRequiredService<TestSystem>();
 
-		var gameLoop = game.RunManually();
+        var gameLoop = game.Build();
 
-		gameLoop.Init(dt);
+        gameLoop.Init(dt);
 
         Assert.Equal(1, testSystem.InitializeCount);
         Assert.Equal(0, testSystem.UpdateCount);
