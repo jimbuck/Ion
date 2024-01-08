@@ -18,9 +18,9 @@ var gameHost = KyberHost.CreateDefaultBuilder()
 			game.Config.MaxFPS = 120;
 			game.Config.ClearColor = Color.CornflowerBlue;
 
-			game.AddSystem<TestLoggerSystem>()
-				.AddSystem<TestSpriteRendererSystem>()
-				.AddSystem<UserInputSystem>();
+			//game.AddSystem<TestLoggerSystem>()
+			//	.AddSystem<TestSpriteRendererSystem>()
+			//	.AddSystem<UserInputSystem>();
 		})
 		.Build();
 

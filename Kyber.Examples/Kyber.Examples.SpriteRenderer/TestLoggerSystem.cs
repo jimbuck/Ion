@@ -1,14 +1,17 @@
-﻿namespace Kyber.Examples.SpriteRenderer;
+﻿using System.Diagnostics;
 
-public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem, IFirstSystem
+namespace Kyber.Examples.SpriteRenderer;
+
+public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 {
 	private readonly ILogger _logger;
 	private readonly IInputState _input;
 	private readonly IEventListener _events;
 
 	private bool _wasDown = false;
-	private float _totalDt = 0;
+	private double _totalDt = 0;
 	private int _frameCount = 0;
+	private readonly Stopwatch _stopwatch = new();
 
 	public bool IsEnabled { get; set; } = true;
 
@@ -24,21 +27,10 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 		_logger.LogInformation("Simple Example Started");
 	}
 
-	public void First(GameTime dt)
-	{
-		_totalDt += dt;
-		_frameCount++;
-
-		if (_totalDt > 0.5f)
-		{
-			_logger.LogInformation($"Frame Time: {1000 * _totalDt / _frameCount: 00.00}, FPS: {_frameCount / _totalDt:###.0}");
-			_totalDt = 0f;
-			_frameCount = 0;
-		}
-	}
-
 	public void Update(GameTime dt)
 	{
+		_stopwatch.Restart();
+
 		if (_events.On<WindowResizeEvent>()) _logger.LogInformation("Window Resized!");
 		if (_events.On<WindowFocusGainedEvent>()) _logger.LogInformation("Window Focus Gained!");
 		if (_events.On<WindowFocusLostEvent>()) _logger.LogInformation("Window Focus Lost!");
@@ -68,6 +60,21 @@ public class TestLoggerSystem : IInitializeSystem, IDestroySystem, IUpdateSystem
 
 		if (_input.Pressed(MouseButton.Left)) _logger.LogInformation("LEFT MOUSE DOWN!");
 		if (_input.Released(MouseButton.Left)) _logger.LogInformation("LEFT MOUSE UP!");
+
+
+		// next();
+
+		_stopwatch.Stop();
+		var duration = _stopwatch.Elapsed.TotalSeconds;
+		_totalDt += duration;
+		_frameCount++;
+
+		if (_totalDt > 0.5f)
+		{
+			_logger.LogInformation($"Frame Time: {1000 * _totalDt / _frameCount: 00.00}, FPS: {_frameCount / _totalDt:###.0}");
+			_totalDt = 0f;
+			_frameCount = 0;
+		}
 	}
 
 	public void Destroy()

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Kyber.Extensions.Scenes" />
+	</ItemGroup>
+
+	<ItemGroup>
+    <ProjectReference Include="..\Kyber.Core.Abstractions\Kyber.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Kyber.Extensions.Scenes.InternalGenerators\Kyber.Extensions.Scenes.InternalGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<Version>0.1.2</Version>
+		<TargetFramework>net7.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<RootNamespace>Kyber</RootNamespace>
+		<Configurations>Debug;Release;DebugGenerators</Configurations>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Using Include="System.Collections" />
+		<Using Include="System.Collections.Concurrent" />
+		<Using Include="System.Diagnostics.CodeAnalysis" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Kyber" />
+		<InternalsVisibleTo Include="Kyber.Tests" />
+		<InternalsVisibleToSuffix Include=".Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
+	  <PackageReference Include="Veldrid" Version="4.9.0" />
+	</ItemGroup>
+
+</Project>
+
