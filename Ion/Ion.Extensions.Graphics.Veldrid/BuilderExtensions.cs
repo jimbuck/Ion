@@ -15,7 +15,6 @@ public static class BuilderExtensions
 		services
 			// Standard
 			.Configure<GraphicsConfig>(config)
-			.AddScoped<IAssetManager, AssetManager>()
 
 			// Implementation-specific
 			.AddSingleton<IWindow, Window>()
@@ -24,6 +23,8 @@ public static class BuilderExtensions
 
 			// Loaders
 			.AddSingleton<IAssetLoader, Texture2DLoader>()
+			.AddSingleton<GlobalAssetManager>()
+			.AddScoped<IAssetManager, ScopedAssetManager>()
 
 			// Implementation-specific Systems
 			.AddSingleton<WindowSystem>()
