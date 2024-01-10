@@ -24,4 +24,13 @@
 
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Assets\Ball1.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Block1.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -29,6 +29,7 @@ public class BreakoutSystems
 	private readonly IInputState _input;
 	private readonly ISpriteBatch _spriteBatch;
 	private readonly IEventListener _events;
+	private readonly IAssetManager _assets;
 
 	private const int ROWS = 10;
 	private const int COLS = 10;
@@ -37,7 +38,7 @@ public class BreakoutSystems
 	private readonly Color[] _blockColors = new Color[ROWS * COLS];
 	private readonly RectangleF[] _blockRects = new RectangleF[ROWS * COLS];
 
-	private Vector2 _blockSize = new(100, 20f);
+	private Vector2 _blockSize = new(100, 25f);
 	private readonly float _blockGap = 10f;
 	private readonly float _playerGap = 150f;
 	private readonly float _bottomGap = 20f;
@@ -53,17 +54,24 @@ public class BreakoutSystems
 	private readonly Vector2 _paddleBounceMin = Vector2.Normalize(new Vector2(-1, -0.75f));
 	private readonly Vector2 _paddleBounceMax = Vector2.Normalize(new Vector2(+1, -0.75f));
 
-	public BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events)
+	private Texture2D _blockTexture;
+	private Texture2D _ballTexture;
+
+	public BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events, IAssetManager assets)
 	{
 		_window = window;
 		_input = input;
 		_spriteBatch = spriteBatch;
 		_events = events;
+		_assets = assets;
 	}
 
 	[Init]
 	public void SetupBlocks(GameTime dt, GameLoopDelegate next)
 	{
+		_blockTexture = _assets.Load<Texture2D>("Block1.png");
+		_ballTexture = _assets.Load<Texture2D>("Ball1.png");
+
 		// Setup blocks in rows and columns across the window each with different colors:
 		for (int row = 0; row < ROWS; row++)
 		{
@@ -203,12 +211,12 @@ public class BreakoutSystems
 			for (var col = 0; col < COLS; col++)
 			{
 				var i = (row * COLS) + col;
-				if (_blockStates[i]) _spriteBatch.DrawRect(_blockColors[i], _blockRects[i]);
+				if (_blockStates[i]) _spriteBatch.Draw(_blockTexture, _blockRects[i], color: _blockColors[i], options: (SpriteEffect)(i % 3));
 			}
 		}
 
-		_spriteBatch.DrawRect(Color.DarkBlue, _playerRect);
-		_spriteBatch.DrawRect(Color.OrangeRed, _ballRect);
+		_spriteBatch.Draw(_blockTexture, _playerRect, color: Color.DarkBlue);
+		_spriteBatch.Draw(_ballTexture, _ballRect, color: Color.DarkRed);
 
 		next(dt);
 	}

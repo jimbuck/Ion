@@ -15,13 +15,10 @@ public static class BuilderExtensions
 		services
 			// Standard
 			.Configure<GraphicsConfig>(config)
-			.AddScoped<IAssetManager, AssetManager>()
+			.AddScoped<IAssetManager, GlobalAssetManager>()
 
 			// Implementation-specific
 			.AddSingleton<ISpriteBatch, SpriteBatch>()
-
-			// Loaders
-			//.AddSingleton<IAssetLoader, Texture2DLoader>()
 
 			// Implementation-specific Systems
 			.AddSingleton<IInputState, InputState>();

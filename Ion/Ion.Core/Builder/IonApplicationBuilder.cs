@@ -36,6 +36,8 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 		Services.AddSingleton<IEventEmitter, EventEmitter>();
 		Services.AddTransient<IEventListener, EventListener>();
 		Services.AddSingleton<EventSystem>();
+
+		Services.AddSingleton<IPersistentStorage, PersistentStorage>();
 	}
 
 	public IonApplication Build()
