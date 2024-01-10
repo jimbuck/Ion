@@ -15,7 +15,8 @@ public static class BuilderExtensions
 		services
 			// Standard
 			.Configure<GraphicsConfig>(config)
-			.AddScoped<IAssetManager, GlobalAssetManager>()
+			.AddSingleton<GlobalAssetManager>()
+			.AddScoped<IAssetManager, ScopedAssetManager>()
 
 			// Implementation-specific
 			.AddSingleton<ISpriteBatch, SpriteBatch>()
