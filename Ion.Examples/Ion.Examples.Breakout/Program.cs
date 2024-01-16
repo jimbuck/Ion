@@ -54,8 +54,9 @@ public class BreakoutSystems
 	private readonly Vector2 _paddleBounceMin = Vector2.Normalize(new Vector2(-1, -0.75f));
 	private readonly Vector2 _paddleBounceMax = Vector2.Normalize(new Vector2(+1, -0.75f));
 
-	private Texture2D _blockTexture;
-	private Texture2D _ballTexture;
+	private Texture2D _blockTexture = default!;
+	private Texture2D _ballTexture = default!;
+	private readonly RectangleF _ballSprite = new RectangleF(1, 1, 14, 14);
 
 	public BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events, IAssetManager assets)
 	{
@@ -154,7 +155,7 @@ public class BreakoutSystems
 
 			if (intersection.IsEmpty is false)
 			{
-				_ballSpeed += 1f;
+				_ballSpeed += 5f;
 				_handlePlayerCollision(ref intersection);
 			}
 		}
@@ -167,7 +168,7 @@ public class BreakoutSystems
 			RectangleF.Intersect(ref _ballRect, ref _blockRects[i], out var intersection);
 			if (intersection.IsEmpty) continue;
 
-			_ballSpeed += 3f;
+			_ballSpeed += 10f;
 			_blockStates[i] = false;
 			_ballVelocity *= _getReboundDirection(ref intersection);
 			_ballVelocity = Vector2.Normalize(_ballVelocity);
@@ -211,12 +212,12 @@ public class BreakoutSystems
 			for (var col = 0; col < COLS; col++)
 			{
 				var i = (row * COLS) + col;
-				if (_blockStates[i]) _spriteBatch.Draw(_blockTexture, _blockRects[i], color: _blockColors[i], options: (SpriteEffect)(i % 3));
+				if (_blockStates[i]) _spriteBatch.Draw(_blockTexture, _blockRects[i], color: _blockColors[i]);
 			}
 		}
 
 		_spriteBatch.Draw(_blockTexture, _playerRect, color: Color.DarkBlue);
-		_spriteBatch.Draw(_ballTexture, _ballRect, color: Color.DarkRed);
+		_spriteBatch.Draw(_ballTexture, _ballRect, color: Color.DarkRed, sourceRectangle: _ballSprite);
 
 		next(dt);
 	}
