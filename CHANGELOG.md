@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.1.5"></a>
+## [0.1.5](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.5) (2024-1-10)
+
+### ✨ Features
+
+* Basic Texture2D Loading (#20) ([91a897e](https://www.github.com/jimbuck/Ion/commit/91a897eb750c519754811e6343e4fcbd063bafe4))
+
 <a name="0.1.4"></a>
 ## [0.1.4](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.4) (2024-1-8)
 
