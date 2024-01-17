@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 
+using Ion.Extensions.Assets;
+
 namespace Ion.Extensions.Graphics;
 
 public static class BuilderExtensions
@@ -23,8 +25,6 @@ public static class BuilderExtensions
 
 			// Loaders
 			.AddSingleton<IAssetLoader, Texture2DLoader>()
-			.AddSingleton<GlobalAssetManager>()
-			.AddScoped<IAssetManager, ScopedAssetManager>()
 
 			// Implementation-specific Systems
 			.AddSingleton<WindowSystem>()

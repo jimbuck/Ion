@@ -1,16 +1,7 @@
 ﻿using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 
-namespace Ion.Extensions.Graphics;
-
-public interface IAssetManager
-{
-	T Load<T>(params string[] path) where T : class, IAsset;
-	T LoadGlobal<T>(params string[] path) where T : class, IAsset;
-	T? Get<T>(int id) where T : class, IAsset;
-	void Unload<T>(T asset) where T : class, IAsset;
-	void UnloadGlobal<T>(T asset) where T : class, IAsset;
-}
+namespace Ion.Extensions.Assets;
 
 public class GlobalAssetManager : IAssetManager
 {
@@ -29,15 +20,13 @@ public class GlobalAssetManager : IAssetManager
 
 	public T Load<T>(params string[] path) where T : class, IAsset
 	{
-		var name = Path.Combine(path);
+		var name = Path.Combine(["Assets", ..path]);
 
 		if (_pathCache.TryGetValue(name, out var cachedAsset)) return (T)cachedAsset;
 
 		if (!_loaders.TryGetValue(typeof(T), out IAssetLoader? loader)) throw new InvalidOperationException("No loader registered for type " + typeof(T).Name);
 
-		using var stream = _storage.Assets.Read(name);
-
-		var asset = loader.Load<T>(stream, name);
+		var asset = loader.Load<T>(name);
 
 		_assetCache.Add(asset.Id, asset);
 		_pathCache.Add(name, asset);

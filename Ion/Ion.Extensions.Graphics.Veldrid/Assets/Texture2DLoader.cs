@@ -7,6 +7,8 @@ using SixLabors.ImageSharp.Processing;
 
 using VeldridLib = Veldrid;
 
+using Ion.Extensions.Assets;
+
 namespace Ion.Extensions.Graphics;
 
 internal class Texture2DLoader : IAssetLoader
@@ -20,16 +22,18 @@ internal class Texture2DLoader : IAssetLoader
 		_graphicsContext = graphicsContext;
 	}
 
-	public T Load<T>(Stream stream, string name) where T : class, IAsset
+	public T Load<T>(string filepath) where T : class, IAsset
 	{
-		if (typeof(T) == typeof(Texture2D)) return (T)_loadTexture2D(stream, name);
+		if (typeof(T) == typeof(Texture2D)) return (T)_loadTexture2D(filepath);
 
 		throw new ArgumentException("Incorrect type specified for loading!", nameof(T));
 	}
 
-	private unsafe IAsset _loadTexture2D(Stream stream, string name)
+	private unsafe IAsset _loadTexture2D(string filepath)
 	{
 		if (_graphicsContext.GraphicsDevice is null) throw new Exception("GraphicsDevice is not initialized yet!");
+
+		using var stream = File.OpenRead(filepath);
 
 		var image = Image.Load<Rgba32>(stream);
 		var mipmaps = _generateMipmaps(image, out int totalSize);
@@ -58,7 +62,7 @@ internal class Texture2DLoader : IAssetLoader
 				allTexData,
 				_graphicsContext.GraphicsDevice, VeldridLib.TextureUsage.Sampled);
 
-		return new Texture2D(name, texture);
+		return new Texture2D(filepath, texture);
 	}
 
 	// Taken from Veldrid.ImageSharp

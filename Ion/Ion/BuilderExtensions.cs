@@ -2,7 +2,9 @@
 using Microsoft.Extensions.DependencyInjection;
 
 using Ion.Extensions.Debug;
+using Ion.Extensions.Assets;
 using Ion.Extensions.Graphics;
+using Ion.Extensions.Audio;
 using Ion.Extensions.Scenes;
 using Ion.Extensions.Coroutines;
 
@@ -14,7 +16,9 @@ public static class BuilderExtensions
 	{
 		return services
 			.AddDebugUtils(config)
+			.AddAssets()
 			.AddVeldridGraphics(config, configureOptions)
+			.AddAudio()
 			.AddScenes()
 			.AddCoroutines();
 	}

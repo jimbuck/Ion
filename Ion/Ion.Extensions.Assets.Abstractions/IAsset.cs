@@ -1,5 +1,5 @@
 ﻿
-namespace Ion.Extensions.Graphics;
+namespace Ion.Extensions.Assets;
 
 public interface IAsset : IDisposable
 {

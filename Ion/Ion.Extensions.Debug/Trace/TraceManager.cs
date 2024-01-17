@@ -74,7 +74,7 @@ internal class TraceManager : ITraceManager
 				//{ "clock-offset-since-epoch", $"{_start}" },
 			},
 		}));
-		_logger.LogDebug("Kybver Trace output to {traceOutput}", traceOutputPath);
+		_logger.LogDebug("Ion Trace output to {traceOutput}", traceOutputPath);
 	}
 
 	private class TraceEvent
