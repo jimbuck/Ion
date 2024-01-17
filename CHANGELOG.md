@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.1.7"></a>
+## [0.1.7](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.7) (2024-1-17)
+
+### ✨ Features
+
+* .NET 8 and Audio API (#22) ([f6068f6](https://www.github.com/jimbuck/Ion/commit/f6068f6feef9abe69ab2bd63b79305c652e35d3e))
+
 <a name="0.1.6"></a>
 ## [0.1.6](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.6) (2024-1-16)
 
