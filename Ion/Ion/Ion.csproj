@@ -1,23 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
+    <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Assets\Ion.Extensions.Assets.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Audio\Ion.Extensions.Audio.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Debug\Ion.Extensions.Debug.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Veldrid\Ion.Extensions.Graphics.Veldrid.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
   </ItemGroup>
-
   <ItemGroup>
-<ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
-<ProjectReference Include="..\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />
-<ProjectReference Include="..\Ion.Extensions.Debug\Ion.Extensions.Debug.csproj" />
-<ProjectReference Include="..\Ion.Extensions.Graphics.Veldrid\Ion.Extensions.Graphics.Veldrid.csproj" />
-<ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
-
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
   </ItemGroup>
-
 </Project>

@@ -2,7 +2,9 @@
 using Microsoft.Extensions.DependencyInjection;
 
 using Ion;
+using Ion.Extensions.Assets;
 using Ion.Extensions.Graphics;
+using Ion.Extensions.Audio;
 
 var builder = IonApplication.CreateBuilder(args);
 
@@ -30,6 +32,7 @@ public class BreakoutSystems
 	private readonly ISpriteBatch _spriteBatch;
 	private readonly IEventListener _events;
 	private readonly IAssetManager _assets;
+	private readonly IAudioManager _audio;
 
 	private const int ROWS = 10;
 	private const int COLS = 10;
@@ -51,6 +54,8 @@ public class BreakoutSystems
 	private float _ballSpeed = 200f;
 	private bool _ballIsCaptured = true;
 
+	private readonly Random _rand = new(6014);
+
 	private readonly Vector2 _paddleBounceMin = Vector2.Normalize(new Vector2(-1, -0.75f));
 	private readonly Vector2 _paddleBounceMax = Vector2.Normalize(new Vector2(+1, -0.75f));
 
@@ -58,13 +63,17 @@ public class BreakoutSystems
 	private Texture2D _ballTexture = default!;
 	private readonly RectangleF _ballSprite = new RectangleF(1, 1, 14, 14);
 
-	public BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events, IAssetManager assets)
+	private SoundEffect _bonkSound = default!;
+	private SoundEffect _pingSound = default!;
+
+	public BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events, IAssetManager assets, IAudioManager audio)
 	{
 		_window = window;
 		_input = input;
 		_spriteBatch = spriteBatch;
 		_events = events;
 		_assets = assets;
+		_audio = audio;
 	}
 
 	[Init]
@@ -72,6 +81,8 @@ public class BreakoutSystems
 	{
 		_blockTexture = _assets.Load<Texture2D>("Block1.png");
 		_ballTexture = _assets.Load<Texture2D>("Ball1.png");
+		_bonkSound =  _assets.Load<SoundEffect>("Bonk.wav");
+		_pingSound =  _assets.Load<SoundEffect>("Ping.mp3");
 
 		// Setup blocks in rows and columns across the window each with different colors:
 		for (int row = 0; row < ROWS; row++)
@@ -122,23 +133,27 @@ public class BreakoutSystems
 		// Ball movement
 		_ballRect.Location += _ballVelocity * _ballSpeed * dt;
 
-		// WIndow border collisions
+		// Window border collisions
+		var hitWall = false;
 		if (_ballRect.X <= 0)
 		{
-			_ballRect.X = 0;
+			_ballRect.X = 1;
 			_ballVelocity.X *= -1;
+			hitWall = true;
 		}
 
 		if (_ballRect.X >= _window.Width - _ballRect.Width)
 		{
-			_ballRect.X = _window.Width - _ballRect.Width;
+			_ballRect.X = _window.Width - (_ballRect.Width + 1);
 			_ballVelocity.X *= -1;
+			hitWall = true;
 		}
 
 		if (_ballRect.Top <= 0)
 		{
-			_ballRect.Y = 0;
+			_ballRect.Y = 1;
 			_ballVelocity.Y *= -1;
+			hitWall = true;
 		}
 
 		if (_ballRect.Y > _window.Height)
@@ -155,10 +170,13 @@ public class BreakoutSystems
 
 			if (intersection.IsEmpty is false)
 			{
+				hitWall = true;
 				_ballSpeed += 5f;
 				_handlePlayerCollision(ref intersection);
 			}
 		}
+
+		if (hitWall) _audio.Play(_bonkSound, pitchShift: (_rand.NextSingle() - 0.5f) / 16f);
 
 		// Ball to block collisions
 		for (var i = 0; i < _blockRects.Length; i++)
@@ -168,6 +186,7 @@ public class BreakoutSystems
 			RectangleF.Intersect(ref _ballRect, ref _blockRects[i], out var intersection);
 			if (intersection.IsEmpty) continue;
 
+			_audio.Play(_pingSound, pitchShift: (_rand.NextSingle() - 0.5f) / 4f);
 			_ballSpeed += 10f;
 			_blockStates[i] = false;
 			_ballVelocity *= _getReboundDirection(ref intersection);

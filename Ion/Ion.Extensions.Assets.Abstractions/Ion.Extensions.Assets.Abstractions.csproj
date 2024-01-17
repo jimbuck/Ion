@@ -1,14 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
   <ItemGroup>
-    <InternalsVisibleTo Include="Ion.Extensions.Scenes" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\Ion.Extensions.Scenes.InternalGenerators\Ion.Extensions.Scenes.InternalGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
+
 </Project>

@@ -1,29 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Assimp" Version="3.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="7.0.0" />
     <PackageReference Include="Veldrid" Version="4.9.0" />
     <PackageReference Include="Veldrid.ImageSharp" Version="4.9.0" />
     <PackageReference Include="Veldrid.SPIRV" Version="1.0.15" />
     <PackageReference Include="Veldrid.StartupUtilities" Version="4.9.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
   </ItemGroup>
-
   <ItemGroup>
-<ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
-<ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
-<ProjectReference Include="..\Ion.Extensions.Debug.Abstractions\Ion.Extensions.Debug.Abstractions.csproj" />
-<ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
-
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Debug.Abstractions\Ion.Extensions.Debug.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
   </ItemGroup>
-
 </Project>

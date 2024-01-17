@@ -1,24 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-	<PropertyGroup>
-		<TargetFramework>net7.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
-	</PropertyGroup>
-
-	<ItemGroup>
-<InternalsVisibleTo Include="Ion.Extensions.Graphics" />
-
-	</ItemGroup>
-
-	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="7.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
-	</ItemGroup>
-
-	<ItemGroup>
-<ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
-
-	</ItemGroup>
-
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Assets\**" />
+    <EmbeddedResource Remove="Assets\**" />
+    <None Remove="Assets\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Graphics" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Assets.Abstractions\Ion.Extensions.Assets.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+  </ItemGroup>
 </Project>

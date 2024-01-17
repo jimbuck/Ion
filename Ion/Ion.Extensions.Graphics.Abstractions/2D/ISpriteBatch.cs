@@ -1,5 +1,7 @@
 ﻿using System.Numerics;
 
+using Ion.Extensions.Assets;
+
 namespace Ion.Extensions.Graphics;
 
 public interface ISpriteBatch

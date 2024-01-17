@@ -1,7 +1,7 @@
 ﻿
 using System.Numerics;
 
-namespace Ion.Extensions.Graphics;
+namespace Ion.Extensions.Assets;
 
 public interface ITexture2D : IAsset
 {

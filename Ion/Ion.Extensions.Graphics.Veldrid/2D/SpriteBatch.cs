@@ -5,6 +5,8 @@ using Veldrid.SPIRV;
 using Ion.Extensions.Debug;
 using System.Diagnostics;
 
+using Ion.Extensions.Assets;
+
 namespace Ion.Extensions.Graphics;
 
 internal class SpriteBatch : ISpriteBatch, IDisposable
@@ -19,7 +21,7 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 	private readonly ITraceTimer<SpriteBatch> _trace;
 
 	private readonly SpriteBatchManager _batchManager;
-	private Texture? _whitePixel;
+	private BaseTexture? _whitePixel;
 
 	private CommandList? _commandList;
 	private DeviceBuffer? _vertexBuffer;
