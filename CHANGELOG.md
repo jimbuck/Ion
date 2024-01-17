@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.1.6"></a>
+## [0.1.6](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.6) (2024-1-16)
+
+### ✨ Features
+
+* Added basic asset loading (Texture2D only for now). (#21) ([2397ded](https://www.github.com/jimbuck/Ion/commit/2397ded3afe9de798d0caa992551c6739864618c))
+
 <a name="0.1.5"></a>
 ## [0.1.5](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.5) (2024-1-10)
 
