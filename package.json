@@ -5,6 +5,10 @@
 	"scripts": {
 		"open-trace": "npx perfetto-trace-viewer .\\Ion.Examples\\Ion.Examples.Breakout\\bin\\Release\\net8.0\\trace.json"
 	},
-	"license": "ISC"
-, "-vs-binding":{"ProjectOpened":["open-trace"]}
+	"license": "ISC",
+	"-vs-binding": {
+		"ProjectOpened": [
+			"open-trace"
+		]
+	}
 }
