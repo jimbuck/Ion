@@ -162,10 +162,11 @@ public struct RectangleF : IEquatable<RectangleF>
 		return !(a == b);
 	}
 
+	public static implicit operator System.Drawing.Rectangle(RectangleF src) => new((int)src.X, (int)src.Y, (int)src.Width, (int)src.Height);
+	public static explicit operator RectangleF(System.Drawing.Rectangle src) => new(src.X, src.Y, src.Width, src.Height);
+
 	#endregion
-
 	#region Public Methods
-
 	/// <summary>
 	/// Gets whether or not the provided coordinates lie within the bounds of this <see cref="Rectangle"/>.
 	/// </summary>

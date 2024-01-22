@@ -22,6 +22,9 @@ public static class BuilderExtensions
 			// Implementation-specific
 			.AddSingleton<IWindow, Window>()
 			.AddSingleton<IGraphicsContext, GraphicsContext>()
+			.AddSingleton<SpriteRenderer>()
+			.AddSingleton<FontRenderer>()
+			.AddSingleton<ITexture2DManager, FontStashTexture2DManager>()
 			.AddSingleton<ISpriteBatch, SpriteBatch>()
 
 			// Loaders

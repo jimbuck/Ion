@@ -10,7 +10,7 @@ internal class SpriteBatchManager
 	public const int BATCH_STEP_SIZE_MINUS_ONE = BATCH_STEP_SIZE - 1;
 	public const int BATCH_STEP_SIZE_BIT_COMP = ~BATCH_STEP_SIZE_MINUS_ONE;
 
-	public static int INSTANCE_SIZE = (int)MemUtils.SizeOf<Instance>();
+	public static int INSTANCE_SIZE = (int)MemUtils.SizeOf<SpriteInstance>();
 
 	private readonly Stack<SpriteBatch> _batchPool;
 	private readonly Dictionary<ITexture2D, SpriteBatch> _batches;
@@ -23,7 +23,7 @@ internal class SpriteBatchManager
 		_batchPool = new();
 	}
 
-	public ref Instance Add(ITexture2D texture)
+	public ref SpriteInstance Add(ITexture2D texture)
 	{
 		if (!_batches.TryGetValue(texture, out var group))
 		{
@@ -55,21 +55,21 @@ internal class SpriteBatchManager
 
 	public static uint GetBatchSize(int count)
 	{
-		return (uint)(((count + BATCH_STEP_SIZE_MINUS_ONE) & BATCH_STEP_SIZE_BIT_COMP) * Instance.SizeInBytes);
+		return (uint)(((count + BATCH_STEP_SIZE_MINUS_ONE) & BATCH_STEP_SIZE_BIT_COMP) * SpriteInstance.SizeInBytes);
 	}
 
 	public class SpriteBatch
 	{
-		internal Instance[] _items;
+		internal SpriteInstance[] _items;
 
 		public int Count { get; private set; }
 
 		public SpriteBatch()
 		{
-			_items = new Instance[BATCH_STEP_SIZE];
+			_items = new SpriteInstance[BATCH_STEP_SIZE];
 		}
 
-		public ref Instance Add()
+		public ref SpriteInstance Add()
 		{
 			if (Count >= _items.Length)
 			{
@@ -86,14 +86,14 @@ internal class SpriteBatchManager
 			Count = 0;
 		}
 
-		public ReadOnlySpan<Instance> GetSpan()
+		public ReadOnlySpan<SpriteInstance> GetSpan()
 		{
 			//Array.Sort(_items, 0, Count);
 			return new(_items, 0, Count);
 		}
 	}
 
-	public struct Instance : IComparable<Instance>
+	public struct SpriteInstance : IComparable<SpriteInstance>
 	{
 		public Vector4 UV;
 		public Color Color;
@@ -103,7 +103,7 @@ internal class SpriteBatchManager
 		public float Rotation;
 		public RectangleF Scissor;
 
-		public static uint SizeInBytes => MemUtils.SizeOf<Instance>();
+		public static uint SizeInBytes => MemUtils.SizeOf<SpriteInstance>();
 
 		public void Update(Vector2 textureSize, RectangleF destinationRectangle, RectangleF sourceRectangle, Color color, float rotation, Vector2 origin, float layerDepth, RectangleF scissor, SpriteEffect options)
 		{
@@ -140,7 +140,7 @@ internal class SpriteBatchManager
 			return new(sourceLocation.X, sourceLocation.Y, sourceSize.X, sourceSize.Y);
 		}
 
-		public int CompareTo(Instance other)
+		public int CompareTo(SpriteInstance other)
 		{
 			return (int)(other.Location.Z - this.Location.Z);
 		}
