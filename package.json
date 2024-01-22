@@ -3,7 +3,7 @@
 	"version": "0.0.0",
 	"description": "Tasks for the Ion solution.",
 	"scripts": {
-		"open-trace": "npx perfetto-trace-viewer .\\Ion.Examples\\Ion.Examples.SpriteRenderer\\bin\\Release\\net6.0\\trace.json"
+		"open-trace": "npx perfetto-trace-viewer .\\Ion.Examples\\Ion.Examples.Breakout\\bin\\Release\\net8.0\\trace.json"
 	},
 	"license": "ISC"
 , "-vs-binding":{"ProjectOpened":["open-trace"]}
