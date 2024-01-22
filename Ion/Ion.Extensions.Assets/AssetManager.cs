@@ -3,81 +3,47 @@ using Microsoft.Extensions.Logging;
 
 namespace Ion.Extensions.Assets;
 
-public class GlobalAssetManager : IAssetManager
+internal class GlobalAssetManager(ILogger<GlobalAssetManager> logger, IEnumerable<IAssetLoader> loaders) : IBaseAssetManager
 {
-	private readonly ILogger _logger;
-	private readonly IPersistentStorage _storage;
-	private readonly ImmutableDictionary<Type, IAssetLoader> _loaders;
-	private readonly Dictionary<int, IAsset> _assetCache = new();
-	private readonly Dictionary<string, IAsset> _pathCache = new();
+	private readonly ILogger _logger = logger;
+	private readonly ImmutableDictionary<Type, IAssetLoader> _loaders = loaders.ToImmutableDictionary(l => l.AssetType);
+	private readonly Dictionary<int, IAsset> _idCache = [];
+	private readonly Dictionary<string, IAsset> _nameCache = [];
 
-	public GlobalAssetManager(ILogger<GlobalAssetManager> logger, IPersistentStorage storage, IEnumerable<IAssetLoader> loaders)
+	public virtual IAssetLoader GetLoader(Type assetType)
 	{
-		_logger = logger;
-		_storage = storage;
-		_loaders = loaders.ToImmutableDictionary(l => l.AssetType);
+		if (!_loaders.TryGetValue(assetType, out IAssetLoader? loader)) throw new InvalidOperationException("No loader registered for type " + assetType.Name);
+
+		return loader;
 	}
 
-	public T Load<T>(params string[] path) where T : class, IAsset
+	public T Set<T>(T asset) where T : class, IAsset
 	{
-		var name = Path.Combine(["Assets", ..path]);
-
-		if (_pathCache.TryGetValue(name, out var cachedAsset)) return (T)cachedAsset;
-
-		if (!_loaders.TryGetValue(typeof(T), out IAssetLoader? loader)) throw new InvalidOperationException("No loader registered for type " + typeof(T).Name);
-
-		var asset = loader.Load<T>(name);
-
-		_assetCache.Add(asset.Id, asset);
-		_pathCache.Add(name, asset);
+		_idCache.Add(asset.Id, asset);
+		_nameCache.Add(asset.Name, asset);
 
 		return asset;
 	}
 
-	public virtual T LoadGlobal<T>(params string[] path) where T : class, IAsset
+	public T? Get<T>(int id) where T : class, IAsset
 	{
-		return Load<T>(path);
-	}
-
-	public virtual T? Get<T>(int id) where T : class, IAsset
-	{
-		return _assetCache.TryGetValue(id, out var asset) ? (T)asset : default;
+		return _idCache.TryGetValue(id, out var asset) ? (T)asset : default;
 	}
 
 	public void Unload<T>(T asset) where T : class, IAsset
 	{
-		_assetCache.Remove(asset.Id);
-		_pathCache.Remove(asset.Name);
+		_idCache.Remove(asset.Id);
+		_nameCache.Remove(asset.Name);
 		asset.Dispose();
-	}
-
-	public virtual void UnloadGlobal<T>(T asset) where T : class, IAsset
-	{
-		Unload(asset);
 	}
 }
 
-public class ScopedAssetManager : GlobalAssetManager
+internal class ScopedAssetManager(ILogger<GlobalAssetManager> logger, GlobalAssetManager globalAssetManager) : GlobalAssetManager(logger, Enumerable.Empty<IAssetLoader>()), IAssetManager
 {
-	private readonly GlobalAssetManager _globalAssetManager;
+	public IBaseAssetManager Global { get; } = globalAssetManager;
 
-	public ScopedAssetManager(ILogger<GlobalAssetManager> logger, IPersistentStorage storage, IEnumerable<IAssetLoader> loaders, GlobalAssetManager globalAssetManager) : base(logger, storage, loaders)
+	public override IAssetLoader GetLoader(Type assetType)
 	{
-		_globalAssetManager = globalAssetManager;
-	}
-
-	public override T LoadGlobal<T>(params string[] path)
-	{
-		return _globalAssetManager.Load<T>(path);
-	}
-
-	public override void UnloadGlobal<T>(T asset)
-	{
-		_globalAssetManager.Unload(asset);
-	}
-
-	public override T? Get<T>(int id) where T : class
-	{
-		return base.Get<T>(id) ?? _globalAssetManager.Get<T>(id);
+		return Global.GetLoader(assetType);
 	}
 }

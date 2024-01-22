@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 
 using Ion.Extensions.Assets;
+using FontStashSharp.Interfaces;
 
 namespace Ion.Extensions.Graphics;
 
@@ -25,6 +26,7 @@ public static class BuilderExtensions
 
 			// Loaders
 			.AddSingleton<IAssetLoader, Texture2DLoader>()
+			.AddSingleton<IAssetLoader, FontLoader>()
 
 			// Implementation-specific Systems
 			.AddSingleton<WindowSystem>()

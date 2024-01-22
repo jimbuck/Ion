@@ -1,10 +1,10 @@
-﻿
-using VeldridLib = Veldrid;
+﻿using VeldridLib = Veldrid;
 
 namespace Ion.Extensions.Graphics;
 
 public class Texture2D : BaseTexture
 {
+	public Texture2D(VeldridLib.Texture texture) : base(texture.Name, texture) { }
 	public Texture2D(string name, VeldridLib.Texture texture) : base(name, texture) { }
 
 	public static implicit operator VeldridLib.Texture(Texture2D texture) => texture._texture;

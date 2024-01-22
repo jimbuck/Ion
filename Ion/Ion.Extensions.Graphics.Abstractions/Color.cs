@@ -137,6 +137,8 @@ public struct Color : IEquatable<Color>
 	/// <param name="alpha">Alpha component value from 0 to 255.</param>
 	public Color(int r, int g, int b, int alpha) : this(r / 255f, g / 255f, b / 255f, alpha/255f) { }
 
+	public Color(byte r, byte g, byte b, byte alpha) : this((int)r, (int)g, (int)b, (int)alpha) { }
+
 	/// <summary>
 	/// Compares whether two <see cref="Color"/> instances are equal.
 	/// </summary>

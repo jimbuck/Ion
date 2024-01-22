@@ -11,29 +11,30 @@ using Ion.Extensions.Assets;
 
 namespace Ion.Extensions.Graphics;
 
-internal class Texture2DLoader : IAssetLoader
+public static class Texture2DAssetManagerExtensions
 {
-	private readonly IGraphicsContext _graphicsContext;
+	public static Texture2D Load<T>(this IBaseAssetManager assetManager, string path) where T : Texture2D
+	{
+		var loader = (Texture2DLoader)assetManager.GetLoader(typeof(Texture2D));
+		return loader.Load(path);
+	}
+}
+
+internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStorage storage) : IAssetLoader
+{
+	private readonly IGraphicsContext _graphicsContext = graphicsContext;
+	private readonly IPersistentStorage _storage = storage;
 
 	public Type AssetType { get; } = typeof(Texture2D);
 
-	public Texture2DLoader(IGraphicsContext graphicsContext)
+	public Texture2D Load(string assetPath)
 	{
-		_graphicsContext = graphicsContext;
+		return _loadTexture2D(assetPath, _storage.Assets.Read(assetPath));
 	}
 
-	public T Load<T>(string filepath) where T : class, IAsset
-	{
-		if (typeof(T) == typeof(Texture2D)) return (T)_loadTexture2D(filepath);
-
-		throw new ArgumentException("Incorrect type specified for loading!", nameof(T));
-	}
-
-	private unsafe IAsset _loadTexture2D(string filepath)
+	private unsafe Texture2D _loadTexture2D(string name, Stream stream)
 	{
 		if (_graphicsContext.GraphicsDevice is null) throw new Exception("GraphicsDevice is not initialized yet!");
-
-		using var stream = File.OpenRead(filepath);
 
 		var image = Image.Load<Rgba32>(stream);
 		var mipmaps = _generateMipmaps(image, out int totalSize);
@@ -62,7 +63,7 @@ internal class Texture2DLoader : IAssetLoader
 				allTexData,
 				_graphicsContext.GraphicsDevice, VeldridLib.TextureUsage.Sampled);
 
-		return new Texture2D(filepath, texture);
+		return new Texture2D(name, texture);
 	}
 
 	// Taken from Veldrid.ImageSharp
@@ -101,7 +102,7 @@ internal class Texture2DLoader : IAssetLoader
 		return 1 + (int)Math.Floor(Math.Log(Math.Max(width, height), 2));
 	}
 
-	private unsafe VeldridLib.Texture _createDeviceTexture(
+	private static unsafe VeldridLib.Texture _createDeviceTexture(
 		VeldridLib.PixelFormat format,
 		VeldridLib.TextureType type,
 		uint width,

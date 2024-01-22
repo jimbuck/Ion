@@ -3,24 +3,22 @@ using Microsoft.Extensions.Logging;
 using Veldrid;
 using Veldrid.SPIRV;
 using Ion.Extensions.Debug;
-using System.Diagnostics;
 
 using Ion.Extensions.Assets;
+using FontStashSharp.Interfaces;
 
 namespace Ion.Extensions.Graphics;
 
-internal class SpriteBatch : ISpriteBatch, IDisposable
+internal class SpriteBatch(
+	IGraphicsContext graphicsContext,
+	ILogger<SpriteBatch> logger,
+	ITraceTimer<SpriteBatch> trace
+) : ISpriteBatch, IDisposable
 {
 	private static readonly RectangleF _defaultScissor = new(-(1 << 22), -(1 << 22), 1 << 23, 1 << 23);
 	private static readonly Vector2 VEC2_HALF = Vector2.One / 2f;
-
-	private readonly IWindow _window;
-	private readonly IGraphicsContext _graphicsContext;
-	private readonly ILogger _logger;
-	private readonly IEventListener _events;
-	private readonly ITraceTimer<SpriteBatch> _trace;
-
-	private readonly SpriteBatchManager _batchManager;
+	private readonly ILogger _logger = logger;
+	private readonly SpriteBatchManager _batchManager = new();
 	private BaseTexture? _whitePixel;
 
 	private CommandList? _commandList;
@@ -33,6 +31,8 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 	private Pipeline? _pipeline;
 
 	private bool _beginCalled = false;
+
+	private IFontStashRenderer _fontRenderer = default!;
 
 	private class BufferContainer
 	{
@@ -55,7 +55,7 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 		}
 	}
 
-	private readonly Dictionary<ITexture2D, BufferContainer> _buffers;
+	private readonly Dictionary<ITexture2D, BufferContainer> _buffers = new();
 
 	private const string VertexCode = @"
 #version 450
@@ -143,37 +143,27 @@ void main()
     fsout_Color = fsin_Color * texture(sampler2D(Tex, Sampler), tex_coord);
 }";
 
-	public SpriteBatch(IWindow window, IGraphicsContext graphicsContext, ILogger<SpriteBatch> logger, IEventListener events, ITraceTimer<SpriteBatch> trace)
-	{
-		_window = window;
-		_graphicsContext = graphicsContext;
-		_logger = logger;
-		_events = events;
-		_trace = trace;
-
-		_batchManager = new();
-		_buffers = new();
-	}
-
 	public void Initialize()
 	{
-		if (_graphicsContext.NoRender) return;
-		if (_graphicsContext.GraphicsDevice == null)
+		if (graphicsContext.NoRender) return;
+		if (graphicsContext.GraphicsDevice == null)
 		{
 			_logger.LogWarning($"{nameof(SpriteBatch)} automically disabled due to GraphicsDevice not being set.");
 			return;
 		}
 
-		var timer = _trace.Start("SpriteRenderer::Initialize");
+		var timer = trace.Start("SpriteRenderer::Initialize");
 
-		var factory = _graphicsContext.Factory;
+		_fontRenderer = new FontStashRenderer(this, graphicsContext);
+
+		var factory = graphicsContext.Factory;
 		_commandList = factory.CreateCommandList();
 
 		timer.Then("CreateWhitePixel");
 
 		TextureDescription desc = new(1, 1, 1, 1, 1, PixelFormat.B8_G8_R8_A8_UNorm, TextureUsage.Sampled, Veldrid.TextureType.Texture2D);
 		_whitePixel = factory.CreateTexture2D(desc, "white-pixel");
-		_graphicsContext.GraphicsDevice.UpdateTexture(_whitePixel, new byte[] { 255, 255, 255, 255 }, 0, 0, 0, 1, 1, 1, 0, 0);
+		graphicsContext.GraphicsDevice.UpdateTexture(_whitePixel, new byte[] { 255, 255, 255, 255 }, 0, 0, 0, 1, 1, 1, 0, 0);
 
 		timer.Then("CreateShaders");
 
@@ -190,7 +180,7 @@ void main()
 		_logger.LogInformation("Created _vertexBuffer");
 		_vertexBuffer = factory.CreateBuffer(new(4 * MemUtils.SizeOf<Vector2>(), BufferUsage.VertexBuffer));
 		_logger.LogInformation("Updated _vertexBuffer");
-		_graphicsContext.GraphicsDevice.UpdateBuffer(_vertexBuffer, 0, new Vector2[] {
+		graphicsContext.GraphicsDevice.UpdateBuffer(_vertexBuffer, 0, new Vector2[] {
 			new( 0,  0),
 			new( 1,  0),
 			new( 0,  1),
@@ -216,9 +206,9 @@ void main()
 			PrimitiveTopology = PrimitiveTopology.TriangleStrip,
 			ResourceLayouts = new ResourceLayout[] { _instanceResourceLayout, _fragmentResourceLayout },
 			ShaderSet = new(vertexLayouts: new[] { vertexLayout }, shaders: _shaders, specializations: new[] {
-				new SpecializationConstant(0, _graphicsContext.GraphicsDevice.IsClipSpaceYInverted)
+				new SpecializationConstant(0, graphicsContext.GraphicsDevice.IsClipSpaceYInverted)
 			}),
-			Outputs = _graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer.OutputDescription
+			Outputs = graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer.OutputDescription
 		});
 
 		timer.Stop();
@@ -226,12 +216,12 @@ void main()
 
 	public void Begin(GameTime dt)
 	{
-		if (_graphicsContext.NoRender) return;
-		if (_graphicsContext.GraphicsDevice == null) throw new InvalidOperationException("Begin cannot be called until the GraphicsDevice has been initialized.");
+		if (graphicsContext.NoRender) return;
+		if (graphicsContext.GraphicsDevice == null) throw new InvalidOperationException("Begin cannot be called until the GraphicsDevice has been initialized.");
 
 		if (_beginCalled) throw new InvalidOperationException("Begin cannot be called again until End has been successfully called.");
 
-		var timer = _trace.Start("Begin");
+		var timer = trace.Start("Begin");
 
 		_batchManager.Clear();
 		_beginCalled = true;
@@ -277,12 +267,26 @@ void main()
 		DrawRect(color, rect, new Vector2(0, 0.5f), rotation: angle, depth: depth);
 	}
 
+	public void DrawString(IFont font, string text, Vector2 position, Color color = default, float depth = 0f, Vector2 origin = default, float rotation = 0f, float scale = 1f, SpriteEffect options = SpriteEffect.None)
+	{
+		var fontstyle = (Font)font;
+
+		fontstyle.SpriteFont.DrawText(_fontRenderer,
+			text: text,
+			position: position, 
+			color: new FontStashSharp.FSColor(color.R, color.G, color.B, color.A),
+			scale: new Vector2(scale),
+			rotation: rotation,
+			origin: origin,
+			layerDepth: depth);
+	}
+
 	public void Draw(ITexture2D texture, RectangleF destinationRectangle, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
 		if (color == default) color = Color.White;
-		if (sourceRectangle.Size.LengthSquared() == 0) sourceRectangle = new RectangleF(0f, 0f, texture.Size.X, texture.Size.Y);
+		if (sourceRectangle.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Size.X, texture.Size.Y);
 
 		_addSprite(texture, color, sourceRectangle, destinationRectangle, origin, rotation, depth, _defaultScissor, options);
 	}
@@ -292,24 +296,24 @@ void main()
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
 		if (color == default) color = Color.White;
-		if (sourceRectangle.Size.LengthSquared() == 0) sourceRectangle = new RectangleF(0f, 0f, texture.Size.X, texture.Size.Y);
+		if (sourceRectangle.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Size.X, texture.Size.Y);
 
-		_addSprite(texture, color, sourceRectangle, new RectangleF(position.X, position.Y, scale.X * texture.Size.X, scale.Y * texture.Size.Y), origin, rotation, depth, _defaultScissor, options);
+		_addSprite(texture, color, sourceRectangle, new RectangleF(position.X, position.Y, scale.X * sourceRectangle.Size.X, scale.Y * sourceRectangle.Size.Y), origin, rotation, depth, _defaultScissor, options);
 	}
 
 	public unsafe void End()
 	{
-		if (_graphicsContext.NoRender) return;
+		if (graphicsContext.NoRender) return;
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling End.");
 
 		_beginCalled = false;
 
-		if (_batchManager.IsEmpty || _graphicsContext.GraphicsDevice is null || _commandList is null) return;
+		if (_batchManager.IsEmpty || graphicsContext.GraphicsDevice is null || _commandList is null) return;
 
-		var timer = _trace.Start("End");
+		var timer = trace.Start("End");
 
 		_commandList.Begin();
-		_commandList.SetFramebuffer(_graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer);
+		_commandList.SetFramebuffer(graphicsContext.GraphicsDevice.MainSwapchain.Framebuffer);
 		//_commandList.SetFullViewports();
 		//_commandList.ClearColorTarget(0, Color.Transparent);
 		//_commandList.ClearDepthStencil(_graphicsContext.GraphicsDevice.IsDepthRangeZeroToOne ? 0f : 1f);
@@ -317,16 +321,16 @@ void main()
 		foreach (var (texture, group) in _batchManager)
 		{
 			var pair = _getBuffer(texture, group.Count + 1);
-			var innerTimer = _trace.Start("End::Texture::Map");
+			var innerTimer = trace.Start("End::Texture::Map");
 			
-			var mapped = _graphicsContext.GraphicsDevice.Map(pair.Buffer, MapMode.Write);
+			var mapped = graphicsContext.GraphicsDevice.Map(pair.Buffer, MapMode.Write);
 
 			innerTimer.Then("End::Texture::Copy");
-			MemUtils.Set(mapped.Data, _graphicsContext.ProjectionMatrix, 1);
+			MemUtils.Set(mapped.Data, graphicsContext.ProjectionMatrix, 1);
 			MemUtils.Copy(mapped.Data + SpriteBatchManager.INSTANCE_SIZE, group.GetSpan());
 
 			innerTimer.Then("End::Texture::Unmap");
-			_graphicsContext.GraphicsDevice.Unmap(pair.Buffer);
+			graphicsContext.GraphicsDevice.Unmap(pair.Buffer);
 			innerTimer.Then("End::Texture::Commands");
 			_commandList.SetVertexBuffer(0, _vertexBuffer);
 			_commandList.SetGraphicsResourceSet(0, pair.InstanceSet);
@@ -336,25 +340,25 @@ void main()
 		}
 		
 		_commandList.End();
-		_graphicsContext.SubmitCommands(_commandList);
+		graphicsContext.SubmitCommands(_commandList);
 
 		timer.Stop();
 	}
 
 	private BufferContainer _getBuffer(ITexture2D texture, int count)
 	{
-		var timer = _trace.Start("_getBuffer");
+		var timer = trace.Start("_getBuffer");
 
 		var size = SpriteBatchManager.GetBatchSize(count);
 		var bci = new BufferDescription(size, BufferUsage.StructuredBufferReadOnly | BufferUsage.Dynamic, SpriteBatchManager.Instance.SizeInBytes);
 
 		if (!_buffers.TryGetValue(texture, out var pair))
 		{
-			var nb = _trace.Start("_getBuffer::NewBuffer");
-			var buffer = _graphicsContext.Factory.CreateBuffer(bci);
+			var nb = trace.Start("_getBuffer::NewBuffer");
+			var buffer = graphicsContext.Factory.CreateBuffer(bci);
 			pair = new(buffer,
-				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, buffer)),
-				_graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)(Texture2D)texture, _graphicsContext.GraphicsDevice!.LinearSampler))
+				graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, buffer)),
+				graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)(Texture2D)texture, graphicsContext.GraphicsDevice!.LinearSampler))
 				);
 
 			_buffers[texture] = pair;
@@ -362,12 +366,12 @@ void main()
 		}
 		else if (size > pair.Buffer.SizeInBytes)
 		{
-			var rb = _trace.Start("_getBuffer::ResizeBuffer");
+			var rb = trace.Start("_getBuffer::ResizeBuffer");
 			pair.Dispose();
 
-			pair.Buffer = _graphicsContext.Factory.CreateBuffer(bci);
-			pair.InstanceSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, pair.Buffer));
-			pair.TextureSet = _graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)(Texture2D)texture, _graphicsContext.GraphicsDevice!.LinearSampler));
+			pair.Buffer = graphicsContext.Factory.CreateBuffer(bci);
+			pair.InstanceSet = graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, pair.Buffer));
+			pair.TextureSet = graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)(Texture2D)texture, graphicsContext.GraphicsDevice!.LinearSampler));
 			_buffers[texture] = pair;
 			rb.Stop();
 		}
@@ -388,7 +392,7 @@ void main()
 	{
 		ref var instance = ref _batchManager.Add(texture);
 
-		instance.Update(texture.Size, destinationRect, sourceRect, color, rotation, origin, depth, _transformRectF(scissor, _graphicsContext.ProjectionMatrix), options);
+		instance.Update(texture.Size, destinationRect, sourceRect, color, rotation, origin, depth, _transformRectF(scissor, graphicsContext.ProjectionMatrix), options);
 	}
 
 	private static RectangleF _transformRectF(RectangleF rect, Matrix4x4 matrix)

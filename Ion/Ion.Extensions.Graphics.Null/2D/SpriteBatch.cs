@@ -22,5 +22,7 @@ internal class SpriteBatch : ISpriteBatch, IDisposable
 
 	public void DrawRect(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0) { }
 
+	public void DrawString(IFont font, string text, Vector2 textPosition, Color color = default, float depth = 0, Vector2 origin = default, float rotation = 0, float scale = 1, SpriteEffect options = SpriteEffect.None) { }
+
 	public void Dispose() { }
 }

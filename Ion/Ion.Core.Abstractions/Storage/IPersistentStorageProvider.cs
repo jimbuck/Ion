@@ -2,6 +2,7 @@
 
 public interface IPersistentStorageProvider
 {
+	string GetPath(params string[] path);
 	void CreateDirectory(params string[] path);
 	void Write(string text, params string[] path);
 	void Write(byte[] bytes, params string[] path);

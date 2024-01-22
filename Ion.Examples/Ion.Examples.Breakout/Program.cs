@@ -66,6 +66,11 @@ public class BreakoutSystems
 	private SoundEffect _bonkSound = default!;
 	private SoundEffect _pingSound = default!;
 
+	private int _score = 0;
+	private FontSet _scoreFontSet = default!;
+	private Font _scoreFont = default!;
+	
+
 	public BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events, IAssetManager assets, IAudioManager audio)
 	{
 		_window = window;
@@ -83,6 +88,8 @@ public class BreakoutSystems
 		_ballTexture = _assets.Load<Texture2D>("Ball1.png");
 		_bonkSound =  _assets.Load<SoundEffect>("Bonk.wav");
 		_pingSound =  _assets.Load<SoundEffect>("Ping.mp3");
+		_scoreFontSet = _assets.Load<FontSet>("BungeeRegular", "Bungee-Regular.ttf");
+		_scoreFont = _scoreFontSet.CreateStyle(24);
 
 		// Setup blocks in rows and columns across the window each with different colors:
 		for (int row = 0; row < ROWS; row++)
@@ -191,6 +198,7 @@ public class BreakoutSystems
 			_blockStates[i] = false;
 			_ballVelocity *= _getReboundDirection(ref intersection);
 			_ballVelocity = Vector2.Normalize(_ballVelocity);
+			_score += 10;
 			break;
 		}
 
@@ -237,6 +245,7 @@ public class BreakoutSystems
 
 		_spriteBatch.Draw(_blockTexture, _playerRect, color: Color.DarkBlue);
 		_spriteBatch.Draw(_ballTexture, _ballRect, color: Color.DarkRed, sourceRectangle: _ballSprite);
+		_spriteBatch.DrawString(_scoreFont, $"Score:  {_score}", new Vector2(20f), Color.White);
 
 		next(dt);
 	}
