@@ -3,7 +3,7 @@ namespace Ion.Extensions.Graphics;
 
 public class WindowConfig
 {
-	public bool ShowCursor { get; set; } = false;
+	public bool ShowCursor { get; set; } = true;
 	public int? Height { get; set; }
 	public int? Width { get; set; }
 	public int? WindowX { get; set; }

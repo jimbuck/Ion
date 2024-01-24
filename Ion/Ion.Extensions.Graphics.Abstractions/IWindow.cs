@@ -16,6 +16,7 @@ public interface IWindow
 	bool IsMinimized { get; set; }
 	bool IsFullscreen { get; set; }
 	bool IsBorderlessFullscreen { get; set; }
+	bool IsMouseGrabbed { get; set; }
 
 	string Title { get; set; }
 	bool IsResizable { get; set; }

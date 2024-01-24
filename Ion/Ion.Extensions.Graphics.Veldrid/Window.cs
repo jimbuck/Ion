@@ -94,6 +94,21 @@ internal class Window : IWindow
 		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? VeldridLib.WindowState.BorderlessFullScreen : VeldridLib.WindowState.Normal; }
 	}
 
+	private bool _isMouseGrabbed = false;
+
+	public bool IsMouseGrabbed
+	{
+		get => _isMouseGrabbed;
+		set
+		{
+			if (Sdl2Window is not null)
+			{
+				Sdl2Native.SDL_SetWindowGrab(Sdl2Window.SdlWindowHandle, value);
+				_isMouseGrabbed = value;
+			}
+		}
+	}
+
 	private string _title;
 	public string Title
 	{
