@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.1.8"></a>
+## [0.1.8](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.8) (2024-1-24)
+
+### ✨ Features
+
+* Sprite Font Support (#25) ([1f51e78](https://www.github.com/jimbuck/Ion/commit/1f51e7873ae688bc2efdbd98aade9f80eb9fccb4))
+
 <a name="0.1.7"></a>
 ## [0.1.7](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.7) (2024-1-17)
 
