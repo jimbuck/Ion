@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Ion.Extensions.Assets.Abstractions\Ion.Extensions.Assets.Abstractions.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Audio.Abstractions\Ion.Extensions.Audio.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Debug.Abstractions\Ion.Extensions.Debug.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

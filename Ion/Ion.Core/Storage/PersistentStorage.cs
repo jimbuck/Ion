@@ -17,12 +17,11 @@ internal class PersistentStorage : IPersistentStorage
 
 	public PersistentStorage(IOptions<GameConfig> config)
 	{
-
-#if DEBUG
 		_game = new PersistentStorageProvider(Environment.CurrentDirectory);
+#if DEBUG
 		_user = new PersistentStorageProvider(Environment.CurrentDirectory);
 #else
-		_game = new PersistentStorageProvider(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), config.Value.Title);
+		//_game = new PersistentStorageProvider(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), config.Value.Title);
 		_user = new PersistentStorageProvider(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), config.Value.Title);
 #endif
 

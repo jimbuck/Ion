@@ -1,27 +1,32 @@
 ﻿using Ion.Extensions.Assets;
+using Ion.Extensions.Debug;
 
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
 namespace Ion.Extensions.Audio;
 
-public class AudioManager : IAudioManager, IDisposable
+public class AudioManager(ITraceTimer<AudioManager> trace) : IAudioManager, IDisposable
 {
-	private readonly IWavePlayer _outputDevice;
-	private readonly MixingSampleProvider _mixer;
+	private readonly WaveOutEvent _outputDevice = new WaveOutEvent();
+	private readonly MixingSampleProvider _mixer = new(WaveFormat.CreateIeeeFloatWaveFormat(48000, 2)) { ReadFully = true };
 
 	public float MasterVolume { get; set; } = 1f;
 
-	public AudioManager()
+	public void Initialize()
 	{
-		_outputDevice = new WaveOutEvent();
-		_mixer = new(WaveFormat.CreateIeeeFloatWaveFormat(48000, 2)) { ReadFully = true };
+		var timer = trace.Start("AudioManager::Initialize");
+
 		_outputDevice.Init(_mixer);
 		_outputDevice.Play();
+
+		timer.Stop();
 	}
 
 	public void Play(ISoundEffect genericSoundEffect, float volume = 1f, float pitchShift = 0f)
 	{
+		var timer = trace.Start("AudioManager::Play");
+
 		if (genericSoundEffect is not SoundEffect soundEffect)
 		{
 			throw new NotImplementedException($"ISoundEffect type {genericSoundEffect.GetType().FullName} not supported!");
@@ -46,6 +51,8 @@ public class AudioManager : IAudioManager, IDisposable
 		}
 
 		_addMixerInput(sampleProvider);
+
+		timer.Stop();
 	}
 
 	private ISampleProvider _convertToRightChannelCount(ISampleProvider input)

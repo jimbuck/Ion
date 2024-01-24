@@ -25,15 +25,8 @@ game.UseIon()
 game.Run();
 
 
-public class BreakoutSystems
+public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events, IAssetManager assets, IAudioManager audio)
 {
-	private readonly IWindow _window;
-	private readonly IInputState _input;
-	private readonly ISpriteBatch _spriteBatch;
-	private readonly IEventListener _events;
-	private readonly IAssetManager _assets;
-	private readonly IAudioManager _audio;
-
 	private const int ROWS = 10;
 	private const int COLS = 10;
 
@@ -66,23 +59,19 @@ public class BreakoutSystems
 	private SoundEffect _bonkSound = default!;
 	private SoundEffect _pingSound = default!;
 
-	public BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events, IAssetManager assets, IAudioManager audio)
-	{
-		_window = window;
-		_input = input;
-		_spriteBatch = spriteBatch;
-		_events = events;
-		_assets = assets;
-		_audio = audio;
-	}
+	private int _score = 0;
+	private FontSet _scoreFontSet = default!;
+	private Font _scoreFont = default!;
 
 	[Init]
 	public void SetupBlocks(GameTime dt, GameLoopDelegate next)
 	{
-		_blockTexture = _assets.Load<Texture2D>("Block1.png");
-		_ballTexture = _assets.Load<Texture2D>("Ball1.png");
-		_bonkSound =  _assets.Load<SoundEffect>("Bonk.wav");
-		_pingSound =  _assets.Load<SoundEffect>("Ping.mp3");
+		_blockTexture = assets.Load<Texture2D>("Block1.png");
+		_ballTexture = assets.Load<Texture2D>("Ball1.png");
+		_bonkSound =  assets.Load<SoundEffect>("Bonk.wav");
+		_pingSound =  assets.Load<SoundEffect>("Ping.mp3");
+		_scoreFontSet = assets.Load<FontSet>("BungeeRegular", "Bungee-Regular.ttf");
+		_scoreFont = _scoreFontSet.CreateStyle(24);
 
 		// Setup blocks in rows and columns across the window each with different colors:
 		for (int row = 0; row < ROWS; row++)
@@ -96,10 +85,10 @@ public class BreakoutSystems
 			}
 		}
 
-		_window.Size = new Vector2((COLS * _blockSize.X) + ((COLS + 1) * _blockGap), (ROWS * _blockSize.Y) + ((ROWS + 1) * _blockGap) + _playerGap + _blockSize.Y + _bottomGap);
-		_window.IsResizable = false;
+		window.Size = new Vector2((COLS * _blockSize.X) + ((COLS + 1) * _blockGap), (ROWS * _blockSize.Y) + ((ROWS + 1) * _blockGap) + _playerGap + _blockSize.Y + _bottomGap);
+		window.IsResizable = false;
 
-		_playerRect.Location = new Vector2(Math.Clamp(_input.MousePosition.X - (_playerRect.Height / 2f), 0, _window.Width - _playerRect.Width), _window.Size.Y - (_blockSize.Y + _bottomGap));
+		_playerRect.Location = new Vector2(Math.Clamp(input.MousePosition.X - (_playerRect.Height / 2f), 0, window.Width - _playerRect.Width), window.Size.Y - (_blockSize.Y + _bottomGap));
 
 		_repositionBlocks();
 
@@ -109,7 +98,7 @@ public class BreakoutSystems
 	[First]
 	public void HandleWindowResize(GameTime dt, GameLoopDelegate next)
 	{
-		if (_events.On<WindowResizeEvent>()) _repositionBlocks();
+		if (events.On<WindowResizeEvent>()) _repositionBlocks();
 
 		next(dt);
 	}
@@ -117,13 +106,28 @@ public class BreakoutSystems
 	[Update]
 	public void Update(GameTime dt, GameLoopDelegate next)
 	{
-		_playerRect.X = Math.Clamp(_input.MousePosition.X - (_playerRect.Height / 2f), 0, _window.Width - _playerRect.Width);
+		var isMouseGrabbed = window.IsMouseGrabbed;
+
+		if (input.Pressed(Key.Escape) && isMouseGrabbed)
+		{
+			window.IsMouseGrabbed = false;
+			window.IsCursorVisible = true;
+		}
+
+		if (input.Pressed(MouseButton.Left) && !isMouseGrabbed)
+		{
+			window.IsMouseGrabbed = true;
+			window.IsCursorVisible = false;
+		}
+
+
+		if (isMouseGrabbed) _playerRect.X = Math.Clamp(input.MousePosition.X - (_playerRect.Height / 2f), 0, window.Width - _playerRect.Width);
 
 		if (_ballIsCaptured)
 		{
 			_ballRect.Location = _playerRect.Location + new Vector2((_playerRect.Width - _ballRect.Width) / 2f, -(_ballRect.Height + 1));
 
-			if (_input.Pressed(MouseButton.Left))
+			if (input.Pressed(MouseButton.Left) && isMouseGrabbed)
 			{
 				_ballIsCaptured = false;
 				_ballVelocity = new Vector2(0, -1);
@@ -142,9 +146,9 @@ public class BreakoutSystems
 			hitWall = true;
 		}
 
-		if (_ballRect.X >= _window.Width - _ballRect.Width)
+		if (_ballRect.X >= window.Width - _ballRect.Width)
 		{
-			_ballRect.X = _window.Width - (_ballRect.Width + 1);
+			_ballRect.X = window.Width - (_ballRect.Width + 1);
 			_ballVelocity.X *= -1;
 			hitWall = true;
 		}
@@ -156,7 +160,7 @@ public class BreakoutSystems
 			hitWall = true;
 		}
 
-		if (_ballRect.Y > _window.Height)
+		if (_ballRect.Y > window.Height)
 		{
 			_ballVelocity = Vector2.Zero;
 			_ballIsCaptured = true;
@@ -176,7 +180,7 @@ public class BreakoutSystems
 			}
 		}
 
-		if (hitWall) _audio.Play(_bonkSound, pitchShift: (_rand.NextSingle() - 0.5f) / 16f);
+		if (hitWall) audio.Play(_bonkSound, pitchShift: (_rand.NextSingle() - 0.5f) / 16f);
 
 		// Ball to block collisions
 		for (var i = 0; i < _blockRects.Length; i++)
@@ -186,11 +190,12 @@ public class BreakoutSystems
 			RectangleF.Intersect(ref _ballRect, ref _blockRects[i], out var intersection);
 			if (intersection.IsEmpty) continue;
 
-			_audio.Play(_pingSound, pitchShift: (_rand.NextSingle() - 0.5f) / 4f);
+			audio.Play(_pingSound, pitchShift: (_rand.NextSingle() - 0.5f) / 4f);
 			_ballSpeed += 10f;
 			_blockStates[i] = false;
 			_ballVelocity *= _getReboundDirection(ref intersection);
 			_ballVelocity = Vector2.Normalize(_ballVelocity);
+			_score += 10;
 			break;
 		}
 
@@ -203,6 +208,7 @@ public class BreakoutSystems
 				break;
 			}
 		}
+
 		if (hasBlocksLeft is false)
 		{
 			_ballIsCaptured = true;
@@ -231,12 +237,13 @@ public class BreakoutSystems
 			for (var col = 0; col < COLS; col++)
 			{
 				var i = (row * COLS) + col;
-				if (_blockStates[i]) _spriteBatch.Draw(_blockTexture, _blockRects[i], color: _blockColors[i]);
+				if (_blockStates[i]) spriteBatch.Draw(_blockTexture, _blockRects[i], color: _blockColors[i]);
 			}
 		}
 
-		_spriteBatch.Draw(_blockTexture, _playerRect, color: Color.DarkBlue);
-		_spriteBatch.Draw(_ballTexture, _ballRect, color: Color.DarkRed, sourceRectangle: _ballSprite);
+		spriteBatch.Draw(_blockTexture, _playerRect, color: Color.DarkBlue);
+		spriteBatch.Draw(_ballTexture, _ballRect, color: Color.DarkRed, sourceRectangle: _ballSprite);
+		spriteBatch.DrawString(_scoreFont, $"Score:  {_score}", new Vector2(20f), Color.Red);
 
 		next(dt);
 	}

@@ -2,22 +2,24 @@
 
 using Ion.Extensions.Assets;
 
-
 namespace Ion.Extensions.Audio;
 
-public class SoundEffectLoader : IAssetLoader
+public static class SoundEffectAssetManagerExtensions
+{
+	public static SoundEffect Load<T>(this IBaseAssetManager assetManager, string path) where T : SoundEffect
+	{
+		var loader = (SoundEffectLoader)assetManager.GetLoader(typeof(SoundEffect));
+		return loader.Load(path);
+	}
+}
+
+public class SoundEffectLoader(IPersistentStorage storage) : IAssetLoader
 {
 	public Type AssetType { get; } = typeof(SoundEffect);
 
-	T IAssetLoader.Load<T>(string filepath)
+	public SoundEffect Load(string assetPath)
 	{
-		if (typeof(T) == typeof(SoundEffect)) return (T)_loadSoundEffect(filepath);
-
-		throw new ArgumentException("Incorrect type specified for loading!", nameof(T));
-	}
-
-	private IAsset _loadSoundEffect(string filepath)
-	{
+		var filepath = storage.Assets.GetPath(assetPath);
 		using var audioFileReader = new AudioFileReader(filepath);
 
 		// TODO: could add resampling in here if required
@@ -31,7 +33,7 @@ public class SoundEffectLoader : IAssetLoader
 		}
 		var audioData = wholeFile.ToArray();
 
-		var soundEffect = new SoundEffect(filepath, audioData)
+		var soundEffect = new SoundEffect(assetPath, audioData)
 		{
 			Duration = (float)audioFileReader.TotalTime.TotalSeconds,
 			WaveFormat = waveFormat,
