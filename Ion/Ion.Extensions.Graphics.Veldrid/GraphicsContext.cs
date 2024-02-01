@@ -120,7 +120,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 		timer.Then("EndFrame::SwapBuffers");
 
-		if (_window.HasClosed) return;
+		if (_window.IsClosing) return;
 
 		if (_window.Sdl2Window.Exists) GraphicsDevice.SwapBuffers();
 

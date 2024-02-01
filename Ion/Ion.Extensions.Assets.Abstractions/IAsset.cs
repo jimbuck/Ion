@@ -3,6 +3,6 @@ namespace Ion.Extensions.Assets;
 
 public interface IAsset : IDisposable
 {
-	int Id { get; }
+	nint Id { get; }
 	string Name { get; }
 }

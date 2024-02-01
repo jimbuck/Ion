@@ -7,7 +7,7 @@ internal class GlobalAssetManager(ILogger<GlobalAssetManager> logger, IEnumerabl
 {
 	private readonly ILogger _logger = logger;
 	private readonly ImmutableDictionary<Type, IAssetLoader> _loaders = loaders.ToImmutableDictionary(l => l.AssetType);
-	private readonly Dictionary<int, IAsset> _idCache = [];
+	private readonly Dictionary<nint, IAsset> _idCache = [];
 	private readonly Dictionary<string, IAsset> _nameCache = [];
 
 	public virtual IAssetLoader GetLoader(Type assetType)
@@ -25,7 +25,7 @@ internal class GlobalAssetManager(ILogger<GlobalAssetManager> logger, IEnumerabl
 		return asset;
 	}
 
-	public T? Get<T>(int id) where T : class, IAsset
+	public T? Get<T>(nint id) where T : class, IAsset
 	{
 		return _idCache.TryGetValue(id, out var asset) ? (T)asset : default;
 	}

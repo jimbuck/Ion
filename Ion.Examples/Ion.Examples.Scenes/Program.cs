@@ -9,10 +9,13 @@ using Ion.Extensions.Graphics;
 using Ion.Extensions.Scenes;
 using Ion.Extensions.Coroutines;
 
+
+
+
 var builder = IonApplication.CreateBuilder(args);
 
 builder.Services.AddDebugUtils(builder.Configuration);
-builder.Services.AddVeldridGraphics(builder.Configuration, graphics =>
+builder.Services.AddWGPUGraphics(builder.Configuration, graphics =>
 {
 	graphics.Output = GraphicsOutput.Window;
 	graphics.ClearColor = Color.CornflowerBlue;
@@ -26,7 +29,7 @@ builder.Services.AddSingleton<TestMiddleware>();
 var game = builder.Build();
 game.UseDebugUtils();
 game.UseEvents();
-game.UseVeldridGraphics();
+game.UseWGPUGraphics();
 
 game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner coroutine) =>
 {
@@ -52,9 +55,11 @@ game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner corout
 	};
 });
 
-game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter) =>
+game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter, IWindow window) =>
 {
 	return dt => {
+		window.IsResizable = true;
+
 		eventEmitter.Emit<int>(42);
 		next(dt);
 	};
@@ -113,28 +118,28 @@ game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter, IInputState i
 
 game.UseScene((int)Scenes.MainMenu, scene =>
 {
-	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	{
-		return dt =>
-		{
-			spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
-			next(dt);
-		};
-	});
+	//scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
+	//{
+	//	return dt =>
+	//	{
+	//		spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
+	//		next(dt);
+	//	};
+	//});
 
 	//scene.UseSystem<TestMiddleware>();
 });
 
 game.UseScene((int)Scenes.Gameplay, scene =>
 {
-	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	{
-		return dt =>
-		{
-			spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
-			next(dt);
-		};
-	});
+	//scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
+	//{
+	//	return dt =>
+	//	{
+	//		spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
+	//		next(dt);
+	//	};
+	//});
 });
 
 game.UseRender(next => dt => Console.WriteLine("NEVER GETTING CALLED!"));
