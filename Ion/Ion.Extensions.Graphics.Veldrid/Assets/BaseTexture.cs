@@ -9,7 +9,7 @@ public abstract class BaseTexture : ITexture2D
 {
 	protected readonly VeldridLib.Texture _texture;
 
-	public int Id => _texture.GetHashCode();
+	public nint Id => _texture.GetHashCode();
 	public string Name => _texture.Name;
 
 	public Vector2 Size { get; }

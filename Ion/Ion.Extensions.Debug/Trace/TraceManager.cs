@@ -73,51 +73,54 @@ internal class TraceManager : ITraceManager
 			{
 				//{ "clock-offset-since-epoch", $"{_start}" },
 			},
-		}));
+		}, TraceExportJsonContext.Default.TraceExport));
 		_logger.LogDebug("Ion Trace output to {traceOutput}", traceOutputPath);
 	}
+}
 
-	private class TraceEvent
+internal partial class TraceEvent
+{
+	[JsonPropertyName("name")]
+	public string Name { get; set; }
+
+	[JsonPropertyName("tid")]
+	public long ThreadId { get; set; }
+
+	[JsonPropertyName("ts")]
+	public double Timestamp { get; set; }
+
+	[JsonPropertyName(name: "dur")]
+	public double Duration { get; set; }
+
+	[JsonPropertyName("ph")]
+	public string Phase { get; set; } = "X";
+
+	//[JsonPropertyName("cat")]
+	//public string? Categories { get; set; }
+
+	//[JsonPropertyName("args")]
+	//public Dictionary<string, object>? Args { get; set; } = new();
+
+	public TraceEvent(TraceTiming timing)
 	{
-		[JsonPropertyName("name")]
-		public string Name { get; set; }
-
-		[JsonPropertyName("tid")]
-		public long ThreadId { get; set; }
-
-		[JsonPropertyName("ts")]
-		public double Timestamp { get; set; }
-
-		[JsonPropertyName(name: "dur")]
-		public double Duration { get; set; }
-
-		[JsonPropertyName("ph")]
-		public string Phase { get; set; } = "X";
-
-		//[JsonPropertyName("cat")]
-		//public string? Categories { get; set; }
-
-		//[JsonPropertyName("args")]
-		//public Dictionary<string, object>? Args { get; set; } = new();
-
-		public TraceEvent(TraceTiming timing)
-		{
-			Name = timing.Name;
-			Timestamp = timing.Start;
-			Duration = timing.Duration;
-			ThreadId = timing.ThreadId;
-		}
-	}
-
-	private class TraceExport
-	{
-		[JsonPropertyName("controllerTraceDataKey")]
-		public string ControllerTraceDataKey { get; set; } = "systraceController";
-
-		[JsonPropertyName("metadata")]
-		public Dictionary<string, string> Metadata { get; set; } = new();
-
-		[JsonPropertyName("traceEvents")]
-		public List<TraceEvent> TraceEvents { get; set; } = new();
+		Name = timing.Name;
+		Timestamp = timing.Start;
+		Duration = timing.Duration;
+		ThreadId = timing.ThreadId;
 	}
 }
+
+internal partial class TraceExport
+{
+	[JsonPropertyName("controllerTraceDataKey")]
+	public string ControllerTraceDataKey { get; set; } = "systraceController";
+
+	[JsonPropertyName("metadata")]
+	public Dictionary<string, string> Metadata { get; set; } = new();
+
+	[JsonPropertyName("traceEvents")]
+	public List<TraceEvent> TraceEvents { get; set; } = new();
+}
+
+[JsonSerializable(typeof(TraceExport))]
+internal partial class TraceExportJsonContext : JsonSerializerContext { }

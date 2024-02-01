@@ -12,7 +12,7 @@ namespace Ion.Extensions.Graphics;
 /// </summary>
 public class FontSet : IFontSet
 {
-	public int Id => _fontSystem.GetHashCode();
+	public nint Id => _fontSystem.GetHashCode();
 
 	public string Name { get; }
 

@@ -15,7 +15,7 @@ public static class UseSystemExtensions
 	/// <param name="app">The <see cref="IApplicationBuilder"/> instance.</param>
 	/// <param name="args">The arguments to pass to the middleware type instance's constructor.</param>
 	/// <returns>The <see cref="IApplicationBuilder"/> instance.</returns>
-	public static IIonApplication UseSystem(this IIonApplication app, Type middlewareType)
+	public static IIonApplication UseSystem(this IIonApplication app, [DynamicallyAccessedMembers(MiddlewareAccessibility)] Type middlewareType)
 	{
 		return UseSystem(app, middlewareType, middlewareType);
 	}
@@ -32,7 +32,7 @@ public static class UseSystemExtensions
 		return UseSystem(app, typeof(TMiddleware), typeof(TMiddleware));
 	}
 
-	public static IIonApplication UseSystem<TService, [DynamicallyAccessedMembers(MiddlewareAccessibility)] TImplementation>(this IIonApplication app)
+	public static IIonApplication UseSystem<[DynamicallyAccessedMembers(MiddlewareAccessibility)] TService, [DynamicallyAccessedMembers(MiddlewareAccessibility)] TImplementation>(this IIonApplication app)
 	{
 		return UseSystem(app, typeof(TService), typeof(TImplementation));
 	}
@@ -44,7 +44,7 @@ public static class UseSystemExtensions
 	/// <param name="implementationType">The middleware type.</param>
 	/// <param name="args">The arguments to pass to the middleware type instance's constructor.</param>
 	/// <returns>The <see cref="IApplicationBuilder"/> instance.</returns>
-	public static IIonApplication UseSystem(this IIonApplication app, Type serviceType, [DynamicallyAccessedMembers(MiddlewareAccessibility)] Type implementationType)
+	public static IIonApplication UseSystem(this IIonApplication app, [DynamicallyAccessedMembers(MiddlewareAccessibility)] Type serviceType, [DynamicallyAccessedMembers(MiddlewareAccessibility)] Type implementationType)
 	{
 		var methods = implementationType.GetMethods(BindingFlags.Instance | BindingFlags.Public);
 

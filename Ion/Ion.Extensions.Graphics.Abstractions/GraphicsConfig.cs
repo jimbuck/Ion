@@ -12,6 +12,7 @@ public class GraphicsConfig
 	public uint MaxFPS { get; set; }
 	public GraphicsOutput Output { get; set; } = GraphicsOutput.Window;
 	public Color ClearColor { get; set; } = Color.Black;
+	public string? CanvasSelector { get; set; }
 }
 
 public enum GraphicsOutput : byte

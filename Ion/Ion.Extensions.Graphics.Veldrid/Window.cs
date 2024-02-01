@@ -24,26 +24,26 @@ internal class Window : IWindow
 	private (int Width, int Height) _prevSize = (0, 0);
 	private bool _closeHandled = false;
 
-	public int Width
+	public uint Width
 	{
-		get => Sdl2Window?.Width ?? 0;
+		get => (uint)(Sdl2Window?.Width ?? 0);
 		set {
 			if (Sdl2Window != null)
 			{
-				Sdl2Window.Width = value;
+				Sdl2Window.Width = (int)value;
 				_size = _size with { X = value };
 			}
 		}
 	}
 
-	public int Height
+	public uint Height
 	{
-		get => Sdl2Window?.Height ?? 0;
+		get => (uint)(Sdl2Window?.Height ?? 0);
 		set
 		{
 			if (Sdl2Window != null)
 			{
-				Sdl2Window.Height = value;
+				Sdl2Window.Height = (int)value;
 				_size = _size with { Y = value };
 			}
 		}
