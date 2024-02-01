@@ -1,102 +1,74 @@
-﻿//using System.Numerics;
+﻿using System.Numerics;
 
-//using FontStashSharp.Interfaces;
-//using FontStashSharp;
-//using Ion.Extensions.Debug;
-//using SixLabors.ImageSharp.PixelFormats;
+using FontStashSharp.Interfaces;
+using FontStashSharp;
 
-//namespace Ion.Extensions.Graphics;
+using WebGPU;
 
-//internal class FontRenderer(SpriteRenderer spriteRenderer, ITexture2DManager textureManager, ITraceTimer<FontRenderer> trace) : IFontStashRenderer
-//{
-//	public ITexture2DManager TextureManager { get; } = textureManager;
+using Ion.Extensions.Debug;
 
-//	public void Draw(object textureObj, Vector2 pos, System.Drawing.Rectangle? src, FSColor fsColor, float rotation, Vector2 scale, float depth)
-//	{
-//		var timer = trace.Start("FontRenderer::Draw");
+namespace Ion.Extensions.Graphics;
 
-//		var texture = (Texture2D)textureObj;
+internal class FontRenderer(SpriteRenderer spriteRenderer, ITexture2DManager textureManager, ITraceTimer<FontRenderer> trace) : IFontStashRenderer
+{
+	public ITexture2DManager TextureManager { get; } = textureManager;
 
-//		var sourceRectangle = src.HasValue ? (RectangleF)src.Value : new RectangleF(0, 0, texture.Size.X, texture.Size.Y);
-//		var color = new Color(fsColor.R, fsColor.G, fsColor.B, fsColor.A);
+	public void Draw(object textureObj, Vector2 pos, System.Drawing.Rectangle? src, FSColor fsColor, float rotation, Vector2 scale, float depth)
+	{
+		var timer = trace.Start("FontRenderer::Draw");
 
-//		spriteRenderer.Draw(
-//			texture: texture,
-//			position: pos,
-//			sourceRectangle: sourceRectangle,
-//			color: color,
-//			rotation: rotation,
-//			origin: Vector2.Zero,
-//			scale: scale,
-//			options: SpriteEffect.None,
-//			depth: depth);
+		var texture = (Texture2D)textureObj;
 
-//		timer.Stop();
-//	}
-//}
+		var sourceRectangle = src.HasValue ? (RectangleF)src.Value : new RectangleF(0, 0, texture.Size.X, texture.Size.Y);
+		var color = new Color(fsColor.R, fsColor.G, fsColor.B, fsColor.A);
 
-//internal class FontStashTexture2DManager(IGraphicsContext graphicsContext, ITraceTimer<FontStashTexture2DManager> trace) : ITexture2DManager
-//{
-//	private int _textureNum = 0;
+		spriteRenderer.Draw(
+			texture: texture,
+			position: pos,
+			sourceRectangle: sourceRectangle,
+			color: color,
+			rotation: rotation,
+			origin: Vector2.Zero,
+			scale: scale,
+			options: SpriteEffect.None,
+			depth: depth);
 
-//	public object CreateTexture(int width, int height)
-//	{
-//		var timer = trace.Start("FontStashTexture2DManager::CreateTexture");
+		timer.Stop();
+	}
+}
 
-//		ArgumentNullException.ThrowIfNull(graphicsContext.Device);
+internal unsafe class FontStashTexture2DManager(IGraphicsContext graphicsContext, ITraceTimer<FontStashTexture2DManager> trace) : ITexture2DManager
+{
+	private int _textureNum = 0;
 
-//		var texture = graphicsContext.CreateTexture2D(new Wgpu.TextureDescriptor
-//		{
-//			label = $"FontTexture{_textureNum++}",
-//			dimension = Wgpu.TextureDimension.TwoDimensions,
-//			size = new Wgpu.Extent3D() { width = (uint)width, height = (uint)height, depthOrArrayLayers = 1 },
-//			format = Wgpu.TextureFormat.BGRA8Unorm,
-//			usage = (uint)(Wgpu.TextureUsage.TextureBinding | Wgpu.TextureUsage.CopyDst),
-//			mipLevelCount = 1,
-//			sampleCount = 1
-//		});
+	public object CreateTexture(int width, int height)
+	{
+		var timer = trace.Start("FontStashTexture2DManager::CreateTexture");
 
-//		timer.Stop();
+		ArgumentNullException.ThrowIfNull(graphicsContext.Device);
 
-//		return new Texture2D(texture);
-//	}
+		Texture2D texture = graphicsContext.CreateTexture2D($"FontTexture{_textureNum++}", width, height, WGPUTextureUsage.TextureBinding | WGPUTextureUsage.CopyDst, WGPUTextureFormat.BGRA8Unorm);
 
-//	public void SetTextureData(object textureObj, System.Drawing.Rectangle bounds, byte[] data)
-//	{
-//		var timer = trace.Start("FontStashTexture2DManager::SetTextureData");
+		timer.Stop();
 
-//		if (textureObj is not Texture2D texture) throw new ArgumentException("textureObj is not a Texture2D", nameof(textureObj));
+		return texture;
+	}
 
-//		_setTextureData(texture, bounds, data);
+	public void SetTextureData(object textureObj, System.Drawing.Rectangle bounds, byte[] data)
+	{
+		var timer = trace.Start("FontStashTexture2DManager::SetTextureData");
 
-//		timer.Stop();
-//	}
+		if (textureObj is not Texture2D texture) throw new ArgumentException("textureObj is not a Texture2D", nameof(textureObj));
 
-//	private unsafe void _setTextureData(Texture2D texture, System.Drawing.Rectangle bounds, byte[] data)
-//	{
-//		graphicsContext.Device.Queue.WriteTexture<byte>(
-//			destination: new ImageCopyTexture
-//			{
-//				Aspect = Wgpu.TextureAspect.All,
-//				MipLevel = 0,
-//				Origin = default,
-//				Texture = texture
-//			},
-//			data: data,
-//			dataLayout: new Wgpu.TextureDataLayout
-//			{
-//				bytesPerRow = (uint)(sizeof(Bgra32) * texture.Size.X),
-//				offset = 0,
-//				rowsPerImage = (uint)texture.Size.Y
-//			},
-//			writeSize: new Wgpu.Extent3D { width = (uint)bounds.Width, height = (uint)bounds.Height, depthOrArrayLayers = 1 }
-//		);
-//	}
+		graphicsContext.WriteTexture2D(texture, data, 0, new Rectangle(bounds.X, bounds.Y, bounds.Width, bounds.Height));
 
-//	public System.Drawing.Point GetTextureSize(object texture)
-//	{
-//		var ionTexture = (Texture2D)texture;
+		timer.Stop();
+	}
 
-//		return new System.Drawing.Point((int)ionTexture.Size.X, (int)ionTexture.Size.Y);
-//	}
-//}
+	public System.Drawing.Point GetTextureSize(object texture)
+	{
+		var ionTexture = (Texture2D)texture;
+
+		return new System.Drawing.Point((int)ionTexture.Size.X, (int)ionTexture.Size.Y);
+	}
+}

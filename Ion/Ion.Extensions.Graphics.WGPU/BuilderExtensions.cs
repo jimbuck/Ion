@@ -23,13 +23,13 @@ public static class BuilderExtensions
 			.AddSingleton<IWindow, Window>()
 			.AddSingleton<IGraphicsContext, GraphicsContext>()
 			.AddSingleton<TriangleRenderer>()
-			//.AddSingleton<SpriteRenderer>()
-			//.AddSingleton<FontRenderer>()
-			//.AddSingleton<ITexture2DManager, FontStashTexture2DManager>()
-			//.AddSingleton<ISpriteBatch, SpriteBatch>()
+			.AddSingleton<SpriteRenderer>()
+			.AddSingleton<FontRenderer>()
+			.AddSingleton<ITexture2DManager, FontStashTexture2DManager>()
+			.AddSingleton<ISpriteBatch, SpriteBatch>()
 
 			// Loaders
-			//.AddSingleton<IAssetLoader, Texture2DLoader>()
+			.AddSingleton<IAssetLoader, Texture2DLoader>()
 			.AddSingleton<IAssetLoader, FontLoader>()
 
 			// Implementation-specific Systems
@@ -51,6 +51,7 @@ public static class BuilderExtensions
 			.UseSystem<InputSystem>()
 			.UseSystem<GraphicsSystem>()
 			.UseSystem<TriangleRenderer>()
-			.UseSystem<SpriteBatchSystem>();
+			.UseSystem<SpriteBatchSystem>()
+			;
 	}
 }

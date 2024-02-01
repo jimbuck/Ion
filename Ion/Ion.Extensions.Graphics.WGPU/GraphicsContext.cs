@@ -176,6 +176,10 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 		_updateRenderTarget();
 
 		_encoder = wgpuDeviceCreateCommandEncoder(_device, "Main Command Encoder");
+
+		// TODO: Create initial render pass to clear the screen (try to reuse resources instead of creating each frame).
+
+
 		// wgpuCommandEncoderPushDebugGroup(_encoder, frameName);
 
 

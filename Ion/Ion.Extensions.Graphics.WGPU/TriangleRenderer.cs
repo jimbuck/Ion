@@ -1,25 +1,12 @@
-﻿using Microsoft.Extensions.Logging;
-
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
 
 using WebGPU;
-
 using static WebGPU.WebGPU;
 
 namespace Ion.Extensions.Graphics;
 
-
-
-[StructLayout(LayoutKind.Sequential, Pack = 4)]
-public readonly struct VertexPositionColor(in Vector3 position, in Vector4 color)
-{
-	public static unsafe readonly int SizeInBytes = sizeof(VertexPositionColor);
-	public readonly Vector3 Position = position;
-	public readonly Vector4 Color = color;
-}
-
-public unsafe class TriangleRenderer(IGraphicsContext graphics, ILogger<TriangleRenderer> logger)
+public unsafe class TriangleRenderer(IGraphicsContext graphics)
 {
 	private WGPUPipelineLayout _pipelineLayout;
 	private WGPURenderPipeline _pipeline;
@@ -186,6 +173,8 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 			return;
 		}
 
+		wgpuCommandEncoderPushDebugGroup(graphics.Encoder, "TriangleRenderer");
+
 		WGPUTextureView targetView = wgpuTextureCreateView(graphics.RenderTarget, null);
 
 		WGPURenderPassColorAttachment renderPassColorAttachment = new()
@@ -193,9 +182,8 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 			view = targetView,
 			// Not relevant here because we do not use multi-sampling
 			resolveTarget = WGPUTextureView.Null,
-			loadOp = WGPULoadOp.Clear,
-			storeOp = WGPUStoreOp.Store,
-			clearValue = new WGPUColor(0.0, 0.0, 0.0, 1.0)
+			loadOp = WGPULoadOp.Load,
+			storeOp = WGPUStoreOp.Store
 		};
 
 		// Describe a render pass, which targets the texture view
@@ -224,6 +212,8 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 
 		wgpuTextureViewReference(targetView);
 
+		wgpuCommandEncoderPopDebugGroup(graphics.Encoder);
+
 		next(dt);
 	}
 
@@ -233,5 +223,14 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 		wgpuRenderPipelineRelease(_pipeline);
 		wgpuBufferDestroy(_vertexBuffer);
 		wgpuBufferRelease(_vertexBuffer);
+	}
+
+	[StructLayout(LayoutKind.Sequential, Pack = 4)]
+	public readonly struct VertexPositionColor(in Vector3 position, in Vector4 color)
+	{
+		public static unsafe readonly int SizeInBytes = sizeof(VertexPositionColor);
+
+		public readonly Vector3 Position = position;
+		public readonly Vector4 Color = color;
 	}
 }
