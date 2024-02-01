@@ -348,13 +348,13 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 	{
 		return backend switch
 		{
-			WGPUBackendType.Null => true,
+			WGPUBackendType.Null => false,
 			WGPUBackendType.D3D11 or WGPUBackendType.D3D12 => RuntimeInformation.IsOSPlatform(OSPlatform.Windows),
 			WGPUBackendType.Vulkan => true,
 			WGPUBackendType.OpenGL => true,
 			WGPUBackendType.Metal => RuntimeInformation.IsOSPlatform(OSPlatform.OSX),
 			WGPUBackendType.OpenGLES => !RuntimeInformation.IsOSPlatform(OSPlatform.OSX),
-			WGPUBackendType.WebGPU => false, // Not yet implemented.
+			WGPUBackendType.WebGPU => OperatingSystem.IsBrowser(),
 			_ => throw new Exception("Illegal backend!"),
 		};
 	}

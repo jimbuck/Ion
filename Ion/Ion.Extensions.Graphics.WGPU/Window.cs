@@ -1,14 +1,15 @@
 ﻿using System.Numerics;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using SDL;
+using static SDL.SDL;
+using static SDL.SDL_bool;
 using WebGPU;
 using static WebGPU.WebGPU;
 
-using static SDL.SDL;
-using static SDL.SDL_bool;
-using System.Runtime.InteropServices;
+using Ion.Extensions.Graphics.MacOS;
 
 namespace Ion.Extensions.Graphics;
 
@@ -204,25 +205,24 @@ internal class Window(
 		}
 		else if (OperatingSystem.IsMacOS() || OperatingSystem.IsMacCatalyst())
 		{
-			throw new NotImplementedException("macOS is not yet supported.");
-			//NSWindow ns_window = new(SDL_GetProperty(SDL_GetWindowProperties(_window), "SDL.window.cocoa.window"));
-			//CAMetalLayer metal_layer = CAMetalLayer.New();
-			//ns_window.contentView.wantsLayer = true;
-			//ns_window.contentView.layer = metal_layer.Handle;
+			NSWindow ns_window = new(SDL_GetProperty(SDL_GetWindowProperties(_window), "SDL.window.cocoa.window"));
+			CAMetalLayer metal_layer = CAMetalLayer.New();
+			ns_window.contentView.wantsLayer = true;
+			ns_window.contentView.layer = metal_layer.Handle;
 
-			//WGPUSurfaceDescriptorFromMetalLayer chain = new()
-			//{
-			//	layer = metal_layer.Handle,
-			//	chain = new WGPUChainedStruct()
-			//	{
-			//		sType = WGPUSType.SurfaceDescriptorFromMetalLayer
-			//	}
-			//};
-			//WGPUSurfaceDescriptor descriptor = new()
-			//{
-			//	nextInChain = (WGPUChainedStruct*)&chain
-			//};
-			//return wgpuInstanceCreateSurface(instance, &descriptor);
+			WGPUSurfaceDescriptorFromMetalLayer chain = new()
+			{
+				layer = metal_layer.Handle,
+				chain = new WGPUChainedStruct()
+				{
+					sType = WGPUSType.SurfaceDescriptorFromMetalLayer
+				}
+			};
+			WGPUSurfaceDescriptor descriptor = new()
+			{
+				nextInChain = (WGPUChainedStruct*)&chain
+			};
+			return wgpuInstanceCreateSurface(instance, &descriptor);
 		}
 		else if (OperatingSystem.IsLinux())
 		{
@@ -252,6 +252,28 @@ internal class Window(
 					chain = new WGPUChainedStruct()
 					{
 						sType = WGPUSType.SurfaceDescriptorFromXlibWindow
+					}
+				};
+				WGPUSurfaceDescriptor descriptor = new()
+				{
+					nextInChain = (WGPUChainedStruct*)&chain
+				};
+				return wgpuInstanceCreateSurface(instance, &descriptor);
+			}
+		}
+		else if (OperatingSystem.IsBrowser())
+		{
+			var config = graphicsConfig.CurrentValue;
+			if (string.IsNullOrWhiteSpace(config.CanvasSelector)) throw new ArgumentNullException(nameof(config.CanvasSelector), "No Canvas HTML selector was provided!");
+
+			fixed (sbyte* selector = Interop.GetUtf8Span(config.CanvasSelector))
+			{
+				WGPUSurfaceDescriptorFromCanvasHTMLSelector chain = new()
+				{
+					selector = selector,
+					chain = new WGPUChainedStruct()
+					{
+						sType = WGPUSType.SurfaceDescriptorFromCanvasHTMLSelector
 					}
 				};
 				WGPUSurfaceDescriptor descriptor = new()
