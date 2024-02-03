@@ -50,8 +50,7 @@ public static class BuilderExtensions
 			.UseSystem<WindowSystem>()
 			.UseSystem<InputSystem>()
 			.UseSystem<GraphicsSystem>()
-			.UseSystem<TriangleRenderer>()
 			.UseSystem<SpriteBatchSystem>()
-			;
+			.UseSystem<TriangleRenderer>();
 	}
 }

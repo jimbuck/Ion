@@ -34,6 +34,17 @@ public class GameLoop
 	public GameLoopDelegate Last { get; set; } = (dt) => { };
 	public GameLoopDelegate Destroy { get; set; } = (dt) => { };
 
+
+	public bool Rebuild { get; set; } = false;
+
+	public MiddlewarePipelineBuilder InitBuilder { get; set; } = default!;
+	public MiddlewarePipelineBuilder FirstBuilder { get; set; } = default!;
+	public MiddlewarePipelineBuilder UpdateBuilder { get; set; } = default!;
+	public MiddlewarePipelineBuilder FixedUpdateBuilder { get; set; } = default!;
+	public MiddlewarePipelineBuilder RenderBuilder { get; set; } = default!;
+	public MiddlewarePipelineBuilder LastBuilder { get; set; } = default!;
+	public MiddlewarePipelineBuilder DestroyBuilder { get; set; } = default!;
+
 	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events, ITraceTimer<GameLoop> trace) {
 		_gameConfig = gameConfig;
 		_events = events;
@@ -45,6 +56,17 @@ public class GameLoop
 			Alpha = 1,
 			Delta = 1f / MaxFPS,
 		};
+	}
+
+	public void Build()
+	{
+		Init = InitBuilder.Build();
+		First = FirstBuilder.Build();
+		Update = UpdateBuilder.Build();
+		FixedUpdate = FixedUpdateBuilder.Build();
+		Render = RenderBuilder.Build();
+		Last = LastBuilder.Build();
+		Destroy = DestroyBuilder.Build();
 	}
 
 	public void Run()
@@ -97,6 +119,12 @@ public class GameLoop
 			}
 
 			GameTime.Frame = FixedGameTime.Frame = (GameTime.Frame + 1);
+
+			if (Rebuild)
+			{
+				Build();
+				Rebuild = false;
+			}
 		}
 
 		Destroy(GameTime);
@@ -116,4 +144,9 @@ public class GameLoop
 
 		Last(time);
     }
+
+	public void Stop()
+	{
+		_shouldExit = true;
+	}
 }

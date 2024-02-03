@@ -10,13 +10,13 @@ public class IonApplication : IIonApplication, IDisposable
 {
 	private readonly IHost _host;
 
-	private readonly IMiddlewarePipelineBuilder _init = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _first = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _fixedUpdate = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _update = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _render = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _last = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _destroy = new MiddlewarePipelineBuilder();
+	private readonly MiddlewarePipelineBuilder _init = new();
+	private readonly MiddlewarePipelineBuilder _first = new();
+	private readonly MiddlewarePipelineBuilder _fixedUpdate = new();
+	private readonly MiddlewarePipelineBuilder _update = new();
+	private readonly MiddlewarePipelineBuilder _render = new();
+	private readonly MiddlewarePipelineBuilder _last = new();
+	private readonly MiddlewarePipelineBuilder _destroy = new();
 
 	/// <summary>
 	/// The application's configured services.
@@ -90,13 +90,15 @@ public class IonApplication : IIonApplication, IDisposable
 	{
 		var gameLoop = ActivatorUtilities.CreateInstance<GameLoop>(Services);
 
-		gameLoop.Init = _init.Build();
-		gameLoop.First = _first.Build();
-		gameLoop.FixedUpdate = _fixedUpdate.Build();
-		gameLoop.Update = _update.Build();
-		gameLoop.Render = _render.Build();
-		gameLoop.Last = _last.Build();
-		gameLoop.Destroy = _destroy.Build();
+		gameLoop.InitBuilder = _init;
+		gameLoop.FirstBuilder = _first;
+		gameLoop.FixedUpdateBuilder = _fixedUpdate;
+		gameLoop.UpdateBuilder = _update;
+		gameLoop.RenderBuilder = _render;
+		gameLoop.LastBuilder = _last;
+		gameLoop.DestroyBuilder = _destroy;
+
+		gameLoop.Build();
 
 		return gameLoop;
 	}
@@ -105,6 +107,10 @@ public class IonApplication : IIonApplication, IDisposable
 	{
 		var gameLoop = Build();
 
+#if DEBUG
+		HotReloadService.ActiveApplication = this;
+		HotReloadService.ActiveGameLoop = gameLoop;
+#endif
 		gameLoop.Run();
 	}
 

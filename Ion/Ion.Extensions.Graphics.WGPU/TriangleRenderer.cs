@@ -2,7 +2,6 @@
 using System.Runtime.InteropServices;
 
 using WebGPU;
-using static WebGPU.WebGPU;
 
 namespace Ion.Extensions.Graphics;
 
@@ -15,13 +14,8 @@ public unsafe class TriangleRenderer(IGraphicsContext graphics)
 	[Init]
 	public void Initialize(GameTime dt, GameLoopDelegate next)
 	{
-		WGPUPipelineLayoutDescriptor layoutDesc = new()
-		{
-			nextInChain = null,
-			bindGroupLayoutCount = 0,
-			bindGroupLayouts = null
-		};
-		_pipelineLayout = wgpuDeviceCreatePipelineLayout(graphics.Device, &layoutDesc);
+		_pipelineLayout = graphics.Device.CreatePipelineLayout();
+
 
 		string shaderSource = @"struct VertexInput {
     @location(0) position: vec3f,
@@ -54,7 +48,7 @@ fn vertexMain(in: VertexInput) -> VertexOutput {
 fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
     return vec4f(in.color, 1.0);
 }";
-		WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(graphics.Device, shaderSource);
+		WGPUShaderModule shaderModule = graphics.Device.CreateShaderModule(shaderSource);
 
 		// Vertex fetch
 		WGPUVertexAttribute* vertexAttributes = stackalloc WGPUVertexAttribute[2] {
@@ -148,18 +142,18 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 			// Default value as well (irrelevant for count = 1 anyways)
 			pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
-			_pipeline = wgpuDeviceCreateRenderPipeline(graphics.Device, &pipelineDesc);
+			_pipeline = graphics.Device.CreateRenderPipeline(pipelineDesc);
 		}
 
-		wgpuShaderModuleRelease(shaderModule);
+		shaderModule.Release();
 
 		ReadOnlySpan<VertexPositionColor> vertexData = [
-			new(new Vector3(0.0f, 0.5f, 0.5f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)),
+			new(new Vector3(0.0f, 0.75f, 0.5f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)),
 			new(new Vector3(0.5f, -0.5f, 0.5f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f)),
 			new(new Vector3(-0.5f, -0.5f, 0.5f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)),
 		];
-		_vertexBuffer = wgpuDeviceCreateBuffer(graphics.Device, WGPUBufferUsage.Vertex | WGPUBufferUsage.CopyDst, vertexData.Length * VertexPositionColor.SizeInBytes);
-		wgpuQueueWriteBuffer(graphics.Queue, _vertexBuffer, vertexData);
+		_vertexBuffer = graphics.Device.CreateBuffer(WGPUBufferUsage.Vertex | WGPUBufferUsage.CopyDst, vertexData.Length * VertexPositionColor.SizeInBytes);
+		graphics.Queue.WriteBuffer(_vertexBuffer, vertexData);
 
 		next(dt);
 	}
@@ -167,15 +161,13 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 	[Render]
 	public void OnDraw(GameTime dt, GameLoopDelegate next)
 	{
-		if (graphics.RenderTarget.IsNull)
-		{
-			next(dt);
-			return;
-		}
+		next(dt);
 
-		wgpuCommandEncoderPushDebugGroup(graphics.Encoder, "TriangleRenderer");
+		var encoder = graphics.Device.CreateCommandEncoder("TriangleRendererCommandEncoder");
 
-		WGPUTextureView targetView = wgpuTextureCreateView(graphics.RenderTarget, null);
+		encoder.PushDebugGroup("TriangleRenderer");
+
+		WGPUTextureView targetView = graphics.RenderTarget.CreateView();
 
 		WGPURenderPassColorAttachment renderPassColorAttachment = new()
 		{
@@ -201,28 +193,30 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 
 		// Create a render pass. We end it immediately because we use its built-in
 		// mechanism for clearing the screen when it begins (see descriptor).
-		WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(graphics.Encoder, &renderPassDesc);
+		var renderPass = encoder.BeginRenderPass(renderPassDesc);
 
-		wgpuRenderPassEncoderSetPipeline(renderPass, _pipeline);
-		wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, _vertexBuffer);
+		renderPass.SetPipeline(_pipeline);
+		renderPass.SetVertexBuffer(0, _vertexBuffer);
 
-		wgpuRenderPassEncoderDraw(renderPass, 3);
+		renderPass.Draw(3);
 
-		wgpuRenderPassEncoderEnd(renderPass);
+		renderPass.End();
 
-		wgpuTextureViewReference(targetView);
+		//wgpuTextureViewReference(targetView);
 
-		wgpuCommandEncoderPopDebugGroup(graphics.Encoder);
+		encoder.PopDebugGroup();
 
-		next(dt);
+		var commandBuffer = encoder.Finish("TriangleRendererCommandBuffer");
+		graphics.Queue.Submit(commandBuffer);
+
+		encoder.Release();
 	}
 
 	public void Dispose()
 	{
-		wgpuPipelineLayoutRelease(_pipelineLayout);
-		wgpuRenderPipelineRelease(_pipeline);
-		wgpuBufferDestroy(_vertexBuffer);
-		wgpuBufferRelease(_vertexBuffer);
+		_pipelineLayout.Release();
+		_pipeline.Release();
+		_vertexBuffer.Dispose();
 	}
 
 	[StructLayout(LayoutKind.Sequential, Pack = 4)]

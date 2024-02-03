@@ -1,6 +1,5 @@
 ﻿using System.Numerics;
 using WebGPU;
-using static WebGPU.WebGPU;
 
 using Ion.Extensions.Debug;
 using Ion.Extensions.Assets;
@@ -32,15 +31,11 @@ internal class SpriteRenderer(
 
 		var timer = trace.Start("SpriteRenderer::Initialize");
 
-		_whitePixel = graphics.CreateTexture2D("SpriteRendererWhitePixel", 1, 1, WGPUTextureUsage.TextureBinding | WGPUTextureUsage.CopyDst, WGPUTextureFormat.RGBA8Unorm);
+		_whitePixel = graphics.CreateTexture2D("SpriteRendererWhitePixel", 1, 1, WGPUTextureUsage.TextureBinding | WGPUTextureUsage.CopyDst, graphics.SwapChainFormat);
+		graphics.WriteTexture2D(_whitePixel, new byte[] { 255, 255, 255, 255 });
 
-		WGPUPipelineLayoutDescriptor layoutDesc = new()
-		{
-			nextInChain = null,
-			bindGroupLayoutCount = 0,
-			bindGroupLayouts = null
-		};
-		_pipelineLayout = wgpuDeviceCreatePipelineLayout(graphics.Device, &layoutDesc);
+		
+		_pipelineLayout = graphics.Device.CreatePipelineLayout();
 
 		string shaderSource = @"struct VertexInput {
     @location(0) position: vec3f,
@@ -73,7 +68,7 @@ fn vertexMain(in: VertexInput) -> VertexOutput {
 fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
     return vec4f(in.color, 1.0);
 }";
-		WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(graphics.Device, shaderSource);
+		WGPUShaderModule shaderModule = graphics.Device.CreateShaderModule(shaderSource);
 
 		// Vertex fetch
 		WGPUVertexAttribute* vertexAttributes = stackalloc WGPUVertexAttribute[2] {
@@ -165,18 +160,18 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 			// Default value as well (irrelevant for count = 1 anyways)
 			pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
-			_pipeline = wgpuDeviceCreateRenderPipeline(graphics.Device, &pipelineDesc);
+			_pipeline = graphics.Device.CreateRenderPipeline(pipelineDesc);
 		}
 
-		wgpuShaderModuleRelease(shaderModule);
+		shaderModule.Release();
 
 		Span<VertexPositionColor> vertexData = [
-			new(new Vector3(-0.5f, 0.5f, 0.5f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)),
-			new(new Vector3(0.5f, 0.5f, 0.5f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f)),
+			new(new Vector3(-0.5f, 0.5f, 0.5f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f)),
+			new(new Vector3(0.5f, 0.5f, 0.5f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)),
 			new(new Vector3(0.5f, -0.5f, 0.5f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)),
 			new(new Vector3(-0.5f, -0.5f, 0.5f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f))
 		];
-		_vertexBuffer = wgpuDeviceCreateBuffer(graphics.Device, graphics.Queue, vertexData, WGPUBufferUsage.Vertex);
+		_vertexBuffer = graphics.Device.CreateBuffer(graphics.Queue, vertexData, WGPUBufferUsage.Vertex);
 
 		// Index buffer
 		Span<ushort> indices = [
@@ -187,7 +182,7 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 			2,
 			3,    // second triangle
 		];
-		_indexBuffer = wgpuDeviceCreateBuffer(graphics.Device, graphics.Queue, indices, WGPUBufferUsage.Index | WGPUBufferUsage.CopyDst);
+		_indexBuffer = graphics.Device.CreateBuffer(graphics.Queue, indices, WGPUBufferUsage.Index | WGPUBufferUsage.CopyDst);
 
 		timer.Stop();
 	}
@@ -213,15 +208,13 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 
 		_beginCalled = false;
 
-		if (graphics.Device.IsNull) return;
-
 		var timer = trace.Start("End");
 
-		var encoder = wgpuDeviceCreateCommandEncoder(graphics.Device, "SpriteRenderer Command Encoder");
+		var encoder = graphics.Device.CreateCommandEncoder("SpriteRenderer Command Encoder");
 
-		wgpuCommandEncoderPushDebugGroup(encoder, "SpriteRenderer");
+		encoder.PushDebugGroup("SpriteRenderer");
 
-		WGPUTextureView targetView = wgpuTextureCreateView(graphics.RenderTarget, null);
+		WGPUTextureView targetView = graphics.RenderTarget.CreateView();
 
 		WGPURenderPassColorAttachment renderPassColorAttachment = new()
 		{
@@ -230,9 +223,8 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 			view = targetView,
 			// Not relevant here because we do not use multi-sampling
 			resolveTarget = WGPUTextureView.Null,
-			loadOp = WGPULoadOp.Clear,
+			loadOp = WGPULoadOp.Load,
 			storeOp = WGPUStoreOp.Store,
-			clearValue = new WGPUColor(0.0, 0.3, 0.5, 0.0)
 		};
 
 		// Describe a render pass, which targets the texture view
@@ -250,23 +242,23 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 
 		// Create a render pass. We end it immediately because we use its built-in
 		// mechanism for clearing the screen when it begins (see descriptor).
-		WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &renderPassDesc);
+		var renderPass = encoder.BeginRenderPass(renderPassDesc);
 
-		wgpuRenderPassEncoderSetPipeline(renderPass, _pipeline);
-		wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, _vertexBuffer);
-		wgpuRenderPassEncoderSetIndexBuffer(renderPass, _indexBuffer, WGPUIndexFormat.Uint16);
+		renderPass.SetPipeline(_pipeline);
+		renderPass.SetVertexBuffer(0, _vertexBuffer);
+		renderPass.SetIndexBuffer(_indexBuffer, WGPUIndexFormat.Uint16);
 
-		wgpuRenderPassEncoderDrawIndexed(renderPass, 6);
+		renderPass.DrawIndexed(6);
 
-		wgpuRenderPassEncoderEnd(renderPass);
-		wgpuTextureViewReference(targetView);
+		renderPass.End();
+		//wgpuTextureViewReference(targetView);
 
-		wgpuCommandEncoderPopDebugGroup(encoder);
+		encoder.PopDebugGroup();
 
-		WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, "Sprite Renderer Command Buffer");
-		wgpuQueueSubmit(graphics.Queue, command);
+		var command = encoder.Finish("Sprite Renderer Command Buffer");
+		graphics.Queue.Submit(command);
 
-		wgpuCommandEncoderRelease(encoder);
+		encoder.Release();
 
 		timer.Stop();
 	}
@@ -332,12 +324,10 @@ fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
 
 	public void Dispose()
 	{
-		wgpuPipelineLayoutRelease(_pipelineLayout);
-		wgpuRenderPipelineRelease(_pipeline);
-		wgpuBufferDestroy(_vertexBuffer);
-		wgpuBufferRelease(_vertexBuffer);
-		wgpuBufferDestroy(_indexBuffer);
-		wgpuBufferRelease(_indexBuffer);
+		_pipelineLayout.Release();
+		_pipeline.Release();
+		_vertexBuffer.Dispose();
+		_indexBuffer.Dispose();
 	}
 
 	private void _addSprite(ITexture2D texture, Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteEffect options)

@@ -17,11 +17,8 @@ public interface IGraphicsContext
 	bool NoRender { get; }
 	public WGPUDevice Device { get; }
 	public WGPUQueue Queue { get; }
-	public WGPUCommandEncoder Encoder { get; }
 	public WGPUTexture RenderTarget { get; }
 	public WGPUTextureFormat SwapChainFormat { get; }
-
-	void SubmitCommands(params WGPUCommandBuffer[] cl);
 
 	Matrix4x4 CreateOrthographic(float left, float right, float bottom, float top, float near, float far);
 	Matrix4x4 CreatePerspective(float fov, float aspectRatio, float near, float far);
@@ -45,12 +42,10 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 	private WGPUQueue _queue = default!;
 	private WGPUTextureFormat _swapchainFormat = default!;
 
-	private WGPUCommandEncoder _encoder = default!;
 	private WGPUTexture _renderTarget = default!;
 
 	public WGPUDevice Device => _device;
 	public WGPUQueue Queue => _queue;
-	public WGPUCommandEncoder Encoder => _encoder;
 	public WGPUTexture RenderTarget => _renderTarget;
 	public WGPUTextureFormat SwapChainFormat => _swapchainFormat;
 
@@ -174,22 +169,9 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 		var timer = _trace.Start("BeginFrame");
 
 		_updateRenderTarget();
+		_clearRenderTarget();
 
-		_encoder = wgpuDeviceCreateCommandEncoder(_device, "Main Command Encoder");
-
-		// TODO: Create initial render pass to clear the screen (try to reuse resources instead of creating each frame).
-
-
-		// wgpuCommandEncoderPushDebugGroup(_encoder, frameName);
-
-
-
-
-
-		//_renderTarget = _swapchain.GetCurrentTextureView() ?? throw new Exception("Could not acquire next swap chain texture");
-
-		//_encoder = _device.CreateCommandEncoder("MainCommandEncoder");
-
+		
 		//_mainRenderPass = _encoder.BeginRenderPass(
 		//	label: "MainRenderPass",
 		//	colorAttachments: [
@@ -220,16 +202,7 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 	{
 		if (NoRender) return;
 
-		var timer = _trace.Start("EndFrame::CommandSubmit");
-
-		// wgpuCommandEncoderPopDebugGroup(_encoder);
-
-		WGPUCommandBuffer command = wgpuCommandEncoderFinish(_encoder, "Main Command Buffer");
-		wgpuQueueSubmit(_queue, command);
-
-		wgpuCommandEncoderRelease(_encoder);
-
-		timer.Then("EndFrame::Present");
+		var timer = _trace.Start("EndFrame::Present");
 
 		// We can tell the surface to present the next texture.
 		wgpuSurfacePresent(_surface);
@@ -243,13 +216,6 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 			UpdateProjection(e.Data.Width, e.Data.Height);
 		}
 
-		timer.Stop();
-	}
-
-	public void SubmitCommands(params WGPUCommandBuffer[] commandList)
-	{
-		var timer = _trace.Start("SubmitCommands");
-		wgpuQueueSubmit(_queue, commandList);
 		timer.Stop();
 	}
 
@@ -297,6 +263,51 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 		}
 
 		_renderTarget = surfaceTexture.texture;
+	}
+
+	private void _clearRenderTarget()
+	{
+		var timer = _trace.Start("ClearRenderTarget");
+
+		var config = _config.CurrentValue;
+
+		var encoder = wgpuDeviceCreateCommandEncoder(_device, "Main Command Encoder");
+
+		WGPUTextureView targetView = _renderTarget.CreateView();
+
+		WGPURenderPassColorAttachment renderPassColorAttachment = new()
+		{
+			view = targetView,
+			// Not relevant here because we do not use multi-sampling
+			resolveTarget = WGPUTextureView.Null,
+			loadOp = WGPULoadOp.Clear,
+			storeOp = WGPUStoreOp.Store,
+			clearValue = new WGPUColor(config.ClearColor.R, config.ClearColor.G, config.ClearColor.B, config.ClearColor.A)
+		};
+
+		// Describe a render pass, which targets the texture view
+		WGPURenderPassDescriptor renderPassDesc = new()
+		{
+			nextInChain = null,
+			colorAttachmentCount = 1,
+			colorAttachments = &renderPassColorAttachment,
+			// No depth buffer for now
+			depthStencilAttachment = null,
+
+			// We do not use timers for now neither
+			timestampWrites = null
+		};
+
+		// Create a render pass. We end it immediately because we use its built-in
+		// mechanism for clearing the screen when it begins (see descriptor).
+		var renderPass = encoder.BeginRenderPass(renderPassDesc);
+		renderPass.End();
+
+		var clearCommand = encoder.Finish("ClearEncoder");
+
+		_queue.Submit(clearCommand);
+
+		timer.Stop();
 	}
 
 	public Matrix4x4 CreateOrthographic(float left, float right, float bottom, float top, float near, float far)

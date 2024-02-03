@@ -9,9 +9,6 @@ using Ion.Extensions.Graphics;
 using Ion.Extensions.Scenes;
 using Ion.Extensions.Coroutines;
 
-
-
-
 var builder = IonApplication.CreateBuilder(args);
 
 builder.Services.AddDebugUtils(builder.Configuration);
@@ -30,6 +27,7 @@ var game = builder.Build();
 game.UseDebugUtils();
 game.UseEvents();
 game.UseWGPUGraphics();
+
 
 game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner coroutine) =>
 {
@@ -67,8 +65,9 @@ game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter, IWindow window)
 
 game.UseFirst((GameLoopDelegate next, IInputState input, ITraceManager traceManager) =>
 {
-	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) => {
-		Console.WriteLine($"Frame: {dt.Frame}");
+	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
+	{
+		Console.WriteLine($"Frame: {dt.Frame}!");
 	});
 
 	return dt =>
@@ -127,7 +126,7 @@ game.UseScene((int)Scenes.MainMenu, scene =>
 	//	};
 	//});
 
-	//scene.UseSystem<TestMiddleware>();
+	scene.UseSystem<TestMiddleware>();
 });
 
 game.UseScene((int)Scenes.Gameplay, scene =>
@@ -164,7 +163,7 @@ public partial class TestMiddleware
 	[First]
 	public void CoolFirstMiddleware(GameTime dt, GameLoopDelegate next)
 	{
-		Console.WriteLine($"Class First {dt.Frame}");
+		//Console.WriteLine($"Class First {dt.Frame}");
 		next(dt);
 	}
 
@@ -175,7 +174,8 @@ public partial class TestMiddleware
 		uint count = 0;
 		return dt =>
 		{
-			Console.WriteLine($"Class Fixed Update inside {count++}");
+			count++;
+			//Console.WriteLine($"Class Fixed Update inside {count++}");
 			next(dt);
 		};
 	}

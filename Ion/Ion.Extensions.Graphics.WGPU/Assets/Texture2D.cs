@@ -1,5 +1,4 @@
-﻿using SixLabors.ImageSharp.PixelFormats;
-using WebGPU;
+﻿using WebGPU;
 
 using static WebGPU.WebGPU;
 
@@ -66,7 +65,7 @@ public unsafe static class TextureFactoryExtensions
 
 		var dataLayout = new WGPUTextureDataLayout
 		{
-			bytesPerRow = (uint)(sizeof(Bgra32) * texture.Size.X),
+			bytesPerRow = (uint)(texture.PixelSize * texture.Size.X),
 			offset = 0,
 			rowsPerImage = (uint)texture.Size.Y
 		};
