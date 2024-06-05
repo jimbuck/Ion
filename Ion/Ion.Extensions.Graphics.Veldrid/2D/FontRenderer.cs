@@ -17,7 +17,7 @@ internal class FontRenderer(SpriteRenderer spriteRenderer, ITexture2DManager tex
 
 		var texture = (Texture2D)textureObj;
 
-		var sourceRectangle = src.HasValue ? (RectangleF)src.Value : new RectangleF(0, 0, texture.Size.X, texture.Size.Y);
+		var sourceRectangle = src.HasValue ? (RectangleF)src.Value : new RectangleF(0, 0, texture.Width, texture.Height);
 		var color = new Color(fsColor.R, fsColor.G, fsColor.B, fsColor.A);
 
 		spriteRenderer.Draw(
@@ -70,6 +70,6 @@ internal class FontStashTexture2DManager(IGraphicsContext graphicsContext, ITrac
 	{
 		var ionTexture = (Texture2D)texture;
 
-		return new System.Drawing.Point((int)ionTexture.Size.X, (int)ionTexture.Size.Y);
+		return new System.Drawing.Point((int)ionTexture.Width, (int)ionTexture.Height);
 	}
 }

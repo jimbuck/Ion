@@ -6,7 +6,7 @@ namespace Ion.Extensions.Audio
 {
 	public class SoundEffect : ISoundEffect
 	{
-		public int Id { get; }
+		public nint Id { get; }
 
 		public string Name { get; }
 

@@ -9,7 +9,7 @@ namespace Ion;
 
 public class IonApplicationBuilder : IIonApplicationBuilder
 {
-	private HostApplicationBuilder _hostBuilder;
+	private readonly HostApplicationBuilder _hostBuilder;
 
 	public ConfigurationManager Configuration => _hostBuilder.Configuration;
 	public IServiceCollection Services => _hostBuilder.Services;

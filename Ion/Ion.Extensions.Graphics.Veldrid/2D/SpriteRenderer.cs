@@ -4,8 +4,6 @@ using Veldrid;
 using Veldrid.SPIRV;
 using Ion.Extensions.Debug;
 
-using Ion.Extensions.Assets;
-
 namespace Ion.Extensions.Graphics;
 
 internal class SpriteRenderer(
@@ -266,7 +264,7 @@ void main()
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
 		if (color == default) color = Color.White;
-		if (sourceRectangle.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Size.X, texture.Size.Y);
+		if (sourceRectangle.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
 
 		_addSprite(texture, color, sourceRectangle, destinationRectangle, origin, rotation, depth, _defaultScissor, options);
 	}
@@ -276,7 +274,7 @@ void main()
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
 		if (color == default) color = Color.White;
-		if (sourceRectangle.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Size.X, texture.Size.Y);
+		if (sourceRectangle.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
 
 		_addSprite(texture, color, sourceRectangle, new RectangleF(position.X, position.Y, scale.X * sourceRectangle.Size.X, scale.Y * sourceRectangle.Size.Y), origin, rotation, depth, _defaultScissor, options);
 	}
@@ -372,7 +370,7 @@ void main()
 	{
 		ref var instance = ref _batchManager.Add(texture);
 
-		instance.Update(texture.Size, destinationRect, sourceRect, color, rotation, origin, depth, _transformRectF(scissor, graphicsContext.ProjectionMatrix), options);
+		instance.Update(new Vector2(texture.Width, texture.Height), destinationRect, sourceRect, color, rotation, origin, depth, _transformRectF(scissor, graphicsContext.ProjectionMatrix), options);
 	}
 
 	private static RectangleF _transformRectF(RectangleF rect, Matrix4x4 matrix)

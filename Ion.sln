@@ -72,6 +72,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ion.Extensions.Assets.Abstr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ion.Extensions.Assets", "Ion\Ion.Extensions.Assets\Ion.Extensions.Assets.csproj", "{63F8B34A-3056-4EB4-A6AA-76508E7CA707}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ion.Extensions.Graphics.WGPU", "Ion\Ion.Extensions.Graphics.WGPU\Ion.Extensions.Graphics.WGPU.csproj", "{DC575907-E24D-4991-B90F-286B8EE342DD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -217,6 +219,12 @@ Global
 		{63F8B34A-3056-4EB4-A6AA-76508E7CA707}.DebugGenerators|Any CPU.Build.0 = Debug|Any CPU
 		{63F8B34A-3056-4EB4-A6AA-76508E7CA707}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{63F8B34A-3056-4EB4-A6AA-76508E7CA707}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DC575907-E24D-4991-B90F-286B8EE342DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC575907-E24D-4991-B90F-286B8EE342DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DC575907-E24D-4991-B90F-286B8EE342DD}.DebugGenerators|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC575907-E24D-4991-B90F-286B8EE342DD}.DebugGenerators|Any CPU.Build.0 = Debug|Any CPU
+		{DC575907-E24D-4991-B90F-286B8EE342DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DC575907-E24D-4991-B90F-286B8EE342DD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -246,6 +254,7 @@ Global
 		{647E9B1E-21CB-48A0-881D-072446AD0E39} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 		{C8C50528-0151-41B3-A78C-505034B1E1C6} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 		{63F8B34A-3056-4EB4-A6AA-76508E7CA707} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
+		{DC575907-E24D-4991-B90F-286B8EE342DD} = {A38C6AA1-BA6E-4DBC-BC7C-F0BD034224CE}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CCF839E2-AF6A-4444-95F2-76F60225DC55}

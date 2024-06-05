@@ -28,6 +28,7 @@ game.UseDebugUtils();
 game.UseEvents();
 game.UseVeldridGraphics();
 
+
 game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner coroutine) =>
 {
 	IEnumerator CountDown(int from)
@@ -52,9 +53,11 @@ game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner corout
 	};
 });
 
-game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter) =>
+game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter, IWindow window) =>
 {
 	return dt => {
+		window.IsResizable = true;
+
 		eventEmitter.Emit<int>(42);
 		next(dt);
 	};
@@ -62,8 +65,9 @@ game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter) =>
 
 game.UseFirst((GameLoopDelegate next, IInputState input, ITraceManager traceManager) =>
 {
-	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) => {
-		Console.WriteLine($"Frame: {dt.Frame}");
+	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
+	{
+		Console.WriteLine($"Frame: {dt.Frame}!");
 	});
 
 	return dt =>
@@ -113,28 +117,28 @@ game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter, IInputState i
 
 game.UseScene((int)Scenes.MainMenu, scene =>
 {
-	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	{
-		return dt =>
-		{
-			spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
-			next(dt);
-		};
-	});
+	//scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
+	//{
+	//	return dt =>
+	//	{
+	//		spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
+	//		next(dt);
+	//	};
+	//});
 
-	//scene.UseSystem<TestMiddleware>();
+	scene.UseSystem<TestMiddleware>();
 });
 
 game.UseScene((int)Scenes.Gameplay, scene =>
 {
-	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	{
-		return dt =>
-		{
-			spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
-			next(dt);
-		};
-	});
+	//scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
+	//{
+	//	return dt =>
+	//	{
+	//		spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
+	//		next(dt);
+	//	};
+	//});
 });
 
 game.UseRender(next => dt => Console.WriteLine("NEVER GETTING CALLED!"));
@@ -159,7 +163,7 @@ public partial class TestMiddleware
 	[First]
 	public void CoolFirstMiddleware(GameTime dt, GameLoopDelegate next)
 	{
-		Console.WriteLine($"Class First {dt.Frame}");
+		//Console.WriteLine($"Class First {dt.Frame}");
 		next(dt);
 	}
 
@@ -170,7 +174,8 @@ public partial class TestMiddleware
 		uint count = 0;
 		return dt =>
 		{
-			Console.WriteLine($"Class Fixed Update inside {count++}");
+			count++;
+			//Console.WriteLine($"Class Fixed Update inside {count++}");
 			next(dt);
 		};
 	}

@@ -24,26 +24,26 @@ internal class Window : IWindow
 	private (int Width, int Height) _prevSize = (0, 0);
 	private bool _closeHandled = false;
 
-	public int Width
+	public uint Width
 	{
-		get => Sdl2Window?.Width ?? 0;
+		get => (uint)(Sdl2Window?.Width ?? 0);
 		set {
 			if (Sdl2Window != null)
 			{
-				Sdl2Window.Width = value;
+				Sdl2Window.Width = (int)value;
 				_size = _size with { X = value };
 			}
 		}
 	}
 
-	public int Height
+	public uint Height
 	{
-		get => Sdl2Window?.Height ?? 0;
+		get => (uint)(Sdl2Window?.Height ?? 0);
 		set
 		{
 			if (Sdl2Window != null)
 			{
-				Sdl2Window.Height = value;
+				Sdl2Window.Height = (int)value;
 				_size = _size with { Y = value };
 			}
 		}
@@ -64,8 +64,9 @@ internal class Window : IWindow
 		}
 	}
 
-	public bool HasClosed { get; private set; }
-    public bool IsActive => (Sdl2Window?.Focused ?? false);
+	public bool IsClosing { get; private set; }
+	public bool IsClosed { get; private set; }
+	public bool IsActive => (Sdl2Window?.Focused ?? false);
 
 	public bool IsVisible
 	{
@@ -88,7 +89,7 @@ internal class Window : IWindow
 		get => (Sdl2Window?.WindowState ?? VeldridLib.WindowState.Hidden) == VeldridLib.WindowState.FullScreen;
 		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? VeldridLib.WindowState.FullScreen : VeldridLib.WindowState.Normal; }
 	}
-	public bool IsBorderlessFullscreen
+	public bool IsBorderless
 	{
 		get => (Sdl2Window?.WindowState ?? VeldridLib.WindowState.Hidden) == VeldridLib.WindowState.BorderlessFullScreen;
 		set { if (Sdl2Window != null) Sdl2Window.WindowState = value ? VeldridLib.WindowState.BorderlessFullScreen : VeldridLib.WindowState.Normal; }
@@ -234,7 +235,7 @@ internal class Window : IWindow
 
 	private void _onClosed()
 	{
-		HasClosed = true;
+		IsClosing = true;
 		_logger.LogDebug("Window closed!");
 		_eventEmitter.Emit<WindowClosedEvent>();
 	}

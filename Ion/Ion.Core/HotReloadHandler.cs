@@ -1,21 +1,26 @@
-﻿
-#if DEBUG
-[assembly: System.Reflection.Metadata.MetadataUpdateHandlerAttribute(typeof(Ion.HotReloadService))]
+﻿using Ion;
+using Ion.Core;
 
-namespace Ion;
+[assembly: System.Reflection.Metadata.MetadataUpdateHandler(typeof(HotReloadService))]
+
 
 internal static class HotReloadService
 {
-	public static IonApplication? Application { get; set; }
+	public static IonApplication ActiveApplication { get; set; } = default!;
+	public static GameLoop ActiveGameLoop { get; set; } = default!;
 
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-	public static event Action<Type[]?>? UpdateApplicationEvent;
-#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-
-	internal static void ClearCache(Type[]? types) { }
-	internal static void UpdateApplication(Type[]? types)
+	public static void ClearCache(Type[]? types)
 	{
-		UpdateApplicationEvent?.Invoke(types);
+		//Console.WriteLine($"HotReloadService::ClearCache");
+		if (types is not null)
+		{
+			foreach (var type in types) Console.WriteLine("  " + type.FullName);
+		}
+	}
+
+	public static void UpdateApplication(Type[]? types)
+	{
+		//Console.WriteLine($"HotReloadService::UpdateApplication ({types?.Length ?? 0})");
+		ActiveGameLoop.Rebuild = true;
 	}
 }
-#endif

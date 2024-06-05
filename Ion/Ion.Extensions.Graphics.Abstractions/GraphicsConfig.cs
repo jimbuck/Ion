@@ -12,6 +12,7 @@ public class GraphicsConfig
 	public uint MaxFPS { get; set; }
 	public GraphicsOutput Output { get; set; } = GraphicsOutput.Window;
 	public Color ClearColor { get; set; } = Color.Black;
+	public string? CanvasSelector { get; set; }
 }
 
 public enum GraphicsOutput : byte
@@ -39,6 +40,10 @@ public enum GraphicsBackend : byte
 	/// </summary>
 	Direct3D11,
 	/// <summary>
+	/// Direct3D 12.
+	/// </summary>
+	Direct3D12,
+	/// <summary>
 	/// Vulkan.
 	/// </summary>
 	Vulkan,
@@ -54,4 +59,9 @@ public enum GraphicsBackend : byte
 	/// OpenGL ES.
 	/// </summary>
 	OpenGLES,
+
+	/// <summary>
+	/// WebGPU
+	/// </summary>
+	WebGPU,
 }
