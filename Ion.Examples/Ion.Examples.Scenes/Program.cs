@@ -12,7 +12,7 @@ using Ion.Extensions.Coroutines;
 var builder = IonApplication.CreateBuilder(args);
 
 builder.Services.AddDebugUtils(builder.Configuration);
-builder.Services.AddWGPUGraphics(builder.Configuration, graphics =>
+builder.Services.AddVeldridGraphics(builder.Configuration, graphics =>
 {
 	graphics.Output = GraphicsOutput.Window;
 	graphics.ClearColor = Color.CornflowerBlue;
@@ -26,7 +26,7 @@ builder.Services.AddSingleton<TestMiddleware>();
 var game = builder.Build();
 game.UseDebugUtils();
 game.UseEvents();
-game.UseWGPUGraphics();
+game.UseVeldridGraphics();
 
 
 game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner coroutine) =>
