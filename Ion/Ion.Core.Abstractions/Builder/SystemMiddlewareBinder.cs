@@ -1,11 +1,12 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace Ion;
 
-public static class SystemMiddlewareBinder
+public class SystemMiddlewareBinder
 {
 	// We're going to keep all public constructors and public methods on middleware
 	public const DynamicallyAccessedMemberTypes MiddlewareAccessibility = DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicMethods;
@@ -32,59 +33,60 @@ public static class SystemMiddlewareBinder
 			return true;
 		}
 
-		var foregroundColor = Console.ForegroundColor;
-		Console.ForegroundColor = ConsoleColor.Yellow;
-		Console.WriteLine($"Unknown middleware system type: {method.Name}({string.Join(", ", parameters.Select(p => p.Name ?? "??"))}): {method.ReturnType.Name}");
-		Console.ForegroundColor = foregroundColor;
+		if (typeof(void).IsAssignableTo(method.ReturnType) && parameters.Length == 0)
+		{
+			var reflectionBinder = new AutoNextGameLoopDelegateMiddlewareBinder(services, serviceType, method);
+			middleware = reflectionBinder.CreateMiddleware;
+			return true;
+		}
+
+		var logger = services.GetRequiredService<ILogger<SystemMiddlewareBinder>>();
+
+		logger.LogWarning("Unknown middleware system type: {ClassName}.{MethodName}({Params}): {ReturnType}", serviceType.FullName, method.Name, string.Join(", ", parameters.Select(p => p.ParameterType.Name + " " + (p.Name ?? "??"))), method.ReturnType.Name);
 
 		return false;
 	}
 
-	private sealed class GameTimeNextVoidMiddlewareBinder
+	private sealed class GameTimeNextVoidMiddlewareBinder(IServiceProvider services, [DynamicallyAccessedMembers(MiddlewareAccessibility)] Type middlewareType, MethodInfo systemMethod)
 	{
-		private readonly IServiceProvider _services;
-		private readonly Type _systemType;
-		private readonly MethodInfo _systemMethod;
-
-		public GameTimeNextVoidMiddlewareBinder(IServiceProvider services, [DynamicallyAccessedMembers(MiddlewareAccessibility)] Type middlewareType, MethodInfo systemMethod)
-		{
-			_services = services;
-			_systemType = middlewareType;
-			_systemMethod = systemMethod;
-		}
-
 		// The CreateMiddleware method name is used by GameLoopBuilder to resolve the middleware type.
 		public GameLoopDelegate CreateMiddleware(GameLoopDelegate next)
 		{
-			var instance = _services.GetRequiredService(_systemType);
+			var instance = services.GetRequiredService(middlewareType);
 
-			var mw = (Action<GameTime, GameLoopDelegate>)_systemMethod.CreateDelegate(typeof(Action<GameTime, GameLoopDelegate>), instance);
+			var mw = (Action<GameTime, GameLoopDelegate>)systemMethod.CreateDelegate(typeof(Action<GameTime, GameLoopDelegate>), instance);
 
 			return (dt) => mw(dt, next);
 		}
 	}
 
-	private sealed class NextGameLoopDelegateMiddlewareBinder
+	private sealed class NextGameLoopDelegateMiddlewareBinder(IServiceProvider services, [DynamicallyAccessedMembers(MiddlewareAccessibility)] Type middlewareType, MethodInfo systemMethod)
 	{
-		private readonly IServiceProvider _services;
-		private readonly Type _systemType;
-		private readonly MethodInfo _systemMethod;
-
-		public NextGameLoopDelegateMiddlewareBinder(IServiceProvider services, [DynamicallyAccessedMembers(MiddlewareAccessibility)] Type middlewareType, MethodInfo systemMethod)
-		{
-			_services = services;
-			_systemType = middlewareType;
-			_systemMethod = systemMethod;
-		}
-
 		// The CreateMiddleware method name is used by GameLoopBuilder to resolve the middleware type.
 		public GameLoopDelegate CreateMiddleware(GameLoopDelegate next)
 		{
-			var instance = _services.GetRequiredService(_systemType);
+			var instance = services.GetRequiredService(middlewareType);
 
-			var @delegate = (Func<GameLoopDelegate, GameLoopDelegate>)_systemMethod.CreateDelegate(typeof(Func<GameLoopDelegate, GameLoopDelegate>), instance);
+			var @delegate = (Func<GameLoopDelegate, GameLoopDelegate>)systemMethod.CreateDelegate(typeof(Func<GameLoopDelegate, GameLoopDelegate>), instance);
 
 			return @delegate(next);
+		}
+	}
+
+	private sealed class AutoNextGameLoopDelegateMiddlewareBinder(IServiceProvider services, [DynamicallyAccessedMembers(MiddlewareAccessibility)] Type middlewareType, MethodInfo systemMethod)
+	{
+		// The CreateMiddleware method name is used by GameLoopBuilder to resolve the middleware type.
+		public GameLoopDelegate CreateMiddleware(GameLoopDelegate next)
+		{
+			var instance = services.GetRequiredService(middlewareType);
+
+			var @delegate = (Action)systemMethod.CreateDelegate(typeof(Action), instance);
+
+			return (dt) =>
+			{
+				@delegate();
+				next(dt);
+			};
 		}
 	}
 }

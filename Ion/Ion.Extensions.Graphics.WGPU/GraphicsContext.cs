@@ -17,7 +17,7 @@ public interface IGraphicsContext
 	bool NoRender { get; }
 	public WGPUDevice Device { get; }
 	public WGPUQueue Queue { get; }
-	public WGPUTexture RenderTarget { get; }
+	public Texture2D RenderTarget { get; }
 	public WGPUTextureFormat SwapChainFormat { get; }
 
 	Matrix4x4 CreateOrthographic(float left, float right, float bottom, float top, float near, float far);
@@ -42,12 +42,15 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 	private WGPUQueue _queue = default!;
 	private WGPUTextureFormat _swapchainFormat = default!;
 
-	private WGPUTexture _renderTarget = default!;
+	private Texture2D _renderTarget = default!;
 
 	public WGPUDevice Device => _device;
 	public WGPUQueue Queue => _queue;
-	public WGPUTexture RenderTarget => _renderTarget;
+	public Texture2D RenderTarget => _renderTarget;
 	public WGPUTextureFormat SwapChainFormat => _swapchainFormat;
+
+	public uint RenderTargetWidth => _window.Width;
+	public uint RenderTargetHeight => _window.Height;
 
 	public Matrix4x4 ProjectionMatrix { get; private set; } = Matrix4x4.Identity;
 
@@ -66,8 +69,6 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 
 	public void Initialize()
 	{
-		if (NoRender) return;
-
 		_logger.LogInformation("Creating graphics device...");
 
 		var config = _config.CurrentValue;
@@ -87,6 +88,8 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 
 		_logger.LogInformation("Graphics device created ({Backend})!", backend.ToString("G"));
 
+		_updateRenderTarget();
+		_clearRenderTarget();
 		UpdateProjection(_window.Width, _window.Height);
 
 		timer.Stop();
@@ -164,44 +167,16 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 
 	public void BeginFrame(GameTime dt)
 	{
-		if (NoRender) return;
-
 		var timer = _trace.Start("BeginFrame");
 
 		_updateRenderTarget();
 		_clearRenderTarget();
-
-		
-		//_mainRenderPass = _encoder.BeginRenderPass(
-		//	label: "MainRenderPass",
-		//	colorAttachments: [
-		//		new RenderPassColorAttachment()
-		//		{
-		//			view = _renderTarget,
-		//			resolveTarget = default,
-		//			loadOp = Wgpu.LoadOp.Clear,
-		//			storeOp = Wgpu.StoreOp.Store,
-		//			clearValue = new Wgpu.Color() { r = config.ClearColor.R, g = config.ClearColor.G, b = config.ClearColor.B, a = config.ClearColor.A }
-		//		}
-		//	],
-		//	depthStencilAttachment: new RenderPassDepthStencilAttachment
-		//	{
-		//		View = _depthTextureView,
-		//		DepthLoadOp = Wgpu.LoadOp.Clear,
-		//		DepthStoreOp = Wgpu.StoreOp.Store,
-		//		DepthClearValue = 0f,
-		//		StencilLoadOp = Wgpu.LoadOp.Clear,
-		//		StencilStoreOp = Wgpu.StoreOp.Discard
-		//	}
-		//);
 
 		timer.Stop();
 	}
 
 	public void EndFrame(GameTime dt)
 	{
-		if (NoRender) return;
-
 		var timer = _trace.Start("EndFrame::Present");
 
 		// We can tell the surface to present the next texture.
@@ -262,7 +237,14 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 			return;
 		}
 
-		_renderTarget = surfaceTexture.texture;
+		_renderTarget = new Texture2D("SwapChain", surfaceTexture.texture, new WGPUTextureDescriptor
+		{
+			dimension = WGPUTextureDimension._2D,
+			format = _swapchainFormat,
+			size = new WGPUExtent3D(_window.Width, _window.Height, 1),
+			mipLevelCount = 1,
+			sampleCount = 1,
+		});
 	}
 
 	private void _clearRenderTarget()
@@ -271,7 +253,7 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 
 		var config = _config.CurrentValue;
 
-		var encoder = wgpuDeviceCreateCommandEncoder(_device, "Main Command Encoder");
+		var encoder = _device.CreateCommandEncoder("Main Command Encoder");
 
 		WGPUTextureView targetView = _renderTarget.CreateView();
 
@@ -342,9 +324,7 @@ internal unsafe class GraphicsContext : IGraphicsContext, IDisposable
 		result.M43 = near * negFarRange;
 
 		return result;
-	}
-
-	
+	}	
 
 	private void _errorCallback(WGPUErrorType type, string message)
 	{

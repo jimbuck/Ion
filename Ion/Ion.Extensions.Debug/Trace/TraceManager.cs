@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
 
 namespace Ion.Extensions.Debug;
 
@@ -30,24 +31,32 @@ internal class TraceManager : ITraceManager
 		IsEnabled = _debugConfig.CurrentValue.TraceEnabled;
 	}
 
-	public void Start() {
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Start()
+	{
+#if DEBUG
 		IsEnabled = true;
+#endif
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Stop()
 	{
+#if DEBUG
 		IsEnabled = false;
+#endif
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public ITraceTimerInstance StartTraceTimer(string prefix, string name)
 	{
-#if !DEBUG
-		return _nullTimer;
-#endif
-
+#if DEBUG
 		if (!IsEnabled) return _nullTimer;
 
 		return new TraceTimerInstance(this, prefix, Interlocked.Increment(ref _nextId), name, Stopwatch.GetTimestamp() * _toMicroSeconds);
+#else
+		return _nullTimer;
+#endif
 	}
 
 	internal void StopTraceTimer(int id, string name, double start, int threadId)

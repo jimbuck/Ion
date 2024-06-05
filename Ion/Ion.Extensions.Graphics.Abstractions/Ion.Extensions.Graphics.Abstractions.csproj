@@ -6,11 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="Assets\**" />
-    <EmbeddedResource Remove="Assets\**" />
-    <None Remove="Assets\**" />
-  </ItemGroup>
-  <ItemGroup>
     <InternalsVisibleTo Include="Ion.Extensions.Graphics" />
   </ItemGroup>
   <ItemGroup>

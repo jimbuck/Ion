@@ -1,7 +1,5 @@
-﻿using System.Numerics;
-using VeldridLib = Veldrid;
+﻿using VeldridLib = Veldrid;
 
-using Ion.Extensions.Assets;
 
 namespace Ion.Extensions.Graphics;
 
@@ -12,13 +10,15 @@ public abstract class BaseTexture : ITexture2D
 	public nint Id => _texture.GetHashCode();
 	public string Name => _texture.Name;
 
-	public Vector2 Size { get; }
+	public uint Width => _texture.Width;
+	public uint Height => _texture.Height;
+
+	public uint MipLevels => _texture.MipLevels;
 
 	internal BaseTexture(string name, VeldridLib.Texture texture)
 	{
 		texture.Name = name;
 		_texture = texture;
-		Size = new Vector2(texture.Width, texture.Height);
 	}
 
 	public void Dispose()

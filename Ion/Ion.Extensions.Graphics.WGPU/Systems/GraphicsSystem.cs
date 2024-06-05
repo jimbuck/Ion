@@ -1,6 +1,8 @@
 ﻿
 using Ion.Extensions.Debug;
 
+using WebGPU;
+
 namespace Ion.Extensions.Graphics;
 
 public class GraphicsSystem
@@ -31,7 +33,7 @@ public class GraphicsSystem
 		var timer = _trace.Start("Render::Pre");
 		_graphics.BeginFrame(dt);
 		timer.Stop();
-		if (_graphics.RenderTarget.IsNotNull) next(dt);
+		next(dt);
 		timer = _trace.Start("Render::Post");
 		_graphics.EndFrame(dt);
 		timer.Stop();

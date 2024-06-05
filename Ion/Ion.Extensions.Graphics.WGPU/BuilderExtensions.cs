@@ -22,8 +22,9 @@ public static class BuilderExtensions
 			// Implementation-specific
 			.AddSingleton<IWindow, Window>()
 			.AddSingleton<IGraphicsContext, GraphicsContext>()
-			.AddSingleton<TriangleRenderer>()
 			.AddSingleton<SpriteRenderer>()
+			.AddSingleton<TriangleRenderer>()
+			.AddSingleton<QuadRenderer>()
 			.AddSingleton<FontRenderer>()
 			.AddSingleton<ITexture2DManager, FontStashTexture2DManager>()
 			.AddSingleton<ISpriteBatch, SpriteBatch>()
@@ -51,6 +52,7 @@ public static class BuilderExtensions
 			.UseSystem<InputSystem>()
 			.UseSystem<GraphicsSystem>()
 			.UseSystem<SpriteBatchSystem>()
-			.UseSystem<TriangleRenderer>();
+			.UseSystem<TriangleRenderer>()
+			.UseSystem<QuadRenderer>();
 	}
 }

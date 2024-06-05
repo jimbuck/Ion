@@ -121,7 +121,7 @@ internal class Window(
 		{
 			if (_window.IsNotNull)
 			{
-				SDL_SetWindowGrab(_window, value ? SDL_TRUE : SDL_FALSE);
+				SDL_SetWindowMouseGrab(_window, value ? SDL_TRUE : SDL_FALSE);
 				_isMouseGrabbed = value;
 			}
 		}
@@ -164,7 +164,7 @@ internal class Window(
 		SDL_LogSetAllPriority(SDL_LogPriority.Verbose);
 #endif
 
-		SDL_LogSetOutputFunction(_onSdlLog);
+		SDL_SetLogOutputFunction(_onSdlLog);
 
 		flags |= SDL_WindowFlags.HighPixelDensity;
 

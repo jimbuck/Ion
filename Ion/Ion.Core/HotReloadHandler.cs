@@ -11,7 +11,7 @@ internal static class HotReloadService
 
 	public static void ClearCache(Type[]? types)
 	{
-		Console.WriteLine($"HotReloadService::ClearCache");
+		//Console.WriteLine($"HotReloadService::ClearCache");
 		if (types is not null)
 		{
 			foreach (var type in types) Console.WriteLine("  " + type.FullName);
@@ -20,7 +20,7 @@ internal static class HotReloadService
 
 	public static void UpdateApplication(Type[]? types)
 	{
-		Console.WriteLine($"HotReloadService::UpdateApplication ({types?.Length ?? 0})");
+		//Console.WriteLine($"HotReloadService::UpdateApplication ({types?.Length ?? 0})");
 		ActiveGameLoop.Rebuild = true;
 	}
 }

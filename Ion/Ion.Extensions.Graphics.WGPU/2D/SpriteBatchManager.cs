@@ -1,6 +1,9 @@
 ﻿using System.Numerics;
+using System.Runtime.InteropServices;
 
 using Ion.Extensions.Assets;
+
+using WebGPU;
 
 namespace Ion.Extensions.Graphics;
 
@@ -12,18 +15,12 @@ internal class SpriteBatchManager
 
 	public static int INSTANCE_SIZE = (int)MemUtils.SizeOf<SpriteInstance>();
 
-	private readonly Stack<SpriteBatch> _batchPool;
-	private readonly Dictionary<ITexture2D, SpriteBatch> _batches;
+	private readonly Stack<SpriteBatch> _batchPool = new();
+	private readonly Dictionary<Texture2D, SpriteBatch> _batches = [];
 
 	public bool IsEmpty { get; private set; }
 
-	public SpriteBatchManager()
-	{
-		_batches = new();
-		_batchPool = new();
-	}
-
-	public ref SpriteInstance Add(ITexture2D texture)
+	public ref SpriteInstance Add(Texture2D texture)
 	{
 		if (!_batches.TryGetValue(texture, out var group))
 		{
@@ -43,7 +40,7 @@ internal class SpriteBatchManager
 		IsEmpty = true;
 	}
 
-	public Dictionary<ITexture2D, SpriteBatch>.Enumerator GetEnumerator() => _batches.GetEnumerator();
+	public Dictionary<Texture2D, SpriteBatch>.Enumerator GetEnumerator() => _batches.GetEnumerator();
 
 	private SpriteBatch _rentSpriteBatch()
 	{
@@ -88,24 +85,33 @@ internal class SpriteBatchManager
 
 		public ReadOnlySpan<SpriteInstance> GetSpan()
 		{
-			//Array.Sort(_items, 0, Count);
 			return new(_items, 0, Count);
 		}
 	}
 
-	public struct SpriteInstance : IComparable<SpriteInstance>
+	[StructLayout(LayoutKind.Sequential, Pack = 4)]
+	public struct SpriteInstance(in Vector3 position, in float rotation, in Vector2 origin, in Vector4 uv, in Vector2 scale, in Color color, in Vector4 scissor) : IComparable<SpriteInstance>
 	{
-		public Vector4 UV;
-		public Color Color;
-		public Vector2 Scale;
-		public Vector2 Origin;
-		public Vector3 Location;
-		public float Rotation;
-		public RectangleF Scissor;
+		public static unsafe readonly int SizeInBytes = sizeof(SpriteInstance);
+		public static WGPUVertexAttribute[] VertexAttributes => [
+			new WGPUVertexAttribute(WGPUVertexFormat.Float32x4, 0, 0),
+			new WGPUVertexAttribute(WGPUVertexFormat.Float32x4, 16, 1),
+			new WGPUVertexAttribute(WGPUVertexFormat.Float32x4, 32, 2),
+			new WGPUVertexAttribute(WGPUVertexFormat.Float32x3, 48, 3),
+			new WGPUVertexAttribute(WGPUVertexFormat.Float32, 60, 4),
+			new WGPUVertexAttribute(WGPUVertexFormat.Float32x2, 64, 5),
+			new WGPUVertexAttribute(WGPUVertexFormat.Float32x2, 72, 6),
+		];
 
-		public static uint SizeInBytes => MemUtils.SizeOf<SpriteInstance>();
+		public Color Color = color;
+		public Vector4 UV = uv;
+		public Vector4 Scissor = scissor;
+		public Vector3 Position = position;
+		public float Rotation = rotation;
+		public Vector2 Origin = origin;
+		public Vector2 Scale = scale;
 
-		public void Update(Vector2 textureSize, RectangleF destinationRectangle, RectangleF sourceRectangle, Color color, float rotation, Vector2 origin, float layerDepth, RectangleF scissor, SpriteEffect options)
+		public void Update(Vector2 textureSize, RectangleF destinationRectangle, RectangleF sourceRectangle, Color color, float rotation, Vector2 origin, float layerDepth, Vector4 scissor, SpriteEffect options)
 		{
 			var sourceSize = new Vector2(sourceRectangle.Width, sourceRectangle.Height) / textureSize;
 			var pos = new Vector2(sourceRectangle.X, sourceRectangle.Y) / textureSize;
@@ -114,10 +120,11 @@ internal class SpriteBatchManager
 			Color = color;
 			Scale = destinationRectangle.Size;
 			Origin = origin * Scale;
-			Location = new(destinationRectangle.Location, layerDepth);
+			Position = new(destinationRectangle.Location, layerDepth);
 			Rotation = rotation;
 			Scissor = scissor;
 		}
+
 		private static Vector4 _createUV(SpriteEffect options, Vector2 sourceSize, Vector2 sourceLocation)
 		{
 			if (options != SpriteEffect.None)
@@ -142,8 +149,9 @@ internal class SpriteBatchManager
 
 		public int CompareTo(SpriteInstance other)
 		{
-			return (int)(other.Location.Z - this.Location.Z);
+			return (int)(other.Position.Z - this.Position.Z);
 		}
 	}
 }
+
 

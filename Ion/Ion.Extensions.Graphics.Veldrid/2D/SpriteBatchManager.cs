@@ -88,7 +88,6 @@ internal class SpriteBatchManager
 
 		public ReadOnlySpan<SpriteInstance> GetSpan()
 		{
-			//Array.Sort(_items, 0, Count);
 			return new(_items, 0, Count);
 		}
 	}

@@ -5,7 +5,6 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
 using WebGPU;
-using static WebGPU.WebGPU;
 
 using Ion.Extensions.Assets;
 
@@ -33,13 +32,13 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 	{
 		if (graphicsContext.Device.IsNull) throw new Exception("GraphicsDevice is not initialized yet!");
 
-		var image = Image.Load<Rgba32>(stream);
+		var image = Image.Load<Bgra32>(stream);
 
-		Span<Rgba32> pixels = new Rgba32[image.Width * image.Height];
+		Span<Bgra32> pixels = new Bgra32[image.Width * image.Height];
 
 		image.CopyPixelDataTo(pixels);
 
-		return _createTexture2D(name, WGPUTextureFormat.RGBA8Unorm, (uint)image.Width, (uint)image.Height, 1, 1, 1, pixels);
+		return _createTexture2D(name, WGPUTextureFormat.BGRA8Unorm, (uint)image.Width, (uint)image.Height, 1, 1, 1, pixels);
 	}
 
 	private static Image<T>[] _generateMipmaps<T>(Image<T> baseImage, out int totalSize) where T : unmanaged, IPixel<T>
@@ -76,7 +75,7 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 		return 1 + (int)Math.Floor(Math.Log(Math.Max(width, height), 2));
 	}
 
-	private unsafe Texture2D _createTexture2D(
+	private unsafe Texture2D _createTexture2D<T>(
 		string label,
 		WGPUTextureFormat format,
 		uint width,
@@ -84,7 +83,7 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 		uint depth,
 		uint mipLevels,
 		uint sampleCount,
-		Span<Rgba32> textureData)
+		Span<T> textureData) where T : unmanaged
 	{
 		Texture2D texture = graphicsContext.CreateTexture2D(label, width, height, WGPUTextureUsage.TextureBinding | WGPUTextureUsage.CopyDst, format);
 
