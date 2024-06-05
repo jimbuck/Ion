@@ -10,7 +10,7 @@
     <ProjectReference Include="..\Ion.Extensions.Audio\Ion.Extensions.Audio.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Debug\Ion.Extensions.Debug.csproj" />
-    <ProjectReference Include="..\Ion.Extensions.Graphics.WGPU\Ion.Extensions.Graphics.WGPU.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Veldrid\Ion.Extensions.Graphics.Veldrid.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -17,8 +17,8 @@ public static class BuilderExtensions
 		return services
 			.AddDebugUtils(config)
 			.AddAssets()
-			//.AddVeldridGraphics(config, configureOptions)
-			.AddWGPUGraphics(config, configureOptions)
+			.AddVeldridGraphics(config, configureOptions)
+			//.AddWGPUGraphics(config, configureOptions)
 			.AddAudio()
 			.AddScenes()
 			.AddCoroutines();
@@ -29,7 +29,7 @@ public static class BuilderExtensions
 		return app
 			.UseDebugUtils()
 			.UseEvents()
-			.UseWGPUGraphics();
-			//.UseVeldridGraphics();
+			//.UseWGPUGraphics();
+			.UseVeldridGraphics();
 	}
 }
