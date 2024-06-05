@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.2.0"></a>
+## [0.2.0](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.0) (2024-6-5)
+
+### Other
+
+* Initial SDL3 and WGPU integration (hardcoded triangle). (#43) ([ae2c4c5](https://www.github.com/jimbuck/Ion/commit/ae2c4c5e10f1ef53aff9899469dafdb5d6c90e1e))
+
 <a name="0.1.8"></a>
 ## [0.1.8](https://www.github.com/jimbuck/Ion/releases/tag/v0.1.8) (2024-1-24)
 
