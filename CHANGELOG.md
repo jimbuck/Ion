@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.2.1"></a>
+## [0.2.1](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.1) (2024-6-7)
+
+### Other
+
+* Codebase cleanup. ([b509ef6](https://www.github.com/jimbuck/Ion/commit/b509ef6a876caf9d5f47d77a4e989e814bf2930e))
+
 <a name="0.2.0"></a>
 ## [0.2.0](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.0) (2024-6-5)
 
