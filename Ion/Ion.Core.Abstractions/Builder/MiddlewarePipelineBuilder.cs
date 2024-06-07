@@ -10,8 +10,8 @@ public interface IMiddlewarePipelineBuilder
 
 public class MiddlewarePipelineBuilder : IMiddlewarePipelineBuilder
 {
-	private readonly List<Func<GameLoopDelegate, GameLoopDelegate>> _systems = new();
-	private readonly List<string> _descriptions = new();
+	private readonly List<Func<GameLoopDelegate, GameLoopDelegate>> _systems = [];
+	private readonly List<string> _descriptions = [];
 
 	public IMiddlewarePipelineBuilder Use(Func<GameLoopDelegate, GameLoopDelegate> middleware)
 	{
@@ -22,26 +22,25 @@ public class MiddlewarePipelineBuilder : IMiddlewarePipelineBuilder
 
 	public GameLoopDelegate Build()
 	{
-		GameLoopDelegate app = (dt) => { };
+		GameLoopDelegate gameLoop = (dt) => { };
 
-		for (var s = _systems.Count - 1; s >= 0; s--)
-		{
-			app = _systems[s](app);
-		}
+		for (var s = _systems.Count - 1; s >= 0; s--) gameLoop = _systems[s](gameLoop);
 
-		return app;
+		return gameLoop;
 	}
 
-	private string _createMiddlewareDescription(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	private static string _createMiddlewareDescription(Func<GameLoopDelegate, GameLoopDelegate> middleware)
 	{
-		if (middleware.Target != null)
+		if (middleware.Target is not null)
 		{
 			if (middleware.Method.Name == "CreateMiddleware")
 			{
-				return middleware.Target.ToString()!;
+				return middleware.Target?.ToString() ?? middleware.Method.Name.ToString(); ;
 			}
-
-			return middleware.Target.GetType().FullName + "." + middleware.Method.Name;
+			else
+			{
+				return middleware.Target.GetType().FullName + "." + middleware.Method.Name;
+			}
 		}
 
 		return middleware.Method.Name.ToString();

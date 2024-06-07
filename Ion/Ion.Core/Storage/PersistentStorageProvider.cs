@@ -1,13 +1,8 @@
 ﻿namespace Ion;
 
-internal class PersistentStorageProvider : IPersistentStorageProvider
+internal class PersistentStorageProvider(params string[] rootPath) : IPersistentStorageProvider
 {
-	private readonly string _rootPath;
-
-	public PersistentStorageProvider(params string[] rootPath)
-	{
-		_rootPath = Path.Combine(rootPath);
-	}
+	private readonly string _rootPath = Path.Combine(rootPath);
 
 	public void Initialize()
 	{

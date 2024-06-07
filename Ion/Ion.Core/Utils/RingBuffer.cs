@@ -14,7 +14,7 @@ public class RingBuffer<T>
 	public T this[int index] {
 		get
 		{
-			if (index >= _size) throw new ArgumentOutOfRangeException(nameof(index));
+			ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _size);
 
 			return _buffer[(_head + index) % _capacity];
 		}

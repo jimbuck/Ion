@@ -10,19 +10,16 @@ namespace Ion.Core;
 /// <summary>
 /// Top-level class representing the runnable game.
 /// </summary>
-public class GameLoop
+public class GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events, ITraceTimer<GameLoop> trace)
 {
 	private bool _shouldExit;
 	private readonly float _maxFrameTime = 0.1f; // 100ms
+	private readonly ITraceTimer _trace = trace;
 
-	private readonly IOptionsMonitor<GameConfig> _gameConfig;
-	private readonly IEventListener _events;
-	private readonly ITraceTimer _trace;
+	private float MaxFPS => gameConfig.CurrentValue.MaxFPS < 1 ? 120 : gameConfig.CurrentValue.MaxFPS;
 
-	private float MaxFPS => _gameConfig.CurrentValue.MaxFPS < 1 ? 120 : _gameConfig.CurrentValue.MaxFPS;
-
-	public GameTime GameTime { get; }
-	public GameTime FixedGameTime { get; }
+	public GameTime GameTime { get; } = new();
+	public GameTime FixedGameTime { get; private set; } = new();
 
 	public bool IsRunning { get; private set; } = false;
 
@@ -34,7 +31,6 @@ public class GameLoop
 	public GameLoopDelegate Last { get; set; } = (dt) => { };
 	public GameLoopDelegate Destroy { get; set; } = (dt) => { };
 
-
 	public bool Rebuild { get; set; } = false;
 
 	public MiddlewarePipelineBuilder InitBuilder { get; set; } = default!;
@@ -44,19 +40,6 @@ public class GameLoop
 	public MiddlewarePipelineBuilder RenderBuilder { get; set; } = default!;
 	public MiddlewarePipelineBuilder LastBuilder { get; set; } = default!;
 	public MiddlewarePipelineBuilder DestroyBuilder { get; set; } = default!;
-
-	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events, ITraceTimer<GameLoop> trace) {
-		_gameConfig = gameConfig;
-		_events = events;
-		_trace = trace;
-		
-		GameTime = new();
-		FixedGameTime = new()
-		{
-			Alpha = 1,
-			Delta = 1f / MaxFPS,
-		};
-	}
 
 	public void Build()
 	{
@@ -72,6 +55,13 @@ public class GameLoop
 	public void Run()
     {
 		IsRunning = true;
+
+		FixedGameTime = new()
+		{
+			Alpha = 1,
+			Delta = 1f / MaxFPS,
+		};
+
 		Init(GameTime);
 
         var stopwatch = Stopwatch.StartNew();
@@ -106,7 +96,7 @@ public class GameLoop
 
 			Render(GameTime);
 
-			if (_events.On<ExitGameEvent>()) _shouldExit = true;
+			if (events.On<ExitGameEvent>()) _shouldExit = true;
 
 			Last(GameTime);
 

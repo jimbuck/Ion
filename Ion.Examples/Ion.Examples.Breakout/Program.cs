@@ -65,7 +65,7 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 
 	[Init]
 	public void SetupBlocks(GameTime dt, GameLoopDelegate next)
-	{
+	{		
 		_blockTexture = assets.Load<Texture2D>("Block1.png");
 		_ballTexture = assets.Load<Texture2D>("Ball1.png");
 		_bonkSound =  assets.Load<SoundEffect>("Bonk.wav");

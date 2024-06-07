@@ -2,17 +2,11 @@
 
 namespace Ion.Extensions.Audio;
 
-internal class SoundEffectSampleProvider : ISampleProvider
+internal class SoundEffectSampleProvider(SoundEffect cachedSound) : ISampleProvider
 {
-	private readonly SoundEffect cachedSound;
 	private long position;
 
 	public WaveFormat WaveFormat => cachedSound.WaveFormat;
-
-	public SoundEffectSampleProvider(SoundEffect cachedSound)
-	{
-		this.cachedSound = cachedSound;
-	}
 
 	public int Read(float[] buffer, int offset, int count)
 	{

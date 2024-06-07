@@ -3,23 +3,14 @@ using Ion.Extensions.Debug;
 
 namespace Ion.Extensions.Graphics;
 
-public class WindowSystem
+public class WindowSystem(IWindow window, IEventListener events, ITraceTimer<WindowSystem> trace)
 {
-	private readonly Window _window;
-	private readonly IEventListener _events;
-	private readonly ITraceTimer _trace;
-
-	public WindowSystem(IWindow window, IEventListener events, ITraceTimer<WindowSystem> trace)
-	{
-		_window = (Window)window;
-		_events = events;
-		_trace = trace;
-	}
+	private readonly Window _window = (Window)window;
 
 	[Init]
 	public void Init(GameTime dt, GameLoopDelegate next)
 	{
-		var timer = _trace.Start("Init");
+		var timer = trace.Start("Init");
 		_window.Initialize();
 		timer.Stop();
 		next(dt);
@@ -28,7 +19,7 @@ public class WindowSystem
 	[First]
 	public void First(GameTime dt, GameLoopDelegate next)
 	{
-		var timer = _trace.Start("First");
+		var timer = trace.Start("First");
 		_window.Step();
 		timer.Stop();
 		next(dt);
@@ -38,8 +29,8 @@ public class WindowSystem
 	public void Render(GameTime dt, GameLoopDelegate next)
 	{
 		next(dt);
-		var timer = _trace.Start("Render");
-		if (_events.On<WindowClosedEvent>()) _events.Emit<ExitGameEvent>();
+		var timer = trace.Start("Render");
+		if (events.On<WindowClosedEvent>()) events.Emit<ExitGameEvent>();
 		timer.Stop();
 	}
 }

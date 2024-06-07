@@ -8,33 +8,27 @@ namespace Ion.Extensions.Scenes;
 
 internal delegate Scene SceneBuilderFactory(IConfiguration config, IServiceProvider services);
 
-internal sealed class SceneSystem : IDisposable
+/// <summary>
+/// Creates a new SceneManager instance, keeping a reference to the service provider.
+/// </summary>
+/// <param name="serviceProvider">The root service provider.</param>
+internal sealed class SceneSystem(
+	IServiceProvider serviceProvider,
+	ILogger<SceneSystem> logger, IConfiguration config,
+	IEventListener events,
+	ITraceTimer<SceneSystem> trace
+	) : IDisposable
 {
-	private readonly IServiceProvider _serviceProvider;
-	private readonly ILogger _logger;
-	private readonly IConfiguration _config;
-	private readonly IEventListener _events;
-	private readonly ITraceTimer _trace;
+	private readonly ILogger _logger = logger;
+	private readonly ITraceTimer _trace = trace;
 	private readonly Dictionary<int, SceneBuilderFactory> _scenesBuilders = new();
 
 	private Scene? _activeScene;
+	private Transition? _activeTransition;
 	private IServiceScope? _activeScope;
-	private int _nextScene = 0;
+	private int _nextSceneId = 0;
 
-	public int CurrentScene => _activeScene?.Id ?? 0;
-
-	/// <summary>
-	/// Creates a new SceneManager instance, keeping a reference to the service provider.
-	/// </summary>
-	/// <param name="serviceProvider">The root service provider.</param>
-	public SceneSystem(IServiceProvider serviceProvider, ILogger<SceneSystem> logger, IConfiguration config, IEventListener events, ITraceTimer<SceneSystem> trace)
-	{
-		_serviceProvider = serviceProvider;
-		_logger = logger;
-		_config = config;
-		_events = events;
-		_trace = trace;
-	}
+	public int CurrentSceneId => _activeScene?.Id ?? 0;
 
 	public void Register(int sceneId, SceneBuilderFactory sceneBuilderFactory)
 	{
@@ -43,25 +37,25 @@ internal sealed class SceneSystem : IDisposable
 
 	private void _loadNextScene(GameTime dt)
 	{
-		if (_nextScene == CurrentScene) return;
+		if (_nextSceneId == CurrentSceneId) return;
 
 		if (_activeScene != null)
 		{
-			_logger.LogInformation("Unloading {CurrentScene} Scene.", CurrentScene);
+			_logger.LogInformation("Unloading {CurrentSceneId} Scene.", CurrentSceneId);
 			_activeScene?.Destroy(dt);
 			_activeScope?.Dispose();
-			_logger.LogInformation("Unloaded {CurrentScene} Scene.", CurrentScene);
+			_logger.LogInformation("Unloaded {CurrentSceneId} Scene.", CurrentSceneId);
 			_activeScene = null;
 		}
 
-		_logger.LogInformation("Loading {NextScene} Scene.", _nextScene);
-		_activeScope = _serviceProvider.CreateScope();
+		_logger.LogInformation("Loading {NextScene} Scene.", _nextSceneId);
+		_activeScope = serviceProvider.CreateScope();
 		var currScene = (CurrentScene)_activeScope.ServiceProvider.GetRequiredService<ICurrentScene>();
-		currScene.Set(_nextScene);
+		currScene.Set(_nextSceneId);
 
-		_activeScene = _scenesBuilders[_nextScene](_config, _activeScope.ServiceProvider);
+		_activeScene = _scenesBuilders[_nextSceneId](config, _activeScope.ServiceProvider);
 		_activeScene.Init(dt);
-		_logger.LogInformation("Loaded {NextScene} Scene.", _nextScene);
+		_logger.LogInformation("Loaded {NextScene} Scene.", _nextSceneId);
 	}
 
 	/// <summary>
@@ -72,7 +66,7 @@ internal sealed class SceneSystem : IDisposable
 	{
 		var timer = _trace.Start("Init");
 
-		_logger.LogDebug("Init ({CurrentScene}) {dt}", CurrentScene, dt);
+		_logger.LogDebug("Init ({CurrentSceneId}) {dt}", CurrentSceneId, dt);
 
 		_handleChangeSceneEvents();
 
@@ -82,7 +76,7 @@ internal sealed class SceneSystem : IDisposable
 		}
 		else
 		{
-			_nextScene = _scenesBuilders.First().Key;
+			_nextSceneId = _scenesBuilders.First().Key;
 			_loadNextScene(dt);
 		}
 
@@ -97,7 +91,7 @@ internal sealed class SceneSystem : IDisposable
 
 		_handleChangeSceneEvents();
 
-		if (_nextScene != CurrentScene) _loadNextScene(dt);
+		if (_nextSceneId != CurrentSceneId) _loadNextScene(dt);
 		_activeScene?.First(dt);
 
 		timer.Stop();
@@ -123,6 +117,7 @@ internal sealed class SceneSystem : IDisposable
 		var timer = _trace.Start("Update");
 
 		_activeScene?.Update(dt);
+		_activeTransition?.Update(dt);
 
 		timer.Stop();
 	}
@@ -137,6 +132,7 @@ internal sealed class SceneSystem : IDisposable
 		var timer = _trace.Start("Render");
 
 		_activeScene?.Render(dt);
+		_activeTransition?.Render(dt);
 
 		timer.Stop();
 	}
@@ -174,11 +170,11 @@ internal sealed class SceneSystem : IDisposable
 
 	private void _handleChangeSceneEvents()
 	{
-		if (_events.OnLatest<ChangeSceneEvent>(out var e))
+		if (events.OnLatest<ChangeSceneEvent>(out var e))
 		{
-			if (!_scenesBuilders.ContainsKey(e.Data.NextScene)) _logger.LogWarning("Tried to load unknown scene '{NextScene}'.", e.Data.NextScene);
+			if (!_scenesBuilders.ContainsKey(e.Data.NextSceneId)) _logger.LogWarning("Tried to load unknown scene '{NextSceneId}'.", e.Data.NextSceneId);
 
-			_nextScene = e.Data.NextScene;
+			_nextSceneId = e.Data.NextSceneId;
 			e.Handled = true;
 		}
 	}

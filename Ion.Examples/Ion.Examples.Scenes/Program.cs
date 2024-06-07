@@ -87,8 +87,8 @@ game.UseFirst((GameLoopDelegate next, IInputState input, ITraceManager traceMana
 game.UseUpdate((GameLoopDelegate next, IEventEmitter eventEmitter, IEventListener events) =>
 {
 	var flip = false;
-	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(1), (dt) => {
-		eventEmitter.Emit(new ChangeSceneEvent(flip ? (int)Scenes.MainMenu : (int)Scenes.Gameplay));
+	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(3), (dt) => {
+		eventEmitter.EmitChangeScene(flip ? (int)Scenes.MainMenu : (int)Scenes.Gameplay);
 		flip = !flip;
 	});
 
@@ -117,28 +117,28 @@ game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter, IInputState i
 
 game.UseScene((int)Scenes.MainMenu, scene =>
 {
-	//scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	//{
-	//	return dt =>
-	//	{
-	//		spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
-	//		next(dt);
-	//	};
-	//});
+	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
+	{
+		return dt =>
+		{
+			spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
+			next(dt);
+		};
+	});
 
 	scene.UseSystem<TestMiddleware>();
 });
 
 game.UseScene((int)Scenes.Gameplay, scene =>
 {
-	//scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	//{
-	//	return dt =>
-	//	{
-	//		spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
-	//		next(dt);
-	//	};
-	//});
+	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
+	{
+		return dt =>
+		{
+			spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
+			next(dt);
+		};
+	});
 });
 
 game.UseRender(next => dt => Console.WriteLine("NEVER GETTING CALLED!"));

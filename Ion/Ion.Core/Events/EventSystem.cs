@@ -2,22 +2,15 @@
 
 namespace Ion;
 
-internal class EventSystem
+internal class EventSystem(IEventEmitter eventEmitter, ITraceTimer<EventSystem> trace)
 {
-	private readonly EventEmitter _eventEmitter;
-	private readonly ITraceTimer _trace;
-
-	public EventSystem(IEventEmitter eventEmitter, ITraceTimer<EventSystem> trace)
-	{
-		_eventEmitter = (EventEmitter)eventEmitter;
-		_trace = trace;
-	}
+	private readonly EventEmitter _eventEmitter = (EventEmitter)eventEmitter;
 
 	[Last]
 	public void StepEvents(GameTime dt, GameLoopDelegate next)
 	{
 		next(dt);
-		var timer = _trace.Start("Step");
+		var timer = trace.Start("Step");
 		_eventEmitter.Step();
 		timer.Stop();
 	}

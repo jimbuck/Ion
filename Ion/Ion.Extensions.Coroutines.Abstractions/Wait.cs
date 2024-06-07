@@ -18,14 +18,14 @@ public record struct WaitFor(float Delay) : IWait
 
 public record struct WaitUntil(Func<bool> Predicate) : IWait
 {
-	public bool IsReady => Predicate();
+	public readonly bool IsReady => Predicate();
 	public void Update(GameTime dt, IEventListener eventListener) { }
 }
 
 public record struct WaitForEvent<TEvent>() : IWait where TEvent : unmanaged
 {
 	private bool _isReady = false;
-	public bool IsReady => _isReady;
+	public readonly bool IsReady => _isReady;
 	public void Update(GameTime dt, IEventListener eventListener) { 
 		if (eventListener.On<TEvent>()) _isReady = true;
 	}

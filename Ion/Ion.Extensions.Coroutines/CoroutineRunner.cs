@@ -4,23 +4,17 @@ using System.Collections;
 
 namespace Ion;
 
-public class CoroutineRunner : ICoroutineRunner
+public class CoroutineRunner(IServiceProvider services) : ICoroutineRunner
 {
-	private readonly List<CoroutineHandle> _routines = new();
-	private readonly IServiceProvider _services;
+	private readonly List<CoroutineHandle> _routines = [];
 
 	/// <inheritdoc/>
 	public int Count => _routines.Count;
 
-	public CoroutineRunner(IServiceProvider services)
-	{
-		_services = services;
-	}
-
 	/// <inheritdoc/>
 	public void Start(IEnumerator routine)
 	{
-		_routines.Add(new CoroutineHandle(routine, _services.GetRequiredService<IEventListener>()));
+		_routines.Add(new CoroutineHandle(routine, services.GetRequiredService<IEventListener>()));
 	}
 
 	/// <inheritdoc/>
@@ -81,16 +75,10 @@ public class CoroutineRunner : ICoroutineRunner
 		return result;
 	}
 
-	private class CoroutineHandle
+	private class CoroutineHandle(IEnumerator enumerator, IEventListener eventListener)
 	{
-		public IEnumerator Enumerator { get; }
-		public IEventListener EventListener { get; }
+		public IEnumerator Enumerator { get; } = enumerator;
+		public IEventListener EventListener { get; } = eventListener;
 		public IWait? Wait { get; set; }
-
-		public CoroutineHandle(IEnumerator enumerator, IEventListener eventListener)
-		{
-			Enumerator = enumerator;
-			EventListener = eventListener;
-		}
 	}
 }

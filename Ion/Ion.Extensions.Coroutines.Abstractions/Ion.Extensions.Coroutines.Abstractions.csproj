@@ -6,9 +6,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <Compile Remove="Waits\**" />
+    <EmbeddedResource Remove="Waits\**" />
+    <None Remove="Waits\**" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Waits\" />
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
   </ItemGroup>
 </Project>

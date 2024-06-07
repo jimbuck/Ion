@@ -40,7 +40,7 @@ public class IonApplication : IIonApplication, IDisposable
 
 	public static IonApplicationBuilder CreateBuilder()
 	{
-		return CreateBuilder(Array.Empty<string>());
+		return CreateBuilder([]);
 	}
 
 	public IIonApplication UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware)

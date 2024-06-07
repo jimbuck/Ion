@@ -8,10 +8,10 @@ namespace Ion.Extensions.Audio;
 
 public class AudioManager(ITraceTimer<AudioManager> trace) : IAudioManager, IDisposable
 {
-	private readonly WaveOutEvent _outputDevice = new WaveOutEvent();
+	private readonly WaveOutEvent _outputDevice = new();
 	private readonly MixingSampleProvider _mixer = new(WaveFormat.CreateIeeeFloatWaveFormat(48000, 2)) { ReadFully = true };
 
-	public float MasterVolume { get; set; } = 1f;
+	public float MasterVolume { get; set; } = 10f;
 
 	public void Initialize()
 	{

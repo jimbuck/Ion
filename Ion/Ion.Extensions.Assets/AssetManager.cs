@@ -5,7 +5,6 @@ namespace Ion.Extensions.Assets;
 
 internal class GlobalAssetManager(ILogger<GlobalAssetManager> logger, IEnumerable<IAssetLoader> loaders) : IBaseAssetManager
 {
-	private readonly ILogger _logger = logger;
 	private readonly ImmutableDictionary<Type, IAssetLoader> _loaders = loaders.ToImmutableDictionary(l => l.AssetType);
 	private readonly Dictionary<nint, IAsset> _idCache = [];
 	private readonly Dictionary<string, IAsset> _nameCache = [];

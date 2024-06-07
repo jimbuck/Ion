@@ -10,8 +10,15 @@ public static class BuilderExtensions
 	{
 		services
 			.AddSingleton<IAudioManager, AudioManager>()
-			.AddSingleton<IAssetLoader, SoundEffectLoader>();
+			.AddSingleton<IAssetLoader, SoundEffectLoader>()
+			.AddSingleton<AudioSystem>();
 
 		return services;
+	}
+
+	public static IIonApplication UseAudio(this IIonApplication app)
+	{
+		return app
+			.UseSystem<AudioSystem>();
 	}
 }

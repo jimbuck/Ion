@@ -2,21 +2,14 @@
 
 namespace Ion.Extensions.Graphics;
 
-public class SpriteBatchSystem
+public class SpriteBatchSystem(ISpriteBatch spriteBatch, ITraceTimer<SpriteBatchSystem> trace)
 {
-	private readonly SpriteBatch _spriteBatch;
-	private readonly ITraceTimer _trace;
-
-	public SpriteBatchSystem(ISpriteBatch spriteBatch, ITraceTimer<SpriteBatchSystem> trace)
-	{
-		_spriteBatch = (SpriteBatch)spriteBatch;
-		_trace = trace;
-	}
+	private readonly SpriteBatch _spriteBatch = (SpriteBatch)spriteBatch;
 
 	[Init]
 	public void Init(GameTime dt, GameLoopDelegate next)
 	{
-		var timer = _trace.Start("Init");
+		var timer = trace.Start("Init");
 		_spriteBatch.Initialize();
 		timer.Stop();
 		next(dt);
@@ -25,11 +18,11 @@ public class SpriteBatchSystem
 	[Render]
 	public void Render(GameTime dt, GameLoopDelegate next)
 	{
-		var timer = _trace.Start("Render::Pre");
+		var timer = trace.Start("Render::Pre");
 		_spriteBatch.Begin(dt);
 		timer.Stop();
 		next(dt);
-		timer = _trace.Start("Render::Post");
+		timer = trace.Start("Render::Post");
 		_spriteBatch.End();
 		timer.Stop();
 	}
