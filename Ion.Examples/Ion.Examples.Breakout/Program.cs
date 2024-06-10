@@ -11,7 +11,7 @@ var builder = IonApplication.CreateBuilder(args);
 builder.Services.AddIon(builder.Configuration, graphics =>
 {
 	graphics.Output = GraphicsOutput.Window;
-	graphics.ClearColor = Color.DarkSlateGray;
+	graphics.ClearColor = new Color(0x333);
 });
 
 builder.Services.AddSingleton<BreakoutSystems>();
@@ -34,14 +34,14 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 	private readonly Color[] _blockColors = new Color[ROWS * COLS];
 	private readonly RectangleF[] _blockRects = new RectangleF[ROWS * COLS];
 
-	private Vector2 _blockSize = new(100, 25f);
+	private Vector2 _blockSize = new(192f, 64f);
 	private readonly float _blockGap = 10f;
 	private readonly float _playerGap = 150f;
 	private readonly float _bottomGap = 20f;
 
-	private RectangleF _playerRect = new(0, 0, 160, 20f);
+	private RectangleF _paddleRect = new(0, 0, 244f, 64f);
 
-	private RectangleF _ballRect = new(0, 0, 20f, 20f);
+	private RectangleF _ballRect = new(0, 0, 32f, 32f);
 	private Vector2 _ballVelocity = Vector2.Zero;
 	private readonly float _initialBallSpeed = 200f;
 	private float _ballSpeed = 200f;
@@ -54,7 +54,8 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 
 	private Texture2D _blockTexture = default!;
 	private Texture2D _ballTexture = default!;
-	private readonly RectangleF _ballSprite = new RectangleF(1, 1, 14, 14);
+	private Texture2D _paddleTexture = default!;
+	private readonly RectangleF _ballSprite = new(0, 0, 128, 128);
 
 	private SoundEffect _bonkSound = default!;
 	private SoundEffect _pingSound = default!;
@@ -66,8 +67,9 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 	[Init]
 	public void SetupBlocks(GameTime dt, GameLoopDelegate next)
 	{		
-		_blockTexture = assets.Load<Texture2D>("Block1.png");
-		_ballTexture = assets.Load<Texture2D>("Ball1.png");
+		_blockTexture = assets.Load<Texture2D>("15-Breakout-Tiles.png");
+		_paddleTexture = assets.Load<Texture2D>("49-Breakout-Tiles.png");
+		_ballTexture = assets.Load<Texture2D>("58-Breakout-Tiles.png");
 		_bonkSound =  assets.Load<SoundEffect>("Bonk.wav");
 		_pingSound =  assets.Load<SoundEffect>("Ping.mp3");
 		_scoreFontSet = assets.Load<FontSet>("BungeeRegular", "Bungee-Regular.ttf");
@@ -88,7 +90,7 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 		window.Size = new Vector2((COLS * _blockSize.X) + ((COLS + 1) * _blockGap), (ROWS * _blockSize.Y) + ((ROWS + 1) * _blockGap) + _playerGap + _blockSize.Y + _bottomGap);
 		window.IsResizable = false;
 
-		_playerRect.Location = new Vector2(Math.Clamp(input.MousePosition.X - (_playerRect.Height / 2f), 0, window.Width - _playerRect.Width), window.Size.Y - (_blockSize.Y + _bottomGap));
+		_paddleRect.Location = new Vector2(Math.Clamp(input.MousePosition.X - (_paddleRect.Height / 2f), 0, window.Width - _paddleRect.Width), window.Size.Y - (_blockSize.Y + _bottomGap));
 
 		_repositionBlocks();
 
@@ -121,11 +123,11 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 		}
 
 
-		if (isMouseGrabbed) _playerRect.X = Math.Clamp(input.MousePosition.X - (_playerRect.Height / 2f), 0, window.Width - _playerRect.Width);
+		if (isMouseGrabbed) _paddleRect.X = Math.Clamp(input.MousePosition.X - (_paddleRect.Height / 2f), 0, window.Width - _paddleRect.Width);
 
 		if (_ballIsCaptured)
 		{
-			_ballRect.Location = _playerRect.Location + new Vector2((_playerRect.Width - _ballRect.Width) / 2f, -(_ballRect.Height + 1));
+			_ballRect.Location = _paddleRect.Location + new Vector2((_paddleRect.Width - _ballRect.Width) / 2f, -(_ballRect.Height + 1));
 
 			if (input.Pressed(MouseButton.Left) && isMouseGrabbed)
 			{
@@ -170,7 +172,7 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 		// Ball to player collisions
 		if (_ballRect.Bottom > 250 && _ballVelocity.Y > 0)
 		{
-			RectangleF.Intersect(ref _ballRect, ref _playerRect, out var intersection);
+			RectangleF.Intersect(ref _ballRect, ref _paddleRect, out var intersection);
 
 			if (intersection.IsEmpty is false)
 			{
@@ -237,12 +239,12 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 			for (var col = 0; col < COLS; col++)
 			{
 				var i = (row * COLS) + col;
-				if (_blockStates[i]) spriteBatch.Draw(_blockTexture, _blockRects[i], color: _blockColors[i]);
+				if (_blockStates[i]) spriteBatch.Draw(_blockTexture, _blockRects[i]);//, color: _blockColors[i]);
 			}
 		}
 
-		spriteBatch.Draw(_blockTexture, _playerRect, color: Color.DarkBlue);
-		spriteBatch.Draw(_ballTexture, _ballRect, color: Color.DarkRed, sourceRectangle: _ballSprite);
+		spriteBatch.Draw(_paddleTexture, _paddleRect);//, color: Color.DarkBlue);
+		spriteBatch.Draw(_ballTexture, _ballRect);//, color: Color.DarkRed);
 		spriteBatch.DrawString(_scoreFont, $"Score:  {_score}", new Vector2(20f), Color.Red);
 
 		next(dt);
@@ -269,12 +271,12 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 		{
 			_ballVelocity.X *= -1f;
 			_ballVelocity = Vector2.Normalize(_ballVelocity);
-			_ballRect.X = intersection.Left == _playerRect.Left ? _playerRect.X - (_ballRect.Width+1) : _playerRect.Right + 1;
+			_ballRect.X = intersection.Left == _paddleRect.Left ? _paddleRect.X - (_ballRect.Width+1) : _paddleRect.Right + 1;
 			return;
 		}
 
 		_ballVelocity.Y *= -1f;
-		var offsetFromPaddle = (_ballRect.Left - _playerRect.X) / (_playerRect.Width - _ballRect.Width);
+		var offsetFromPaddle = (_ballRect.Left - _paddleRect.X) / (_paddleRect.Width - _ballRect.Width);
 
 		_ballVelocity = Vector2.Lerp(_paddleBounceMin, _paddleBounceMax, offsetFromPaddle);
 

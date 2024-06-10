@@ -8,23 +8,28 @@
   </PropertyGroup>
   <ItemGroup>
     <None Remove="appsettings.json" />
+    <None Remove="Assets\15-Breakout-Tiles.png" />
+    <None Remove="Assets\49-Breakout-Tiles.png" />
+    <None Remove="Assets\58-Breakout-Tiles.png" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="Assets\15-Breakout-Tiles.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\49-Breakout-Tiles.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\58-Breakout-Tiles.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Ion\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />
     <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="Assets\Ball1.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\Block1.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="Assets\bonk.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
