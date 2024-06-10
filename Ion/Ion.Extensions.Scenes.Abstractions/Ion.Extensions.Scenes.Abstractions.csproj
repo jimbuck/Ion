@@ -10,6 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\Ion.Extensions.Scenes.InternalGenerators\Ion.Extensions.Scenes.InternalGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" ReferenceOutputAssembly="false" PackAsAnalyzer="true" />
   </ItemGroup>
 </Project>

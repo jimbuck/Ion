@@ -6,7 +6,7 @@ using Ion.Extensions.Debug;
 
 namespace Ion.Extensions.Scenes;
 
-internal delegate Scene SceneBuilderFactory(IConfiguration config, IServiceProvider services);
+internal delegate SceneInstance SceneBuilderFactory(IConfiguration config, IServiceProvider services);
 
 /// <summary>
 /// Creates a new SceneManager instance, keeping a reference to the service provider.
@@ -23,7 +23,7 @@ internal sealed class SceneSystem(
 	private readonly ITraceTimer _trace = trace;
 	private readonly Dictionary<int, SceneBuilderFactory> _scenesBuilders = new();
 
-	private Scene? _activeScene;
+	private SceneInstance? _activeScene;
 	private Transition? _activeTransition;
 	private IServiceScope? _activeScope;
 	private int _nextSceneId = 0;

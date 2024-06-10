@@ -48,26 +48,44 @@ public struct Color : IEquatable<Color>
 	/// <summary>
 	/// Constructs an RGBA color from a packed value.
 	/// The value is a 32-bit unsigned integer, with A in the least significant octet.
+	/// Acceptable formats include 8 value (RRGGBBAA), 6 value (RRGGBB), 4 value (RGBA) and 3 value (RGB).
 	/// </summary>
-	/// <param name="packedValue">The packed value.</param>
-	public Color(uint packedValue)
+	/// <param name="hex">The packed value.</param>
+	public Color(uint hex)
 	{
 		float r, g, b, a;
 		unchecked
 		{
-			if ((packedValue & 0xff000000) != 0)
+			if (hex <= 0xFFF) // RGB
 			{
-				r = (byte)packedValue >> 24;
-				g = (byte)packedValue >> 16;
-				b = (byte)packedValue >> 8;
-				a = (byte)packedValue;
-			} else {
-				r = (byte)packedValue >> 16;
-				g = (byte)packedValue >> 8;
-				b = (byte)packedValue;
-				a = 0;
+				r = (byte)((hex >> 8 & 0xF) * 0x11); // replicate 4-bit value
+				g = (byte)((hex >> 4 & 0xF) * 0x11); // replicate 4-bit value
+				b = (byte)((hex & 0xF) * 0x11); // replicate 4-bit value
+				a = 255; // fully opaque
 			}
-			
+			else if (hex <= 0xFFFF)
+			{
+				r = (byte)((hex >> 16 & 0xF) * 0x11); // replicate 4-bit value
+				g = (byte)((hex >> 8 & 0xF) * 0x11); // replicate 4-bit value
+				g = (byte)((hex >> 4 & 0xF) * 0x11); // replicate 4-bit value
+				b = (byte)((hex & 0xF) * 0x11); // replicate 4-bit value
+				a = 255; // fully opaque
+			}
+			else if (hex <= 0xFFFFFF) // RRGGBB
+			{
+				r = (byte)((hex >> 16) & 0xFF);
+				g = (byte)((hex >> 8) & 0xFF);
+				b = (byte)(hex & 0xFF);
+				a = 255; // fully opaque
+			}
+			else // RRGGBBAA
+			{
+				r = (byte)((hex >> 24) & 0xFF);
+				g = (byte)((hex >> 16) & 0xFF);
+				b = (byte)((hex >> 8) & 0xFF);
+				a = (byte)(hex & 0xFF);
+			}
+
 		}
 
 		_channels = new Vector4(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);

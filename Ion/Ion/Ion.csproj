@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -11,6 +11,7 @@
     <ProjectReference Include="..\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Debug\Ion.Extensions.Debug.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Veldrid\Ion.Extensions.Graphics.Veldrid.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" ReferenceOutputAssembly="false" PackAsAnalyzer="true" />
     <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -1,7 +1,11 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-
 using SourceGeneratorUtils;
+
+using System.Collections.Immutable;
+
+using System.Diagnostics;
 
 namespace Ion.Core.InternalGenerators;
 
@@ -9,22 +13,23 @@ namespace Ion.Core.InternalGenerators;
 public class UseDelegateServicesGenerator : IIncrementalGenerator
 {
 	private const int MAX_SERVICES = 8;
-	private static readonly string[] STAGES = new[] { "Init", "First", "FixedUpdate", "Update", "Render", "Last", "Destroy" };
+	private static readonly string[] STAGES = ["Init", "First", "FixedUpdate", "Update", "Render", "Last", "Destroy"];
 
 	public void Initialize(IncrementalGeneratorInitializationContext context)
 	{
 #if DEBUGGENERATORS
-		if (!Debugger.IsAttached)
-		{
-			Debugger.Launch();
-		}
+		//if (!Debugger.IsAttached)
+		//{
+		//	Debugger.Launch();
+		//}
 #endif
 
+
 		// Add the marker attribute to the compilation
-		context.RegisterPostInitializationOutput(ctx => ctx.AddSource("UseDelegateServiceExtensions.g.cs", GetUseDelegateServiceExtensions()));
+		context.RegisterPostInitializationOutput(ctx => ctx.AddSource("UseDelegateServiceExtensions.g.cs", _getUseDelegateServiceExtensions()));
 	}
 
-	private static SourceText GetUseDelegateServiceExtensions()
+	private static SourceText _getUseDelegateServiceExtensions()
 	{
 		var source = new SourceWriter();
 		source.WriteLine("using Microsoft.Extensions.DependencyInjection;");

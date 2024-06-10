@@ -11,10 +11,10 @@ public class CoroutinesGenerator : IIncrementalGenerator
 	public void Initialize(IncrementalGeneratorInitializationContext context)
 	{
 #if DEBUGGENERATORS
-		if (!Debugger.IsAttached)
-		{
-			Debugger.Launch();
-		}
+		//if (!System.Diagnostics.Debugger.IsAttached)
+		//{
+		//	System.Diagnostics.Debugger.Launch();
+		//}
 #endif
 
 		// Add the marker attribute to the compilation
