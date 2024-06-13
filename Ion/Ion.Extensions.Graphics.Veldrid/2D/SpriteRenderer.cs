@@ -28,18 +28,11 @@ internal class SpriteRenderer(
 
 	private bool _beginCalled = false;
 
-	private class BufferContainer
+	private class BufferContainer(DeviceBuffer buffer, ResourceSet instanceSet, ResourceSet textureSet)
 	{
-		public DeviceBuffer Buffer { get; set; }
-		public ResourceSet InstanceSet { get; set; }
-		public ResourceSet TextureSet { get; set; }
-
-		public BufferContainer(DeviceBuffer buffer, ResourceSet instanceSet, ResourceSet textureSet)
-		{
-			Buffer = buffer;
-			InstanceSet = instanceSet;
-			TextureSet = textureSet;
-		}
+		public DeviceBuffer Buffer { get; set; } = buffer;
+		public ResourceSet InstanceSet { get; set; } = instanceSet;
+		public ResourceSet TextureSet { get; set; } = textureSet;
 
 		public void Dispose()
 		{
@@ -49,7 +42,7 @@ internal class SpriteRenderer(
 		}
 	}
 
-	private readonly Dictionary<ITexture2D, BufferContainer> _buffers = new();
+	private readonly Dictionary<ITexture2D, BufferContainer> _buffers = [];
 
 	private const string VertexCode = @"
 #version 450

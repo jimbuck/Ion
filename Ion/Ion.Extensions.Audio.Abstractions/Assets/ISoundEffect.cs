@@ -1,5 +1,6 @@
-﻿
-namespace Ion.Extensions.Assets;
+﻿using Ion.Extensions.Assets;
+
+namespace Ion.Extensions.Audio;
 
 public interface ISoundEffect : IAsset
 {
