@@ -55,7 +55,6 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 	private Texture2D _blockTexture = default!;
 	private Texture2D _ballTexture = default!;
 	private Texture2D _paddleTexture = default!;
-	private readonly RectangleF _ballSprite = new(0, 0, 128, 128);
 
 	private SoundEffect _bonkSound = default!;
 	private SoundEffect _pingSound = default!;
