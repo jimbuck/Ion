@@ -4,6 +4,8 @@ public static class Wait
 {
 	public static IWait For(float delay) => new WaitFor(delay);
 
+	public static IWait For(TimeSpan delay) => new WaitFor((float)delay.TotalSeconds);
+
 	public static IWait For<TEvent>() where TEvent : unmanaged => new WaitForEvent<TEvent>();
 
 	public static IWait Until(Func<bool> predicate) => new WaitUntil(predicate);

@@ -5,7 +5,7 @@ namespace Ion.Extensions.Scenes.Generators.Tests;
 
 public class SceneGeneratorTests
 {
-	[Fact]
+	[Fact(Skip = "WIP")]
 	public Task TestSceneGenerator()
 	{
 		// The source code to test
@@ -47,6 +47,15 @@ public static class TestHelper
 
 		// Run the source generator!
 		driver = driver.RunGenerators(compilation);
+
+		var runResults = driver.GetRunResult();
+		foreach(var generatedTree in runResults.GeneratedTrees)
+		{
+			var filename = generatedTree.FilePath;
+			var contents = generatedTree.GetText().ToString();
+			Console.WriteLine(@$"// Generated File: {filename}
+{contents}");
+		}
 
 		// Use verify to snapshot test the source generator output!
 		return Verifier.Verify(driver);

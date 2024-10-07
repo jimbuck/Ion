@@ -34,11 +34,13 @@ game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner corout
 {
 	IEnumerator CountDown(int from)
 	{
-		while (from >= 0)
+		while (from > 0)
 		{
 			Console.WriteLine("Countdown: " + from--);
-			yield return Wait.Until(() => input.Pressed(Key.Space));
+			yield return Wait.For(TimeSpan.FromSeconds(1));
 		}
+
+		Console.WriteLine("Countdown done!");
 	}
 
 	return dt =>
@@ -68,7 +70,7 @@ game.UseFirst((GameLoopDelegate next, IInputState input, ITraceManager traceMana
 {
 	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
 	{
-		Console.WriteLine($"Frame: {dt.Frame}!");
+		//Console.WriteLine($"Frame: {dt.Frame}!");
 	});
 
 	return dt =>
@@ -97,7 +99,7 @@ game.UseUpdate((GameLoopDelegate next, IEventEmitter eventEmitter, IEventListene
 	{
 		if (events.On<int>(out var e)) Console.WriteLine($"Int event! {e.Data}");
 		next(dt);
-		switchScene(dt);
+		//switchScene(dt);
 	};
 });
 

@@ -122,7 +122,7 @@ public class {SCENE_ATTRIBUTE_NAME} : Attribute {{ }}
 		source.OpenBlock();
 
 		#region UseScene Extension
-		source.WriteLine($"public static IIonApplication UseScene(this IIonApplication app, {enumNamespace}.{enumName} sceneId, Action<ISceneBuilder> configure) => return app.UseScene((int)sceneId, configure);");
+		source.WriteLine($"public static IIonApplication UseScene(this IIonApplication app, {enumNamespace}.{enumName} sceneId, Action<ISceneBuilder> configure) => app.UseScene((int)sceneId, configure);");
 		#endregion
 
 		source.WriteEmptyLines(1);

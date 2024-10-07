@@ -27,6 +27,7 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+	  <ProjectReference Include="..\..\Ion\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
     <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
   </ItemGroup>
   <ItemGroup>
