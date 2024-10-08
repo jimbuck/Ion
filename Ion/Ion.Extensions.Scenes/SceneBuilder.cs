@@ -2,7 +2,7 @@
 
 namespace Ion.Extensions.Scenes;
 
-internal class SceneBuilder : ISceneBuilder
+internal class SceneBuilder(int sceneId, IConfiguration config, IServiceProvider services) : ISceneBuilder
 {
 	private readonly IMiddlewarePipelineBuilder _init = new MiddlewarePipelineBuilder();
 	private readonly IMiddlewarePipelineBuilder _first = new MiddlewarePipelineBuilder();
@@ -12,18 +12,11 @@ internal class SceneBuilder : ISceneBuilder
 	private readonly IMiddlewarePipelineBuilder _last = new MiddlewarePipelineBuilder();
 	private readonly IMiddlewarePipelineBuilder _destroy = new MiddlewarePipelineBuilder();
 
-	public int SceneId { get; }
+	public int SceneId { get; } = sceneId;
 
-	public IConfiguration Configuration { get; }
+	public IConfiguration Configuration { get; } = config;
 
-	public IServiceProvider Services { get; }
-
-	public SceneBuilder(int sceneId, IConfiguration config, IServiceProvider services)
-    {
-		SceneId = sceneId;
-		Configuration = config;
-		Services = services;
-    }
+	public IServiceProvider Services { get; } = services;
 
 	public ISceneBuilder UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware)
 	{
@@ -68,9 +61,9 @@ internal class SceneBuilder : ISceneBuilder
 		return this;
 	}
 
-	internal Scene Build()
+	internal SceneInstance Build()
     {
-		return new Scene(SceneId)
+		return new SceneInstance(SceneId)
 		{
 			Init = _init.Build(),
 			First = _first.Build(),

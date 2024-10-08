@@ -9,6 +9,8 @@ using Ion.Extensions.Graphics;
 using Ion.Extensions.Scenes;
 using Ion.Extensions.Coroutines;
 
+using Ion.Examples.Scenes;
+
 var builder = IonApplication.CreateBuilder(args);
 
 builder.Services.AddDebugUtils(builder.Configuration);
@@ -28,16 +30,17 @@ game.UseDebugUtils();
 game.UseEvents();
 game.UseVeldridGraphics();
 
-
 game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner coroutine) =>
 {
 	IEnumerator CountDown(int from)
 	{
-		while (from >= 0)
+		while (from > 0)
 		{
 			Console.WriteLine("Countdown: " + from--);
-			yield return Wait.Until(() => input.Pressed(Key.Space));
+			yield return Wait.For(TimeSpan.FromSeconds(1));
 		}
+
+		Console.WriteLine("Countdown done!");
 	}
 
 	return dt =>
@@ -67,7 +70,7 @@ game.UseFirst((GameLoopDelegate next, IInputState input, ITraceManager traceMana
 {
 	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
 	{
-		Console.WriteLine($"Frame: {dt.Frame}!");
+		//Console.WriteLine($"Frame: {dt.Frame}!");
 	});
 
 	return dt =>
@@ -88,7 +91,7 @@ game.UseUpdate((GameLoopDelegate next, IEventEmitter eventEmitter, IEventListene
 {
 	var flip = false;
 	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(3), (dt) => {
-		eventEmitter.EmitChangeScene(flip ? (int)Scenes.MainMenu : (int)Scenes.Gameplay);
+		eventEmitter.EmitChangeScene(flip ? Scene.MainMenu : Scene.Gameplay);
 		flip = !flip;
 	});
 
@@ -96,7 +99,7 @@ game.UseUpdate((GameLoopDelegate next, IEventEmitter eventEmitter, IEventListene
 	{
 		if (events.On<int>(out var e)) Console.WriteLine($"Int event! {e.Data}");
 		next(dt);
-		switchScene(dt);
+		//switchScene(dt);
 	};
 });
 
@@ -115,7 +118,7 @@ game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter, IInputState i
 	};
 });
 
-game.UseScene((int)Scenes.MainMenu, scene =>
+game.UseScene(Scene.MainMenu, scene =>
 {
 	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
 	{
@@ -129,7 +132,7 @@ game.UseScene((int)Scenes.MainMenu, scene =>
 	scene.UseSystem<TestMiddleware>();
 });
 
-game.UseScene((int)Scenes.Gameplay, scene =>
+game.UseScene(Scene.Gameplay, scene =>
 {
 	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
 	{
@@ -145,71 +148,76 @@ game.UseRender(next => dt => Console.WriteLine("NEVER GETTING CALLED!"));
 
 game.Run();
 
-enum Scenes
+namespace Ion.Examples.Scenes
 {
-	MainMenu = 1,
-	Gameplay,
-}
-
-public partial class TestMiddleware
-{
-	private readonly Queue<float> _frameTimes = new Queue<float>();
-
-	public TestMiddleware()
+	public enum Scene
 	{
-		Console.WriteLine("TestMiddleware Constructor");
+		MainMenu = 1,
+		Gameplay,
+		Test,
 	}
 
-	[First]
-	public void CoolFirstMiddleware(GameTime dt, GameLoopDelegate next)
+	public partial class TestMiddleware
 	{
-		//Console.WriteLine($"Class First {dt.Frame}");
-		next(dt);
-	}
+		private readonly Queue<float> _frameTimes = new();
 
-	[FixedUpdate]
-	public GameLoopDelegate FancyFixedUpdate(GameLoopDelegate next)
-	{
-		Console.WriteLine("Class Fixed Update SETUP");
-		uint count = 0;
-		return dt =>
+		public TestMiddleware()
 		{
-			count++;
-			//Console.WriteLine($"Class Fixed Update inside {count++}");
+			Console.WriteLine("TestMiddleware Constructor");
+		}
+
+		[First]
+		public void CoolFirstMiddleware(GameTime dt, GameLoopDelegate next)
+		{
+			//Console.WriteLine($"Class First {dt.Frame}");
 			next(dt);
-		};
-	}
+		}
 
-	[Render]
-	public GameLoopDelegate Render(GameLoopDelegate next)
-	{
-		var stopwatch = new Stopwatch();
-
-		return dt =>
+		[FixedUpdate]
+		public GameLoopDelegate FancyFixedUpdate(GameLoopDelegate next)
 		{
-			stopwatch.Restart();
-			next(dt);
-			stopwatch.Stop();
-			_frameTimes.Enqueue((float)stopwatch.Elapsed.TotalSeconds);
-			while (_frameTimes.Count > 60) _frameTimes.Dequeue();
-		};
-	}
-}
-
-static class Throttler
-{
-	public static Action<GameTime> Wrap(TimeSpan interval, Action<GameTime> action)
-	{
-		var total = 0f;
-
-		return (dt) =>
-		{
-			total += dt.Delta;
-			if (total > interval.TotalSeconds)
+			Console.WriteLine("Class Fixed Update SETUP");
+			uint count = 0;
+			return dt =>
 			{
-				total = 0;
-				action(dt);
-			}
-		};
+				count++;
+				//Console.WriteLine($"Class Fixed Update inside {count++}");
+				next(dt);
+			};
+		}
+
+		[Render]
+		public GameLoopDelegate Render(GameLoopDelegate next)
+		{
+			var stopwatch = new Stopwatch();
+
+			return dt =>
+			{
+				stopwatch.Restart();
+				next(dt);
+				stopwatch.Stop();
+				_frameTimes.Enqueue((float)stopwatch.Elapsed.TotalSeconds);
+				while (_frameTimes.Count > 60) _frameTimes.Dequeue();
+			};
+		}
 	}
+
+	static class Throttler
+	{
+		public static Action<GameTime> Wrap(TimeSpan interval, Action<GameTime> action)
+		{
+			var total = 0f;
+
+			return (dt) =>
+			{
+				total += dt.Delta;
+				if (total > interval.TotalSeconds)
+				{
+					total = 0;
+					action(dt);
+				}
+			};
+		}
+	}
+
 }

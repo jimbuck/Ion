@@ -1,11 +1,8 @@
-﻿using Ion.Extensions.Assets;
+﻿namespace Ion.Extensions.Audio;
 
-namespace Ion.Extensions.Audio
+public interface IAudioManager
 {
-	public interface IAudioManager
-	{
-		float MasterVolume { get; set; }
+	float MasterVolume { get; set; }
 
-		void Play(ISoundEffect soundEffect, float volume = 1f, float pitchShift = 0f);
-	}
+	void Play(ISoundEffect soundEffect, float volume = 1f, float pitchShift = 0f);
 }

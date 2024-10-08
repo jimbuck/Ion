@@ -1,6 +1,6 @@
 ﻿namespace Ion.Extensions.Scenes;
 
-public class Scene
+public class SceneInstance
 {
 	public int Id { get; }
     public string Name { get; }
@@ -13,7 +13,7 @@ public class Scene
 	public GameLoopDelegate Last { get; set; } = (dt) => { };
 	public GameLoopDelegate Destroy { get; set; } = (dt) => { };
 
-	internal Scene(int id)
+	internal SceneInstance(int id)
     {
 		Id = id;
 		Name = $"Scene{id}";
