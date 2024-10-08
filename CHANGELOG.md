@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.2.2"></a>
+## [0.2.2](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.2) (2024-10-8)
+
+### ✨ Features
+
+* Scene generators (#44) ([88c6d6a](https://www.github.com/jimbuck/Ion/commit/88c6d6a85d6664ba8b6a2e2b096d32065fe52fba))
+
 <a name="0.2.1"></a>
 ## [0.2.1](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.1) (2024-6-7)
 
