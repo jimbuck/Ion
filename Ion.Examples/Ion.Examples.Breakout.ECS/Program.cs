@@ -30,7 +30,7 @@ game.UseIon()
 	.UseSystem<MouseCaptureSystem>()
 	.UseSystem<SpriteRendererSystem>()
 	.UseSystem<ScoreSystem>()
-	.UseSystem<SoundEffectsSystem>()
+	//.UseSystem<SoundEffectsSystem>()
 	.UseSystem<PaddleSystem>()
 	.UseSystem<BallSystem>()
 	.UseSystem<BlockSystem>()
@@ -73,7 +73,7 @@ public static class BreakoutConstants
 	public static readonly float PLAYER_GAP = 150f;
 	public static readonly float BOTTOM_GAP = 20f;
 
-	public static readonly Vector2 BLOCK_SIZE = new(192f, 32f);
+	public static readonly Vector2 BLOCK_SIZE = new(192f, 64f);
 	public static readonly Vector2 PADDLE_SIZE = new(244f, 64f);
 
 	public static readonly Vector2 BALL_SIZE = new(32f, 32f);
@@ -335,7 +335,8 @@ public class BallSystem(World world, IEventListener events, IWindow window, IAss
 			else
 			{
 				ballVelocity.Direction = _recalculateBallDirection(ballVelocity, direction);
-				ballPosition.Value = new Vector2(direction == CollisionDirection.Left ? paddleRect.Right + 1 : paddleRect.Left - (ballRect.Width + 1), ballPosition.Value.Y);
+				ballVelocity.Direction = new Vector2(ballVelocity.Direction.X, -MathF.Abs(ballVelocity.Direction.Y));
+				ballPosition.Value = new Vector2(direction == CollisionDirection.Left ? paddleRect.Right + 1 : paddleRect.Left - (ballRect.Width + 1), ballPosition.Value.Y - 1);
 			}
 			events.Emit(new PaddleHitEvent((paddleIntersection.Left - paddleRect.Left) / paddleRect.Width));
 		}
@@ -346,10 +347,10 @@ public class BallSystem(World world, IEventListener events, IWindow window, IAss
 			var i = (gridLocation.Row * BreakoutConstants.COLS) + gridLocation.Column;
 			var blockRect = new RectangleF(position.Value, BreakoutConstants.BLOCK_SIZE);
 
-			RectangleF.Intersect(ref ballRect, ref blockRect, out var intersection);
-			if (intersection.IsEmpty) return;
+			RectangleF.Intersect(ref ballRect, ref blockRect, out var blockIntersection);
+			if (blockIntersection.IsEmpty) return;
 
-			var direction = _getIntersectionDirection(ref intersection, ref ballRect);
+			var direction = _getIntersectionDirection(ref blockIntersection, ref ballRect);
 			collisions.Add(direction);
 			world.Destroy(entity);
 			events.Emit(new BlockHitEvent(direction));
@@ -372,11 +373,14 @@ public class BallSystem(World world, IEventListener events, IWindow window, IAss
 
 	private CollisionDirection _getIntersectionDirection(ref RectangleF intersection, ref RectangleF ballRect)
 	{
-		if (intersection.Top == ballRect.Top) return CollisionDirection.Top;
-		if (intersection.Bottom == ballRect.Bottom) return CollisionDirection.Bottom;
-		if (intersection.Left == ballRect.Left) return CollisionDirection.Left;
-		if (intersection.Right == ballRect.Right) return CollisionDirection.Right;
-
+		if (intersection.Width > intersection.Height) {
+			if (intersection.Top == ballRect.Top) return CollisionDirection.Top;
+			if (intersection.Bottom == ballRect.Bottom) return CollisionDirection.Bottom;
+		} else {
+			if (intersection.Left == ballRect.Left) return CollisionDirection.Left;
+			if (intersection.Right == ballRect.Right) return CollisionDirection.Right;
+		}	
+		
 		return CollisionDirection.Unkown;
 	}
 
