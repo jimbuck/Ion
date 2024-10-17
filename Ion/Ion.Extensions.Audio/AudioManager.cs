@@ -1,5 +1,4 @@
-﻿using Ion.Extensions.Assets;
-using Ion.Extensions.Debug;
+﻿using Ion.Extensions.Debug;
 
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
@@ -8,7 +7,7 @@ namespace Ion.Extensions.Audio;
 
 public class AudioManager(ITraceTimer<AudioManager> trace) : IAudioManager, IDisposable
 {
-	private readonly WaveOutEvent _outputDevice = new();
+	private readonly DirectSoundOut _outputDevice = new();
 	private readonly MixingSampleProvider _mixer = new(WaveFormat.CreateIeeeFloatWaveFormat(48000, 2)) { ReadFully = true };
 
 	public float MasterVolume { get; set; } = 10f;
@@ -47,7 +46,7 @@ public class AudioManager(ITraceTimer<AudioManager> trace) : IAudioManager, IDis
 			// greater than zero [0, 1] ->  [1, 2]
 			var naudioPitch = pitchShift < 0 ? (pitchShift / 2f) + 1f : (pitchShift + 1f);
 
-			sampleProvider = new SmbPitchShiftingSampleProvider(sampleProvider) { PitchFactor = naudioPitch };
+			//sampleProvider = new SmbPitchShiftingSampleProvider(sampleProvider) { PitchFactor = naudioPitch };
 		}
 
 		_addMixerInput(sampleProvider);

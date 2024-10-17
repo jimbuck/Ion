@@ -27,6 +27,9 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Arch" Version="1.2.8" />
+  </ItemGroup>
+  <ItemGroup>
 	  <ProjectReference Include="..\..\Ion\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
     <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
   </ItemGroup>
@@ -37,7 +40,7 @@
     <None Update="Assets\Bungee-Regular.ttf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Assets\ping.mp3">
+    <None Update="Assets\ping.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
