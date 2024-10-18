@@ -11,6 +11,7 @@
 	  <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
 	  <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 	  <Configurations>Debug;Release;DebugGenerators</Configurations>
+	  <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
