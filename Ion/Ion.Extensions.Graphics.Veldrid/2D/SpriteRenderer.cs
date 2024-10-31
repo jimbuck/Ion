@@ -262,14 +262,9 @@ void main()
 		_addSprite(texture, color, sourceRectangle, destinationRectangle, origin, rotation, depth, _defaultScissor, options);
 	}
 
-	public void Draw(ITexture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
+	public void Draw(ITexture2D texture, Vector2 position, Vector2 size, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
 	{
-		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
-
-		if (color == default) color = Color.White;
-		if (sourceRectangle.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
-
-		_addSprite(texture, color, sourceRectangle, new RectangleF(position.X, position.Y, scale.X * sourceRectangle.Size.X, scale.Y * sourceRectangle.Size.Y), origin, rotation, depth, _defaultScissor, options);
+		Draw(texture, new RectangleF(position, size), sourceRectangle, color, origin, rotation, depth, options);
 	}
 
 	public unsafe void End()

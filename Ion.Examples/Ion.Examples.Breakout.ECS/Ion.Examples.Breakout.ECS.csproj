@@ -29,8 +29,8 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Aether.Physics2D" Version="2.1.0" />
     <PackageReference Include="Arch" Version="1.2.8" />
-    <PackageReference Include="MagicPhysX" Version="1.0.0" />
   </ItemGroup>
   <ItemGroup>
 	  <ProjectReference Include="..\..\Ion\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
@@ -49,8 +49,5 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Numerics" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="PhysicsToolkit\" />
   </ItemGroup>
 </Project>

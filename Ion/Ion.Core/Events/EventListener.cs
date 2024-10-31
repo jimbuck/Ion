@@ -6,7 +6,6 @@ public class EventListener : IEventListener
 {
     private readonly EventEmitter _eventEmitter;
 
-
 	private HashSet<ulong> _currFrameSeenEvents = new(8);
     private HashSet<ulong> _prevFrameKnownEvents = new(8);
 
@@ -22,9 +21,9 @@ public class EventListener : IEventListener
 		{
 			var e = _eventEmitter.PreviousFrameEvents[i];
 			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
 
-			_currFrameSeenEvents.Add(e.Id);
+			_currFrameSeenEvents.Add(e.EventId);
 			return true;
 		}
 
@@ -32,9 +31,9 @@ public class EventListener : IEventListener
 		{
 			var e = _eventEmitter.CurrentFrameEvents[i];
 			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
 
-			_currFrameSeenEvents.Add(e.Id);
+			_currFrameSeenEvents.Add(e.EventId);
 			return true;
 		}
 
@@ -47,9 +46,9 @@ public class EventListener : IEventListener
 		{
 			var e = _eventEmitter.PreviousFrameEvents[i];
 			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
 
-			_currFrameSeenEvents.Add(e.Id);
+			_currFrameSeenEvents.Add(e.EventId);
 			@event = (IEvent<T>)e;
 			return true;
 		}
@@ -58,9 +57,9 @@ public class EventListener : IEventListener
 		{
 			var e = _eventEmitter.CurrentFrameEvents[i];
 			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
 
-			_currFrameSeenEvents.Add(e.Id);
+			_currFrameSeenEvents.Add(e.EventId);
 			@event = (IEvent<T>)e;
 			return true;
 		}
@@ -76,9 +75,9 @@ public class EventListener : IEventListener
 		{
 			var e = _eventEmitter.PreviousFrameEvents[i];
 			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
 
-			_currFrameSeenEvents.Add(e.Id);
+			_currFrameSeenEvents.Add(e.EventId);
 			found = true;
 		}
 
@@ -86,9 +85,9 @@ public class EventListener : IEventListener
 		{
 			var e = _eventEmitter.CurrentFrameEvents[i];
 			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
 
-			_currFrameSeenEvents.Add(e.Id);
+			_currFrameSeenEvents.Add(e.EventId);
 			found = true;
 		}
 
@@ -102,9 +101,9 @@ public class EventListener : IEventListener
 		{
 			var e = _eventEmitter.PreviousFrameEvents[i];
 			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
 
-			_currFrameSeenEvents.Add(e.Id);
+			_currFrameSeenEvents.Add(e.EventId);
 			@event = (IEvent<T>)e;
 		}
 
@@ -112,9 +111,9 @@ public class EventListener : IEventListener
 		{
 			var e = _eventEmitter.CurrentFrameEvents[i];
 			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.Id) || _currFrameSeenEvents.Contains(e.Id)) continue;
+			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
 
-			_currFrameSeenEvents.Add(e.Id);
+			_currFrameSeenEvents.Add(e.EventId);
 			@event = (IEvent<T>)e;
 		}
 
