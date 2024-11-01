@@ -518,7 +518,7 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 	{
 		var totalBalls = world.CountEntities(in _ballQuery);
 
-		if (events.OnLatest<LaunchBallCommand>() && totalBalls < 40)
+		if (events.OnLatest<LaunchBallCommand>() && totalBalls < 1000)
 		{
 			var paddlePosition = _paddle.Entity.Get<Transform2D>().Position;
 			var radius = BreakoutConstants.BALL_SIZE.X / 2f;
@@ -554,7 +554,15 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 			}
 		});
 
-		
+		if (events.On<BlocksClearedEvent>())
+		{
+			world.Query(in _ballQuery, (Entity entity, ref DynamicRigidBody body) =>
+			{
+				physics.Remove(body.Body);
+				world.Destroy(entity);
+			});
+		}
+
 
 		next(dt);
 	}
@@ -571,6 +579,8 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 	private readonly QueryDescription _blockQuery = new QueryDescription().WithAll<GridLocation, Sprite, Transform2D>();
 	private readonly QueryDescription _paddleQuery = new QueryDescription().WithAll<Paddle>();
 	private EntityReference _paddle = EntityReference.Null;
+
+	private readonly Random _rand = new();
 
 
 	[Init]
@@ -590,7 +600,7 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 	{
 		next(dt);
 
-		if (events.On<BlockHitEvent>(out var e))
+		while (events.On<BlockHitEvent>(out var e))
 		{
 			var entity = e.Data.Block.Entity;
 			if (entity.IsAlive() && entity.Has<StaticBody>())
@@ -635,8 +645,6 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 	{
 		var blockTexture = assets.Load<Texture2D>("15-Breakout-Tiles.png");
 
-		var rand = new Random(6014);
-
 		var blockHalfExtent = BreakoutConstants.BLOCK_SIZE / 2f;
 
 		var rows = BreakoutConstants.ROWS;
@@ -651,7 +659,7 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 			{
 				var colOffset = blockHalfExtent.X + BreakoutConstants.BLOCK_GAP + (col * (BreakoutConstants.BLOCK_SIZE.X + BreakoutConstants.BLOCK_GAP));
 
-				var transform = new Transform2D(new Vector2(colOffset, rowOffset), ((float)rand.NextDouble() - 0.5f) * maxTilt);
+				var transform = new Transform2D(new Vector2(colOffset, rowOffset), ((float)_rand.NextDouble() - 0.5f) * maxTilt);
 				var body = physics.AddStaticBox(BreakoutConstants.BLOCK_SIZE / BreakoutConstants.PHYSICS_SCALE, transform.Position / BreakoutConstants.PHYSICS_SCALE, transform.Rotation);
 				
 				var blockEntity = world.Create(transform, new GridLocation(row, col), new Sprite(blockTexture, BreakoutConstants.BLOCK_SIZE), new StaticBody(body)).Reference();
