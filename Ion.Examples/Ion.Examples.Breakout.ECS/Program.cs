@@ -154,7 +154,7 @@ public class LevelSystem(IWindow window, PhysicsManager physics)
 
 public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBatch spriteBatch, World world)
 {
-	private QueryDescription _ballQuery = new QueryDescription().WithAll<Ball>();
+	private readonly QueryDescription _ballQuery = new QueryDescription().WithAll<Ball>();
 
 	private FontSet _scoreFontSet = default!;
 	private Font _scoreFont = default!;
@@ -243,7 +243,6 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 	{
 		if (window.IsMouseGrabbed)
 		{
-			ref var paddleComponent = ref _paddle.Entity.Get<Paddle>();
 			ref var paddleTransform = ref _paddle.Entity.Get<Transform2D>();
 
 			paddleTransform.Position = new Vector2(input.MousePosition.X, paddleTransform.Position.Y);
@@ -263,8 +262,8 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 	private Texture2D _ballTexture = default!;
 	private EntityReference _paddle = EntityReference.Null;
 
-	private QueryDescription _ballQuery = new QueryDescription().WithAll<Ball>();
-	private QueryDescription _paddleQuery = new QueryDescription().WithAll<Paddle>();
+	private readonly QueryDescription _ballQuery = new QueryDescription().WithAll<Ball>();
+	private readonly QueryDescription _paddleQuery = new QueryDescription().WithAll<Paddle>();
 
 	private readonly Vector2 _paddleBallOffset = new(0f, -(BreakoutConstants.BALL_SIZE.Y + 20));
 
@@ -288,10 +287,10 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 
 		if (events.OnLatest<LaunchBallCommand>() && totalBalls < BreakoutConstants.MAX_BALLS)
 		{
-			var paddlePosition = _paddle.Entity.Get<Transform2D>().Position;
+			ref var paddleTransform = ref _paddle.Entity.Get<Transform2D>();
 			var radius = BreakoutConstants.BALL_SIZE.X / 2f;
 
-			var ballTransform = paddlePosition + _paddleBallOffset;
+			var ballTransform = paddleTransform.Position + _paddleBallOffset;
 			var entity = _createBall(ballTransform);
 
 			var ballBody = physics.AddDynamicSphere(radius / physics.PhysicsScale, ballTransform / physics.PhysicsScale);
