@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+	<Platforms>AnyCPU</Platforms>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Ion.Extensions.Scenes" />

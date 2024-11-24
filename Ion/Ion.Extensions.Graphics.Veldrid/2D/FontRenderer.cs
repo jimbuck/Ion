@@ -20,6 +20,8 @@ internal class FontRenderer(SpriteRenderer spriteRenderer, ITexture2DManager tex
 		var sourceRectangle = src.HasValue ? (RectangleF)src.Value : new RectangleF(0, 0, texture.Width, texture.Height);
 		var color = new Color(fsColor.R, fsColor.G, fsColor.B, fsColor.A);
 
+		var size = sourceRectangle.Size * scale;
+
 		spriteRenderer.Draw(
 			texture: texture,
 			position: pos,
@@ -27,7 +29,7 @@ internal class FontRenderer(SpriteRenderer spriteRenderer, ITexture2DManager tex
 			color: color,
 			rotation: rotation,
 			origin: Vector2.Zero,
-			scale: scale,
+			size: size,
 			options: SpriteEffect.None,
 			depth: depth);
 

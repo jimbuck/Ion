@@ -1,7 +1,5 @@
 ﻿using System.Numerics;
 
-using Ion.Extensions.Assets;
-
 namespace Ion.Extensions.Graphics;
 
 internal class SpriteBatch(
@@ -69,9 +67,9 @@ internal class SpriteBatch(
 		spriteRenderer.Draw(texture, destinationRectangle, sourceRectangle, color, origin, rotation, depth, options);
 	}
 
-	public void Draw(ITexture2D texture, Vector2 position, Vector2 scale, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
+	public void Draw(ITexture2D texture, Vector2 position, Vector2 size, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
 	{
-		spriteRenderer.Draw(texture, position, scale, sourceRectangle, color, origin, rotation, depth, options);
+		spriteRenderer.Draw(texture, position, size, sourceRectangle, color, origin, rotation, depth, options);
 	}
 
 	public unsafe void End()

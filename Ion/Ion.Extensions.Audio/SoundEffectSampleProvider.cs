@@ -4,16 +4,15 @@ namespace Ion.Extensions.Audio;
 
 internal class SoundEffectSampleProvider(SoundEffect cachedSound) : ISampleProvider
 {
-	private long position;
+	private int position;
 
 	public WaveFormat WaveFormat => cachedSound.WaveFormat;
 
 	public int Read(float[] buffer, int offset, int count)
 	{
-		var availableSamples = cachedSound.AudioData.Length - position;
-		var samplesToCopy = Math.Min(availableSamples, count);
-		Array.Copy(cachedSound.AudioData, position, buffer, offset, samplesToCopy);
-		position += samplesToCopy;
-		return (int)samplesToCopy;
+		count = Math.Min(cachedSound.AudioData.Length - position, count);
+		Array.Copy(cachedSound.AudioData, position, buffer, offset, count);
+		position += count;
+		return count;
 	}
 }
