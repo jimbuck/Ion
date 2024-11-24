@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.2.3"></a>
+## [0.2.3](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.3) (2024-11-24)
+
+### ✨ Features
+
+* Initial ECS Graphics components (#46) ([69f1500](https://www.github.com/jimbuck/Ion/commit/69f1500985ee598584c8ed78578a862e07790846))
+
 <a name="0.2.2"></a>
 ## [0.2.2](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.2) (2024-10-8)
 
