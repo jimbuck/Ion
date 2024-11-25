@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.2.4"></a>
+## [0.2.4](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.4) (2024-11-25)
+
+### Other
+
+* Create FUNDING.yml ([76b274d](https://www.github.com/jimbuck/Ion/commit/76b274dec2a81270b8ccc8ba80a8063922a8be78))
+
 <a name="0.2.3"></a>
 ## [0.2.3](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.3) (2024-11-24)
 
