@@ -1,4 +1,11 @@
 My Changelog
+<a name="0.2.5"></a>
+## [0.2.5](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.5) (2025-1-2)
+
+### 🐛 Fixes
+
+* Fixed generator references. ([716bc9a](https://www.github.com/jimbuck/Ion/commit/716bc9ae2fa5ecbd2e9b98af7c21ac3ac26075d5))
+
 <a name="0.2.4"></a>
 ## [0.2.4](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.4) (2024-11-25)
 
