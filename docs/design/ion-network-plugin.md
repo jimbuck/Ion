@@ -450,9 +450,59 @@ Steam Networking Sockets could be added later as `Ion.Extensions.Network.Steam` 
 
 ---
 
-## Open Questions
+## Chosen Approach: Option 3 (Hybrid)
 
-1. **Serialization format**: Raw blitting (fastest, no versioning) vs MessagePack/MemoryPack (versioning, cross-platform) vs custom (middle ground)?
-2. **Network identity**: Should entities get a `NetworkId` component automatically, or should the developer manage identity?
-3. **Authority model**: Should the plugin enforce server authority, or allow configurable authority per entity (e.g., client-authoritative movement with server validation)?
-4. **Scope**: Should v1 target a specific game genre (e.g., action) or stay fully generic?
+### Decided: Serialization Format
+
+**Raw blitting** via `MemoryMarshal.AsBytes()` for v1. Ion already constrains components to `unmanaged record struct`, so blitting is natural, zero-allocation, and zero-processing. Versioning only matters when shipping updates to a live game — not a v1 concern.
+
+A clean `INetworkSerializer` interface keeps the door open for MemoryPack or similar in the future:
+
+```csharp
+public interface INetworkSerializer
+{
+    int Serialize<T>(in T value, Span<byte> buffer) where T : unmanaged;
+    T Deserialize<T>(ReadOnlySpan<byte> buffer) where T : unmanaged;
+}
+```
+
+### Decided: Network Identity
+
+**Automatic.** The plugin assigns a `NetworkId` component to every entity that has any `[Networked]` component. Only the server (or the entity's owner) can create networked entities.
+
+```csharp
+public record struct NetworkId(uint Id, NetworkPeer Owner);
+```
+
+On the server, `NetworkId` is assigned at entity creation time. On the client, when a replicated entity arrives, the plugin creates the local entity with the matching `NetworkId`. Developers can reference `NetworkId.Id` in explicit network events (e.g., `AbilityActivated { TargetId = netId.Id }`).
+
+### Decided: Authority Model
+
+**Server-authoritative by default, with opt-in owner authority** per component via the `[Networked]` attribute:
+
+```csharp
+[Networked(Authority = NetworkAuthority.Server)]  // default — server writes, clients receive
+public record struct Health(int Current, int Max);
+
+[Networked(Authority = NetworkAuthority.Owner)]   // owning client writes, others receive
+public record struct Transform2D(Vector2 Position, float Rotation = 0);
+```
+
+- `NetworkAuthority.Server` (default): Server is source of truth. Clients can predict locally, but server value wins on conflict.
+- `NetworkAuthority.Owner`: The owning client drives this component. Server and other clients receive updates. Server can still reject/override via validation.
+
+### Decided: v1 Scope
+
+**Generic core, action-game-ready architecture.** The snapshot ring buffer is included in v1 because it's the foundation that prediction, rollback, and lag compensation are built on — but those features ship in v2.
+
+| In v1 | In v2 (architecture supports from day one) |
+|---|---|
+| `INetworkTransport` + LiteNetLib impl | Steam Networking transport |
+| `NetworkSystem` middleware (poll/send) | NAT punch-through helpers |
+| `[Networked]` component replication | Delta compression (v1 sends full snapshots) |
+| `INetworkEventBus` for explicit messages | Client-side prediction / reconciliation |
+| `NetworkId` auto-assignment | Rollback / resimulate API |
+| Server + Client mode | Lag compensation queries (`GetComponentAtTick`) |
+| Snapshot capture (ring buffer) | Peer-to-peer topology |
+| Connection / disconnection events | Lobby / matchmaking |
+| `INetworkSerializer` (raw blit impl) | MemoryPack serializer option |
