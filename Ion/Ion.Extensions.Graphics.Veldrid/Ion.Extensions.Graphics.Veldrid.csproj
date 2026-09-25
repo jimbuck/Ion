@@ -7,6 +7,10 @@
     <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleToSuffix Include=".Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Assimp" Version="3.0.0" />
     <PackageReference Include="FontStashSharp" Version="1.3.9" />
     <PackageReference Include="Veldrid" Version="4.9.0" />
