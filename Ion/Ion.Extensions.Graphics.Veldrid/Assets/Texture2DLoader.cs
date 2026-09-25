@@ -11,39 +11,44 @@ using Ion.Extensions.Assets;
 
 namespace Ion.Extensions.Graphics;
 
+#pragma warning disable CS0618 // Texture2D stays public (obsolete) for one release.
+
 public static class Texture2DAssetManagerExtensions
 {
 	/// <summary>
-	/// Loads the texture at <paramref name="path"/> through <see cref="IBaseAssetManager.GetOrLoad{T}"/>, so the texture is
-	/// cached and owned by <paramref name="assetManager"/>. Loading a path whose texture is still alive returns that same
-	/// texture instead of creating a second GPU texture; a texture that was disposed directly is loaded again.
+	/// Loads the texture at <paramref name="path"/>, cached and owned by <paramref name="assetManager"/>. Loading a path
+	/// whose texture is still alive returns that same texture instead of creating a second GPU texture; a texture that was
+	/// disposed directly is loaded again.
 	/// </summary>
+	/// <remarks>
+	/// Instance-call syntax (<c>assets.Load&lt;Texture2D&gt;(path)</c>) now binds to <see cref="IBaseAssetManager.Load{T}(string)"/>,
+	/// which returns the same cached texture; this forwarder is only reached through a static call.
+	/// </remarks>
+	[Obsolete("Use assets.Load<ITexture2D>(path) and depend on ITexture2D.")]
 	public static Texture2D Load<T>(this IBaseAssetManager assetManager, string path) where T : Texture2D
 	{
-		var loader = (Texture2DLoader)assetManager.GetLoader(typeof(Texture2D));
-
-		var texture = assetManager.GetOrLoad(path, loader.Load);
+		var texture = (Texture2D)assetManager.Load<ITexture2D>(path);
 		if (!texture.IsDisposed) return texture;
 
 		// Disposed outside the asset manager: drop the stale cache entry (wherever it lives) and load it again.
 		assetManager.Unload(texture);
 		if (assetManager is IAssetManager scoped) scoped.Global.Unload(texture);
 
-		return assetManager.GetOrLoad(path, loader.Load);
+		return (Texture2D)assetManager.Load<ITexture2D>(path);
 	}
 }
 
-internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStorage storage) : IAssetLoader
+internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStorage storage) : IAssetLoader<ITexture2D>
 {
 	private readonly IGraphicsContext _graphicsContext = graphicsContext;
 	private readonly IPersistentStorage _storage = storage;
 
-	public Type AssetType { get; } = typeof(Texture2D);
+	public Type AssetType { get; } = typeof(ITexture2D);
 
 	/// <summary>
-	/// Decodes and uploads a new texture on every call. Use <c>IBaseAssetManager.Load&lt;Texture2D&gt;(path)</c> to get the cached one.
+	/// Decodes and uploads a new texture on every call. Use <c>IBaseAssetManager.Load&lt;ITexture2D&gt;(path)</c> to get the cached one.
 	/// </summary>
-	public Texture2D Load(string assetPath)
+	public ITexture2D Load(string assetPath)
 	{
 		using var stream = _storage.Assets.Read(assetPath);
 		return _loadTexture2D(assetPath, stream);
@@ -51,7 +56,7 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 
 	private unsafe Texture2D _loadTexture2D(string name, Stream stream)
 	{
-		if (_graphicsContext.GraphicsDevice is null) throw new Exception("GraphicsDevice is not initialized yet!");
+		if (_graphicsContext.GraphicsDevice is null) throw new InvalidOperationException("GraphicsDevice is not initialized yet!");
 
 		using var image = Image.Load<Rgba32>(stream);
 		var mipmaps = _generateMipmaps(image, out int totalSize);

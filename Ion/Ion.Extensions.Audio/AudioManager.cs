@@ -5,7 +5,12 @@ using NAudio.Wave.SampleProviders;
 
 namespace Ion.Extensions.Audio;
 
-public class AudioManager(ITraceTimer<AudioManager> trace) : IAudioManager, IDisposable
+#pragma warning disable CS0618 // SoundEffect stays public (obsolete) for one release.
+
+/// <summary>
+/// Plays sounds through DirectSound (NAudio). Registered by <see cref="BuilderExtensions.AddAudio"/>.
+/// </summary>
+internal class AudioManager(ITraceTimer<AudioManager> trace) : IAudioManager, IDisposable
 {
 	private readonly DirectSoundOut _outputDevice = new();
 	private readonly MixingSampleProvider _mixer = new(WaveFormat.CreateIeeeFloatWaveFormat(48000, 2)) { ReadFully = true };
@@ -94,8 +99,14 @@ public class AudioManager(ITraceTimer<AudioManager> trace) : IAudioManager, IDis
 		_mixer.AddMixerInput(_convertToRightChannelCount(input));
 	}
 
+	private bool _disposed;
+
 	public void Dispose()
 	{
+		// Registered both as itself and as IAudioManager, so the container may call this twice.
+		if (_disposed) return;
+		_disposed = true;
+
 		_outputDevice.Dispose();
 	}
 }

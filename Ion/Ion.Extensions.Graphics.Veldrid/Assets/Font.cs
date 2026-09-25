@@ -1,15 +1,21 @@
-﻿using System.Numerics;
+using System.Numerics;
 
 using FontStashSharp;
-
-using Ion.Extensions.Assets;
-
 
 namespace Ion.Extensions.Graphics;
 
 /// <summary>
-/// Represents a font that can be rendered with <see cref="TextRenderer"/>.
+/// Gives the Veldrid sprite batch access to the FontStashSharp font behind an <see cref="IFont"/>.
 /// </summary>
+internal interface IVeldridFont
+{
+	DynamicSpriteFont SpriteFont { get; }
+}
+
+/// <summary>
+/// A FontStashSharp font set.
+/// </summary>
+[Obsolete(VeldridObsolete.ConcreteAssetTypes)]
 public class FontSet : IFontSet
 {
 	public nint Id => _fontSystem.GetHashCode();
@@ -32,13 +38,16 @@ public class FontSet : IFontSet
 		return new Font(_fontSystem.GetFont(size), this, size);
 	}
 
+	IFont IFontSet.CreateStyle(float size) => CreateStyle(size);
+
 	public void Dispose()
 	{
 		_fontSystem.Dispose();
 	}
 }
 
-public class Font : IFont
+[Obsolete(VeldridObsolete.ConcreteAssetTypes)]
+public class Font : IFont, IVeldridFont
 {
 	internal readonly DynamicSpriteFont SpriteFont;
 
@@ -51,6 +60,8 @@ public class Font : IFont
 	float IFont.FontSize => FontSize;
 
 	float IFont.LineHeight => LineHeight;
+
+	DynamicSpriteFont IVeldridFont.SpriteFont => SpriteFont;
 
 	internal Font(DynamicSpriteFont spriteFont, FontSet fontSet, float fontSize)
 	{

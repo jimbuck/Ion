@@ -3,15 +3,14 @@ using Ion.Extensions.Debug;
 
 namespace Ion.Extensions.Graphics;
 
-public class WindowSystem(IWindow window, IEventListener events, ITraceTimer<WindowSystem> trace)
+internal class WindowSystem(Window window, IEventListener events, ITraceTimer<WindowSystem> trace)
 {
-	private readonly Window _window = (Window)window;
 
 	[Init]
 	public void Init(GameTime dt, GameLoopDelegate next)
 	{
 		var timer = trace.Start("Init");
-		_window.Initialize();
+		window.Initialize();
 		timer.Stop();
 		next(dt);
 	}
@@ -20,7 +19,7 @@ public class WindowSystem(IWindow window, IEventListener events, ITraceTimer<Win
 	public void First(GameTime dt, GameLoopDelegate next)
 	{
 		var timer = trace.Start("First");
-		_window.Step();
+		window.Step();
 		timer.Stop();
 		next(dt);
 	}

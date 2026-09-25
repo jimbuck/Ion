@@ -30,9 +30,11 @@ ArrayRegistry.Add<StaticBody>();
 
 var builder = IonApplication.CreateBuilder(args);
 
+// Run with --Ion:Headless=true to use the headless graphics and audio backends (no GPU, window or audio device).
+var headless = builder.Configuration.IsHeadless();
+
 builder.Services.AddIon(builder.Configuration, graphics =>
-{	
-	graphics.Output = GraphicsOutput.Window;
+{
 	graphics.ClearColor = new Color(0x333);
 });
 
@@ -48,6 +50,8 @@ builder.Services.AddSingleton<MouseCaptureSystem>()
 				.AddScoped<PhysicsSystem>()
 				.AddScoped<LevelSystem>();
 
+if (headless) builder.Services.AddScoped<HeadlessAutopilotSystem>();
+
 var game = builder.Build();
 game.UseIon()
 	.UseSystem<MouseCaptureSystem>()
@@ -59,6 +63,8 @@ game.UseIon()
 	.UseSystem<BlockSystem>()
 	.UseSystem<SpriteRendererSystem>()
 	.UseSystem<ScoreSystem>();
+
+if (headless) game.UseSystem<HeadlessAutopilotSystem>();
 
 game.Run();
 
@@ -167,8 +173,8 @@ public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBat
 {
 	private readonly QueryDescription _ballQuery = new QueryDescription().WithAll<Ball>();
 
-	private FontSet _scoreFontSet = default!;
-	private Font _scoreFont = default!;
+	private IFontSet _scoreFontSet = default!;
+	private IFont _scoreFont = default!;
 	private int _score = 0;
 
 	private int _ballCount = 0;
@@ -176,7 +182,7 @@ public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBat
 	[Init]
 	public void Init(GameTime dt, GameLoopDelegate next)
 	{
-		_scoreFontSet = assets.Load<FontSet>("BungeeRegular", "Bungee-Regular.ttf");
+		_scoreFontSet = assets.Load<IFontSet>("Bungee-Regular.ttf");
 		_scoreFont = _scoreFontSet.CreateStyle(24);
 
 		next(dt);
@@ -210,14 +216,14 @@ public class SoundEffectsSystem(IAssetManager assets, IEventListener events, IAu
 {
 	private readonly Random _rand = new(6014);
 
-	private SoundEffect _bonkSound = default!;
-	private SoundEffect _pingSound = default!;
+	private ISoundEffect _bonkSound = default!;
+	private ISoundEffect _pingSound = default!;
 
 	[Init]
 	public void Init(GameTime dt, GameLoopDelegate next)
 	{
-		_bonkSound =  assets.Load<SoundEffect>("bonk.wav");
-		_pingSound =  assets.Load<SoundEffect>("ping.wav");
+		_bonkSound =  assets.Load<ISoundEffect>("bonk.wav");
+		_pingSound =  assets.Load<ISoundEffect>("ping.wav");
 
 		next(dt);
 	}
@@ -239,7 +245,7 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 	[Init]
 	public unsafe void Init(GameTime dt, GameLoopDelegate next)
 	{
-		var paddleTexture = assets.Load<Texture2D>("49-Breakout-Tiles.png");
+		var paddleTexture = assets.Load<ITexture2D>("49-Breakout-Tiles.png");
 		var paddlePosition = new Vector2(window.Width / 2f, window.Height - (BreakoutConstants.BOTTOM_GAP + (BreakoutConstants.PADDLE_SIZE.Y/2)));
 
 		var paddleBody = physics.AddKinematicPaddle(BreakoutConstants.PADDLE_SIZE / physics.PhysicsScale, paddlePosition / physics.PhysicsScale);
@@ -270,7 +276,7 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 
 public unsafe class BallSystem(IWindow window, World world, IEventListener events, IAssetManager assets, PhysicsManager physics)
 {	
-	private Texture2D _ballTexture = default!;
+	private ITexture2D _ballTexture = default!;
 	private Entity _paddle = Entity.Null;
 
 	private readonly QueryDescription _ballQuery = new QueryDescription().WithAll<Ball>();
@@ -281,7 +287,7 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 	[Init]
 	public unsafe void Init(GameTime dt, GameLoopDelegate next)
 	{
-		_ballTexture = assets.Load<Texture2D>("58-Breakout-Tiles.png");
+		_ballTexture = assets.Load<ITexture2D>("58-Breakout-Tiles.png");
 
 		next(dt);
 
@@ -410,7 +416,7 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 
 	private unsafe void _resetBlocks()
 	{
-		var blockTexture = assets.Load<Texture2D>("15-Breakout-Tiles.png");
+		var blockTexture = assets.Load<ITexture2D>("15-Breakout-Tiles.png");
 
 		var blockHalfExtent = BreakoutConstants.BLOCK_SIZE / 2f;
 

@@ -7,6 +7,8 @@ using Ion.Extensions.Debug;
 
 namespace Ion.Extensions.Graphics;
 
+#pragma warning disable CS0618 // Texture2D stays public (obsolete) for one release; the renderer still creates its own.
+
 internal class FontRenderer(SpriteRenderer spriteRenderer, ITexture2DManager textureManager, ITraceTimer<FontRenderer> trace) : IFontStashRenderer
 {
 	public ITexture2DManager TextureManager { get; } = textureManager;

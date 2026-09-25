@@ -1,12 +1,10 @@
-﻿namespace Ion.Extensions.Audio;
+namespace Ion.Extensions.Audio;
 
-public class AudioSystem(IAudioManager audioManager)
+internal class AudioSystem(AudioManager audioManager)
 {
-	private readonly AudioManager _audioManager = (AudioManager)audioManager;
-
 	[Init]
 	public void Init()
 	{
-		_audioManager.Initialize();
+		audioManager.Initialize();
 	}
 }

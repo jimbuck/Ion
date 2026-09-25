@@ -56,12 +56,12 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 	public bool NoRender { get; }
 
-	public GraphicsContext(IOptionsMonitor<GraphicsConfig> config, IEventListener events, ILogger<GraphicsContext> logger, IWindow window, ITraceTimer<GraphicsContext> trace)
+	public GraphicsContext(IOptionsMonitor<GraphicsConfig> config, IEventListener events, ILogger<GraphicsContext> logger, Window window, ITraceTimer<GraphicsContext> trace)
 	{
 		_config = config;
 		_events = events;
 		_logger = logger;
-		_window = (Window)window;
+		_window = window;
 		_trace = trace;
 
 		NoRender = _config.CurrentValue.Output == GraphicsOutput.None;
@@ -231,8 +231,14 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 		return result;
 	}
 
+	private bool _disposed;
+
 	public void Dispose()
 	{
+		// Registered both as itself and as IGraphicsContext, so the container may call this twice.
+		if (_disposed) return;
+		_disposed = true;
+
 		_commandList?.Dispose();
 		GraphicsDevice?.Dispose();
 	}

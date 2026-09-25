@@ -7,9 +7,9 @@ using Ion.Extensions.Audio;
 
 var builder = IonApplication.CreateBuilder(args);
 
+// Run with --Ion:Headless=true to use the headless graphics and audio backends (no GPU, window or audio device).
 builder.Services.AddIon(builder.Configuration, graphics =>
 {
-	graphics.Output = GraphicsOutput.Window;
 	graphics.ClearColor = new Color(0x333);
 });
 
@@ -51,26 +51,26 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 	private readonly Vector2 _paddleBounceMin = Vector2.Normalize(new Vector2(-1, -0.75f));
 	private readonly Vector2 _paddleBounceMax = Vector2.Normalize(new Vector2(+1, -0.75f));
 
-	private Texture2D _blockTexture = default!;
-	private Texture2D _ballTexture = default!;
-	private Texture2D _paddleTexture = default!;
+	private ITexture2D _blockTexture = default!;
+	private ITexture2D _ballTexture = default!;
+	private ITexture2D _paddleTexture = default!;
 
-	private SoundEffect _bonkSound = default!;
-	private SoundEffect _pingSound = default!;
+	private ISoundEffect _bonkSound = default!;
+	private ISoundEffect _pingSound = default!;
 
 	private int _score = 0;
-	private FontSet _scoreFontSet = default!;
-	private Font _scoreFont = default!;
+	private IFontSet _scoreFontSet = default!;
+	private IFont _scoreFont = default!;
 
 	[Init]
 	public void SetupBlocks(GameTime dt, GameLoopDelegate next)
 	{		
-		_blockTexture = assets.Load<Texture2D>("15-Breakout-Tiles.png");
-		_paddleTexture = assets.Load<Texture2D>("49-Breakout-Tiles.png");
-		_ballTexture = assets.Load<Texture2D>("58-Breakout-Tiles.png");
-		_bonkSound =  assets.Load<SoundEffect>("bonk.wav");
-		_pingSound =  assets.Load<SoundEffect>("ping.mp3");
-		_scoreFontSet = assets.Load<FontSet>("BungeeRegular", "Bungee-Regular.ttf");
+		_blockTexture = assets.Load<ITexture2D>("15-Breakout-Tiles.png");
+		_paddleTexture = assets.Load<ITexture2D>("49-Breakout-Tiles.png");
+		_ballTexture = assets.Load<ITexture2D>("58-Breakout-Tiles.png");
+		_bonkSound =  assets.Load<ISoundEffect>("bonk.wav");
+		_pingSound =  assets.Load<ISoundEffect>("ping.mp3");
+		_scoreFontSet = assets.Load<IFontSet>("Bungee-Regular.ttf");
 		_scoreFont = _scoreFontSet.CreateStyle(24);
 
 		// Setup blocks in rows and columns across the window each with different colors:

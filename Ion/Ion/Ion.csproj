@@ -10,6 +10,7 @@
     <ProjectReference Include="..\Ion.Extensions.Audio\Ion.Extensions.Audio.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Debug\Ion.Extensions.Debug.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Null\Ion.Extensions.Graphics.Null.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Veldrid\Ion.Extensions.Graphics.Veldrid.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" PackAsAnalyzer="true" />
     <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />

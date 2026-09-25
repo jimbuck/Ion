@@ -13,13 +13,22 @@ using Ion.Examples.Scenes;
 
 var builder = IonApplication.CreateBuilder(args);
 
+// Run with --Ion:Headless=true to use the headless graphics backend (no GPU or window).
+var headless = builder.Configuration.IsHeadless();
+
 builder.Services.AddDebugUtils(builder.Configuration);
-builder.Services.AddVeldridGraphics(builder.Configuration, graphics =>
+if (headless)
 {
-	graphics.Output = GraphicsOutput.Window;
-	graphics.ClearColor = Color.CornflowerBlue;
-	graphics.PreferredBackend = GraphicsBackend.Vulkan;
-});
+	builder.Services.AddNullGraphics(builder.Configuration);
+}
+else
+{
+	builder.Services.AddVeldridGraphics(builder.Configuration, graphics =>
+	{
+		graphics.ClearColor = Color.CornflowerBlue;
+		graphics.PreferredBackend = GraphicsBackend.Vulkan;
+	});
+}
 builder.Services.AddScenes();
 builder.Services.AddCoroutines();
 
@@ -28,7 +37,8 @@ builder.Services.AddSingleton<TestMiddleware>();
 var game = builder.Build();
 game.UseDebugUtils();
 game.UseEvents();
-game.UseVeldridGraphics();
+if (headless) game.UseNullGraphics();
+else game.UseVeldridGraphics();
 // Steps the shared ICoroutineRunner once per frame in the Update stage.
 game.UseCoroutines();
 

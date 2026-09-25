@@ -6,6 +6,8 @@ using Ion.Extensions.Debug;
 
 namespace Ion.Extensions.Graphics;
 
+#pragma warning disable CS0618 // Texture2D stays public (obsolete) for one release; the renderer still creates its own.
+
 internal class SpriteRenderer(
 	IGraphicsContext graphicsContext,
 	ILogger<SpriteRenderer> logger,
@@ -336,7 +338,7 @@ void main()
 			var buffer = graphicsContext.Factory.CreateBuffer(bci);
 			pair = new(buffer,
 				graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, buffer)),
-				graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)(Texture2D)texture, graphicsContext.GraphicsDevice!.LinearSampler))
+				graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, texture.GetDeviceTexture(), graphicsContext.GraphicsDevice!.LinearSampler))
 				);
 
 			_buffers[texture] = pair;
@@ -349,7 +351,7 @@ void main()
 
 			pair.Buffer = graphicsContext.Factory.CreateBuffer(bci);
 			pair.InstanceSet = graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_instanceResourceLayout, pair.Buffer));
-			pair.TextureSet = graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, (Veldrid.Texture)(Texture2D)texture, graphicsContext.GraphicsDevice!.LinearSampler));
+			pair.TextureSet = graphicsContext.Factory.CreateResourceSet(new ResourceSetDescription(_fragmentResourceLayout, texture.GetDeviceTexture(), graphicsContext.GraphicsDevice!.LinearSampler));
 			_buffers[texture] = pair;
 			rb.Stop();
 		}

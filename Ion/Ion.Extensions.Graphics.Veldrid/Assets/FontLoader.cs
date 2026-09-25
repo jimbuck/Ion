@@ -1,37 +1,42 @@
-﻿using FontStashSharp;
+using FontStashSharp;
 
 using Ion.Extensions.Assets;
 
-
 namespace Ion.Extensions.Graphics;
+
+#pragma warning disable CS0618 // FontSet stays public (obsolete) for one release.
 
 public static class FontAssetManagerExtensions
 {
 	/// <summary>
-	/// Loads a font set named <paramref name="name"/> from the font files in <paramref name="fonts"/> through
-	/// <see cref="IBaseAssetManager.GetOrLoad{T}"/>, so the set is cached and owned by <paramref name="assetManager"/>.
-	/// The cache key is <paramref name="name"/>: loading the same name again returns the cached set.
+	/// Loads a font set named <paramref name="name"/> from the font files in <paramref name="fonts"/>, cached and owned by
+	/// <paramref name="assetManager"/>. Forwards to <see cref="FontSetAssetManagerExtensions.LoadFontSet"/>.
 	/// </summary>
+	[Obsolete("Use assets.LoadFontSet(name, fonts) (or assets.Load<IFontSet>(path) for a single file) and depend on IFontSet.")]
 	public static FontSet Load<T>(this IBaseAssetManager assetManager, string name, params string[] fonts) where T : FontSet
 	{
-		var fontLoader = (FontLoader)assetManager.GetLoader(typeof(FontSet));
-
-		return assetManager.GetOrLoad(name, fontName => fontLoader.Load(fontName, fonts));
+		return (FontSet)assetManager.LoadFontSet(name, fonts);
 	}
 }
 
-public class FontLoader(IPersistentStorage storage) : IAssetLoader
+internal class FontLoader(IPersistentStorage storage) : IFontSetLoader
 {
-	public Type AssetType { get; } = typeof(FontSet);
+	public Type AssetType { get; } = typeof(IFontSet);
 
-	public FontSet Load(string name, string[] fonts)
+	/// <summary>
+	/// Loads a font set made of the single font file at <paramref name="path"/>, named after the path.
+	/// </summary>
+	public IFontSet Load(string path) => Load(path, [path]);
+
+	public IFontSet Load(string name, IReadOnlyList<string> fonts)
 	{
-		var fontSystem = new FontSystem(new FontSystemSettings()
-		{
-			
-		});
+		var fontSystem = new FontSystem(new FontSystemSettings());
 
-		foreach (var font in fonts) fontSystem.AddFont(storage.Assets.Read(font));
+		foreach (var font in fonts)
+		{
+			using var stream = storage.Assets.Read(font);
+			fontSystem.AddFont(stream);
+		}
 
 		return new FontSet(name, fontSystem);
 	}

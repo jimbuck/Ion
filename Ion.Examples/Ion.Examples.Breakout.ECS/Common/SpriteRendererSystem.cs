@@ -7,7 +7,7 @@ using Ion.Extensions.Graphics;
 
 namespace Ion.Examples.Breakout.ECS.Common;
 
-public record struct Sprite(Texture2D Texture, Vector2 Size);
+public record struct Sprite(ITexture2D Texture, Vector2 Size);
 
 public class SpriteRendererSystem(ISpriteBatch spriteBatch, World world)
 {

@@ -40,13 +40,19 @@ public static class BuilderExtensions
 			// Standard
 			.Configure<GraphicsConfig>(graphicsConfig)
 
-			// Implementation-specific
-			.AddSingleton<IWindow, Window>()
-			.AddSingleton<IGraphicsContext, GraphicsContext>()
+			// Implementation-specific. The engine systems depend on the concrete types; games resolve the interfaces,
+			// which forward to the same singletons.
+			.AddSingleton<Window>()
+			.AddSingleton<IWindow>(sp => sp.GetRequiredService<Window>())
+			.AddSingleton<GraphicsContext>()
+			.AddSingleton<IGraphicsContext>(sp => sp.GetRequiredService<GraphicsContext>())
 			.AddSingleton<SpriteRenderer>()
 			.AddSingleton<FontRenderer>()
 			.AddSingleton<ITexture2DManager, FontStashTexture2DManager>()
-			.AddSingleton<ISpriteBatch, SpriteBatch>()
+			.AddSingleton<SpriteBatch>()
+			.AddSingleton<ISpriteBatch>(sp => sp.GetRequiredService<SpriteBatch>())
+			.AddSingleton<InputState>()
+			.AddSingleton<IInputState>(sp => sp.GetRequiredService<InputState>())
 
 			// Loaders
 			.AddSingleton<IAssetLoader, Texture2DLoader>()
@@ -56,8 +62,7 @@ public static class BuilderExtensions
 			.AddSingleton<WindowSystem>()
 			.AddSingleton<InputSystem>()
 			.AddSingleton<GraphicsSystem>()
-			.AddSingleton<SpriteBatchSystem>()
-			.AddSingleton<IInputState, InputState>();
+			.AddSingleton<SpriteBatchSystem>();
 
 		if (configureOptions != null) services.Configure(configureOptions);
 

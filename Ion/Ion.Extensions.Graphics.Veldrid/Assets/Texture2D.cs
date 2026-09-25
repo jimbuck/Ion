@@ -1,7 +1,10 @@
-﻿using VeldridLib = Veldrid;
+using VeldridLib = Veldrid;
 
 namespace Ion.Extensions.Graphics;
 
+#pragma warning disable CS0618 // BaseTexture and Texture2D stay public (obsolete) for one release; the backend still uses them internally.
+
+[Obsolete(VeldridObsolete.ConcreteAssetTypes)]
 public class Texture2D : BaseTexture
 {
 	public Texture2D(VeldridLib.Texture texture) : base(texture.Name, texture) { }
@@ -10,7 +13,7 @@ public class Texture2D : BaseTexture
 	public static implicit operator VeldridLib.Texture(Texture2D texture) => texture._texture;
 }
 
-public static class TextureFactoryExtensions
+internal static class TextureFactoryExtensions
 {
 	public static Texture2D CreateTexture2D(this VeldridLib.ResourceFactory factory, VeldridLib.TextureDescription textureDescription, string name)
 	{

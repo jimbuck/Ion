@@ -13,7 +13,7 @@ internal class Window : IWindow
 	private readonly IOptionsMonitor<GraphicsConfig> _graphicsConfig;
 	private readonly IOptionsMonitor<WindowConfig> _windowConfig;
 	private readonly ILogger _logger;
-	private readonly EventEmitter _eventEmitter;
+	private readonly IEventEmitter _eventEmitter;
 	private readonly IEventListener _events;
 
 	public VeldridLib.InputSnapshot? InputSnapshot { get; private set; }
@@ -142,7 +142,7 @@ internal class Window : IWindow
 		_windowConfig = windowConfig;
 
 		_logger = logger;
-        _eventEmitter = (EventEmitter)eventEmitter;
+        _eventEmitter = eventEmitter;
 		_events = events;
 
 		_windowCreateInfo = new()

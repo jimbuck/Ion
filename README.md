@@ -21,10 +21,18 @@ A simple, modern code-first game engine inspired by Monogame and Bevy with an AP
   - Storage
 
 ### Ion.Extensions.Assets
-Adds support for loading assets such as textures, models, and sounds.
+Adds support for loading assets such as textures, models, and sounds. Load assets through their interfaces so the game runs on any backend:
+
+```csharp
+var tiles = assets.Load<ITexture2D>("tiles.png");
+var font = assets.Load<IFontSet>("Bungee-Regular.ttf").CreateStyle(24); // or assets.LoadFontSet(name, files...)
+var bonk = assets.Load<ISoundEffect>("bonk.wav");
+```
+
+Loading the same path twice returns the cached instance.
 
 ### Ion.Extensions.Audio
-Adds support for audio playback and manipulation.
+Adds support for audio playback and manipulation. `AddAudio()` plays through DirectSound (NAudio); `AddNullAudio()` is a headless `IAudioManager` that records every play in `NullAudioManager.Plays` and reads only WAV headers.
 
 ### Ion.Extensions.Coroutines
 Adds support for coroutines, allowing for async code to be run in a synchronous manner.
@@ -36,7 +44,20 @@ Adds support for debug utils such as a trace profiler and debug renderer.
 Adds window, input, and graphics support using the Veldrid API. Includes a built-in sprite batch for easy 2D rendering.
 
 ### Ion.Extensions.Graphics.Null
-A headless graphics backend with no window or GPU, for tests, servers and CI.
+A headless graphics backend with no window, GPU or SDL, for tests, servers and CI. `AddNullGraphics(config)` / `UseNullGraphics()` register everything the Veldrid backend does:
+  - `NullWindow`: sized from `Ion:Window`, emits `WindowResizeEvent` at Init and `WindowClosedEvent` from `Close()` (which ends the game loop).
+  - `NullInputState`: scripted input (`Press`, `Release`, `Tap`, `Click`, `SetMousePosition`, `Scroll`) applied at the start of the next frame.
+  - `NullSpriteBatch`: draws nothing and records per-frame statistics (`LastFrame.DrawCalls`, `Sprites`, `Strings`, and the last draw commands).
+  - Loaders that read texture sizes from image headers and fonts that measure text with a fixed glyph width.
+
+### Running headless
+`AddIon(config)` switches graphics and audio to the headless backends when `Ion:Headless` is `true` or `Ion:Graphics:Output` is `None`, and `UseIon()` adds the matching systems. Any game that depends only on the interfaces (`IWindow`, `IInputState`, `ISpriteBatch`, `IAudioManager`, `ITexture2D`, `IFontSet`, `ISoundEffect`) runs without a GPU, window or audio device:
+
+```sh
+dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS -- --Ion:Headless=true
+```
+
+In tests, resolve `NullInputState` to script input and `NullSpriteBatch` / `NullAudioManager` to assert on what was drawn and played.
 
 ### Ion.Extensions.Scenes
 Adds support for scenes that each have thier own scope for dependency injection!

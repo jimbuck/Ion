@@ -2,6 +2,8 @@
 
 namespace Ion.Extensions.Audio;
 
+#pragma warning disable CS0618 // SoundEffect stays public (obsolete) for one release.
+
 internal class SoundEffectSampleProvider(SoundEffect cachedSound) : ISampleProvider
 {
 	private int position;

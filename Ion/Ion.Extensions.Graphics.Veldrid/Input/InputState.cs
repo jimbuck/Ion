@@ -17,9 +17,9 @@ internal class InputState : IInputState
 
 	public float WheelDelta { get; private set; } = 0;
 
-	public InputState(IWindow window, IEventListener events)
+	public InputState(Window window, IEventListener events)
 	{
-		_window = (Window)window;
+		_window = window;
 		_events = events;
 	}
 
