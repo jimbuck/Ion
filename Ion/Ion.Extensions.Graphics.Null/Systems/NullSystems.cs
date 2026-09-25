@@ -8,19 +8,16 @@ namespace Ion.Extensions.Graphics;
 /// </summary>
 internal sealed class NullWindowSystem(NullWindow window, IEventListener events, ILogger<NullWindowSystem> logger)
 {
-	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	[Init(Order = StageOrder.Window)]
+	public void Init(GameTime dt)
 	{
 		window.Initialize();
 		logger.LogInformation("Headless graphics: null window {Width}x{Height}, nothing is rendered.", window.Width, window.Height);
-		next(dt);
 	}
 
-	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
+	[Render(Order = StageOrder.WindowClose)]
+	public void CheckClosed(GameTime dt)
 	{
-		next(dt);
-
 		if (events.On<WindowClosedEvent>())
 		{
 			window.MarkClosed();
@@ -34,24 +31,22 @@ internal sealed class NullWindowSystem(NullWindow window, IEventListener events,
 /// </summary>
 internal sealed class NullInputSystem(NullInputState input)
 {
-	[First]
-	public void First(GameTime dt, GameLoopDelegate next)
+	[First(Order = StageOrder.Input)]
+	public void First(GameTime dt)
 	{
 		input.Step();
-		next(dt);
 	}
 }
 
 /// <summary>
-/// Wraps every Render stage in <see cref="NullSpriteBatch.Begin"/> and <see cref="NullSpriteBatch.End"/>.
+/// Wraps every Render stage in <see cref="NullSpriteBatch.Begin"/> and <see cref="NullSpriteBatch.End"/> (a scope at
+/// order <see cref="StageOrder.SpriteBatch"/>).
 /// </summary>
 internal sealed class NullSpriteBatchSystem(NullSpriteBatch spriteBatch)
 {
-	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
-	{
-		spriteBatch.Begin();
-		next(dt);
-		spriteBatch.End();
-	}
+	[Begin(Stage.Render, Order = StageOrder.SpriteBatch)]
+	public void Begin(GameTime dt) => spriteBatch.Begin();
+
+	[End(Stage.Render, Order = StageOrder.SpriteBatch)]
+	public void End(GameTime dt) => spriteBatch.End();
 }

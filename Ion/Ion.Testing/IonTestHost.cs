@@ -111,13 +111,13 @@ public sealed class IonTestHost : IDisposable
 	public T Get<T>() where T : notnull => Services.GetRequiredService<T>();
 
 	/// <summary>
-	/// Registers <typeparamref name="T"/> as a singleton and adds it to the pipeline after the engine's systems (and after
-	/// the systems added before it).
+	/// Registers <typeparamref name="T"/> as a singleton and adds it to the schedule. Its steps run by their order (the
+	/// default order 0 is after the engine's setup steps and before its teardown steps), then in the order systems were added.
 	/// </summary>
 	public IonTestHost WithSystem<[DynamicallyAccessedMembers(SystemMembers)] T>() where T : class => WithSystem(typeof(T));
 
 	/// <summary>
-	/// Registers <paramref name="system"/> as a singleton and adds it to the pipeline, like <see cref="WithSystem{T}"/>.
+	/// Registers <paramref name="system"/> as a singleton and adds it to the schedule, like <see cref="WithSystem{T}"/>.
 	/// </summary>
 	public IonTestHost WithSystem([DynamicallyAccessedMembers(SystemMembers)] Type system)
 	{
@@ -127,7 +127,10 @@ public sealed class IonTestHost : IDisposable
 		return this;
 	}
 
-	private const DynamicallyAccessedMemberTypes SystemMembers = DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicMethods;
+	private const DynamicallyAccessedMemberTypes SystemMembers = SystemMiddlewareBinder.MiddlewareAccessibility;
+
+	/// <summary>The order of the Last step that polls the event collectors (see <see cref="Collect{T}"/>).</summary>
+	public const int CollectorOrder = StageOrder.Events - 10;
 
 	/// <summary>
 	/// Adds service registrations. Runs after the engine's registrations, so it can replace them.
@@ -141,7 +144,7 @@ public sealed class IonTestHost : IDisposable
 	}
 
 	/// <summary>
-	/// Adds pipeline setup (for example <c>app.UseSystem&lt;T&gt;()</c> or <c>app.UseUpdate(...)</c>). Runs after
+	/// Adds schedule setup (for example <c>app.UseSystem&lt;T&gt;()</c> or <c>app.Update(...)</c>). Runs after
 	/// <c>UseIon</c> (or the game's own setup) and before the systems added with <see cref="WithSystem{T}"/>.
 	/// </summary>
 	public IonTestHost ConfigureApp(Action<IIonApplication> app)
@@ -183,7 +186,7 @@ public sealed class IonTestHost : IDisposable
 
 	/// <summary>
 	/// Builds a whole game with its own setup instead of the default <c>AddIon</c>/<c>UseIon</c>: <paramref name="configure"/>
-	/// registers its services (and is expected to call <c>AddIon</c>) and <paramref name="use"/> wires its pipeline (and is
+	/// registers its services (and is expected to call <c>AddIon</c>) and <paramref name="use"/> wires its schedule (and is
 	/// expected to call <c>UseIon</c>). The host still forces headless mode and the deterministic clock.
 	/// </summary>
 	public IonTestHost UseGame(Action<IonApplicationBuilder> configure, Action<IIonApplication> use)
@@ -197,8 +200,8 @@ public sealed class IonTestHost : IDisposable
 	}
 
 	/// <summary>
-	/// Records every event of type <typeparamref name="T"/> the game emits from now on (polled at the end of each frame's
-	/// Last stage, so events emitted late in Last are recorded the next frame). Events marked handled before the poll are
+	/// Records every event of type <typeparamref name="T"/> the game emits from now on (polled by a Last step at
+	/// <see cref="CollectorOrder"/>, so events emitted by Last steps with a higher order are recorded the next frame). Events marked handled before the poll are
 	/// not recorded. Starts the host.
 	/// </summary>
 	public EventCollector<T> Collect<T>() where T : unmanaged
@@ -314,13 +317,12 @@ public sealed class IonTestHost : IDisposable
 		foreach (var use in _app) use(application);
 		foreach (var system in _systems) system.Use(application);
 
-		// Innermost Last middleware: runs after every system's Last code that runs before next(), and before the event
-		// system steps the frame buffers.
-		application.UseLast(next => dt =>
+		// A Last step at the end of the teardown band: after every Last step at a lower order, and before the event system
+		// steps the frame buffers (order StageOrder.Events).
+		application.Last(dt =>
 		{
-			next(dt);
 			for (var i = 0; i < _collectors.Count; i++) _collectors[i].Poll(dt.Frame);
-		});
+		}, order: CollectorOrder, name: "IonTestHost.PollCollectors");
 
 		var loop = application.Build();
 		loop.Initialize();

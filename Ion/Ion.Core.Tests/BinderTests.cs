@@ -19,14 +19,15 @@ public class BinderTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
-	public void UnsupportedSignaturesAreSkipped()
+	public void UnsupportedSignaturesFailTheBuild()
 	{
+		// Before 0.3 unsupported signatures were logged and skipped; now they are schedule errors.
 		using var host = new LoopTestHost(new ManualClock(), systems: typeof(BadSignatureSystem));
-		var system = host.Get<BadSignatureSystem>();
 
-		host.BuildLoop().RunFrames(1);
+		var ex = Assert.Throws<IonScheduleException>(() => host.BuildLoop());
 
-		Assert.Equal(0, system.Calls);
+		Assert.Equal([ScheduleDiagnosticCodes.InvalidSignature, ScheduleDiagnosticCodes.UnresolvableParameter], ex.Codes.ToArray());
+		Assert.Equal(0, host.Get<BadSignatureSystem>().Calls);
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]

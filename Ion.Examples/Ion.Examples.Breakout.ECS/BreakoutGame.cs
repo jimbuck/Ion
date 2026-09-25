@@ -59,17 +59,18 @@ public static class BreakoutGame
 		builder.Services.AddSingleton(new BreakoutSettings(seed))
 						.AddSingleton<MouseCaptureSystem>()
 						.AddSingleton<SpriteRendererSystem>()
-						.AddScoped(services => World.Create())
-						.AddScoped<ScoreSystem>()
-						.AddScoped<SoundEffectsSystem>()
-						.AddScoped<PaddleSystem>()
-						.AddScoped<BallSystem>()
-						.AddScoped<BlockSystem>()
-						.AddScoped<PhysicsManager>()
-						.AddScoped<PhysicsSystem>()
-						.AddScoped<LevelSystem>();
+						.AddSingleton(services => World.Create())
+						.AddSingleton<ScoreSystem>()
+						.AddSingleton<SoundEffectsSystem>()
+						.AddSingleton<PaddleSystem>()
+						.AddSingleton<BallSystem>()
+						.AddSingleton<BlockSystem>()
+						.AddSingleton<PhysicsManager>()
+						.AddSingleton<PhysicsSystem>()
+						.AddSingleton<LevelSystem>();
 
-		if (builder.Configuration.IsHeadless()) builder.Services.AddScoped<HeadlessAutopilotSystem>();
+		// The game runs in the root schedule (no scenes), so its systems are singletons: a scoped system there is error ION006.
+		if (builder.Configuration.IsHeadless()) builder.Services.AddSingleton<HeadlessAutopilotSystem>();
 
 		return builder;
 	}
@@ -78,12 +79,17 @@ public static class BreakoutGame
 	/// Adds the engine's systems (<c>UseIon</c>) and the game's systems to <paramref name="app"/>, plus the
 	/// <see cref="HeadlessAutopilotSystem"/> when running headless.
 	/// </summary>
+	/// <remarks>
+	/// Registration order only breaks ties between steps of equal order: the engine's steps use the reserved order bands
+	/// (see <see cref="StageOrder"/>), so a game system can be added before <c>UseIon</c> and its steps still run after
+	/// the window, input and sprite batch setup. <see cref="MouseCaptureSystem"/> is added first to show it.
+	/// </remarks>
 	public static IIonApplication Use(IIonApplication app)
 	{
 		ArgumentNullException.ThrowIfNull(app);
 
-		app.UseIon()
-			.UseSystem<MouseCaptureSystem>()
+		app.UseSystem<MouseCaptureSystem>()
+			.UseIon()
 			.UseSystem<PhysicsSystem>()
 			.UseSystem<LevelSystem>()
 			.UseSystem<SoundEffectsSystem>()

@@ -4,74 +4,44 @@ namespace Ion.Extensions.Scenes;
 
 internal class SceneBuilder(int sceneId, IConfiguration config, IServiceProvider services) : ISceneBuilder
 {
-	private readonly IMiddlewarePipelineBuilder _init = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _first = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _fixedUpdate = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _update = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _render = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _last = new MiddlewarePipelineBuilder();
-	private readonly IMiddlewarePipelineBuilder _destroy = new MiddlewarePipelineBuilder();
-
 	public int SceneId { get; } = sceneId;
 
 	public IConfiguration Configuration { get; } = config;
 
 	public IServiceProvider Services { get; } = services;
 
-	public ISceneBuilder UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware)
+	public ScheduleModel Schedule { get; } = new(SceneName(sceneId), isRoot: false);
+
+	public static string SceneName(int sceneId) => $"Scene {sceneId}";
+
+	public ISceneBuilder UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Init, middleware);
+
+	public ISceneBuilder UseFirst(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.First, middleware);
+
+	public ISceneBuilder UseFixedUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.FixedUpdate, middleware);
+
+	public ISceneBuilder UseUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Update, middleware);
+
+	public ISceneBuilder UseRender(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Render, middleware);
+
+	public ISceneBuilder UseLast(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Last, middleware);
+
+	public ISceneBuilder UseDestroy(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Destroy, middleware);
+
+	private SceneBuilder UseMiddleware(Stage stage, Func<GameLoopDelegate, GameLoopDelegate> middleware)
 	{
-		_init.Use(middleware);
+		Schedule.AddMiddleware(stage, middleware);
 		return this;
 	}
 
-	public ISceneBuilder UseFirst(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_first.Use(middleware);
-		return this;
-	}
-
-	public ISceneBuilder UseFixedUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_fixedUpdate.Use(middleware);
-		return this;
-	}
-
-	public ISceneBuilder UseUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_update.Use(middleware);
-		return this;
-	}
-
-	public ISceneBuilder UseRender(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_render.Use(middleware);
-		return this;
-	}
-
-
-	public ISceneBuilder UseLast(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_last.Use(middleware);
-		return this;
-	}
-
-	public ISceneBuilder UseDestroy(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_destroy.Use(middleware);
-		return this;
-	}
-
+	/// <summary>
+	/// Binds the scene's schedule to its scope. Warnings were already logged when the application's schedule was built
+	/// (scenes are planned with it), so they are not logged again on every load.
+	/// </summary>
 	internal SceneInstance Build()
-    {
-		return new SceneInstance(SceneId)
-		{
-			Init = _init.Build(),
-			First = _first.Build(),
-			FixedUpdate = _fixedUpdate.Build(),
-			Update = _update.Build(),
-			Render = _render.Build(),
-			Last = _last.Build(),
-			Destroy = _destroy.Build()
-		};
+	{
+		var schedule = Schedule.Build(Services, logWarnings: false);
+		Schedule.Freeze();
+		return new SceneInstance(SceneId, schedule);
 	}
 }

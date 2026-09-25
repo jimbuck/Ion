@@ -30,14 +30,13 @@ public class HeadlessAutopilotSystem(NullInputState input, NullSpriteBatch sprit
 	private int _launches;
 
 	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	public void Init(GameTime dt)
 	{
-		next(dt);
 		logger.LogInformation("Headless run: {Width}x{Height} null window, scripted input, null audio.", window.Width, window.Height);
 	}
 
 	[First]
-	public void First(GameTime dt, GameLoopDelegate next)
+	public void First(GameTime dt)
 	{
 		_frame++;
 
@@ -61,15 +60,11 @@ public class HeadlessAutopilotSystem(NullInputState input, NullSpriteBatch sprit
 			}
 		});
 		input.SetMousePosition(new Vector2(target, window.Height / 2f));
-
-		next(dt);
 	}
 
 	[Last]
-	public void Last(GameTime dt, GameLoopDelegate next)
+	public void Last(GameTime dt)
 	{
-		next(dt);
-
 		if (_frame % ReportInterval != 0) return;
 
 		var drawn = spriteBatch.LastFrame;

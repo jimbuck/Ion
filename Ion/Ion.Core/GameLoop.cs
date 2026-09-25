@@ -107,23 +107,42 @@ public class GameLoop
 
 	public bool Rebuild { get; set; } = false;
 
-	public MiddlewarePipelineBuilder InitBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder FirstBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder UpdateBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder FixedUpdateBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder RenderBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder LastBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder DestroyBuilder { get; set; } = default!;
+	/// <summary>
+	/// The schedule the stage delegates (<see cref="Init"/>, <see cref="Update"/>, ...) come from.
+	/// </summary>
+	public Schedule? Schedule { get; private set; }
 
+	/// <summary>
+	/// Rebuilds the schedule for <see cref="Build"/> (hot reload). Set by <see cref="IonApplication.Build"/>.
+	/// </summary>
+	public Func<Schedule>? ScheduleFactory { get; set; }
+
+	/// <summary>
+	/// Runs <paramref name="schedule"/>: sets <see cref="Schedule"/> and the stage delegates from it.
+	/// </summary>
+	public void UseSchedule(Schedule schedule)
+	{
+		ArgumentNullException.ThrowIfNull(schedule);
+
+		Schedule = schedule;
+		Init = schedule.Init;
+		First = schedule.First;
+		FixedUpdate = schedule.FixedUpdate;
+		Update = schedule.Update;
+		Render = schedule.Render;
+		Last = schedule.Last;
+		Destroy = schedule.Destroy;
+	}
+
+	/// <summary>
+	/// Rebuilds the schedule with <see cref="ScheduleFactory"/> and runs it (hot reload sets <see cref="Rebuild"/>, and the
+	/// loop calls this at the end of the frame).
+	/// </summary>
+	/// <exception cref="InvalidOperationException">No <see cref="ScheduleFactory"/> is set.</exception>
 	public void Build()
 	{
-		Init = InitBuilder.Build();
-		First = FirstBuilder.Build();
-		Update = UpdateBuilder.Build();
-		FixedUpdate = FixedUpdateBuilder.Build();
-		Render = RenderBuilder.Build();
-		Last = LastBuilder.Build();
-		Destroy = DestroyBuilder.Build();
+		if (ScheduleFactory is null) throw new InvalidOperationException("The game loop has no schedule factory; build it with IonApplication.Build().");
+		UseSchedule(ScheduleFactory());
 	}
 
 	/// <summary>

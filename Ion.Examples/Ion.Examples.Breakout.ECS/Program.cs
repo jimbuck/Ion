@@ -108,7 +108,7 @@ public static class PhysicsManagerExtensions
 public class LevelSystem(IWindow window, PhysicsManager physics)
 {
 	[Init]
-	public unsafe void Init(GameTime dt, GameLoopDelegate next)
+	public unsafe void Init(GameTime dt)
 	{
 		var wallThickness = BreakoutConstants.BALL_SIZE.X * 2;
 		var windowHalfExtent = window.Size / 2f;
@@ -125,8 +125,6 @@ public class LevelSystem(IWindow window, PhysicsManager physics)
 		physics.AddStaticBox(sideWallSize / physics.PhysicsScale, rightWallPosition / physics.PhysicsScale);
 		physics.AddStaticBox(topWallSize / physics.PhysicsScale, topWallPosition / physics.PhysicsScale);
 		physics.AddStaticBox(topWallSize / physics.PhysicsScale, bottomWallPosition / physics.PhysicsScale);
-
-		next(dt);
 	}
 }
 
@@ -144,32 +142,26 @@ public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBat
 	public int Score => _score;
 
 	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	public void Init(GameTime dt)
 	{
 		_scoreFontSet = assets.Load<IFontSet>("Bungee-Regular.ttf");
 		_scoreFont = _scoreFontSet.CreateStyle(24);
-
-		next(dt);
 	}
 
 	[First]
-	public void UpdateScore(GameTime dt, GameLoopDelegate next)
+	public void UpdateScore(GameTime dt)
 	{
 		while (events.On<BlockHitEvent>(out var e)) _score += 10;
-
-		next(dt);
 	}
 
 	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		_ballCount = world.CountEntities(in _ballQuery);
-
-		next(dt);
 	}
 
 	[Render]
-	public void RenderScore(GameTime dt, GameLoopDelegate next)
+	public void RenderScore(GameTime dt)
 	{
 		spriteBatch.DrawString(_scoreFont, $"Score:  {_score}", new Vector2(20f), Color.Red);
 		spriteBatch.DrawString(_scoreFont, $"Balls:  {_ballCount}", new Vector2(20f, 44), Color.Red);
@@ -184,19 +176,16 @@ public class SoundEffectsSystem(IAssetManager assets, IEventListener events, IAu
 	private ISoundEffect _pingSound = default!;
 
 	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	public void Init(GameTime dt)
 	{
 		_bonkSound =  assets.Load<ISoundEffect>("bonk.wav");
 		_pingSound =  assets.Load<ISoundEffect>("ping.wav");
-
-		next(dt);
 	}
 
-	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	// After the gameplay steps of the frame (order 0), so the sounds match what they did.
+	[Update(Order = 10)]
+	public void Update(GameTime dt)
 	{
-		next(dt);
-
 		if (events.OnLatest<WallHitEvent>() || events.OnLatest<PaddleHitEvent>()) audio.Play(_bonkSound, pitchShift: (_rand.NextSingle() - 0.5f) / 16f);
 		if (events.OnLatest<BlockHitEvent>()) audio.Play(_pingSound, pitchShift: (_rand.NextSingle() - 0.5f) / 4f);
 	}
@@ -207,7 +196,7 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 	private Entity _paddle = Entity.Null;
 
 	[Init]
-	public unsafe void Init(GameTime dt, GameLoopDelegate next)
+	public unsafe void Init(GameTime dt)
 	{
 		var paddleTexture = assets.Load<ITexture2D>("49-Breakout-Tiles.png");
 		var paddlePosition = new Vector2(window.Width / 2f, window.Height - (BreakoutConstants.BOTTOM_GAP + (BreakoutConstants.PADDLE_SIZE.Y/2)));
@@ -215,12 +204,10 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 		var paddleBody = physics.AddKinematicPaddle(BreakoutConstants.PADDLE_SIZE / physics.PhysicsScale, paddlePosition / physics.PhysicsScale);
 		
 		_paddle = world.Create(new Paddle(true), new Transform2D(paddlePosition), new Sprite(paddleTexture, BreakoutConstants.PADDLE_SIZE), new KinematicRigidBody(paddleBody));
-
-		next(dt);
 	}
 
 	[FixedUpdate]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		if (window.IsMouseGrabbed)
 		{
@@ -233,8 +220,6 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 				events.Emit(new LaunchBallCommand());
 			}
 		}
-
-		next(dt);
 	}
 }
 
@@ -248,12 +233,11 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 
 	private readonly Vector2 _paddleBallOffset = new(0f, -(BreakoutConstants.BALL_SIZE.Y + 20));
 
-	[Init]
-	public unsafe void Init(GameTime dt, GameLoopDelegate next)
+	// The paddle entity exists once PaddleSystem's Init step has run.
+	[Init, After<PaddleSystem>]
+	public unsafe void Init(GameTime dt)
 	{
 		_ballTexture = assets.Load<ITexture2D>("58-Breakout-Tiles.png");
-
-		next(dt);
 
 		world.Query(in _paddleQuery, (Entity entity) =>
 		{
@@ -262,7 +246,7 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 	}
 
 	[Update]
-	public void PositionUpdate(GameTime dt, GameLoopDelegate next)
+	public void PositionUpdate(GameTime dt)
 	{
 		var totalBalls = world.CountEntities(in _ballQuery);
 
@@ -304,8 +288,6 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 			});
 		}
 
-
-		next(dt);
 	}
 
 	private Entity _createBall(Vector2 position)
@@ -323,12 +305,10 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 
 	private readonly Random _rand = settings.CreateRandom(2);
 
-	[Init]
-	public void SetupBlocks(GameTime dt, GameLoopDelegate next)
+	[Init, After<PaddleSystem>]
+	public void SetupBlocks(GameTime dt)
 	{
 		_resetBlocks();
-
-		next(dt);
 
 		world.Query(in _paddleQuery, (Entity entity) => {
 			_paddle = entity;
@@ -336,10 +316,8 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 	}
 
 	[FixedUpdate]
-	public void FixedUpdate(GameTime dt, GameLoopDelegate next)
+	public void FixedUpdate(GameTime dt)
 	{
-		next(dt);
-
 		while (events.On<BlockHitEvent>(out var e))
 		{
 			var entity = e.Data.Block;
@@ -354,10 +332,8 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 	}
 
 	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
-		next(dt);
-
 		if (events.On<BlocksClearedEvent>())
 		{
 			ref var paddle = ref _paddle.Get<Paddle>();
@@ -371,10 +347,8 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 	}
 
 	[Last]
-	public void Last(GameTime dt, GameLoopDelegate next)
+	public void Last(GameTime dt)
 	{
-		next(dt);
-
 		if (world.CountEntities(in _blockQuery) == 0) events.Emit(new BlocksClearedEvent());
 	}
 

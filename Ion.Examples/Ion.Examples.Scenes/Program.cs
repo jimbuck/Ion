@@ -13,7 +13,8 @@ using Ion.Examples.Scenes;
 
 var builder = IonApplication.CreateBuilder(args);
 
-// Run with --Ion:Headless=true to use the headless graphics backend (no GPU or window).
+// Run with --Ion:Headless=true to use the headless graphics backend (no GPU or window), and --Ion:PrintSchedule=true to
+// print every stage's steps (including each scene's) at startup.
 var headless = builder.Configuration.IsHeadless();
 
 builder.Services.AddDebugUtils(builder.Configuration);
@@ -35,6 +36,71 @@ builder.Services.AddCoroutines();
 builder.Services.AddSingleton<TestMiddleware>();
 
 var game = builder.Build();
+
+// Function steps: services in the parameter list are resolved once when the schedule is built. They run at the default
+// order (0), after the engine's setup steps and the active scene, whatever the registration order.
+game.Init((GameTime dt, IEventEmitter eventEmitter, IWindow window) =>
+{
+	window.IsResizable = true;
+	eventEmitter.Emit<int>(42);
+});
+
+game.First((GameTime dt, IInputState input, ICoroutineRunner coroutine) =>
+{
+	if (input.Pressed(Key.Enter)) coroutine.Start(CountDown(5));
+});
+
+var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
+{
+	//Console.WriteLine($"Frame: {dt.Frame}!");
+});
+
+game.First((GameTime dt, IInputState input, ITraceManager traceManager) =>
+{
+	if (input.Pressed(Key.F5)) traceManager.Start();
+	if (input.Pressed(Key.F6))
+	{
+		traceManager.Stop();
+		traceManager.OutputTrace();
+	}
+
+	logFrameNumber(dt);
+});
+
+var gameplay = false;
+game.Update((GameTime dt, IEventEmitter eventEmitter, IEventListener events, IInputState input) =>
+{
+	if (events.On<int>(out var e)) Console.WriteLine($"Int event! {e.Data}");
+
+	// Tab switches between the two scenes.
+	if (input.Pressed(Key.Tab))
+	{
+		gameplay = !gameplay;
+		eventEmitter.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu);
+	}
+});
+
+game.Render((GameTime dt, IEventEmitter eventEmitter, IInputState input) =>
+{
+	if (input.Down(Key.Escape))
+	{
+		Console.WriteLine("Escape Pressed!");
+		eventEmitter.Emit<ExitGameEvent>();
+	}
+});
+
+game.UseScene(Scene.MainMenu, scene =>
+{
+	scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90)));
+	scene.UseSystem<TestMiddleware>();
+});
+
+game.UseScene(Scene.Gameplay, scene =>
+{
+	scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90)));
+});
+
+// The engine systems can be added after the game's own steps: engine steps use the reserved order bands.
 game.UseDebugUtils();
 game.UseEvents();
 if (headless) game.UseNullGraphics();
@@ -42,121 +108,18 @@ else game.UseVeldridGraphics();
 // Steps the shared ICoroutineRunner once per frame in the Update stage.
 game.UseCoroutines();
 
-game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner coroutine) =>
-{
-	IEnumerator CountDown(int from)
-	{
-		while (from > 0)
-		{
-			Console.WriteLine("Countdown: " + from--);
-			yield return Wait.For(TimeSpan.FromSeconds(1));
-		}
+game.Run();
 
-		Console.WriteLine("Countdown done!");
+static IEnumerator CountDown(int from)
+{
+	while (from > 0)
+	{
+		Console.WriteLine("Countdown: " + from--);
+		yield return Wait.For(TimeSpan.FromSeconds(1));
 	}
 
-	return dt =>
-	{
-		if (input.Pressed(Key.Enter))
-		{
-			coroutine.Start(CountDown(5));
-		}
-
-		next(dt);
-	};
-});
-
-game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter, IWindow window) =>
-{
-	return dt => {
-		window.IsResizable = true;
-
-		eventEmitter.Emit<int>(42);
-		next(dt);
-	};
-});
-
-game.UseFirst((GameLoopDelegate next, IInputState input, ITraceManager traceManager) =>
-{
-	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
-	{
-		//Console.WriteLine($"Frame: {dt.Frame}!");
-	});
-
-	return dt =>
-	{
-		if (input.Pressed(Key.F5)) traceManager.Start();
-		if (input.Pressed(Key.F6))
-		{
-			traceManager.Stop();
-			traceManager.OutputTrace();
-		}
-
-		logFrameNumber(dt);
-		next(dt);
-	};
-});
-
-game.UseUpdate((GameLoopDelegate next, IEventEmitter eventEmitter, IEventListener events) =>
-{
-	var flip = false;
-	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(3), (dt) => {
-		eventEmitter.EmitChangeScene(flip ? Scene.MainMenu : Scene.Gameplay);
-		flip = !flip;
-	});
-
-	return dt =>
-	{
-		if (events.On<int>(out var e)) Console.WriteLine($"Int event! {e.Data}");
-		next(dt);
-		//switchScene(dt);
-	};
-});
-
-game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter, IInputState input) =>
-{
-	return dt =>
-	{
-		//Console.WriteLine("Game Render");
-		next(dt);
-
-		if (input.Down(Key.Escape))
-		{
-			Console.WriteLine("Escape Pressed!");
-			eventEmitter.Emit<ExitGameEvent>();
-		}
-	};
-});
-
-game.UseScene(Scene.MainMenu, scene =>
-{
-	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	{
-		return dt =>
-		{
-			spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
-			next(dt);
-		};
-	});
-
-	scene.UseSystem<TestMiddleware>();
-});
-
-game.UseScene(Scene.Gameplay, scene =>
-{
-	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	{
-		return dt =>
-		{
-			spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
-			next(dt);
-		};
-	});
-});
-
-game.UseRender(next => dt => Console.WriteLine("NEVER GETTING CALLED!"));
-
-game.Run();
+	Console.WriteLine("Countdown done!");
+}
 
 namespace Ion.Examples.Scenes
 {
@@ -170,6 +133,8 @@ namespace Ion.Examples.Scenes
 	public partial class TestMiddleware
 	{
 		private readonly Queue<float> _frameTimes = new();
+		private readonly Stopwatch _stopwatch = new();
+		private uint _fixedUpdates;
 
 		public TestMiddleware()
 		{
@@ -177,38 +142,25 @@ namespace Ion.Examples.Scenes
 		}
 
 		[First]
-		public void CoolFirstMiddleware(GameTime dt, GameLoopDelegate next)
+		public void CoolFirst(GameTime dt)
 		{
 			//Console.WriteLine($"Class First {dt.Frame}");
-			next(dt);
 		}
 
 		[FixedUpdate]
-		public GameLoopDelegate FancyFixedUpdate(GameLoopDelegate next)
-		{
-			Console.WriteLine("Class Fixed Update SETUP");
-			uint count = 0;
-			return dt =>
-			{
-				count++;
-				//Console.WriteLine($"Class Fixed Update inside {count++}");
-				next(dt);
-			};
-		}
+		public void CountFixedUpdates(GameTime dt) => _fixedUpdates++;
 
-		[Render]
-		public GameLoopDelegate Render(GameLoopDelegate next)
-		{
-			var stopwatch = new Stopwatch();
+		// A scope around the rest of the scene's Render stage: EndRenderTimer runs after every scene render step, even if
+		// one throws.
+		[Begin(Stage.Render, Order = -100)]
+		public void StartRenderTimer(GameTime dt) => _stopwatch.Restart();
 
-			return dt =>
-			{
-				stopwatch.Restart();
-				next(dt);
-				stopwatch.Stop();
-				_frameTimes.Enqueue((float)stopwatch.Elapsed.TotalSeconds);
-				while (_frameTimes.Count > 60) _frameTimes.Dequeue();
-			};
+		[End(Stage.Render, Order = -100)]
+		public void EndRenderTimer(GameTime dt)
+		{
+			_stopwatch.Stop();
+			_frameTimes.Enqueue((float)_stopwatch.Elapsed.TotalSeconds);
+			while (_frameTimes.Count > 60) _frameTimes.Dequeue();
 		}
 	}
 

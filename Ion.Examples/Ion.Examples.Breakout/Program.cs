@@ -63,7 +63,7 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 	private IFont _scoreFont = default!;
 
 	[Init]
-	public void SetupBlocks(GameTime dt, GameLoopDelegate next)
+	public void SetupBlocks(GameTime dt)
 	{		
 		_blockTexture = assets.Load<ITexture2D>("15-Breakout-Tiles.png");
 		_paddleTexture = assets.Load<ITexture2D>("49-Breakout-Tiles.png");
@@ -91,20 +91,16 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 		_paddleRect.Location = new Vector2(Math.Clamp(input.MousePosition.X - (_paddleRect.Height / 2f), 0, window.Width - _paddleRect.Width), window.Size.Y - (_blockSize.Y + _bottomGap));
 
 		_repositionBlocks();
-
-		next(dt);
 	}
 
 	[First]
-	public void HandleWindowResize(GameTime dt, GameLoopDelegate next)
+	public void HandleWindowResize(GameTime dt)
 	{
 		if (events.On<WindowResizeEvent>()) _repositionBlocks();
-
-		next(dt);
 	}
 
 	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		var isMouseGrabbed = window.IsMouseGrabbed;
 
@@ -225,12 +221,10 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 
 			Console.WriteLine("You Win!");
 		}
-
-		next(dt);
 	}
 
 	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
+	public void Render(GameTime dt)
 	{
 		for (var row = 0; row < ROWS; row++)
 		{
@@ -244,8 +238,6 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 		spriteBatch.Draw(_paddleTexture, _paddleRect);//, color: Color.DarkBlue);
 		spriteBatch.Draw(_ballTexture, _ballRect);//, color: Color.DarkRed);
 		spriteBatch.DrawString(_scoreFont, $"Score:  {_score}", new Vector2(20f), Color.Red);
-
-		next(dt);
 	}
 
 	private void _repositionBlocks()

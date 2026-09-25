@@ -23,8 +23,16 @@ public static class BuilderExtensions
 		return services;
 	}
 
+	/// <summary>
+	/// Adds the <see cref="TraceTimerSystem"/>, which times every stage in Debug builds of this package. In Release builds
+	/// the system has no steps and is not added.
+	/// </summary>
 	public static IIonApplication UseDebugUtils(this IIonApplication app)
 	{
+#if DEBUG
 		return app.UseSystem<TraceTimerSystem>();
+#else
+		return app;
+#endif
 	}
 }

@@ -51,6 +51,9 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 
 	public IonApplication Build()
 	{
+		// Captured last, so the root schedule can reject scoped systems and scoped step parameters (ION006).
+		Services.AddSingleton(new ServiceLifetimeIndex(Services));
+
 		var host = _hostBuilder.Build();
 		var game = new IonApplication(host);
 

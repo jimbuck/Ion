@@ -14,7 +14,7 @@ public class SpriteRendererSystem(ISpriteBatch spriteBatch, World world)
 	private readonly QueryDescription _spriteQuery = new QueryDescription().WithAll<Sprite, Transform2D>();
 
 	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
+	public void Render(GameTime dt)
 	{
 		world.Query(in _spriteQuery, (Entity entity, ref Sprite sprite, ref Transform2D transform) => {
 			var halfExtent = sprite.Size / 2f;
@@ -28,7 +28,5 @@ public class SpriteRendererSystem(ISpriteBatch spriteBatch, World world)
 
 			spriteBatch.Draw(sprite.Texture, topLeft, sprite.Size, rotation: transform.Rotation);
 		});
-
-		next(dt);
 	}
 }

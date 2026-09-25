@@ -1,44 +1,26 @@
-﻿using System.Reflection;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 
 namespace Ion.Extensions.Scenes;
 
+/// <summary>
+/// Registers systems on a scene's schedule.
+/// </summary>
 public static class UseSystemExtensions
 {
 	/// <summary>
-	/// Adds a middleware type to the application's request pipeline.
+	/// Adds a system to the scene's schedule (see <c>UseSystem</c> on the application). It is resolved from the scene's
+	/// scope when the scene loads, so scoped systems get one instance per scene load.
 	/// </summary>
-	/// <typeparam name="TMiddleware">The middleware type.</typeparam>
-	/// <param name="scene">The <see cref="ISceneBuilder"/> instance.</param>
-	/// <param name="args">The arguments to pass to the middleware type instance's constructor.</param>
-	/// <returns>The <see cref="ISceneBuilder"/> instance.</returns>
-	public static ISceneBuilder UseSystem<[DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] TMiddleware>(this ISceneBuilder scene)
+	public static ISceneBuilder UseSystem<[DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] TSystem>(this ISceneBuilder scene)
 	{
-		return UseSystem(scene, typeof(TMiddleware));
+		return UseSystem(scene, typeof(TSystem));
 	}
 
-	/// <summary>
-	/// Adds a middleware type to the application's request pipeline.
-	/// </summary>
-	/// <param name="scene">The <see cref="ISceneBuilder"/> instance.</param>
-	/// <param name="middlewareType">The middleware type.</param>
-	/// <param name="args">The arguments to pass to the middleware type instance's constructor.</param>
-	/// <returns>The <see cref="ISceneBuilder"/> instance.</returns>
-	public static ISceneBuilder UseSystem(this ISceneBuilder scene, [DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type middlewareType)
+	/// <inheritdoc cref="UseSystem{TSystem}(ISceneBuilder)"/>
+	public static ISceneBuilder UseSystem(this ISceneBuilder scene, [DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type systemType)
 	{
-		var methods = middlewareType.GetMethods(BindingFlags.Instance | BindingFlags.Public);
-
-		foreach (var method in methods)
-		{
-			if (SystemMiddlewareBinder.TryGetSystemFunction<InitAttribute>(scene.Services, method, middlewareType, out var initMiddleware)) scene.UseInit(initMiddleware);
-			if (SystemMiddlewareBinder.TryGetSystemFunction<FirstAttribute>(scene.Services, method, middlewareType, out var firstMiddleware)) scene.UseFirst(firstMiddleware);
-			if (SystemMiddlewareBinder.TryGetSystemFunction<UpdateAttribute>(scene.Services, method, middlewareType, out var updateMiddleware)) scene.UseUpdate(updateMiddleware);
-			if (SystemMiddlewareBinder.TryGetSystemFunction<FixedUpdateAttribute>(scene.Services, method, middlewareType, out var fixedUpdateMiddleware)) scene.UseFixedUpdate(fixedUpdateMiddleware);
-			if (SystemMiddlewareBinder.TryGetSystemFunction<RenderAttribute>(scene.Services, method, middlewareType, out var renderMiddleware)) scene.UseRender(renderMiddleware);
-			if (SystemMiddlewareBinder.TryGetSystemFunction<LastAttribute>(scene.Services, method, middlewareType, out var lastMiddleware)) scene.UseLast(lastMiddleware);
-			if (SystemMiddlewareBinder.TryGetSystemFunction<DestroyAttribute>(scene.Services, method, middlewareType, out var destroyMiddleware)) scene.UseDestroy(destroyMiddleware);
-		}
-
+		ArgumentNullException.ThrowIfNull(scene);
+		scene.Schedule.AddSystem(systemType, systemType);
 		return scene;
 	}
 }

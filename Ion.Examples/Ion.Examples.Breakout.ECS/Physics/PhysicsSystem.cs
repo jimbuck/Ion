@@ -16,22 +16,20 @@ public class PhysicsSystem(World world, PhysicsManager physics)
 	public bool IsDebugRenderEnabled { get; set; } = true;
 
 	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	public void Init(GameTime dt)
 	{
 		physics.Init();
-		next(dt);
 	}
 
-	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
+	// Drawn over the sprites and the score (order 0).
+	[Render(Order = 10)]
+	public void Render(GameTime dt)
 	{
-		next(dt);
-
 		if (IsDebugRenderEnabled) physics.DebugRender(dt, physics.PhysicsScale);
 	}
 
 	[FixedUpdate]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		world.Query(in _kinematicQuery, (ref KinematicRigidBody kineticComponent, ref Transform2D transform, ref Sprite sprite) =>
 		{
@@ -56,7 +54,5 @@ public class PhysicsSystem(World world, PhysicsManager physics)
 			var position2d = rigidBody.Body.Position;
 			transform.Position = new Vector2(position2d.X * physics.PhysicsScale, position2d.Y * physics.PhysicsScale);
 		});
-
-		next(dt);
 	}
 }

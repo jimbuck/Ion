@@ -1,33 +1,32 @@
-﻿
-using Ion.Extensions.Debug;
+﻿using Ion.Extensions.Debug;
 
 namespace Ion.Extensions.Graphics;
 
+/// <summary>
+/// Creates the window (Init), pumps its events at the start of every frame (First), and turns a closed window into an
+/// exit request at the end of Render (order <see cref="StageOrder.WindowClose"/>).
+/// </summary>
 internal class WindowSystem(Window window, IEventListener events, ITraceTimer<WindowSystem> trace)
 {
-
-	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	[Init(Order = StageOrder.Window)]
+	public void Init(GameTime dt)
 	{
 		var timer = trace.Start("Init");
 		window.Initialize();
 		timer.Stop();
-		next(dt);
 	}
 
-	[First]
-	public void First(GameTime dt, GameLoopDelegate next)
+	[First(Order = StageOrder.Window)]
+	public void First(GameTime dt)
 	{
 		var timer = trace.Start("First");
 		window.Step();
 		timer.Stop();
-		next(dt);
 	}
 
-	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
+	[Render(Order = StageOrder.WindowClose)]
+	public void CheckClosed(GameTime dt)
 	{
-		next(dt);
 		var timer = trace.Start("Render");
 		if (events.On<WindowClosedEvent>()) events.Emit<ExitGameEvent>();
 		timer.Stop();

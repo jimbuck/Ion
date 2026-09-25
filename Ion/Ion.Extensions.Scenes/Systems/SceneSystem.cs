@@ -9,14 +9,16 @@ namespace Ion.Extensions.Scenes;
 internal delegate SceneInstance SceneBuilderFactory(IConfiguration config, IServiceProvider services);
 
 /// <summary>
-/// Owns the registered scenes of one application and runs the active scene's pipelines.
+/// Owns the registered scenes of one application and runs the active scene's schedule.
 /// </summary>
 /// <remarks>
-/// Ordering: in every stage the active scene's systems run first, then <c>next</c> is called so that any application
-/// systems registered after <c>UseScene</c> still run. Systems registered before <c>UseScene</c> wrap the scene
-/// (their code before <c>next</c> runs before the scene, their code after <c>next</c> runs after it).
+/// In every stage it is one step at order <see cref="StageOrder.Scenes"/> (the end of the engine setup band): the active
+/// scene's steps run after the engine's setup steps (window, input, frame and sprite batch scopes) and before the
+/// application's own steps at the default order, whatever the registration order. Use <c>[Before&lt;SceneSystem&gt;]</c>
+/// or a lower order to run an application step before the scene. Scene steps are ordered among themselves with the same
+/// rules as application steps.
 /// </remarks>
-internal sealed class SceneSystem(
+public sealed class SceneSystem(
 	IServiceProvider serviceProvider,
 	ILogger<SceneSystem> logger, IConfiguration config,
 	IEventListener events,
@@ -33,14 +35,18 @@ internal sealed class SceneSystem(
 	private int _nextSceneId = 0;
 
 	/// <summary>
-	/// True once this instance has been added to the application's pipelines. Tracked on the (per-application) singleton
+	/// True once this instance has been added to the application's schedule. Tracked on the (per-application) singleton
 	/// so that several applications in one process each get their own scene system.
 	/// </summary>
 	internal bool IsBound { get; set; }
 
+	/// <summary>The id of the active scene, or 0 when none is loaded.</summary>
 	public int CurrentSceneId => _activeScene?.Id ?? 0;
 
-	public void Register(int sceneId, SceneBuilderFactory sceneBuilderFactory)
+	/// <summary>The active scene, or null when none is loaded.</summary>
+	public SceneInstance? ActiveScene => _activeScene;
+
+	internal void Register(int sceneId, SceneBuilderFactory sceneBuilderFactory)
 	{
 		_scenesBuilders[sceneId] = sceneBuilderFactory;
 	}
@@ -71,10 +77,10 @@ internal sealed class SceneSystem(
 	}
 
 	/// <summary>
-	/// Initializes the active scene.
+	/// Loads the first scene (running its Init stage), or runs the active scene's Init stage again.
 	/// </summary>
-	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	[Init(Order = StageOrder.Scenes)]
+	public void Init(GameTime dt)
 	{
 		var timer = _trace.Start("Init");
 
@@ -93,12 +99,13 @@ internal sealed class SceneSystem(
 		}
 
 		timer.Stop();
-
-		next(dt);
 	}
 
-	[First]
-	public void First(GameTime dt, GameLoopDelegate next)
+	/// <summary>
+	/// Switches scene when a <see cref="ChangeSceneEvent"/> asked for it, then runs the active scene's First stage.
+	/// </summary>
+	[First(Order = StageOrder.Scenes)]
+	public void First(GameTime dt)
 	{
 		var timer = _trace.Start("First");
 
@@ -108,71 +115,47 @@ internal sealed class SceneSystem(
 		_activeScene?.First(dt);
 
 		timer.Stop();
-
-		next(dt);
 	}
 
-	[FixedUpdate]
-	public void FixedUpdate(GameTime dt, GameLoopDelegate next)
+	/// <summary>Runs the active scene's FixedUpdate stage.</summary>
+	[FixedUpdate(Order = StageOrder.Scenes)]
+	public void FixedUpdate(GameTime dt)
 	{
 		var timer = _trace.Start("FixedUpdate");
-
 		_activeScene?.FixedUpdate(dt);
-
 		timer.Stop();
-
-		next(dt);
 	}
 
-	/// <summary>
-	/// Updates the active scene.
-	/// </summary>
-	/// <param name="dt">The elapsed time since the last call to Update.</param>
-	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	/// <summary>Runs the active scene's Update stage.</summary>
+	[Update(Order = StageOrder.Scenes)]
+	public void Update(GameTime dt)
 	{
 		var timer = _trace.Start("Update");
-
 		_activeScene?.Update(dt);
-
 		timer.Stop();
-
-		next(dt);
 	}
 
-	/// <summary>
-	/// Draws the active scene.
-	/// </summary>
-	/// <param name="dt">The elapsed time since the last call to Draw.</param>
-	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
+	/// <summary>Runs the active scene's Render stage.</summary>
+	[Render(Order = StageOrder.Scenes)]
+	public void Render(GameTime dt)
 	{
 		var timer = _trace.Start("Render");
-
 		_activeScene?.Render(dt);
-
 		timer.Stop();
-
-		next(dt);
 	}
 
-	[Last]
-	public void Last(GameTime dt, GameLoopDelegate next)
+	/// <summary>Runs the active scene's Last stage.</summary>
+	[Last(Order = StageOrder.Scenes)]
+	public void Last(GameTime dt)
 	{
 		var timer = _trace.Start("Last");
-
 		_activeScene?.Last(dt);
-
 		timer.Stop();
-
-		next(dt);
 	}
 
-	/// <summary>
-	/// Unloads content for the active scene.
-	/// </summary>
-	[Destroy]
-	public void Destroy(GameTime dt, GameLoopDelegate next)
+	/// <summary>Runs the active scene's Destroy stage (once).</summary>
+	[Destroy(Order = StageOrder.Scenes)]
+	public void Destroy(GameTime dt)
 	{
 		var timer = _trace.Start("Destroy");
 
@@ -184,10 +167,9 @@ internal sealed class SceneSystem(
 		}
 
 		timer.Stop();
-
-		next(dt);
 	}
 
+	/// <summary>Destroys the active scene if its Destroy stage has not run, and disposes its scope.</summary>
 	public void Dispose()
 	{
 		if (_activeScene != null && !_activeSceneDestroyed)
