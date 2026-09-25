@@ -8,16 +8,37 @@ namespace Ion.Extensions.Graphics;
 
 public static class BuilderExtensions
 {
+	/// <summary>
+	/// Registers the Veldrid graphics services, binding <see cref="GraphicsConfig"/> from <c>Ion:Graphics</c>
+	/// and <see cref="WindowConfig"/> from <c>Ion:Window</c>.
+	/// </summary>
 	public static IServiceCollection AddVeldridGraphics(this IServiceCollection services, IConfiguration config, Action<GraphicsConfig>? configureOptions = null)
 	{
-		return AddVeldridGraphics(services, config.GetSection("Ion").GetSection("Graphics"), configureOptions);
+		var ionSection = config.GetSection("Ion");
+		return AddVeldridGraphics(services, ionSection.GetSection("Graphics"), ionSection.GetSection("Window"), configureOptions);
 	}
 
+	/// <summary>
+	/// Registers the Veldrid graphics services, binding <see cref="GraphicsConfig"/> from <paramref name="config"/>.
+	/// <see cref="WindowConfig"/> keeps its defaults; use the overload taking a window section to bind it.
+	/// </summary>
 	public static IServiceCollection AddVeldridGraphics(this IServiceCollection services, IConfigurationSection config, Action<GraphicsConfig>? configureOptions = null)
 	{
+		return AddVeldridGraphics(services, config, null, configureOptions);
+	}
+
+	/// <summary>
+	/// Registers the Veldrid graphics services, binding <see cref="GraphicsConfig"/> from <paramref name="graphicsConfig"/>
+	/// and, when given, <see cref="WindowConfig"/> from <paramref name="windowConfig"/>.
+	/// </summary>
+	public static IServiceCollection AddVeldridGraphics(this IServiceCollection services, IConfigurationSection graphicsConfig, IConfigurationSection? windowConfig, Action<GraphicsConfig>? configureOptions = null)
+	{
+		services.AddOptions<WindowConfig>();
+		if (windowConfig is not null) services.Configure<WindowConfig>(windowConfig);
+
 		services
 			// Standard
-			.Configure<GraphicsConfig>(config)
+			.Configure<GraphicsConfig>(graphicsConfig)
 
 			// Implementation-specific
 			.AddSingleton<IWindow, Window>()

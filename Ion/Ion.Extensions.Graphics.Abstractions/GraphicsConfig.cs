@@ -11,8 +11,48 @@ public class GraphicsConfig
 	public bool VSync { get; set; }
 	public uint MaxFPS { get; set; }
 	public GraphicsOutput Output { get; set; } = GraphicsOutput.Window;
+	/// <summary>
+	/// The color the back buffer is cleared to each frame. Set it from code, or from configuration through <see cref="ClearColorHex"/>.
+	/// </summary>
 	public Color ClearColor { get; set; } = Color.Black;
+
+	/// <summary>
+	/// <see cref="ClearColor"/> as a hex string, for configuration binding (for example <c>Ion:Graphics:ClearColorHex = "#333333"</c>).
+	/// Accepts <c>RGB</c>, <c>RGBA</c>, <c>RRGGBB</c> and <c>RRGGBBAA</c>, with or without a leading <c>#</c>.
+	/// Reading it returns the current <see cref="ClearColor"/> as <c>#RRGGBBAA</c>.
+	/// </summary>
+	public string? ClearColorHex
+	{
+		get => $"#{ClearColor.PackedValue:X8}";
+		set
+		{
+			if (string.IsNullOrWhiteSpace(value)) return;
+			ClearColor = ParseHexColor(value);
+		}
+	}
 	public string? CanvasSelector { get; set; }
+
+	private static Color ParseHexColor(string value)
+	{
+		var hex = value.Trim().TrimStart('#');
+		if (!uint.TryParse(hex, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var packed))
+		{
+			throw new FormatException($"'{value}' is not a valid hex color.");
+		}
+
+		// Expand the short forms (RGB, RGBA) to one byte per channel.
+		static int Nibble(uint v, int shift) => (int)((v >> shift) & 0xF) * 0x11;
+		static int Byte(uint v, int shift) => (int)((v >> shift) & 0xFF);
+
+		return hex.Length switch
+		{
+			3 => new Color(Nibble(packed, 8), Nibble(packed, 4), Nibble(packed, 0), 255),
+			4 => new Color(Nibble(packed, 12), Nibble(packed, 8), Nibble(packed, 4), Nibble(packed, 0)),
+			6 => new Color(Byte(packed, 16), Byte(packed, 8), Byte(packed, 0), 255),
+			8 => new Color(Byte(packed, 24), Byte(packed, 16), Byte(packed, 8), Byte(packed, 0)),
+			_ => throw new FormatException($"'{value}' is not a valid hex color (expected RGB, RGBA, RRGGBB or RRGGBBAA)."),
+		};
+	}
 }
 
 public enum GraphicsOutput : byte

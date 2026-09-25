@@ -46,11 +46,7 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 			foreach (var mipmap in mipmaps)
 			{
 				long mipSize = mipmap.Width * mipmap.Height * sizeof(Rgba32);
-				if (!mipmap.TryGetSinglePixelSpan(out Span<Rgba32> pixelSpan)) throw new Exception("Unable to get image pixelspan.");
-				fixed (void* pixelPtr = &MemoryMarshal.GetReference(pixelSpan))
-				{
-					Buffer.MemoryCopy(pixelPtr, allTexDataPtr + offset, mipSize, mipSize);
-				}
+				mipmap.CopyPixelDataTo(new Span<Rgba32>(allTexDataPtr + offset, mipmap.Width * mipmap.Height));
 
 				offset += mipSize;
 			}

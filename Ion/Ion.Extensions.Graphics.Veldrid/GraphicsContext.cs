@@ -20,6 +20,24 @@ public interface IGraphicsContext
 	Matrix4x4 CreatePerspective(float fov, float aspectRatio, float near, float far);
 }
 
+/// <summary>
+/// Maps Ion's <see cref="GraphicsBackend"/> onto <see cref="Veldrid.GraphicsBackend"/>.
+/// The two enums do not share ordinals, so they must never be cast onto each other.
+/// </summary>
+internal static class VeldridBackendMapper
+{
+	/// <exception cref="NotSupportedException">The backend has no Veldrid implementation (Direct3D12, WebGPU).</exception>
+	public static Veldrid.GraphicsBackend ToVeldrid(GraphicsBackend backend) => backend switch
+	{
+		GraphicsBackend.Direct3D11 => Veldrid.GraphicsBackend.Direct3D11,
+		GraphicsBackend.Vulkan => Veldrid.GraphicsBackend.Vulkan,
+		GraphicsBackend.OpenGL => Veldrid.GraphicsBackend.OpenGL,
+		GraphicsBackend.Metal => Veldrid.GraphicsBackend.Metal,
+		GraphicsBackend.OpenGLES => Veldrid.GraphicsBackend.OpenGLES,
+		_ => throw new NotSupportedException($"Graphics backend {backend} is not supported by the Veldrid graphics extension."),
+	};
+}
+
 internal class GraphicsContext : IGraphicsContext, IDisposable
 {
 	private readonly IOptionsMonitor<GraphicsConfig> _config;
@@ -57,11 +75,13 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 		var config = _config.CurrentValue;
 
-		var veldridBackend = (Veldrid.GraphicsBackend)config.PreferredBackend;
+		var veldridBackend = VeldridBackendMapper.ToVeldrid(config.PreferredBackend);
 
 		if (!GraphicsDevice.IsBackendSupported(veldridBackend))
 		{
-			throw new Exception($"Unsupported backend! ({config.PreferredBackend}");
+			var fallback = Veldrid.StartupUtilities.VeldridStartup.GetPlatformDefaultBackend();
+			_logger.LogWarning("Preferred graphics backend {preferredBackend} is not supported on this platform, falling back to {fallbackBackend}", veldridBackend.ToString("G"), fallback.ToString("G"));
+			veldridBackend = fallback;
 		}
 
 		_logger.LogInformation("Initializing {graphicsBackend}", veldridBackend.ToString("G"));
@@ -82,7 +102,7 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 		_commandList = GraphicsDevice.ResourceFactory.CreateCommandList();
 
-		_logger.LogInformation($"Graphics device created ({GraphicsDevice.BackendType})!");
+		_logger.LogInformation("Graphics device created ({graphicsBackend})!", GraphicsDevice.BackendType.ToString("G"));
 
 		UpdateProjection((uint)_window.Width, (uint)_window.Height);
 
