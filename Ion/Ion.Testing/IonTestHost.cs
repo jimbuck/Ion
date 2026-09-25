@@ -264,13 +264,37 @@ public sealed class IonTestHost : IDisposable
 	}
 
 	/// <summary>
-	/// Captures the last rendered frame. Not supported yet: the headless backend does not rasterize, so this always throws
-	/// <see cref="NotSupportedException"/>. It will return an image once the headless renderer (Veldrid on lavapipe)
-	/// exists; until then assert on <see cref="SpriteBatch"/> commands and counts instead.
+	/// Turns on headless rendering (<c>Ion:Headless:Render = true</c>): the Vulkan RHI backend renders every frame into an
+	/// offscreen target sized from <c>Ion:Window</c> (960x540 by default), systems can render through
+	/// <see cref="IGraphicsFrame"/>, and <see cref="Screenshot"/> captures frames. Needs a Vulkan driver (on Linux CI, Mesa
+	/// lavapipe). Sprites drawn with <see cref="ISpriteBatch"/> are still only recorded until the 2D renderer is ported to
+	/// the RHI.
 	/// </summary>
-	/// <exception cref="NotSupportedException">Always.</exception>
-	public byte[] Screenshot() =>
-		throw new NotSupportedException("IonTestHost cannot capture frames yet: the headless backend records draw calls (see SpriteBatch) but does not rasterize them.");
+	public IonTestHost WithRendering(uint? width = null, uint? height = null)
+	{
+		WithConfiguration(RenderKey, "true");
+		if (width is { } w) WithConfiguration("Ion:Window:Width", w.ToString(System.Globalization.CultureInfo.InvariantCulture));
+		if (height is { } h) WithConfiguration("Ion:Window:Height", h.ToString(System.Globalization.CultureInfo.InvariantCulture));
+		return this;
+	}
+
+	/// <summary>
+	/// Captures the last rendered frame as RGBA8 pixels (compare it with <see cref="GoldenImage"/>). Requires headless
+	/// rendering (<see cref="WithRendering"/> or <c>Ion:Headless:Render = true</c>) and at least one frame run.
+	/// </summary>
+	/// <exception cref="NotSupportedException">Headless rendering is off: the null backend records draw calls (see <see cref="SpriteBatch"/>) but does not rasterize them.</exception>
+	/// <exception cref="InvalidOperationException">No frame has been rendered yet.</exception>
+	public Screenshot Screenshot()
+	{
+		var source = Services.GetService<IScreenshotSource>()
+			?? throw new NotSupportedException("IonTestHost captures frames only with headless rendering: call WithRendering() (Ion:Headless:Render = true). The default headless backend records draw calls (see SpriteBatch) but does not rasterize them.");
+		return source.Capture();
+	}
+
+	/// <summary>Captures the last rendered frame (see <see cref="Screenshot"/>) and writes it to <paramref name="path"/> as PNG.</summary>
+	public void SaveScreenshot(string path) => GoldenImage.Save(Screenshot(), path);
+
+	private const string RenderKey = "Ion:Headless:Render";
 
 	/// <summary>
 	/// Runs the Destroy stage (when the game was started) and disposes the application and its services.

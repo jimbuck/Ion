@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
 
 env:
+  VK_LAYER_ENABLES: VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
@@ -35,9 +36,18 @@ jobs:
       run: dotnet tool restore
     - name: Build
       run: dotnet build --configuration Release --no-restore
+    # Mesa lavapipe (a CPU Vulkan driver) runs the headless rendering and golden-image tests; Xvfb runs the windowed ones.
+    # Without a driver those tests are skipped, not failed. With the Khronos validation layer (and synchronization
+    # validation, VK_LAYER_ENABLES in env) the Vulkan tests fail on any validation error.
+    - name: Install lavapipe and Xvfb
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: sudo apt-get update -y -qq && sudo apt-get install -y -qq mesa-vulkan-drivers libvulkan1 vulkan-validationlayers xvfb
     - name: Unit Tests
       if: ${{ matrix.os != 'windows-latest' }}
       run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category!=E2E" --collect:"XPlat Code Coverage" --results-directory ./coverage --settings coverage.runsettings
+    - name: Windowed Vulkan E2E Tests (Xvfb)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: xvfb-run -a dotnet test Ion/Ion.Extensions.Graphics.Vulkan.Tests --configuration Release --no-build --verbosity normal --filter "Category=E2E"
     - name: Unit Tests & E2E Tests
       if: ${{ matrix.os == 'windows-latest' }}
       run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage --settings coverage.runsettings
@@ -91,8 +101,8 @@ jobs:
         path: bench/
         if-no-files-found: warn
 
-  # NativeAOT publish of the ECS sample. Fails on any trim/AOT warning whose subject is Ion's own code;
-  # warnings from third-party packages (Aether.Physics2D, NAudio, Vortice, DependencyModel) are reported only.
+  # NativeAOT publish of the ECS sample and the Silk.NET quad sample. Fails on any trim/AOT warning whose subject is Ion's
+  # own code; warnings from third-party packages (Aether.Physics2D, Vortice, DependencyModel, Silk.NET.Core) are reported only.
   aot:
     runs-on: ubuntu-latest
     steps:
@@ -110,6 +120,12 @@ jobs:
         # TrimmerSingleWarn=false reports every warning instead of one summary line per assembly.
         dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -c Release -r linux-x64 \
           -p:PublishAot=true -p:TrimmerSingleWarn=false -o ./aot 2>&1 | tee aot-publish.log
+    - name: Publish Silk.NET quad sample with NativeAOT
+      shell: bash
+      run: |
+        set -o pipefail
+        dotnet publish Ion.Examples/Ion.Examples.Quad -c Release -r linux-x64 \
+          -p:PublishAot=true -p:TrimmerSingleWarn=false -o ./aot-quad 2>&1 | tee -a aot-publish.log
     - name: Check for Ion AOT warnings
       shell: bash
       run: |

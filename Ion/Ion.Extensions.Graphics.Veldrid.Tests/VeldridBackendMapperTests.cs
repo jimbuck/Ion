@@ -11,12 +11,15 @@ public class VeldridBackendMapperTests
 {
 	private static readonly IonBackend[] Unsupported = [IonBackend.Direct3D12, IonBackend.WebGPU];
 
+	// Auto has no Veldrid member of the same name; it maps to Veldrid's platform default (tested separately).
+	private static readonly IonBackend[] NotNamedAlike = [.. Unsupported, IonBackend.Auto];
+
 	public static TheoryData<IonBackend> SupportedBackends()
 	{
 		var data = new TheoryData<IonBackend>();
 		foreach (var backend in Enum.GetValues<IonBackend>())
 		{
-			if (!Unsupported.Contains(backend)) data.Add(backend);
+			if (!NotNamedAlike.Contains(backend)) data.Add(backend);
 		}
 		return data;
 	}
@@ -38,6 +41,12 @@ public class VeldridBackendMapperTests
 	{
 		var ex = Assert.Throws<NotSupportedException>(() => VeldridBackendMapper.ToVeldrid(backend));
 		Assert.Contains(backend.ToString(), ex.Message);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void ToVeldrid_MapsAutoToThePlatformDefault()
+	{
+		Assert.Equal(Veldrid.StartupUtilities.VeldridStartup.GetPlatformDefaultBackend(), VeldridBackendMapper.ToVeldrid(IonBackend.Auto));
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]

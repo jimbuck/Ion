@@ -278,10 +278,11 @@ public class IonTestHostTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
-	public void ScreenshotIsNotSupportedYet()
+	public void ScreenshotIsNotSupportedWithoutRendering()
 	{
 		using var host = new IonTestHost();
-		Assert.Throws<NotSupportedException>(() => host.Screenshot());
+		var ex = Assert.Throws<NotSupportedException>(() => host.Screenshot());
+		Assert.Contains("WithRendering", ex.Message);
 	}
 
 	[Fact, Trait(CATEGORY, INTEGRATION)]

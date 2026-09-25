@@ -7,10 +7,45 @@ namespace Ion.Extensions.Graphics;
 
 public class GraphicsConfig
 {
+	/// <summary>
+	/// The graphics API to use. <see cref="GraphicsBackend.Auto"/> lets the backend pick the platform default (Vulkan on
+	/// desktop and mobile with the Silk.NET stack). The Veldrid backend maps <see cref="GraphicsBackend.Auto"/> to its own
+	/// platform default.
+	/// </summary>
 	public GraphicsBackend PreferredBackend { get; set; } = GraphicsBackend.Vulkan;
+
+	/// <summary>Wait for vertical blank when presenting (FIFO). Off: mailbox where supported, else immediate.</summary>
 	public bool VSync { get; set; }
 	public uint MaxFPS { get; set; }
 	public GraphicsOutput Output { get; set; } = GraphicsOutput.Window;
+
+	/// <summary>
+	/// The number of frames the CPU may record ahead of the GPU in the RHI backends (2 or 3; other values are clamped).
+	/// </summary>
+	public int FramesInFlight { get; set; } = 2;
+
+	/// <summary>
+	/// Enables the graphics API's validation (Vulkan: <c>VK_LAYER_KHRONOS_validation</c> and a debug messenger, when
+	/// installed). Null: on in Debug builds of the backend, off in Release.
+	/// </summary>
+	public bool? Validation { get; set; }
+
+	/// <summary>
+	/// Whether the RHI backends create a depth target with the color target (<see cref="IGraphicsFrame.DepthTarget"/>).
+	/// </summary>
+	public bool DepthBuffer { get; set; } = true;
+
+	/// <summary>
+	/// Windowed RHI backends: copy every presented frame to host memory so <see cref="IScreenshotSource.Capture"/> can return
+	/// it. Costs a full-frame copy per frame, so it is off by default; the headless backend always supports capture.
+	/// </summary>
+	public bool RetainLastFrame { get; set; }
+
+	/// <summary>
+	/// The adapter to use when there are several: the first whose name contains this text (case-insensitive). Null: prefer
+	/// a discrete GPU, then an integrated one, then anything else.
+	/// </summary>
+	public string? Adapter { get; set; }
 	/// <summary>
 	/// The color the back buffer is cleared to each frame. Set it from code, or from configuration through <see cref="ClearColorHex"/>.
 	/// </summary>
@@ -104,4 +139,10 @@ public enum GraphicsBackend : byte
 	/// WebGPU
 	/// </summary>
 	WebGPU,
+
+	/// <summary>
+	/// The platform default: Vulkan for the Silk.NET stack (desktop, Android, iOS over MoltenVK), OpenGL ES where Vulkan is
+	/// unavailable (next wave), and the platform default of the Veldrid backend.
+	/// </summary>
+	Auto,
 }

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Graphics</RootNamespace>
+    <Description>Headless rendering for Ion: the Vulkan RHI backend without a window, rendering into an offscreen target (sized from Ion:Window) with RGBA8 capture and PNG screenshots. Runs on any Vulkan driver, including Mesa lavapipe on CI.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Null\Ion.Extensions.Graphics.Null.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Vulkan\Ion.Extensions.Graphics.Vulkan.csproj" />
+  </ItemGroup>
+</Project>

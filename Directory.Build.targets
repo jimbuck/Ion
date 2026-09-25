@@ -1,4 +1,7 @@
 <Project>
+  <!-- NativeAOT: stub out Silk.NET code paths Ion never runs (packaged as buildTransitive for NuGet consumers). -->
+  <Import Project="Ion\Ion.Extensions.Windowing.SilkNet\buildTransitive\Ion.Extensions.Windowing.SilkNet.targets" />
+
   <Target Name="AddInternalsVisibleTo" BeforeTargets="BeforeCompile">
     <!-- Add default suffix if there is no InternalsVisibleTo or InternalsVisibleToSuffix defined -->
     <ItemGroup Condition="@(InternalsVisibleToSuffix-&gt;Count()) == 0 AND @(InternalsVisibleTo-&gt;Count()) == 0">

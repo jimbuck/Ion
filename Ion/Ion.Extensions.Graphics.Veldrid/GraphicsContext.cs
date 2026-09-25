@@ -34,6 +34,7 @@ internal static class VeldridBackendMapper
 		GraphicsBackend.OpenGL => Veldrid.GraphicsBackend.OpenGL,
 		GraphicsBackend.Metal => Veldrid.GraphicsBackend.Metal,
 		GraphicsBackend.OpenGLES => Veldrid.GraphicsBackend.OpenGLES,
+		GraphicsBackend.Auto => Veldrid.StartupUtilities.VeldridStartup.GetPlatformDefaultBackend(),
 		_ => throw new NotSupportedException($"Graphics backend {backend} is not supported by the Veldrid graphics extension."),
 	};
 }

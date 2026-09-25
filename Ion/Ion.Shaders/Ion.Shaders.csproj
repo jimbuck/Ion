@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Ion's build-time shader compiler: GLSL 4.5 (Vulkan dialect) to SPIR-V with Silk.NET.Shaderc, and SPIR-V to GLSL ES 3.10
+    with Silk.NET.SPIRV.Cross (for the GLES backend). Run by Ion.Shaders.targets during the build of any project that has
+    IonShader items; games never ship it or its native libraries.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- A build tool, not an engine library: no AOT analysis. -->
+    <IonAotLibrary>false</IonAotLibrary>
+    <IsAotCompatible>false</IsAotCompatible>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleToSuffix Include=".Tests" />
+    <InternalsVisibleTo Include="Ion.Extensions.Graphics.Vulkan.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.Shaderc" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Shaderc.Native" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.SPIRV.Cross" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.SPIRV.Cross.Native" Version="2.23.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Ion.Shaders.targets" />
+  </ItemGroup>
+</Project>
