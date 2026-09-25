@@ -19,6 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
+    <ProjectReference Include="..\Ion.Benchmarks.GeneratedApp\Ion.Benchmarks.GeneratedApp.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Debug\Ion.Extensions.Debug.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />

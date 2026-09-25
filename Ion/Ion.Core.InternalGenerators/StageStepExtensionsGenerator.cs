@@ -82,7 +82,7 @@ public class StageStepExtensionsGenerator : IIncrementalGenerator
 					source.WriteLine($"builder.Schedule.AddFunction(global::Ion.Stage.{stage}, step, new global::System.Type[] {{ {types} }}, services =>");
 					source.OpenBlock();
 					for (var i = 0; i < count; i++) source.WriteLine($"var service{i} = services.GetRequiredService<TService{i}>();");
-					source.WriteLine($"return dt => step(dt, {string.Join(", ", Enumerable.Range(0, count).Select(i => $"service{i}"))});");
+					source.WriteLine($"return global::Ion.StepAdapters.FromFunction(step, {string.Join(", ", Enumerable.Range(0, count).Select(i => $"service{i}"))});");
 					source.CloseBlock();
 					source.WriteLine(", order, name);");
 				}

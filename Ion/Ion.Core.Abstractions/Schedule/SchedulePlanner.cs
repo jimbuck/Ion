@@ -24,6 +24,10 @@ internal static class SchedulePlanner
 		{
 			switch (entry)
 			{
+				case SystemEntry { Generated: { } generated } system:
+					DiscoverGenerated(context, system, generated, items);
+					break;
+
 				case SystemEntry system:
 					DiscoverSystem(context, system, items);
 					break;
@@ -34,8 +38,9 @@ internal static class SchedulePlanner
 					{
 						Function = function,
 						RegistrationIndex = function.Index,
-						After = Targets(FunctionConstraints(function), before: false),
-						Before = Targets(FunctionConstraints(function), before: true),
+						After = function.After is { } after ? [.. after] : Targets(FunctionConstraints(function), before: false),
+						Before = function.Before is { } before ? [.. before] : Targets(FunctionConstraints(function), before: true),
+						Services = function.ServiceTypes,
 					});
 					break;
 
@@ -134,6 +139,8 @@ internal static class SchedulePlanner
 						{
 							System = system,
 							Method = method,
+							MethodName = method.Name,
+							NeedsInstance = !method.IsStatic,
 							After = after,
 							Before = before,
 							RegistrationIndex = system.Index,
@@ -147,6 +154,9 @@ internal static class SchedulePlanner
 						{
 							System = system,
 							Method = method,
+							MethodName = method.Name,
+							NeedsInstance = !method.IsStatic,
+							Services = [.. StepSignature.ServiceParameters(method)],
 							After = after,
 							Before = before,
 							RegistrationIndex = system.Index,
@@ -222,6 +232,10 @@ internal static class SchedulePlanner
 				System = system,
 				Method = begin.Method,
 				EndMethod = end.Method,
+				MethodName = begin.Method.Name,
+				NeedsInstance = !begin.Method.IsStatic || !end.Method.IsStatic,
+				Services = [.. StepSignature.ServiceParameters(begin.Method)],
+				EndServices = [.. StepSignature.ServiceParameters(end.Method)],
 				ScopeName = scopeName,
 				After = Targets(constraints, before: false),
 				Before = Targets(constraints, before: true),
@@ -234,6 +248,44 @@ internal static class SchedulePlanner
 		if (count == 0)
 		{
 			context.Warning(ScheduleDiagnosticCodes.SystemWithoutSteps, $"System '{type.Name}' has no public method with a stage attribute ([Init], [Update], ...) or [Begin]/[End], so it never runs.");
+		}
+	}
+
+	private static void DiscoverGenerated(Context context, SystemEntry system, GeneratedSystem generated, List<StepPlan> items)
+	{
+		// The generator already validated the system with the same rules as DiscoverSystem; replay its diagnostics (in
+		// discovery order) so that the runtime reports exactly what reflection would.
+		foreach (var diagnostic in generated.Diagnostics)
+		{
+			if (diagnostic.Severity == ScheduleDiagnosticSeverity.Error) context.Error(diagnostic.Code, diagnostic.Message);
+			else context.Warning(diagnostic.Code, diagnostic.Message);
+		}
+
+		var type = generated.Name;
+		foreach (var step in generated.Steps)
+		{
+			var kind = step.Kind switch
+			{
+				GeneratedStepKind.Scope => StepKind.Scope,
+				GeneratedStepKind.Middleware => StepKind.Middleware,
+				_ => StepKind.Step,
+			};
+
+			items.Add(new StepPlan(step.Stage, kind, step.Order, type + "." + step.Method)
+			{
+				EndName = step.EndMethod is null ? null : type + "." + step.EndMethod,
+				System = system,
+				Generated = step,
+				MethodName = step.Method,
+				NeedsInstance = !step.IsStatic || (step.EndMethod is not null && !step.EndIsStatic),
+				Services = step.Services,
+				EndServices = step.EndServices,
+				ScopeName = step.ScopeName,
+				After = step.After,
+				Before = step.Before,
+				RegistrationIndex = system.Index,
+				DeclarationIndex = step.DeclarationIndex,
+			});
 		}
 	}
 
@@ -333,102 +385,31 @@ internal static class SchedulePlanner
 		}
 	}
 
-	private static bool NeedsInstance(StepPlan item) => item.Method is { IsStatic: false } || item.EndMethod is { IsStatic: false };
+	private static bool NeedsInstance(StepPlan item) => item.NeedsInstance;
 
 	private static IEnumerable<(Type Type, string Owner)> InjectedServices(StepPlan item)
 	{
-		if (item.Function is { } function)
-		{
-			foreach (var type in function.ServiceTypes) yield return (type, item.Name);
-			yield break;
-		}
-
-		if (item.Kind == StepKind.Middleware) yield break;
-
-		if (item.Method is { } method)
-		{
-			foreach (var type in StepSignature.ServiceParameters(method)) yield return (type, item.Name);
-		}
-
-		if (item.EndMethod is { } end)
-		{
-			foreach (var type in StepSignature.ServiceParameters(end)) yield return (type, item.EndName ?? item.Name);
-		}
+		foreach (var type in item.Services) yield return (type, item.Name);
+		foreach (var type in item.EndServices) yield return (type, item.EndName ?? item.Name);
 	}
 
 	private static List<StepPlan> Sort(Context context, Stage stage, List<StepPlan> items)
 	{
-		var n = items.Count;
-		var successors = new List<int>[n];
-		var predecessors = new List<int>[n];
-		var inDegree = new int[n];
-		var edges = new HashSet<(int, int)>();
+		var order = ScheduleSorter.Sort(
+			items.Count,
+			(i, j) => items[i].System is not null && items[j].System == items[i].System,
+			(i, j) => items[i].After.Any(target => Matches(target, items[j])),
+			(i, j) => items[i].Before.Any(target => Matches(target, items[j])),
+			i => new ScheduleSortKey(items[i].Order, items[i].Kind == StepKind.Scope ? 0 : 1, items[i].RegistrationIndex, items[i].DeclarationIndex),
+			out var cycle);
 
-		for (var i = 0; i < n; i++)
+		if (order is null)
 		{
-			successors[i] = [];
-			predecessors[i] = [];
-		}
-
-		void AddEdge(int from, int to)
-		{
-			if (!edges.Add((from, to))) return;
-			successors[from].Add(to);
-			predecessors[to].Add(from);
-			inDegree[to]++;
-		}
-
-		for (var i = 0; i < n; i++)
-		{
-			var item = items[i];
-			for (var j = 0; j < n; j++)
-			{
-				if (i == j) continue;
-				var other = items[j];
-				if (item.System is not null && other.System == item.System) continue;
-
-				foreach (var target in item.After)
-				{
-					if (Matches(target, other)) AddEdge(j, i);
-				}
-
-				foreach (var target in item.Before)
-				{
-					if (Matches(target, other)) AddEdge(i, j);
-				}
-			}
-		}
-
-		var ready = new List<int>();
-		for (var i = 0; i < n; i++) if (inDegree[i] == 0) ready.Add(i);
-
-		var sorted = new List<StepPlan>(n);
-		var done = new bool[n];
-		while (ready.Count > 0)
-		{
-			var best = 0;
-			for (var r = 1; r < ready.Count; r++)
-			{
-				if (Compare(items[ready[r]], ready[r], items[ready[best]], ready[best]) < 0) best = r;
-			}
-
-			var next = ready[best];
-			ready.RemoveAt(best);
-			done[next] = true;
-			sorted.Add(items[next]);
-
-			foreach (var successor in successors[next])
-			{
-				if (--inDegree[successor] == 0) ready.Add(successor);
-			}
-		}
-
-		if (sorted.Count < n)
-		{
-			context.Error(ScheduleDiagnosticCodes.OrderingCycle, $"The [Before]/[After] constraints in {stage} form a cycle: {DescribeCycle(items, predecessors, done)}.");
+			context.Error(ScheduleDiagnosticCodes.OrderingCycle, $"The [Before]/[After] constraints in {stage} form a cycle: {string.Join(" -> ", cycle!.Select(i => items[i].Name))}.");
 			return items;
 		}
 
+		var sorted = order.Select(i => items[i]).ToList();
 		var depth = 0;
 		foreach (var item in sorted)
 		{
@@ -437,39 +418,6 @@ internal static class SchedulePlanner
 		}
 
 		return sorted;
-	}
-
-	private static int Compare(StepPlan a, int aIndex, StepPlan b, int bIndex)
-	{
-		var c = a.Order.CompareTo(b.Order);
-		if (c != 0) return c;
-		c = Rank(a).CompareTo(Rank(b));
-		if (c != 0) return c;
-		c = a.RegistrationIndex.CompareTo(b.RegistrationIndex);
-		if (c != 0) return c;
-		c = a.DeclarationIndex.CompareTo(b.DeclarationIndex);
-		if (c != 0) return c;
-		return aIndex.CompareTo(bIndex);
-	}
-
-	// At equal order a scope opens before the steps, so it wraps them.
-	private static int Rank(StepPlan item) => item.Kind == StepKind.Scope ? 0 : 1;
-
-	private static string DescribeCycle(List<StepPlan> items, List<int>[] predecessors, bool[] done)
-	{
-		var start = Array.IndexOf(done, false);
-		var path = new List<int>();
-		var current = start;
-
-		while (!path.Contains(current))
-		{
-			path.Add(current);
-			current = predecessors[current].First(p => !done[p]);
-		}
-
-		var cycle = path.Skip(path.IndexOf(current)).Reverse().ToList();
-		cycle.Add(cycle[0]);
-		return string.Join(" -> ", cycle.Select(i => items[i].Name));
 	}
 
 	private sealed class Context(ScheduleModel model)

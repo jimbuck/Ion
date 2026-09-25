@@ -1,4 +1,7 @@
-﻿using Ion.Core;
+﻿using Microsoft.Extensions.DependencyInjection;
+
+using Ion.Benchmarks.GeneratedApp;
+using Ion.Core;
 
 namespace Ion.Benchmarks;
 
@@ -8,7 +11,9 @@ namespace Ion.Benchmarks;
 /// (a) the runtime schedule with leaf steps (a flat array of delegates, the 0.3 shape),
 /// (b) the same systems in the legacy middleware form, which the schedule runs as nested opaque middleware (the pre-0.3
 ///     shape, and what <c>Ion_ReflectionBoundPipeline</c> measured before 0.3), and
-/// (c) the same middleware chain built by hand with closures (no binder involved).
+/// (c) the same middleware chain built by hand with closures (no binder involved), and
+/// (d) the schedule emitted by the Ion source generator (<c>Ion.Benchmarks.GeneratedApp</c> is compiled with it): one
+///     method per stage calling every step directly.
 /// </summary>
 [MemoryDiagnoser]
 public class PipelineBenchmarks
@@ -25,6 +30,9 @@ public class PipelineBenchmarks
 	private GameLoopDelegate _ionLegacyUpdate = null!;
 	private GameLoopDelegate _manualClosureChain = null!;
 	private CounterSystem[] _flat = null!;
+	private GeneratedBenchmarkApp _generatedApp = null!;
+	private GameLoopDelegate _generatedUpdate = null!;
+	private GeneratedCounterSystem _generatedSystem = null!;
 
 	[GlobalSetup]
 	public void Setup()
@@ -55,6 +63,12 @@ public class PipelineBenchmarks
 
 		_flat = new CounterSystem[SystemCount];
 		Array.Fill(_flat, _system);
+
+		// Generated path: the same systems registered in a project compiled with the generator.
+		_generatedApp = GeneratedApps.Counters(SystemCount);
+		if (!_generatedApp.IsGenerated) throw new InvalidOperationException("The generated schedule is not in use.");
+		_generatedUpdate = _generatedApp.Loop.Update;
+		_generatedSystem = _generatedApp.Application.Services.GetRequiredService<GeneratedCounterSystem>();
 	}
 
 	[GlobalCleanup]
@@ -62,6 +76,7 @@ public class PipelineBenchmarks
 	{
 		_app.Dispose();
 		_legacyApp.Dispose();
+		_generatedApp.Dispose();
 	}
 
 	[Benchmark(Baseline = true)]
@@ -77,6 +92,13 @@ public class PipelineBenchmarks
 	{
 		_ionUpdate(_dt);
 		return _system.Update;
+	}
+
+	[Benchmark]
+	public int Ion_GeneratedSchedule()
+	{
+		_generatedUpdate(_dt);
+		return _generatedSystem.Update;
 	}
 
 	[Benchmark]

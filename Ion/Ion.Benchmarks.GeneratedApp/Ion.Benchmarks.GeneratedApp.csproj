@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The benchmark applications compiled with the Ion schedule generator (Ion.Benchmarks itself is not, so its
+       Ion_* rows keep measuring the runtime-bound schedule). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Optimize>true</Optimize>
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableConfigurationBindingGenerator>false</EnableConfigurationBindingGenerator>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
+  </ItemGroup>
+</Project>

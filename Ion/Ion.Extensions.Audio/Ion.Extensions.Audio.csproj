@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Assets.Abstractions\Ion.Extensions.Assets.Abstractions.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Audio.Abstractions\Ion.Extensions.Audio.Abstractions.csproj" />

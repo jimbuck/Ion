@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot">
+
+  <!-- LangVersion, Nullable, ImplicitUsings and Deterministic come from Directory.Build.props. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Analyzers never publish natively; ignore PublishAot passed on the command line (avoids NETSDK1207). -->
+    <PublishAot>false</PublishAot>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <Platforms>AnyCPU</Platforms>
+    <RootNamespace>Ion.Generators</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Ion.Generators</PackageId>
+    <Description>Compile-time schedule, composition root and interceptors for Ion games.</Description>
+    <PackageTags>ion;game engine;analyzers;source generator</PackageTags>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Roslyn 4.4 is the oldest compiler shipped with a .NET 8 SDK; newer references break 8.0.1xx SDKs (CS9057).
+         Interceptor locations (Roslyn 4.12+) are reached through reflection when the running compiler has them. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shared with the runtime: the stage sort, so both produce the same order. -->
+    <Compile Include="..\Ion.Core.Abstractions\Schedule\ScheduleSorter.cs" Link="Shared\ScheduleSorter.cs" />
+    <!-- Shared minimal source writer. -->
+    <Compile Include="..\Ion.Core.InternalGenerators\SourceWriter.cs" Link="Shared\SourceWriter.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Generators.Tests" />
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+</Project>

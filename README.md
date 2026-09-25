@@ -9,7 +9,7 @@ A small, positively-charged, schedule-based game engine for C#.
 
 ## Requirements
 
-Ion targets `net10.0` and builds with the .NET 10 SDK (pinned in `global.json`, `rollForward: latestFeature`). The source generators target `netstandard2.0` on Roslyn 4.4, so they load in any compiler from the .NET 8 SDK onwards. Games can be published with NativeAOT (`dotnet publish -r <rid> -p:PublishAot=true`).
+Ion targets `net10.0` and builds with the .NET 10 SDK (pinned in `global.json`, `rollForward: latestFeature`). The source generators target `netstandard2.0` on Roslyn 4.4, so they load in any compiler from the .NET 8 SDK onwards; the schedule generator's interceptors need the .NET SDK 9.0.200 or later (see [Compile-time schedule](#compile-time-schedule-source-generator)). Games can be published with NativeAOT (`dotnet publish -r <rid> -p:PublishAot=true`).
 
 ## Systems and the schedule
 
@@ -54,6 +54,62 @@ app.Render(Hud.Draw, order: 50);                                         // a st
 ```
 
 **Legacy middleware.** Methods of the form `void M(GameTime dt, GameLoopDelegate next)` or `GameLoopDelegate M(GameLoopDelegate next)`, and `app.UseUpdate(next => dt => ...)` delegates (including the `UseUpdate<TService...>` overloads), keep working for one release as opaque middleware placed by their order: they wrap every step after them. Building logs `ION010` with the rewrite.
+
+## Compile-time schedule (source generator)
+
+`Ion.Generators` turns the schedule into code at compile time. It ships as an analyzer of the `Ion` and `Ion.Core` packages, whose build props enable its interceptor namespace, so a game that references either package needs no setup. In a project that references the generator by `ProjectReference` instead (as the samples in this repository do), add:
+
+```xml
+<PropertyGroup>
+  <InterceptorsNamespaces>$(InterceptorsNamespaces);Ion.Generated</InterceptorsNamespaces>
+</PropertyGroup>
+<ItemGroup>
+  <ProjectReference Include="path/to/Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+</ItemGroup>
+```
+
+Interceptors need the .NET SDK 9.0.200 or later (Roslyn 4.12); with an older compiler, or without the namespace, the generator reports `ION014` and the game runs on the runtime path.
+
+**What it does.** It intercepts `UseSystem`, function steps (`app.Update(...)`), legacy middleware (`app.UseUpdate(...)`), `UseScene` and `Build()`/`Run()`/`RunFrames()`, and emits:
+
+- **Pre-bound registrations.** Each system is described at compile time (steps, scopes, orders, constraints, diagnostics) with delegates that bind its methods directly, so the runtime plans and binds it without reflection. This is what makes NativeAOT publishing reflection-free.
+- **A generated schedule** for each application (the registrations made on it before `Build()`/`Run()` in the same method) and each scene (its configure callback): one method per stage that calls every step directly, in plan order, with a `try/finally` per scope; systems and injected services are resolved once in its constructor. It is sorted by the same code as the runtime planner (`ScheduleSorter`, shared), so `PrintSchedule()` is identical either way.
+- **Registration summaries.** For every method that takes an application or scene builder (`UseIon()`, `UseNullGraphics()`, your own `UseMyGame(app)`), an assembly attribute lists what it registers, so an application compiled later sees through helpers in other assemblies. Registrations under an `if` are included and guarded.
+- **Diagnostics.** `ION001` to `ION013` become compiler errors and warnings with the runtime's messages, at the offending method (or the registration call).
+
+```csharp
+// Generated for the Render stage of a small game (abridged):
+public override void Render(global::Ion.GameTime dt)
+{
+    _s0.BeginRender(dt);                       // -1000 TraceTimerSystem.BeginRender
+    try
+    {
+        _b1(dt);                                // -850 NullSpriteBatchSystem.Begin (internal: bound delegate)
+        try
+        {
+            _s7.Render(dt);                     // 0 SpriteRendererSystem.Render
+            _s9.RenderScore(dt);                // 0 ScoreSystem.RenderScore
+            if (_g3) _d4(dt);                   // 900 NullWindowSystem.CheckClosed (registered under an if)
+        }
+        finally { _e1(dt); }
+    }
+    finally { _s0.EndRender(dt); }
+}
+```
+
+**When it is used.** At `Build()`, the registrations actually made are aligned with the ones the generator saw (each carries its call site) and the runtime plan is compared with the generated order. If anything differs (a `Type` only known at run time, a plugin, a helper compiled without the generator, a registration made in a loop or through a callback the generator could not follow) the runtime binds the plan itself, from the pre-bound registrations where it has them, and logs why at `Debug` level under `Ion.Schedule`. `loop.Schedule.IsGenerated` tells which path runs. Correctness never depends on the generator seeing everything; only speed does.
+
+**What changes for you.** Stack traces through the schedule show only your frames: every generated type and the engine's dispatch methods are `[StackTraceHidden]`.
+
+```text
+System.InvalidOperationException: Thrown by a user step.
+   at MyGame.ThrowingSystem.Render(GameTime dt) in .../Systems.cs:line 12
+   at Program.<Main>$(String[] args) in .../Program.cs:line 30
+```
+
+Per-frame dispatch is direct calls (32 systems in a stage: 15.7 ns against 13.3 ns for a hand-written loop of direct calls, and 67 ns for the runtime-bound schedule; see `docs/plans/benchmarks/2026-09-25-stage2-generator`). The runtime path remains the reference behaviour and is what runs when the generator is not referenced.
+
+**Limits.** The generator cannot see the output of other source generators, so registrations whose arguments depend on generated code are left to the runtime (the scenes generator's enum overloads are library methods for this reason). `ION006`, `ION008` and `ION009` are reported only for types declared in the project that no service registration call in the project mentions; if a project registers its systems by assembly scanning, turn them off with `dotnet_diagnostic.ION009.severity = none` (the runtime check still applies).
 
 ## Modules
 

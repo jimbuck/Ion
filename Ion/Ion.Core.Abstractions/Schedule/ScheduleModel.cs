@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
@@ -62,6 +63,19 @@ public sealed class ScheduleModel
 	}
 
 	/// <summary>
+	/// Adds a system described at compile time by the Ion source generator: planned like
+	/// <see cref="AddSystem(Type, Type)"/>, without reflection, and bound through the generated delegates.
+	/// </summary>
+	/// <param name="system">The generated description.</param>
+	/// <param name="site">The generated call site (see <see cref="ScheduleEntry.Site"/>).</param>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	public SystemEntry AddSystem(GeneratedSystem system, string? site = null)
+	{
+		ArgumentNullException.ThrowIfNull(system);
+		return Add(new SystemEntry(system), site);
+	}
+
+	/// <summary>
 	/// Adds a function step: <paramref name="bind"/> is called once when the schedule is built and returns the per-frame
 	/// delegate. <paramref name="serviceTypes"/> lists the services it resolves, for validation.
 	/// </summary>
@@ -80,6 +94,28 @@ public sealed class ScheduleModel
 	}
 
 	/// <summary>
+	/// Adds a function step whose name and ordering constraints were computed at compile time by the Ion source generator
+	/// (no reflection over the delegate).
+	/// </summary>
+	/// <param name="stage">The stage to run in.</param>
+	/// <param name="function">The user delegate.</param>
+	/// <param name="serviceTypes">The services <paramref name="bind"/> resolves.</param>
+	/// <param name="bind">Creates the per-frame delegate from the schedule's services.</param>
+	/// <param name="order">The step order.</param>
+	/// <param name="name">The printed name; derived from <paramref name="function"/> when null.</param>
+	/// <param name="after">The <see cref="AfterAttribute{T}"/> targets; read from the delegate's method when null.</param>
+	/// <param name="before">The <see cref="BeforeAttribute{T}"/> targets; read from the delegate's method when null.</param>
+	/// <param name="site">The generated call site (see <see cref="ScheduleEntry.Site"/>).</param>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	public FunctionEntry AddFunction(Stage stage, Delegate function, IReadOnlyList<Type> serviceTypes, Func<IServiceProvider, GameLoopDelegate> bind, int order, string? name, IReadOnlyList<Type>? after, IReadOnlyList<Type>? before, string? site)
+	{
+		ArgumentNullException.ThrowIfNull(function);
+		ArgumentNullException.ThrowIfNull(serviceTypes);
+		ArgumentNullException.ThrowIfNull(bind);
+		return Add(new FunctionEntry(stage, order, name ?? DescribeFunction(function, serviceTypes), function, serviceTypes, bind) { After = after, Before = before }, site);
+	}
+
+	/// <summary>
 	/// Adds a legacy middleware (<c>next =&gt; dt =&gt; { ...; next(dt); }</c>). It wraps every step that sorts after it in
 	/// the stage, and building the schedule logs warning ION010.
 	/// </summary>
@@ -88,6 +124,29 @@ public sealed class ScheduleModel
 		ArgumentNullException.ThrowIfNull(middleware);
 		return Add(new MiddlewareEntry(stage, order, name ?? DescribeDelegate(middleware), middleware));
 	}
+
+	/// <summary>
+	/// Adds a legacy middleware registered through a generated call site (see <see cref="AddMiddleware(Stage, Func{GameLoopDelegate, GameLoopDelegate}, int, string?)"/>).
+	/// </summary>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	public MiddlewareEntry AddMiddleware(Stage stage, Func<GameLoopDelegate, GameLoopDelegate> middleware, int order, string? name, string? site)
+	{
+		ArgumentNullException.ThrowIfNull(middleware);
+		return Add(new MiddlewareEntry(stage, order, name ?? DescribeDelegate(middleware), middleware), site);
+	}
+
+	/// <summary>
+	/// The schedule the Ion source generator emitted for this model, set by generated code before the schedule is built
+	/// (see <see cref="UseGenerated"/>).
+	/// </summary>
+	public GeneratedScheduleFactory? Generated { get; private set; }
+
+	/// <summary>
+	/// Uses <paramref name="factory"/> when the schedule is built, if the registrations made at run time are the ones the
+	/// generator saw; otherwise the runtime binds the plan as usual. Called by generated code.
+	/// </summary>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	public void UseGenerated(GeneratedScheduleFactory? factory) => Generated = factory;
 
 	/// <summary>
 	/// Declares a schedule run by a step of this one (a scene run by the scene system), so that it is validated when this
@@ -136,6 +195,18 @@ public sealed class ScheduleModel
 			LogWarnings(plan, services.GetService<ILoggerFactory>()?.CreateLogger("Ion.Schedule"));
 		}
 
+		if (Generated is { } generated)
+		{
+			var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Ion.Schedule");
+			if (generated.TryCreate(this, plan, services, out var schedule, out var mismatch))
+			{
+				logger?.LogDebug("Schedule '{Schedule}' runs the generated schedule of {Name}.", Name, generated.Name);
+				return new Schedule(plan, schedule);
+			}
+
+			logger?.LogDebug("The generated schedule {Name} is not used for schedule '{Schedule}': {Reason} The runtime binds it instead.", generated.Name, Name, mismatch);
+		}
+
 		return new Schedule(plan, services);
 	}
 
@@ -152,10 +223,11 @@ public sealed class ScheduleModel
 		}
 	}
 
-	private T Add<T>(T entry) where T : ScheduleEntry
+	private T Add<T>(T entry, string? site = null) where T : ScheduleEntry
 	{
 		EnsureNotFrozen(entry.ToString());
 		entry.Index = _entries.Count;
+		entry.Site = site;
 		_entries.Add(entry);
 		return entry;
 	}
@@ -247,6 +319,12 @@ public abstract class ScheduleEntry
 {
 	/// <summary>The registration index (position in <see cref="ScheduleModel.Entries"/>), used to break order ties.</summary>
 	public int Index { get; internal set; }
+
+	/// <summary>
+	/// The call site that made the registration, when it was made by code the Ion source generator intercepted
+	/// (<c>Assembly#n</c>); null for registrations made by reflection-bound calls.
+	/// </summary>
+	public string? Site { get; internal set; }
 }
 
 /// <summary>A system registered with <c>UseSystem</c>.</summary>
@@ -258,6 +336,16 @@ public sealed class SystemEntry : ScheduleEntry
 		ImplementationType = implementationType;
 	}
 
+	internal SystemEntry(GeneratedSystem generated)
+	{
+		ServiceType = generated.ServiceType;
+		ImplementationType = generated.ImplementationType;
+		Generated = generated;
+	}
+
+	/// <summary>The compile-time description, for systems registered by generated code; null for reflection-bound ones.</summary>
+	public GeneratedSystem? Generated { get; }
+
 	/// <summary>The type the instance is resolved as.</summary>
 	public Type ServiceType { get; }
 
@@ -266,7 +354,7 @@ public sealed class SystemEntry : ScheduleEntry
 	public Type ImplementationType { get; }
 
 	/// <inheritdoc/>
-	public override string ToString() => ImplementationType.Name;
+	public override string ToString() => Generated?.Name ?? ImplementationType.Name;
 }
 
 /// <summary>A function step (a delegate with injected parameters).</summary>
@@ -299,6 +387,12 @@ public sealed class FunctionEntry : ScheduleEntry
 
 	/// <summary>Creates the per-frame delegate from the schedule's services.</summary>
 	public Func<IServiceProvider, GameLoopDelegate> Bind { get; }
+
+	/// <summary>The <see cref="AfterAttribute{T}"/> targets computed at compile time; null to read them from the delegate.</summary>
+	public IReadOnlyList<Type>? After { get; internal init; }
+
+	/// <summary>The <see cref="BeforeAttribute{T}"/> targets computed at compile time; null to read them from the delegate.</summary>
+	public IReadOnlyList<Type>? Before { get; internal init; }
 
 	/// <inheritdoc/>
 	public override string ToString() => Name;

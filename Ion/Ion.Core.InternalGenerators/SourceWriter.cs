@@ -44,6 +44,25 @@ internal sealed class SourceWriter
 		WriteLine("}");
 	}
 
+	/// <summary>Closes a block, writing <paramref name="suffix"/> after the brace (for example <c>,</c> or <c>);</c>).</summary>
+	public void CloseBlock(string suffix)
+	{
+		if (_indent == 0) throw new InvalidOperationException("No open block to close.");
+
+		_indent--;
+		WriteLine("}" + suffix);
+	}
+
+	/// <summary>Indents the following lines without writing a brace.</summary>
+	public void OpenIndent() => _indent++;
+
+	/// <summary>Removes one level of indentation opened with <see cref="OpenIndent"/>.</summary>
+	public void CloseIndent()
+	{
+		if (_indent == 0) throw new InvalidOperationException("No open indent to close.");
+		_indent--;
+	}
+
 	public void CloseAllBlocks()
 	{
 		while (_indent > 0) CloseBlock();

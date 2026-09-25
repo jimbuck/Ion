@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+using System.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -106,15 +107,18 @@ public class IonApplication : IIonApplication, IDisposable
 	}
 
 	/// <inheritdoc/>
+	[StackTraceHidden]
 	public void Run() => Run(CancellationToken.None);
 
 	/// <inheritdoc/>
+	[StackTraceHidden]
 	public void Run(CancellationToken cancellationToken)
 	{
 		BuildForRun().Run(cancellationToken);
 	}
 
 	/// <inheritdoc/>
+	[StackTraceHidden]
 	public void RunFrames(int frames)
 	{
 		ArgumentOutOfRangeException.ThrowIfNegative(frames);

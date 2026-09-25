@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Ion.Extensions.Debug;
 
 using Microsoft.Extensions.Options;
@@ -151,6 +152,7 @@ public class GameLoop
 	/// </summary>
 	/// <param name="cancellationToken">Stops the loop (after the current frame) when cancelled.</param>
 	/// <exception cref="InvalidOperationException">The loop is already running.</exception>
+	[StackTraceHidden]
 	public void Run(CancellationToken cancellationToken = default)
 	{
 		RunCore(long.MaxValue, cancellationToken);
@@ -162,12 +164,14 @@ public class GameLoop
 	/// </summary>
 	/// <param name="frames">The number of frames to run. Must not be negative.</param>
 	/// <exception cref="InvalidOperationException">The loop is already running.</exception>
+	[StackTraceHidden]
 	public void RunFrames(int frames)
 	{
 		ArgumentOutOfRangeException.ThrowIfNegative(frames);
 		RunCore(frames, CancellationToken.None);
 	}
 
+	[StackTraceHidden]
 	private void RunCore(long maxFrames, CancellationToken cancellationToken)
 	{
 		if (IsRunning) throw new InvalidOperationException("The game loop is already running.");
@@ -200,6 +204,7 @@ public class GameLoop
 	/// <see cref="Run"/> and <see cref="RunFrames"/>; call it directly only when driving the loop with <see cref="Step()"/>
 	/// (as test hosts do), once, before the first frame.
 	/// </summary>
+	[StackTraceHidden]
 	public void Initialize()
 	{
 		_shouldExit = false;
@@ -221,6 +226,7 @@ public class GameLoop
 	/// Runs the Destroy stage. Called by <see cref="Run"/> and <see cref="RunFrames"/> after the last frame; call it
 	/// directly only when driving the loop with <see cref="Step()"/>, once, after the last frame.
 	/// </summary>
+	[StackTraceHidden]
 	public void Shutdown()
 	{
 		_context.Stage = GameLoopStage.Destroy;
@@ -245,6 +251,7 @@ public class GameLoop
 	/// Last, then frame pacing. Does not run Init or Destroy. Time is measured from the previous frame (or from when the
 	/// loop was created or started) using <see cref="Clock"/>.
 	/// </summary>
+	[StackTraceHidden]
 	public void Step()
 	{
 		var config = _gameConfig.CurrentValue;
@@ -314,6 +321,7 @@ public class GameLoop
 	/// involved, which makes it the cheapest way to drive systems from tests and benchmarks.
 	/// </summary>
 	/// <param name="time">The time passed to every stage.</param>
+	[StackTraceHidden]
 	public void Step(GameTime time)
 	{
 		var context = _context;

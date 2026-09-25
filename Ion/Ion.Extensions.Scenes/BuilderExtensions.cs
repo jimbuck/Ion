@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Ion.Extensions.Scenes;
@@ -20,6 +22,25 @@ public static class BuilderExtensions
 	/// </summary>
 	public static IIonApplication UseScene(this IIonApplication app, int sceneId, Action<ISceneBuilder> configure)
 	{
+		return UseScene(app, sceneId, configure, null);
+	}
+
+	/// <summary>
+	/// Registers a scene identified by an enum value (see <see cref="UseScene(IIonApplication, int, Action{ISceneBuilder})"/>).
+	/// </summary>
+	public static IIonApplication UseScene<TScene>(this IIonApplication app, TScene sceneId, Action<ISceneBuilder> configure) where TScene : struct, Enum
+	{
+		return UseScene(app, Convert.ToInt32(sceneId, System.Globalization.CultureInfo.InvariantCulture), configure, null);
+	}
+
+	/// <summary>
+	/// Registers a scene whose schedule the Ion source generator emitted: <paramref name="generated"/> is used for the
+	/// scene's schedule when the registrations made by <paramref name="configure"/> are the ones the generator saw (see
+	/// <see cref="GeneratedScheduleFactory"/>). Called by generated code.
+	/// </summary>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	public static IIonApplication UseScene(this IIonApplication app, int sceneId, Action<ISceneBuilder> configure, GeneratedScheduleFactory? generated)
+	{
 		ArgumentNullException.ThrowIfNull(app);
 		ArgumentNullException.ThrowIfNull(configure);
 
@@ -27,6 +48,7 @@ public static class BuilderExtensions
 		sceneSystem.Register(sceneId, (config, services) =>
 		{
 			var sceneBuilder = new SceneBuilder(sceneId, config, services);
+			sceneBuilder.Schedule.UseGenerated(generated);
 			configure(sceneBuilder);
 			return sceneBuilder.Build();
 		});
@@ -35,6 +57,7 @@ public static class BuilderExtensions
 		{
 			using var scope = (services ?? app.Services).CreateScope();
 			var sceneBuilder = new SceneBuilder(sceneId, app.Configuration, scope.ServiceProvider);
+			sceneBuilder.Schedule.UseGenerated(generated);
 			configure(sceneBuilder);
 			return sceneBuilder.Schedule.Plan(services is null ? null : scope.ServiceProvider);
 		});

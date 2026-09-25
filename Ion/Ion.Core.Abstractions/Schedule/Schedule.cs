@@ -40,8 +40,46 @@ public sealed class Schedule
 		Destroy = _stages[6].Entry;
 	}
 
+	/// <summary>
+	/// Runs <paramref name="plan"/> with the stage methods of a <see cref="Ion.GeneratedSchedule"/> emitted by the source
+	/// generator (normally created by <see cref="ScheduleModel.Build"/> once the generated schedule matched the plan).
+	/// </summary>
+	public Schedule(SchedulePlan plan, GeneratedSchedule generated)
+	{
+		ArgumentNullException.ThrowIfNull(plan);
+		ArgumentNullException.ThrowIfNull(generated);
+
+		Plan = plan;
+		Generated = generated;
+
+		Init = generated.Init;
+		First = generated.First;
+		FixedUpdate = generated.FixedUpdate;
+		Update = generated.Update;
+		Render = generated.Render;
+		Last = generated.Last;
+		Destroy = generated.Destroy;
+
+		_stages[0] = new StageRunner([Init]);
+		_stages[1] = new StageRunner([First]);
+		_stages[2] = new StageRunner([FixedUpdate]);
+		_stages[3] = new StageRunner([Update]);
+		_stages[4] = new StageRunner([Render]);
+		_stages[5] = new StageRunner([Last]);
+		_stages[6] = new StageRunner([Destroy]);
+	}
+
 	/// <summary>The plan this schedule was bound from.</summary>
 	public SchedulePlan Plan { get; }
+
+	/// <summary>
+	/// The generated schedule whose stage methods this schedule runs, or null when the runtime bound the plan itself
+	/// (the generator is not referenced, or the registrations differ from what it saw).
+	/// </summary>
+	public GeneratedSchedule? Generated { get; }
+
+	/// <summary>Whether the stages run the generated stage methods (see <see cref="Generated"/>).</summary>
+	public bool IsGenerated => Generated is not null;
 
 	/// <summary>Runs the Init stage.</summary>
 	public GameLoopDelegate Init { get; }
@@ -110,25 +148,33 @@ public sealed class Schedule
 			if (wrapper.Kind == StepKind.Scope)
 			{
 				var instance = Instance(wrapper);
+				if (wrapper.Generated is { } scope)
+				{
+					return new StageRunner([.. leaves], scope.Bind!(scope.IsStatic ? null : instance, services), scope.BindEnd!(scope.EndIsStatic ? null : instance, services), inner);
+				}
+
 				return new StageRunner([.. leaves], Bind(instance, wrapper.Method!), Bind(instance, wrapper.EndMethod!), inner);
 			}
 
 			// A middleware's next is the inner runner's entry: the next middleware or the single step directly when that is
 			// all the inner runner does, so a chain of legacy middleware costs what it did before 0.3.
-			var middleware = wrapper.Middleware?.Middleware ?? BindLegacy(Instance(wrapper), wrapper.Method!);
+			var middleware = wrapper.Middleware?.Middleware
+				?? (wrapper.Generated is { } legacy ? legacy.BindMiddleware!(legacy.IsStatic ? null : Instance(wrapper), services) : null)
+				?? BindLegacy(Instance(wrapper), wrapper.Method!);
 			return new StageRunner([.. leaves], middleware(inner.Entry));
 		}
 
 		private GameLoopDelegate BindLeaf(StepPlan step)
 		{
 			if (step.Function is { } function) return function.Bind(services);
+			if (step.Generated is { } generated) return generated.Bind!(generated.IsStatic ? null : Instance(step), services);
 			return Bind(Instance(step), step.Method!);
 		}
 
 		private object? Instance(StepPlan step)
 		{
 			if (step.System is not { } system) return null;
-			if (step.Method is { IsStatic: true } && (step.EndMethod is null || step.EndMethod.IsStatic)) return null;
+			if (!step.NeedsInstance) return null;
 
 			if (!_instances.TryGetValue(system, out var instance))
 			{
@@ -149,8 +195,7 @@ public sealed class Schedule
 					return method.CreateDelegate<GameLoopDelegate>(target);
 
 				case SignatureKind.NoArguments:
-					var action = method.CreateDelegate<Action>(target);
-					return _ => action();
+					return StepAdapters.FromAction(method.CreateDelegate<Action>(target));
 
 				case SignatureKind.Injected:
 					var parameters = method.GetParameters();
@@ -178,8 +223,7 @@ public sealed class Schedule
 				return method.CreateDelegate<Func<GameLoopDelegate, GameLoopDelegate>>(target);
 			}
 
-			var middleware = method.CreateDelegate<Action<GameTime, GameLoopDelegate>>(target);
-			return next => dt => middleware(dt, next);
+			return StepAdapters.FromMiddleware(method.CreateDelegate<Action<GameTime, GameLoopDelegate>>(target));
 		}
 	}
 

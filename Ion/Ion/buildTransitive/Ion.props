@@ -1,0 +1,9 @@
+<Project>
+  <!--
+    The Ion schedule generator (shipped in this package as an analyzer) emits C# interceptors in the Ion.Generated
+    namespace; the compiler only accepts interceptors in namespaces listed here.
+  -->
+  <PropertyGroup>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Ion.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+</Project>

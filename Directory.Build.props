@@ -11,6 +11,9 @@
     <Deterministic>true</Deterministic>
     <!-- Warnings stay warnings; WarningLevel is left at the SDK default. -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- The Ion schedule generator (Ion.Generators) emits its interceptors in Ion.Generated. Games get this from the Ion
+         package's build props; the engine, samples and tests set it here. Harmless where the generator is not referenced. -->
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Ion.Generated</InterceptorsNamespaces>
   </PropertyGroup>
 
   <!--

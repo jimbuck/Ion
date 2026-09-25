@@ -187,8 +187,23 @@ public sealed class StepPlan
 	/// <summary>The system of a step, scope or middleware method; null for functions and middleware delegates.</summary>
 	public SystemEntry? System { get; internal init; }
 
-	/// <summary>The step method, the scope's begin method, or the middleware method.</summary>
+	/// <summary>The step method, the scope's begin method, or the middleware method (null for generated systems, see <see cref="Generated"/>).</summary>
 	public MethodInfo? Method { get; internal init; }
+
+	/// <summary>The name of the step method, the scope's begin method, or the middleware method; null for functions and middleware delegates.</summary>
+	public string? MethodName { get; internal init; }
+
+	/// <summary>The compile-time description of the step, for systems registered by generated code.</summary>
+	public GeneratedStep? Generated { get; internal init; }
+
+	/// <summary>Whether running the item needs the system instance (a non-static step, begin or end method).</summary>
+	public bool NeedsInstance { get; internal init; }
+
+	/// <summary>The services injected into the step (and the scope's end method), in parameter order.</summary>
+	public IReadOnlyList<Type> Services { get; internal init; } = [];
+
+	/// <summary>The services injected into a scope's end method.</summary>
+	public IReadOnlyList<Type> EndServices { get; internal init; } = [];
 
 	/// <summary>The scope's end method.</summary>
 	public MethodInfo? EndMethod { get; internal init; }

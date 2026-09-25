@@ -1,3 +1,4 @@
+using Ion.Benchmarks.GeneratedApp;
 using Ion.Core;
 using Ion.Extensions.Debug;
 using Ion.Extensions.Scenes;
@@ -20,6 +21,7 @@ public class FullFrameBenchmarks
 	private GameLoop _eightSystems = null!;
 	private GameLoop _eightSystemsWithTrace = null!;
 	private GameLoop _eightSystemsInScene = null!;
+	private GeneratedBenchmarkApp _eightSystemsGenerated = null!;
 
 	[GlobalSetup]
 	public void Setup()
@@ -45,12 +47,18 @@ public class FullFrameBenchmarks
 		events.EmitChangeScene(1);
 		_eightSystemsInScene.Init(_dt);
 		_eightSystemsInScene.Step(_dt);
+
+		// The same shape compiled with the Ion source generator: every stage is one method of direct calls.
+		_eightSystemsGenerated = GeneratedApps.EightStageSystems();
+		if (!_eightSystemsGenerated.IsGenerated) throw new InvalidOperationException("The generated schedule is not in use.");
+		_eightSystemsGenerated.Loop.Initialize();
 	}
 
 	[GlobalCleanup]
 	public void Cleanup()
 	{
 		foreach (var app in _apps) app.Dispose();
+		_eightSystemsGenerated.Dispose();
 		_apps.Clear();
 	}
 
@@ -65,6 +73,9 @@ public class FullFrameBenchmarks
 
 	[Benchmark]
 	public void Step_8Systems() => _eightSystems.Step(_dt);
+
+	[Benchmark]
+	public void Step_8Systems_GeneratedSchedule() => _eightSystemsGenerated.Loop.Step(_dt);
 
 	[Benchmark]
 	public void Step_8Systems_DebugTraceInstalled() => _eightSystemsWithTrace.Step(_dt);

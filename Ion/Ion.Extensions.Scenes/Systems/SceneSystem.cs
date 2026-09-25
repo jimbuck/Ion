@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -51,6 +52,7 @@ public sealed class SceneSystem(
 		_scenesBuilders[sceneId] = sceneBuilderFactory;
 	}
 
+	[StackTraceHidden]
 	private void _loadNextScene(GameTime dt)
 	{
 		if (_nextSceneId == CurrentSceneId) return;
@@ -79,6 +81,7 @@ public sealed class SceneSystem(
 	/// <summary>
 	/// Loads the first scene (running its Init stage), or runs the active scene's Init stage again.
 	/// </summary>
+	[StackTraceHidden]
 	[Init(Order = StageOrder.Scenes)]
 	public void Init(GameTime dt)
 	{
@@ -104,6 +107,7 @@ public sealed class SceneSystem(
 	/// <summary>
 	/// Switches scene when a <see cref="ChangeSceneEvent"/> asked for it, then runs the active scene's First stage.
 	/// </summary>
+	[StackTraceHidden]
 	[First(Order = StageOrder.Scenes)]
 	public void First(GameTime dt)
 	{
@@ -118,6 +122,7 @@ public sealed class SceneSystem(
 	}
 
 	/// <summary>Runs the active scene's FixedUpdate stage.</summary>
+	[StackTraceHidden]
 	[FixedUpdate(Order = StageOrder.Scenes)]
 	public void FixedUpdate(GameTime dt)
 	{
@@ -127,6 +132,7 @@ public sealed class SceneSystem(
 	}
 
 	/// <summary>Runs the active scene's Update stage.</summary>
+	[StackTraceHidden]
 	[Update(Order = StageOrder.Scenes)]
 	public void Update(GameTime dt)
 	{
@@ -136,6 +142,7 @@ public sealed class SceneSystem(
 	}
 
 	/// <summary>Runs the active scene's Render stage.</summary>
+	[StackTraceHidden]
 	[Render(Order = StageOrder.Scenes)]
 	public void Render(GameTime dt)
 	{
@@ -145,6 +152,7 @@ public sealed class SceneSystem(
 	}
 
 	/// <summary>Runs the active scene's Last stage.</summary>
+	[StackTraceHidden]
 	[Last(Order = StageOrder.Scenes)]
 	public void Last(GameTime dt)
 	{
@@ -154,6 +162,7 @@ public sealed class SceneSystem(
 	}
 
 	/// <summary>Runs the active scene's Destroy stage (once).</summary>
+	[StackTraceHidden]
 	[Destroy(Order = StageOrder.Scenes)]
 	public void Destroy(GameTime dt)
 	{
