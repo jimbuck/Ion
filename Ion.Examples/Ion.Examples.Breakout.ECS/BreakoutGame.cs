@@ -67,7 +67,9 @@ public static class BreakoutGame
 						.AddSingleton<BlockSystem>()
 						.AddSingleton<PhysicsManager>()
 						.AddSingleton<PhysicsSystem>()
-						.AddSingleton<LevelSystem>();
+						.AddSingleton<LevelSystem>()
+						// The ECS hook of the frame stats: FrameStats.Entities (frame log, overlay, dotnet-counters).
+						.AddSingleton<IFrameStatsSource, EntityStatsSource>();
 
 		// The game runs in the root schedule (no scenes), so its systems are singletons: a scoped system there is error ION006.
 		if (builder.Configuration.IsHeadless()) builder.Services.AddSingleton<HeadlessAutopilotSystem>();
@@ -127,4 +129,10 @@ public static class BreakoutGame
 			_componentsRegistered = true;
 		}
 	}
+}
+
+/// <summary>Writes the number of live Arch entities into every frame's <see cref="FrameStats.Entities"/>.</summary>
+internal sealed class EntityStatsSource(World world) : IFrameStatsSource
+{
+	public void Collect(ref FrameStats stats) => stats.Entities = world.Size;
 }

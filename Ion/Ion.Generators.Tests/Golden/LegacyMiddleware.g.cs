@@ -162,13 +162,19 @@ namespace Ion.Generated
 		private readonly global::Ion.GameLoopDelegate _next_Last_2;
 		private readonly global::Ion.GameLoopDelegate _m2;
 		private readonly global::Leaf _s1;
+		private readonly global::Ion.FrameProfiler _prof;
+		private readonly global::Ion.SpanId _span0;
 		private readonly global::Ion.GameLoopDelegate _next_Update_3;
 		private readonly global::Ion.GameLoopDelegate _m4;
+		private readonly global::Ion.SpanId _span1;
 
 		public Schedule0(global::Ion.GeneratedScheduleContext context)
 		{
 			_s0 = context.System<global::Wrapper>(0);
 			_s1 = context.System<global::Leaf>(1);
+			_prof = context.Profiler;
+			_span0 = global::Ion.MetricsIds.Register("Leaf.Tick");
+			_span1 = global::Ion.MetricsIds.Register("Leaf.Draw");
 			_next_Update_0 = new global::Ion.GameLoopDelegate(Update_0);
 			_next_Render_1 = new global::Ion.GameLoopDelegate(Render_1);
 			_next_Last_2 = new global::Ion.GameLoopDelegate(Last_2);
@@ -222,7 +228,11 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		private void Update_0(global::Ion.GameTime dt)
 		{
-			_s1.Tick(dt); // 0 Leaf.Tick
+			{
+				long t0 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span0) : 0L;
+				_s1.Tick(dt); // 0 Leaf.Tick
+				if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span0, t0);
+			}
 			// 0 App.lambda (legacy middleware, wraps the rest of the stage)
 			_m4(dt);
 		}
@@ -230,7 +240,11 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		private void Render_1(global::Ion.GameTime dt)
 		{
-			_s1.Draw(dt); // 0 Leaf.Draw
+			{
+				long t1 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span1) : 0L;
+				_s1.Draw(dt); // 0 Leaf.Draw
+				if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span1, t1);
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]

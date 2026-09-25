@@ -23,6 +23,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
-    <ProjectReference Include="..\Ion.Extensions.Debug\Ion.Extensions.Debug.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Metrics\Ion.Extensions.Metrics.csproj" />
   </ItemGroup>
 </Project>

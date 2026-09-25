@@ -7,6 +7,7 @@ using Ion;
 using Ion.Extensions.Assets;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Audio;
+using Ion.Extensions.Metrics;
 
 using World = Arch.Core.World;
 using Vector2 = System.Numerics.Vector2;
@@ -26,6 +27,11 @@ BreakoutGame.Configure(builder);
 
 using var game = builder.Build();
 BreakoutGame.Use(game);
+
+#if TRACY
+// Built with -p:IonTracy=true: stream every span, frame mark and counter to a Tracy server.
+Ion.Extensions.Metrics.Tracy.TracyExtensions.UseMetricsTracy(game);
+#endif
 
 game.Run();
 
@@ -137,8 +143,12 @@ public class LevelSystem(IWindow window, PhysicsManager physics, IEvents events)
 	}
 }
 
-public class ScoreSystem(IEvents events, IAssetManager assets, ISpriteBatch spriteBatch, World world)
+public class ScoreSystem(IEvents events, IAssetManager assets, ISpriteBatch spriteBatch, World world, IMetrics metrics)
 {
+	// Game metrics: registered once by name, updated through the handles (frame log, overlay, dotnet-counters).
+	private readonly MetricsGauge _ballsMetric = metrics.Gauge("balls");
+	private readonly MetricsCounter _blocksHitMetric = metrics.Counter("blocks_hit");
+
 	private EventReader<BlockHitEvent> _blockHits = events.Reader<BlockHitEvent>();
 	private EventReader<BallLostEvent> _ballsLost = events.Reader<BallLostEvent>();
 
@@ -167,7 +177,9 @@ public class ScoreSystem(IEvents events, IAssetManager assets, ISpriteBatch spri
 	[First]
 	public void UpdateScore(GameTime dt)
 	{
-		_score += 10 * _blockHits.Read().Length;
+		var hits = _blockHits.Read().Length;
+		_score += 10 * hits;
+		_blocksHitMetric.Add(hits);
 		_lost += _ballsLost.Read().Length;
 	}
 
@@ -175,6 +187,7 @@ public class ScoreSystem(IEvents events, IAssetManager assets, ISpriteBatch spri
 	public void Update(GameTime dt)
 	{
 		_ballCount = world.CountEntities(in _ballQuery);
+		_ballsMetric.Set(_ballCount);
 	}
 
 	[Render]

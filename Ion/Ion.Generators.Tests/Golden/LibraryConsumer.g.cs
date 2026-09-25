@@ -102,17 +102,25 @@ namespace Ion.Generated
 	[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 	file sealed class Schedule0 : global::Ion.GeneratedSchedule
 	{
+		private readonly global::Ion.FrameProfiler _prof;
 		private readonly global::Plugin.PluginSystem _s0;
+		private readonly global::Ion.SpanId _span0;
 		private readonly global::Game _s2;
+		private readonly global::Ion.SpanId _span1;
 		private readonly bool _g1;
 		private readonly global::Ion.GameLoopDelegate _d2;
+		private readonly global::Ion.SpanId _span2;
 
 		public Schedule0(global::Ion.GeneratedScheduleContext context)
 		{
+			_prof = context.Profiler;
 			_s0 = context.System<global::Plugin.PluginSystem>(0);
+			_span0 = global::Ion.MetricsIds.Register("PluginSystem.Tick");
 			_s2 = context.System<global::Game>(2);
+			_span1 = global::Ion.MetricsIds.Register("Game.Tick");
 			_g1 = context.IsActive(1);
 			_d2 = context.Step(1, global::Ion.Stage.Render, "Draw", 0);
+			_span2 = global::Ion.MetricsIds.Register("HiddenSystem.Draw");
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -133,14 +141,42 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Update(global::Ion.GameTime dt)
 		{
-			_s0.Tick(dt); // -100 PluginSystem.Tick
-			_s2.Tick(dt); // 0 Game.Tick
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t0 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span0) : 0L;
+					_s0.Tick(dt); // -100 PluginSystem.Tick
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span0, t0);
+				}
+				{
+					long t1 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span1) : 0L;
+					_s2.Tick(dt); // 0 Game.Tick
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span1, t1);
+				}
+			}
+			else
+			{
+				_s0.Tick(dt); // -100 PluginSystem.Tick
+				_s2.Tick(dt); // 0 Game.Tick
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Render(global::Ion.GameTime dt)
 		{
-			if (_g1) _d2(dt); // 0 HiddenSystem.Draw
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g1)
+				{
+					long t2 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span2) : 0L;
+					_d2(dt); // 0 HiddenSystem.Draw
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span2, t2);
+				}
+			}
+			else
+			{
+				if (_g1) _d2(dt); // 0 HiddenSystem.Draw
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]

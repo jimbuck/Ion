@@ -1,5 +1,3 @@
-using Ion.Extensions.Debug;
-
 namespace Ion;
 
 /// <summary>
@@ -10,13 +8,13 @@ namespace Ion;
 internal partial class EventSystem
 {
 	private readonly EventBus _events;
-	private readonly ITraceTimer _trace;
+	private readonly FrameProfiler _profiler;
 	private readonly ILogger _logger;
 
-	public EventSystem(EventBus events, ITraceTimer<EventSystem> trace, ILogger<EventSystem> logger)
+	public EventSystem(EventBus events, FrameProfiler profiler, ILogger<EventSystem> logger)
 	{
 		_events = events;
-		_trace = trace;
+		_profiler = profiler;
 		_logger = logger;
 		events.ChannelGrew += OnChannelGrew;
 	}
@@ -24,9 +22,8 @@ internal partial class EventSystem
 	[Last(Order = StageOrder.Events)]
 	public void StepEvents(GameTime dt)
 	{
-		var timer = _trace.Start("Step");
+		using var _ = _profiler.Scope(SpanIds.EventsStep);
 		_events.Step();
-		timer.Stop();
 	}
 
 	private void OnChannelGrew(EventChannel channel) => LogChannelGrew(_logger, channel.Id, channel.EventType.Name, channel.Capacity);

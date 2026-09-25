@@ -1,5 +1,7 @@
-﻿using Ion.Debug;
+﻿
 using Ion.Extensions.Debug;
+
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,7 +36,13 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 		Services.Configure<StorageConfig>(Configuration.GetSection("Ion:Storage"));
 		Services.Configure<InputConfig>(Configuration.GetSection("Ion:Input"));
 
-		Services.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(NullTraceTimer<>)));
+		// Metrics: a profiler without history until AddMetrics replaces it (the loop then opens a profile per frame).
+		Services.TryAddSingleton(FrameProfiler.Disabled);
+		Services.AddSingleton<IStepProfiler>(static sp => sp.GetRequiredService<FrameProfiler>());
+		Services.AddSingleton<IFrameStatsSource, EventStatsSource>();
+#pragma warning disable CS0618 // The obsolete trace timers stay registered for one release, as adapters over the profiler.
+		Services.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(TraceTimerAdapter<>)));
+#pragma warning restore CS0618
 		Services.AddSingleton<IClock, StopwatchClock>();
 		Services.AddSingleton<GameLoopContext>();
 		Services.AddSingleton<ILoopContext>(static sp => sp.GetRequiredService<GameLoopContext>());

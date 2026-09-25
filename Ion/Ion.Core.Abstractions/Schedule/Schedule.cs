@@ -24,7 +24,7 @@ public sealed class Schedule
 		ArgumentNullException.ThrowIfNull(services);
 
 		Plan = plan;
-		var binder = new Binder(services);
+		var binder = new Binder(services, FrameProfiler.IsProfilingEnabled && services.GetService<IStepProfiler>() is { CanRecord: true } profiler ? profiler : null);
 
 		foreach (var stage in plan.Stages)
 		{
@@ -125,22 +125,25 @@ public sealed class Schedule
 	/// <inheritdoc/>
 	public override string ToString() => Plan.Print();
 
-	private sealed class Binder(IServiceProvider services)
+	private sealed class Binder(IServiceProvider services, IStepProfiler? profiler)
 	{
 		private readonly Dictionary<SystemEntry, object> _instances = [];
 
 		public StageRunner BuildRunner(IReadOnlyList<StepPlan> steps, int start)
 		{
 			var leaves = new List<GameLoopDelegate>();
+			var ids = new List<SpanId>();
 			var i = start;
 
 			while (i < steps.Count && !steps[i].Wraps)
 			{
 				leaves.Add(BindLeaf(steps[i]));
+				if (profiler is not null) ids.Add(MetricsIds.Register(steps[i].Name));
 				i++;
 			}
 
-			if (i == steps.Count) return new StageRunner([.. leaves]);
+			var profiling = profiler is null ? null : new StageProfiling(profiler, [.. ids], i < steps.Count ? MetricsIds.Register(steps[i].Name) : default);
+			if (i == steps.Count) return new StageRunner([.. leaves], profiling);
 
 			var wrapper = steps[i];
 			var inner = BuildRunner(steps, i + 1);
@@ -150,10 +153,10 @@ public sealed class Schedule
 				var instance = Instance(wrapper);
 				if (wrapper.Generated is { } scope)
 				{
-					return new StageRunner([.. leaves], scope.Bind!(scope.IsStatic ? null : instance, services), scope.BindEnd!(scope.EndIsStatic ? null : instance, services), inner);
+					return new StageRunner([.. leaves], scope.Bind!(scope.IsStatic ? null : instance, services), scope.BindEnd!(scope.EndIsStatic ? null : instance, services), inner, profiling);
 				}
 
-				return new StageRunner([.. leaves], Bind(instance, wrapper.Method!), Bind(instance, wrapper.EndMethod!), inner);
+				return new StageRunner([.. leaves], Bind(instance, wrapper.Method!), Bind(instance, wrapper.EndMethod!), inner, profiling);
 			}
 
 			// A middleware's next is the inner runner's entry: the next middleware or the single step directly when that is
@@ -161,7 +164,7 @@ public sealed class Schedule
 			var middleware = wrapper.Middleware?.Middleware
 				?? (wrapper.Generated is { } legacy ? legacy.BindMiddleware!(legacy.IsStatic ? null : Instance(wrapper), services) : null)
 				?? BindLegacy(Instance(wrapper), wrapper.Method!);
-			return new StageRunner([.. leaves], middleware(inner.Entry));
+			return new StageRunner([.. leaves], middleware(inner.Entry), profiling);
 		}
 
 		private GameLoopDelegate BindLeaf(StepPlan step)
@@ -239,8 +242,22 @@ public sealed class Schedule
 }
 
 /// <summary>
+/// How a <see cref="StageRunner"/> times its items: the profiler, a span id per leaf step and the scope's span id.
+/// </summary>
+internal sealed class StageProfiling(IStepProfiler profiler, SpanId[] steps, SpanId scope)
+{
+	public IStepProfiler Profiler { get; } = profiler;
+
+	public SpanId[] Steps { get; } = steps;
+
+	public SpanId Scope { get; } = scope;
+}
+
+/// <summary>
 /// Runs one stage: the leaf steps in order, then either nothing, a scope (<c>Begin</c>, the inner runner, <c>End</c> in a
-/// <c>finally</c>), or a legacy middleware (whose <c>next</c> is the inner runner's <see cref="Entry"/>).
+/// <c>finally</c>), or a legacy middleware (whose <c>next</c> is the inner runner's <see cref="Entry"/>). With
+/// <see cref="StageProfiling"/>, every leaf step and the scope (from its begin to its end) is recorded as a span while the
+/// profiler is active.
 /// </summary>
 internal sealed class StageRunner
 {
@@ -251,31 +268,35 @@ internal sealed class StageRunner
 	private readonly GameLoopDelegate? _end;
 	private readonly GameLoopDelegate? _middleware;
 	private readonly StageRunner? _inner;
+	private readonly StageProfiling? _profiling;
 
-	public StageRunner(GameLoopDelegate[] steps)
+	public StageRunner(GameLoopDelegate[] steps, StageProfiling? profiling = null)
 	{
 		_steps = steps;
+		_profiling = FrameProfiler.IsProfilingEnabled && steps.Length > 0 ? profiling : null;
 		Entry = steps.Length switch
 		{
 			0 => Empty,
-			1 => steps[0],
+			1 when _profiling is null => steps[0],
 			_ => RunSteps,
 		};
 	}
 
-	public StageRunner(GameLoopDelegate[] steps, GameLoopDelegate begin, GameLoopDelegate end, StageRunner inner)
+	public StageRunner(GameLoopDelegate[] steps, GameLoopDelegate begin, GameLoopDelegate end, StageRunner inner, StageProfiling? profiling = null)
 	{
 		_steps = steps;
 		_begin = begin;
 		_end = end;
 		_inner = inner;
+		_profiling = FrameProfiler.IsProfilingEnabled ? profiling : null;
 		Entry = RunScope;
 	}
 
-	public StageRunner(GameLoopDelegate[] steps, GameLoopDelegate middleware)
+	public StageRunner(GameLoopDelegate[] steps, GameLoopDelegate middleware, StageProfiling? profiling = null)
 	{
 		_steps = steps;
 		_middleware = middleware;
+		_profiling = FrameProfiler.IsProfilingEnabled && steps.Length > 0 ? profiling : null;
 		Entry = steps.Length == 0 ? middleware : RunMiddleware;
 	}
 
@@ -288,14 +309,35 @@ internal sealed class StageRunner
 	private void RunSteps(GameTime dt)
 	{
 		var steps = _steps;
+		if (FrameProfiler.IsProfilingEnabled && _profiling is { } profiling && profiling.Profiler.IsActive)
+		{
+			RunStepsProfiled(dt, profiling);
+			return;
+		}
+
 		for (var i = 0; i < steps.Length; i++) steps[i](dt);
+	}
+
+	[StackTraceHidden]
+	private void RunStepsProfiled(GameTime dt, StageProfiling profiling)
+	{
+		var steps = _steps;
+		var profiler = profiling.Profiler;
+		var ids = profiling.Steps;
+		for (var i = 0; i < steps.Length; i++)
+		{
+			var start = profiler.Begin(ids[i]);
+			steps[i](dt);
+			profiler.End(ids[i], start);
+		}
 	}
 
 	[StackTraceHidden]
 	private void RunMiddleware(GameTime dt)
 	{
 		var steps = _steps;
-		for (var i = 0; i < steps.Length; i++) steps[i](dt);
+		if (FrameProfiler.IsProfilingEnabled && _profiling is { } stepProfiling && stepProfiling.Profiler.IsActive) RunStepsProfiled(dt, stepProfiling);
+		else for (var i = 0; i < steps.Length; i++) steps[i](dt);
 		_middleware!(dt);
 	}
 
@@ -303,7 +345,11 @@ internal sealed class StageRunner
 	private void RunScope(GameTime dt)
 	{
 		var steps = _steps;
-		for (var i = 0; i < steps.Length; i++) steps[i](dt);
+		if (FrameProfiler.IsProfilingEnabled && _profiling is { } stepProfiling && stepProfiling.Profiler.IsActive) RunStepsProfiled(dt, stepProfiling);
+		else for (var i = 0; i < steps.Length; i++) steps[i](dt);
+
+		var profiling = FrameProfiler.IsProfilingEnabled ? _profiling : null;
+		var start = profiling is null ? 0 : profiling.Profiler.Begin(profiling.Scope);
 
 		_begin!(dt);
 		try
@@ -313,6 +359,7 @@ internal sealed class StageRunner
 		finally
 		{
 			_end!(dt);
+			if (profiling is not null) profiling.Profiler.End(profiling.Scope, start);
 		}
 	}
 }

@@ -5,8 +5,10 @@ namespace Ion.Extensions.Graphics;
 internal class SpriteBatch(
 	SpriteRenderer spriteRenderer,
 	FontRenderer fontRenderer
-) : ISpriteBatch
+) : ISpriteBatch, ISpriteBatchStatistics
 {
+	/// <inheritdoc/>
+	public SpriteBatchStatistics LastFrameStatistics => spriteRenderer.LastFrameStatistics;
 
 	public void Initialize()
 	{

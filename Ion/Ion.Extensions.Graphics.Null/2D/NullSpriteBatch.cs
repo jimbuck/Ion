@@ -94,7 +94,7 @@ public interface ISpriteBatchStats
 /// <see cref="LastFrame"/> holds what was drawn during it. Registered by <c>AddNullGraphics</c>; resolve it as
 /// <see cref="NullSpriteBatch"/> to read the statistics.
 /// </summary>
-public sealed class NullSpriteBatch : ISpriteBatch
+public sealed class NullSpriteBatch : ISpriteBatch, ISpriteBatchStatistics
 {
 	/// <summary>
 	/// The default for <see cref="CommandCapacity"/>.
@@ -112,6 +112,7 @@ public sealed class NullSpriteBatch : ISpriteBatch
 		public int Rects { get; set; }
 		public int Points { get; set; }
 		public int Lines { get; set; }
+		public int Glyphs { get; set; }
 		public IReadOnlyList<SpriteBatchCommand> Commands => CommandList;
 	}
 
@@ -140,6 +141,20 @@ public sealed class NullSpriteBatch : ISpriteBatch
 	/// The last completed frame. Before the first <see cref="End"/> it is empty with a <see cref="ISpriteBatchStats.Frame"/> of -1.
 	/// </summary>
 	public ISpriteBatchStats LastFrame => _last;
+
+	/// <summary>
+	/// <see cref="LastFrame"/> as metrics: every call is a draw call (nothing is batched), every sprite, rectangle, point,
+	/// line and non-whitespace glyph is a quad of two triangles.
+	/// </summary>
+	public SpriteBatchStatistics LastFrameStatistics
+	{
+		get
+		{
+			var last = _last;
+			var quads = last.Sprites + last.Rects + last.Points + last.Lines + last.Glyphs;
+			return new SpriteBatchStatistics(last.Frame, last.DrawCalls, quads, quads * 2);
+		}
+	}
 
 	/// <summary>
 	/// Starts recording a new frame, discarding anything drawn since the last <see cref="End"/>.
@@ -174,6 +189,7 @@ public sealed class NullSpriteBatch : ISpriteBatch
 	public void DrawString(IFont font, string text, Vector2 textPosition, Color color = default, float depth = 0, Vector2 origin = default, float rotation = 0, float scale = 1, SpriteEffect options = SpriteEffect.None)
 	{
 		_current.Strings++;
+		foreach (var c in text) if (!char.IsWhiteSpace(c)) _current.Glyphs++;
 		_record(new SpriteBatchCommand(SpriteBatchCommandKind.String, textPosition, font.MeasureString(text) * scale, color, rotation, depth, Font: font, Text: text));
 	}
 

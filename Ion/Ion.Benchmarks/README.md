@@ -7,9 +7,9 @@ BenchmarkDotNet micro-benchmarks that measure the engine's own per-frame overhea
 | `PipelineBenchmarks` | Dispatch cost of the reflection-bound middleware chain for 1/8/32 systems vs a hand-built closure chain vs direct calls |
 | `PipelineBuildBenchmarks` | Startup cost of building the host, binding systems and building the seven stage pipelines |
 | `InliningBenchmarks` | Closure chain vs a struct-generic (constrained call) chain prototype vs direct calls, depth 8 |
-| `FullFrameBenchmarks` | One headless `GameLoop.Step` with events only, with 8 systems, with the Debug trace package, and inside a scene scope |
+| `FullFrameBenchmarks` | One headless `GameLoop.Step` with events only, with 8 systems (runtime and generated schedule), with the metrics module, with a frame profiler (stats only, and profiling every step), and inside a scene scope |
 | `EventBenchmarks` | Emit/read cost and allocations of Events v2: the runtime `EventBus` (direct and through `IEvents`), the generated bus of `Ion.Benchmarks.GeneratedApp`, the obsolete `IEventEmitter`/`IEventListener` adapters, and the typed-channel prototype it was designed from |
-| `TraceBenchmarks` | `trace.Start()/Stop()` cost for the Core null timer and the Debug package timer |
+| `MetricsBenchmarks` | Metrics v2 hot paths: `MetricsScope` and the generated `Begin`/`End` bracket with profiling off and on, a game counter increment, the once-per-frame stats write, and the obsolete `ITraceTimer` adapter |
 | `SpriteBatchBenchmarks` | CPU cost of batching 10k sprites across 1/16 textures, with and without the per-sprite scissor transform |
 | `CoroutineBenchmarks` | Stepping 100 coroutines that yield `Wait.For` every frame, as `IEnumerator<Wait>` (unboxed) and as plain `IEnumerator` |
 | `ArchQueryBenchmarks` | Arch 2.1 delegate query vs inline struct query vs chunk spans over 10k entities |

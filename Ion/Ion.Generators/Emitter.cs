@@ -10,8 +10,14 @@ namespace Ion.Generators;
 /// (with their hidden step adapters) and one <c>GeneratedSchedule</c> per application and scene. Every generated type is
 /// file-local, so assemblies that see each other's internals never clash.
 /// </summary>
-internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrations)
+internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrations, bool profiling = true)
 {
+	private const string ProfilingEnabled = "global::Ion.FrameProfiler.IsProfilingEnabled";
+
+	// Brackets every step and scope of the generated stage methods with profiler timestamps (see WriteItems), unless the
+	// project set <IonMetricsProfiling>false</IonMetricsProfiling> or the engine predates the frame profiler.
+	private readonly bool _profiling = profiling && known.FrameProfiler is not null;
+
 	private const string GeneratorName = "Ion.Generators";
 	private const string GeneratorVersion = "0.3.0";
 
@@ -390,6 +396,10 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 		public HashSet<int> Guards { get; } = [];
 		public HashSet<int> Instances { get; } = [];
 		public int Items;
+		public int Spans;
+		public Dictionary<CandidateItem, string> LeafCalls { get; } = [];
+		public Dictionary<CandidateItem, (string Begin, string End)> ScopeCalls { get; } = [];
+		public Dictionary<CandidateItem, (string Field, string Local)> SpanFields { get; } = [];
 		public int Stage;
 		public Dictionary<int, List<string>> StageMiddlewareInit { get; } = [];
 
@@ -413,7 +423,7 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 		{
 			var body = new SourceWriter();
 			state.Stage = stage;
-			WriteItems(body, candidate, state, candidate.Stages[stage - 1], 0, stage);
+			WriteStage(body, candidate, state, candidate.Stages[stage - 1], 0, stage);
 			bodies.Add((KnownSymbols.StageName(stage), body));
 		}
 
@@ -424,7 +434,7 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 			var (name, items, start, stage) = state.ContinuationMethods[c];
 			var body = new SourceWriter();
 			state.Stage = stage;
-			WriteItems(body, candidate, state, items, start, stage);
+			WriteItems(body, candidate, state, items, start, stage, _profiling);
 			continuationBodies.Add((name, body));
 		}
 
@@ -510,7 +520,32 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 		w.CloseBlock();
 	}
 
-	private void WriteItems(SourceWriter w, ScheduleCandidate candidate, ScheduleWriter state, List<CandidateItem> items, int start, int stage)
+	/// <summary>
+	/// Writes a stage. With profiling, a stage without legacy middleware is written twice: a copy that brackets every step
+	/// and scope, run while the profiler is active, and the plain copy, so a stage costs one check when it is not. (A legacy
+	/// middleware splits the stage into continuation methods, which are written once, with the per-step checks.)
+	/// </summary>
+	private void WriteStage(SourceWriter w, ScheduleCandidate candidate, ScheduleWriter state, List<CandidateItem> items, int start, int stage)
+	{
+		var split = _profiling && items.Count > start && !items.Any(i => i.Wraps && !i.IsScope);
+		if (!split)
+		{
+			WriteItems(w, candidate, state, items, start, stage, _profiling);
+			return;
+		}
+
+		EnsureProfilerField(state);
+		w.WriteLine($"if ({ProfilingEnabled} && _prof.IsActive)");
+		w.OpenBlock();
+		WriteItems(w, candidate, state, items, start, stage, profiled: true);
+		w.CloseBlock();
+		w.WriteLine("else");
+		w.OpenBlock();
+		WriteItems(w, candidate, state, items, start, stage, profiled: false);
+		w.CloseBlock();
+	}
+
+	private void WriteItems(SourceWriter w, ScheduleCandidate candidate, ScheduleWriter state, List<CandidateItem> items, int start, int stage, bool profiled)
 	{
 		for (var i = start; i < items.Count; i++)
 		{
@@ -519,16 +554,26 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 
 			if (item.IsScope)
 			{
-				var (begin, end) = ScopeCalls(candidate, state, item);
+				if (!state.ScopeCalls.TryGetValue(item, out var calls)) state.ScopeCalls[item] = calls = ScopeCalls(candidate, state, item);
+				var (begin, end) = calls;
 				w.WriteLine($"// {item.Order.ToString(CultureInfo.InvariantCulture)} {item.Name} ... {item.System!.Name}.{item.Step!.EndMethod!.Name}");
+				var span = profiled ? Span(state, item) : null;
+				if (span is not null)
+				{
+					// The scope's span covers its begin, everything inside it and its end.
+					var condition = guard.Length == 0 ? ProfilingEnabled : $"{ProfilingEnabled} && {GuardName(item)}";
+					w.WriteLine($"long {span.Value.Local} = {condition} ? _prof.Begin({span.Value.Field}) : 0L;");
+				}
+
 				w.WriteLine(guard + begin + ";");
 				w.WriteLine("try");
 				w.OpenBlock();
-				WriteItems(w, candidate, state, items, i + 1, stage);
+				WriteItems(w, candidate, state, items, i + 1, stage, profiled);
 				w.CloseBlock();
 				w.WriteLine("finally");
 				w.OpenBlock();
 				w.WriteLine(guard + end + ";");
+				if (span is not null) w.WriteLine($"if ({ProfilingEnabled}) _prof.End({span.Value.Field}, {span.Value.Local});");
 				w.CloseBlock();
 				return;
 			}
@@ -548,9 +593,49 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 				return;
 			}
 
-			w.WriteLine($"{guard}{LeafCall(candidate, state, item)}; // {item.Order.ToString(CultureInfo.InvariantCulture)} {item.Name}{(item.KindCode == "F" ? " (function)" : "")}");
+			if (!state.LeafCalls.TryGetValue(item, out var leaf)) state.LeafCalls[item] = leaf = LeafCall(candidate, state, item);
+			var comment = $" // {item.Order.ToString(CultureInfo.InvariantCulture)} {item.Name}{(item.KindCode == "F" ? " (function)" : "")}";
+			var leafSpan = profiled ? Span(state, item) : null;
+			if (leafSpan is null)
+			{
+				w.WriteLine($"{guard}{leaf};{comment}");
+				continue;
+			}
+
+			// A span per step: two timestamps when the profiler is active, two field reads when it is not, and nothing at all
+			// when the Ion.Metrics.Profiling feature switch is off (the constant folds and the compiler drops both lines).
+			if (guard.Length > 0) w.WriteLine(guard.TrimEnd());
+			w.OpenBlock();
+			w.WriteLine($"long {leafSpan.Value.Local} = {ProfilingEnabled} ? _prof.Begin({leafSpan.Value.Field}) : 0L;");
+			w.WriteLine($"{leaf};{comment}");
+			w.WriteLine($"if ({ProfilingEnabled}) _prof.End({leafSpan.Value.Field}, {leafSpan.Value.Local});");
+			w.CloseBlock();
 		}
 	}
+
+	/// <summary>The span id field (registered in the constructor with the item's name) and the timestamp local of an item.</summary>
+	private (string Field, string Local)? Span(ScheduleWriter state, CandidateItem item)
+	{
+		if (!_profiling) return null;
+		if (state.SpanFields.TryGetValue(item, out var existing)) return existing;
+
+		EnsureProfilerField(state);
+		var n = (state.Spans++).ToString(CultureInfo.InvariantCulture);
+		state.Fields.Add($"private readonly global::Ion.SpanId _span{n};");
+		state.Init.Add($"_span{n} = global::Ion.MetricsIds.Register({Literal(item.Name)});");
+		return state.SpanFields[item] = ($"_span{n}", $"t{n}");
+	}
+
+	private static void EnsureProfilerField(ScheduleWriter state)
+	{
+		if (state.Fields.Contains(ProfilerField)) return;
+		state.Fields.Add(ProfilerField);
+		state.Init.Add("_prof = context.Profiler;");
+	}
+
+	private const string ProfilerField = "private readonly global::Ion.FrameProfiler _prof;";
+
+	private static string GuardName(CandidateItem item) => "_g" + item.Entry.ToString(CultureInfo.InvariantCulture);
 
 	private static string Guard(ScheduleCandidate candidate, ScheduleWriter state, CandidateItem item)
 	{

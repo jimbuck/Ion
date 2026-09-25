@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-using Ion.Extensions.Debug;
+using Ion.Extensions.Metrics;
 using Ion.Extensions.Assets;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Audio;
@@ -19,7 +19,7 @@ public static class BuilderExtensions
 	public const string HeadlessKey = "Ion:Headless";
 
 	/// <summary>
-	/// Registers every Ion extension: debug utilities, assets, graphics, audio, scenes and coroutines.
+	/// Registers every Ion extension: metrics, assets, graphics, audio, scenes and coroutines.
 	/// </summary>
 	/// <remarks>
 	/// Graphics and audio are chosen from configuration. When <c>Ion:Headless</c> is <c>true</c>, or the graphics output is
@@ -45,7 +45,7 @@ public static class BuilderExtensions
 		var headless = IsHeadless(config, configureOptions);
 
 		services
-			.AddDebugUtils(config)
+			.AddMetrics(config)
 			.AddAssets();
 
 		if (headless)
@@ -81,7 +81,7 @@ public static class BuilderExtensions
 		var render = selection?.Render ?? (headless && app.Configuration.IsHeadlessRender());
 
 		app
-			.UseDebugUtils()
+			.UseMetrics()
 			.UseEvents()
 			.UseAssets();
 

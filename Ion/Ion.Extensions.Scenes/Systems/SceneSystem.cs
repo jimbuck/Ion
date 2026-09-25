@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using Microsoft.Extensions.Configuration;
-using Ion.Extensions.Debug;
 
 namespace Ion.Extensions.Scenes;
 
@@ -22,12 +21,12 @@ internal delegate SceneInstance SceneBuilderFactory(IConfiguration config, IServ
 public sealed class SceneSystem(
 	IServiceProvider serviceProvider,
 	ILogger<SceneSystem> logger, IConfiguration config,
-	IEvents events,
-	ITraceTimer<SceneSystem> trace
+	IEvents events
 	) : IDisposable
 {
+	// Each step is timed by the schedule that runs it (a span named SceneSystem.{Stage}); the scene's own steps get spans
+	// from the scene's schedule.
 	private readonly ILogger _logger = logger;
-	private readonly ITraceTimer _trace = trace;
 	private EventReader<ChangeSceneEvent> _changeScene = events.Reader<ChangeSceneEvent>();
 	private readonly Dictionary<int, SceneBuilderFactory> _scenesBuilders = new();
 
@@ -86,8 +85,6 @@ public sealed class SceneSystem(
 	[Init(Order = StageOrder.Scenes)]
 	public void Init(GameTime dt)
 	{
-		var timer = _trace.Start("Init");
-
 		_logger.LogDebug("Init ({CurrentSceneId}) {dt}", CurrentSceneId, dt);
 
 		_handleChangeSceneEvents();
@@ -101,8 +98,6 @@ public sealed class SceneSystem(
 			if (!_scenesBuilders.ContainsKey(_nextSceneId)) _nextSceneId = _scenesBuilders.First().Key;
 			_loadNextScene(dt);
 		}
-
-		timer.Stop();
 	}
 
 	/// <summary>
@@ -112,14 +107,10 @@ public sealed class SceneSystem(
 	[First(Order = StageOrder.Scenes)]
 	public void First(GameTime dt)
 	{
-		var timer = _trace.Start("First");
-
 		_handleChangeSceneEvents();
 
 		if (_nextSceneId != CurrentSceneId) _loadNextScene(dt);
 		_activeScene?.First(dt);
-
-		timer.Stop();
 	}
 
 	/// <summary>Runs the active scene's FixedUpdate stage.</summary>
@@ -127,9 +118,7 @@ public sealed class SceneSystem(
 	[FixedUpdate(Order = StageOrder.Scenes)]
 	public void FixedUpdate(GameTime dt)
 	{
-		var timer = _trace.Start("FixedUpdate");
 		_activeScene?.FixedUpdate(dt);
-		timer.Stop();
 	}
 
 	/// <summary>Runs the active scene's Update stage.</summary>
@@ -137,9 +126,7 @@ public sealed class SceneSystem(
 	[Update(Order = StageOrder.Scenes)]
 	public void Update(GameTime dt)
 	{
-		var timer = _trace.Start("Update");
 		_activeScene?.Update(dt);
-		timer.Stop();
 	}
 
 	/// <summary>Runs the active scene's Render stage.</summary>
@@ -147,9 +134,7 @@ public sealed class SceneSystem(
 	[Render(Order = StageOrder.Scenes)]
 	public void Render(GameTime dt)
 	{
-		var timer = _trace.Start("Render");
 		_activeScene?.Render(dt);
-		timer.Stop();
 	}
 
 	/// <summary>Runs the active scene's Last stage.</summary>
@@ -157,9 +142,7 @@ public sealed class SceneSystem(
 	[Last(Order = StageOrder.Scenes)]
 	public void Last(GameTime dt)
 	{
-		var timer = _trace.Start("Last");
 		_activeScene?.Last(dt);
-		timer.Stop();
 	}
 
 	/// <summary>Runs the active scene's Destroy stage (once).</summary>
@@ -167,16 +150,12 @@ public sealed class SceneSystem(
 	[Destroy(Order = StageOrder.Scenes)]
 	public void Destroy(GameTime dt)
 	{
-		var timer = _trace.Start("Destroy");
-
 		_logger.LogDebug("Destroy");
 		if (_activeScene != null && !_activeSceneDestroyed)
 		{
 			_activeScene.Destroy(dt);
 			_activeSceneDestroyed = true;
 		}
-
-		timer.Stop();
 	}
 
 	/// <summary>Destroys the active scene if its Destroy stage has not run, and disposes its scope.</summary>

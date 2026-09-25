@@ -40,14 +40,20 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 			.Collect()
 			.Select(static (items, _) => items.Length > 0);
 
-		context.RegisterSourceOutput(context.CompilationProvider.Combine(relevant), static (spc, source) =>
+		// <IonMetricsProfiling>false</IonMetricsProfiling> (a CompilerVisibleProperty set by the Ion props) emits the stage
+		// methods without profiler brackets at all; otherwise they are emitted behind the Ion.Metrics.Profiling feature switch.
+		var profiling = context.AnalyzerConfigOptionsProvider.Select(static (options, _) =>
+			!options.GlobalOptions.TryGetValue("build_property.IonMetricsProfiling", out var value)
+			|| !string.Equals(value?.Trim(), "false", StringComparison.OrdinalIgnoreCase));
+
+		context.RegisterSourceOutput(context.CompilationProvider.Combine(relevant).Combine(profiling), static (spc, source) =>
 		{
-			if (!source.Right) return;
-			Execute(source.Left, spc);
+			if (!source.Left.Right) return;
+			Execute(source.Left.Left, spc, source.Right);
 		});
 	}
 
-	private static void Execute(Compilation compilation, SourceProductionContext context)
+	private static void Execute(Compilation compilation, SourceProductionContext context, bool profiling)
 	{
 		var known = KnownSymbols.TryCreate(compilation);
 		if (known is null) return;
@@ -61,7 +67,7 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 		var namespaceEnabled = InterceptableLocations.IsNamespaceEnabled(compilation);
 		var canIntercept = InterceptableLocations.IsSupported && namespaceEnabled;
 
-		ExecuteSchedule(known, context, Report, canIntercept, namespaceEnabled);
+		ExecuteSchedule(known, context, Report, canIntercept, namespaceEnabled, profiling);
 		if (known.HasEvents) ExecuteEvents(known, context, Report, canIntercept);
 	}
 
@@ -75,7 +81,7 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 		if (source is not null) context.AddSource("IonEvents.g.cs", source);
 	}
 
-	private static void ExecuteSchedule(KnownSymbols known, SourceProductionContext context, Action<DiagnosticDescriptor, Location?, string> Report, bool canIntercept, bool namespaceEnabled)
+	private static void ExecuteSchedule(KnownSymbols known, SourceProductionContext context, Action<DiagnosticDescriptor, Location?, string> Report, bool canIntercept, bool namespaceEnabled, bool profiling)
 	{
 		var compilation = known.Compilation;
 
@@ -151,7 +157,7 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 		var summaries = analyzer.Summaries(context.CancellationToken);
 		if (calls.Count == 0 && summaries.Count == 0) return;
 
-		var source = new Emitter(known, analyzer).Emit(calls, candidates, summaries);
+		var source = new Emitter(known, analyzer, profiling).Emit(calls, candidates, summaries);
 		context.AddSource("IonSchedule.g.cs", source);
 	}
 }

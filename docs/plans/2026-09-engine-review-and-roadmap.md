@@ -339,6 +339,17 @@ Three layers, all allocation-free on the hot path:
 2. **Counters.** Engine counters (`draw_calls`, `sprites`, `triangles`, `entities`, `events_emitted`, `gc_gen0/1/2`, `allocated_bytes`, `frame_ms`, `fixed_steps`) live in a `FrameStats` struct written once per frame; games add their own with `Metrics.Counter("balls")`.
 3. **Export.** Chrome trace JSON (Perfetto) and Tracy zones from the ring, `System.Diagnostics.Metrics` `Meter` for frame-level aggregates so `dotnet-counters` works, a JSONL "frame log" line per frame for agents, and an optional on-screen overlay drawn by the 2D renderer.
 
+**As implemented (Stage 3, metrics wave).** The ring, the ids and the scope live in `Ion.Core.Abstractions` (`FrameProfiler`, `FrameProfile`, `SpanRecord`, `SpanId`/`MetricsIds`/`SpanIds`, `MetricsScope`, `FrameStats`, `IStepProfiler`, `IFrameStatsSource`, `IFrameListener`, `ISpanSink`), so the generator and the loop need nothing else; `Ion.Extensions.Debug*` became `Ion.Extensions.Metrics*` (`IMetrics`, instruments, export, capture, frame log, meter, overlay) with the 0.2 trace API kept as obsolete adapters. Decisions and deviations:
+
+- The feature switch is `FrameProfiler.IsProfilingEnabled`, a `[FeatureSwitchDefinition("Ion.Metrics.Profiling")]` static property with an initializer (a `static readonly` backing field, folded by the JIT); the Ion props emit the `RuntimeHostConfigurationOption` (`Trim="true"`) and a `CompilerVisibleProperty` from `IonMetricsProfiling` (default true). With `false` the generator emits no brackets at all and ILC removes every other recording site: in the NativeAOT map of the Breakout ECS sample `FrameProfiler.BeginCore`/`EndCore` and the runtime schedule's `RunStepsProfiled` exist with the default and are absent with `IonMetricsProfiling=false` (the frame stats, frame log and meter remain).
+- Each generated stage without legacy middleware is emitted twice, a bracketed copy run while `_prof.IsActive` and the plain copy, so profiling that is compiled in but off costs one check per stage instead of one per step. Stages split by legacy middleware keep a check per step. The runtime schedule checks once per stage runner.
+- Scopes get one span from before `Begin` to after `End` (in the `finally`), so Perfetto nests the stage's steps under the scope. The loop adds a span per stage, per fixed step and for the idle time, and profiles Init and Destroy as their own entries of the ring.
+- Frame stats are collected whenever metrics are installed (a profiler with history), profiling or not. `allocated_bytes` is the loop thread's allocation (`GC.GetAllocatedBytesForCurrentThread`, 7 ns): the process-wide total is either imprecise across collections or 600 ns with `precise: true`.
+- An enabled span costs two `Stopwatch.GetTimestamp()` reads, which are 40 ns each on the benchmark VM (TSC clock source under virtualization), so the enabled target of 30 ns is not reachable with `Stopwatch` here; the rest of the path is a few nanoseconds and allocation-free. Bare metal reads the clock in 15 to 20 ns.
+- Tracy is a live `ISpanSink` (zones cannot be emitted after the fact with the C API), in the separate `Ion.Extensions.Metrics.Tracy` project over Tracy-CSharp 0.13.1, whose `LibraryImport` bindings publish with NativeAOT without warnings; its natives cover win-x64 and linux-x64 only, and a DllImport resolver loads TracyClient from the application directory under NativeAOT. It was run headless (no Tracy server attached), not against a live profiler.
+- The overlay is drawn by the metrics module itself through `ISpriteBatch` (any backend) when a font asset is configured, rather than in each backend's text path.
+- Not done: a Tracy server session check, per-thread span buffers (spans from other threads use an atomic increment on the loop's current frame), and the ECS module's `entities` source (the hook exists; the Breakout ECS sample implements it for its Arch world).
+
 ### 4.7 Graphics on Silk.NET (Stage 4)
 
 **Decision (owner).** Silk.NET is the rendering platform. The choice of graphics API underneath is per target, and the browser is an option for later, not a requirement.
@@ -517,6 +528,31 @@ This is the most important number in the suite. Each `Emit` boxes (36 B per even
 
 Under NativeAOT the Debug path remains two interface calls per bracket; Metrics v2 replaces both with a generated timestamp write behind a static feature switch.
 
+After Metrics v2 (`MetricsBenchmarks`, `docs/plans/benchmarks/2026-09-25-stage3-metrics`, .NET 10, 256 operations per invocation):
+
+| Row | Mean | Allocated |
+|---|---|---|
+| `MetricsScope` enter and exit, profiling off | 0.77 ns | 0 B |
+| `MetricsScope` enter and exit, profiling on | 76 ns | 0 B |
+| Generated `Begin`/`End` bracket, off | 0.61 ns | 0 B |
+| Generated `Begin`/`End` bracket, on | 74 ns | 0 B |
+| `MetricsCounter.Increment` | 6.6 ns | 0 B |
+| `FrameStats` write (`EndFrame` + `BeginFrame`) | 113 ns | 0 B |
+| Obsolete `ITraceTimer` adapter, off | 0.88 ns | 0 B |
+| Obsolete `ITraceTimer` adapter, on | 148 ns | 0 B |
+
+The enabled rows are two `Stopwatch.GetTimestamp()` reads at 40 ns each on this VM. `FullFrameBenchmarks` after the change:
+
+| Configuration | Per `Step` | Allocated per frame |
+|---|---|---|
+| Event system only | 15 ns | 0 B |
+| 8 systems binding all stages (runtime schedule) | 100 ns | 0 B |
+| Same, generated schedule (profiling compiled in, off) | 63 ns | 0 B |
+| 8 systems with `AddMetrics`/`UseMetrics` (frame stats, meter, profiling off) | 254 ns | 0 B |
+| Generated schedule with a frame profiler (stats only) | 181 ns | 0 B |
+| Generated schedule, profiling on (about 46 spans per frame) | 3.57 us | 0 B |
+| 8 systems inside a scene scope | 123 ns | 0 B |
+
 ### 5.5 Sprite batching CPU (`SpriteBatchBenchmarks`, 10,000 sprites)
 
 | Textures | Without scissor transform | With the renderer's scissor transform |
@@ -590,6 +626,7 @@ Each stage is sized so a single agent session (or a small PR series) can deliver
 - Assets: cache by (loader, path) with reference counting, scoped release on scene unload, hot reload on file change, polled background decode for images.
 - Audio (P0, section 4.12): engine mixer on the audio thread fed by a lock-free command queue, `Silk.NET.OpenAL` output, WAV/OGG decoding at load, `NullAudioOutput` for headless; fixes pitch, master volume and resampling.
 - Acceptance status (events wave, see "As implemented" in 4.4): `EventBenchmarks` allocates 0 B in every new row (met). Emit x100 + `Step` 200 ns and emit + `TryReadLatest` 209/235 ns are at the prototype's 204/605 ns; emit + `Read()` of all 4 types is 258 ns with 1 reader (1.27x the prototype) and 650 ns with 8 (1.07x), where the prototype does not keep the previous frame visible or the fixed-step backlog (partly met). The generated bus row (in `Ion.Benchmarks.GeneratedApp`, which also carries the loop context and the engine's channels) is 329/758 ns, not faster than the runtime bus in this micro-benchmark; its value today is the closed type list, compile-time ids and capacities, and the diagnostics (open). `ION101`..`ION106` are reported with golden tests, and in the Breakout ECS sample they found a wall/paddle-hit event nobody emitted and a ball-lost event nobody read (met). NativeAOT publish of the ECS sample: no Ion warnings, runs headless (met). `FullFrameBenchmarks.Step_8Systems` not re-measured in this wave.
+- Acceptance status (metrics wave, see "As implemented" in 4.6): frame ring, counters, Chrome trace and Tracy export, `Meter` aggregates, JSONL frame log and overlay are in place and work in Release and NativeAOT builds behind the runtime toggle (met). Trace export is bounded by the ring: a run of any length keeps and writes at most `HistoryFrames` frames (met, test). `MetricsBenchmarks`: a disabled scope 0.77 ns and 0 B (target below 1 ns, met), an enabled scope 76 ns and 0 B (target below 30 ns: not met on this VM, where each `Stopwatch` read is 40 ns; the allocation target is met). `FullFrameBenchmarks` allocates 0 B in every row, with metrics installed and with profiling on (met). NativeAOT publish of the ECS sample: no Ion warnings with profiling on, off, and with the Tracy bridge; with `IonMetricsProfiling=false` the recording code is absent from the ILC map (met).
 - Acceptance: `EventBenchmarks` at or below the `Prototype_TypedChannels` numbers with zero allocation and the generated bus emitting `ION10x` diagnostics for the misuse cases in 4.4; `FullFrameBenchmarks.Step_8Systems` allocates 0 bytes; trace export of a 10-minute run bounded in memory; audio plays on all three desktops and on the R36S with an allocation-free audio thread.
 
 ### Stage 4: Silk.NET graphics stack and 2D renderer v2 (5-7 weeks)

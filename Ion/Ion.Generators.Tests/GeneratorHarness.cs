@@ -42,11 +42,14 @@ internal static class GeneratorHarness
 			new CSharpCompilationOptions(kind, nullableContextOptions: NullableContextOptions.Enable, allowUnsafe: true));
 	}
 
-	/// <summary>Runs the generator on <paramref name="source"/>.</summary>
-	public static GeneratorResult Run(string source, string assemblyName = "TestApp", IEnumerable<MetadataReference>? extraReferences = null)
+	/// <summary>Runs the generator on <paramref name="source"/>, with optional MSBuild properties (<c>build_property.*</c>).</summary>
+	public static GeneratorResult Run(string source, string assemblyName = "TestApp", IEnumerable<MetadataReference>? extraReferences = null, IReadOnlyDictionary<string, string>? buildProperties = null)
 	{
 		var compilation = Compile(source, assemblyName, extraReferences: extraReferences);
-		GeneratorDriver driver = CSharpGeneratorDriver.Create([new ScheduleGenerator().AsSourceGenerator()], parseOptions: ParseOptions);
+		GeneratorDriver driver = CSharpGeneratorDriver.Create(
+			[new ScheduleGenerator().AsSourceGenerator()],
+			parseOptions: ParseOptions,
+			optionsProvider: buildProperties is null ? null : new BuildProperties(buildProperties));
 		driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var generatorDiagnostics);
 		var run = driver.GetRunResult();
 		string Tree(string name) => run.GeneratedTrees.Where(t => Path.GetFileName(t.FilePath) == name).Select(t => t.GetText().ToString()).SingleOrDefault() ?? "";
@@ -82,6 +85,24 @@ internal static class GeneratorHarness
 		Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error)));
 		stream.Position = 0;
 		return new AssemblyLoadContext(compilation.AssemblyName, isCollectible: true).LoadFromStream(stream);
+	}
+}
+
+/// <summary>Analyzer options carrying MSBuild properties, as <c>CompilerVisibleProperty</c> passes them.</summary>
+internal sealed class BuildProperties(IReadOnlyDictionary<string, string> properties) : Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptionsProvider
+{
+	private readonly Options _global = new(properties.ToDictionary(p => "build_property." + p.Key, p => p.Value));
+	private static readonly Options Empty = new(new Dictionary<string, string>());
+
+	public override Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GlobalOptions => _global;
+
+	public override Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GetOptions(SyntaxTree tree) => Empty;
+
+	public override Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GetOptions(AdditionalText textFile) => Empty;
+
+	private sealed class Options(Dictionary<string, string> values) : Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions
+	{
+		public override bool TryGetValue(string key, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? value) => values.TryGetValue(key, out value);
 	}
 }
 

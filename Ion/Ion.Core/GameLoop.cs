@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Ion.Extensions.Debug;
+using System.Runtime.CompilerServices;
 
 using Microsoft.Extensions.Options;
 
@@ -36,9 +36,10 @@ public class GameLoop
 	private readonly IOptionsMonitor<GameConfig> _gameConfig;
 	private readonly EventBus _events;
 	private EventReader<ExitGameEvent> _exitRequests;
-	private readonly ITraceTimer _trace;
 	private readonly IClock _clock;
 	private readonly GameLoopContext _context;
+	private readonly FrameProfiler _profiler;
+	private readonly IFrameStatsSource[] _statsSources;
 
 	private volatile bool _shouldExit;
 	private TimeSpan _frameStart;
@@ -49,20 +50,25 @@ public class GameLoop
 	/// </summary>
 	/// <param name="gameConfig">The game configuration (fixed-step rate, frame time clamp, pacing).</param>
 	/// <param name="events">The event bus: the loop marks the start of every fixed step on it and reads <see cref="ExitGameEvent"/>.</param>
-	/// <param name="trace">The trace timer used to record idle time.</param>
 	/// <param name="clock">The time source for every frame.</param>
 	/// <param name="context">
 	/// The loop context to keep up to date (the application's singleton <see cref="GameLoopContext"/>). When omitted the loop
 	/// uses a private one, which only this loop's <see cref="Context"/> exposes.
 	/// </param>
-	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, EventBus events, ITraceTimer<GameLoop> trace, IClock clock, GameLoopContext? context = null)
+	/// <param name="profiler">
+	/// The frame profiler: the loop opens and closes a profile per frame (and for Init and Destroy), records a span per
+	/// stage and the idle time, and writes the frame's <see cref="FrameStats"/>. <see cref="FrameProfiler.Disabled"/> when omitted.
+	/// </param>
+	/// <param name="statsSources">The sources that add engine counters to every frame's stats (sprite batch, event bus, ECS).</param>
+	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, EventBus events, IClock clock, GameLoopContext? context = null, FrameProfiler? profiler = null, IEnumerable<IFrameStatsSource>? statsSources = null)
 	{
 		_gameConfig = gameConfig;
 		_events = events;
 		_exitRequests = events.Reader<ExitGameEvent>();
-		_trace = trace;
 		_clock = clock;
 		_context = context ?? new GameLoopContext();
+		_profiler = profiler ?? FrameProfiler.Disabled;
+		_statsSources = statsSources is null ? [] : [.. statsSources];
 
 		_frameStart = clock.Elapsed;
 		FixedGameTime.Alpha = 1;
@@ -78,6 +84,11 @@ public class GameLoop
 	/// Where the loop is: the running stage, the frame and the number of fixed steps started. Set before each stage runs.
 	/// </summary>
 	public ILoopContext Context => _context;
+
+	/// <summary>
+	/// The frame profiler this loop writes to (<see cref="FrameProfiler.Disabled"/> when metrics are not installed).
+	/// </summary>
+	public FrameProfiler Profiler => _profiler;
 
 	/// <summary>
 	/// The variable-rate time passed to First, Update, Render and Last.
@@ -212,6 +223,8 @@ public class GameLoop
 		_shouldExit = false;
 		_context.Frame = GameTime.Frame;
 		_context.Stage = GameLoopStage.Init;
+		_profiler.BeginFrame(GameTime.Frame, FrameKind.Init);
+		var span = BeginSpan(SpanIds.Init);
 		try
 		{
 			Init(GameTime);
@@ -219,6 +232,8 @@ public class GameLoop
 		finally
 		{
 			_context.Stage = GameLoopStage.None;
+			EndSpan(SpanIds.Init, span);
+			EndFrameStats(0, 0);
 		}
 
 		_frameStart = _clock.Elapsed;
@@ -232,6 +247,8 @@ public class GameLoop
 	public void Shutdown()
 	{
 		_context.Stage = GameLoopStage.Destroy;
+		_profiler.BeginFrame(GameTime.Frame, FrameKind.Destroy);
+		var span = BeginSpan(SpanIds.Destroy);
 		try
 		{
 			Destroy(GameTime);
@@ -239,6 +256,8 @@ public class GameLoop
 		finally
 		{
 			_context.Stage = GameLoopStage.None;
+			EndSpan(SpanIds.Destroy, span);
+			EndFrameStats(0, 0);
 		}
 	}
 
@@ -276,18 +295,25 @@ public class GameLoop
 
 		var context = _context;
 		context.Frame = GameTime.Frame;
+		_profiler.BeginFrame(GameTime.Frame);
 
 		context.Stage = GameLoopStage.First;
+		var span = BeginSpan(SpanIds.First);
 		First(GameTime);
+		EndSpan(SpanIds.First, span);
 
+		var fixedSteps = 0;
 		while (_accumulator + AccumulatorEpsilon >= fixedStep)
 		{
 			FixedGameTime.Elapsed += TimeSpan.FromSeconds(fixedStep);
 			context.FixedStepCount++;
 			_events.BeginFixedStep();
 			context.Stage = GameLoopStage.FixedUpdate;
+			span = BeginSpan(SpanIds.FixedUpdate);
 			FixedUpdate(FixedGameTime);
+			EndSpan(SpanIds.FixedUpdate, span);
 			_accumulator -= fixedStep;
+			fixedSteps++;
 		}
 
 		if (_accumulator < 0) _accumulator = 0;
@@ -295,19 +321,26 @@ public class GameLoop
 
 		_events.EndFixedSteps();
 		context.Stage = GameLoopStage.Update;
+		span = BeginSpan(SpanIds.Update);
 		Update(GameTime);
+		EndSpan(SpanIds.Update, span);
 
 		context.Stage = GameLoopStage.Render;
+		span = BeginSpan(SpanIds.Render);
 		Render(GameTime);
+		EndSpan(SpanIds.Render, span);
 
 		if (_exitRequests.Read().Length > 0) _shouldExit = true;
 
 		context.Stage = GameLoopStage.Last;
+		span = BeginSpan(SpanIds.Last);
 		Last(GameTime);
+		EndSpan(SpanIds.Last, span);
 
 		context.Stage = GameLoopStage.None;
 
-		Pace(config, frameStart);
+		var idle = Pace(config, frameStart);
+		EndFrameStats(fixedSteps, idle);
 
 		GameTime.Frame = FixedGameTime.Frame = GameTime.Frame + 1;
 		context.Frame = GameTime.Frame;
@@ -330,29 +363,41 @@ public class GameLoop
 	{
 		var context = _context;
 		context.Frame = time.Frame;
+		_profiler.BeginFrame(time.Frame);
 
 		context.Stage = GameLoopStage.First;
+		var span = BeginSpan(SpanIds.First);
 		First(time);
+		EndSpan(SpanIds.First, span);
 
 		context.FixedStepCount++;
 		_events.BeginFixedStep();
 		context.Stage = GameLoopStage.FixedUpdate;
+		span = BeginSpan(SpanIds.FixedUpdate);
 		FixedUpdate(time);
+		EndSpan(SpanIds.FixedUpdate, span);
 
 		_events.EndFixedSteps();
 		context.Stage = GameLoopStage.Update;
+		span = BeginSpan(SpanIds.Update);
 		Update(time);
+		EndSpan(SpanIds.Update, span);
 
 		if (!_shouldExit)
 		{
 			context.Stage = GameLoopStage.Render;
+			span = BeginSpan(SpanIds.Render);
 			Render(time);
+			EndSpan(SpanIds.Render, span);
 
 			context.Stage = GameLoopStage.Last;
+			span = BeginSpan(SpanIds.Last);
 			Last(time);
+			EndSpan(SpanIds.Last, span);
 		}
 
 		context.Stage = GameLoopStage.None;
+		EndFrameStats(1, 0, time.Delta);
 	}
 
 	/// <summary>
@@ -363,17 +408,49 @@ public class GameLoop
 		_shouldExit = true;
 	}
 
-	private void Pace(GameConfig config, TimeSpan frameStart)
+	/// <summary>Sleeps for what is left of the frame; returns the wall-clock milliseconds slept (0 when not profiling).</summary>
+	private double Pace(GameConfig config, TimeSpan frameStart)
 	{
-		if (config.VSync || config.MaxFPS < 1) return;
+		if (config.VSync || config.MaxFPS < 1) return 0;
 
 		var targetFrameTime = TimeSpan.FromSeconds(1.0 / config.MaxFPS);
 		var remaining = targetFrameTime - (_clock.Elapsed - frameStart);
-		if (remaining <= TimeSpan.Zero) return;
+		if (remaining <= TimeSpan.Zero) return 0;
 
-		var timer = _trace.Start("Idle");
+		var measure = _profiler.IsEnabled;
+		var start = measure ? Stopwatch.GetTimestamp() : 0;
+		var span = BeginSpan(SpanIds.Idle);
 		_clock.Sleep(remaining);
-		timer.Stop();
+		EndSpan(SpanIds.Idle, span);
+		return measure ? Stopwatch.GetElapsedTime(start).TotalMilliseconds : 0;
+	}
+
+	/// <summary>Writes the frame's stats (the loop's own counters and every source's) and closes the profile.</summary>
+	private void EndFrameStats(int fixedSteps, double idleMs, float? delta = null)
+	{
+		var profiler = _profiler;
+		if (!profiler.IsEnabled) return;
+
+		var stats = new FrameStats
+		{
+			DeltaMs = (delta ?? GameTime.Delta) * 1000.0,
+			IdleMs = idleMs,
+			FixedSteps = fixedSteps,
+		};
+
+		var sources = _statsSources;
+		for (var i = 0; i < sources.Length; i++) sources[i].Collect(ref stats);
+
+		profiler.EndFrame(ref stats);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private long BeginSpan(SpanId span) => FrameProfiler.IsProfilingEnabled ? _profiler.Begin(span) : 0;
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private void EndSpan(SpanId span, long start)
+	{
+		if (FrameProfiler.IsProfilingEnabled) _profiler.End(span, start);
 	}
 
 	private static double GetFixedStepSeconds(GameConfig config)

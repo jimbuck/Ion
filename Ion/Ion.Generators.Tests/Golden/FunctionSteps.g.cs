@@ -138,33 +138,56 @@ namespace Ion.Generated
 	[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 	file sealed class Schedule0 : global::Ion.GeneratedSchedule
 	{
+		private readonly global::Ion.FrameProfiler _prof;
 		private readonly global::System.Action<global::Ion.GameTime> _f0;
+		private readonly global::Ion.SpanId _span0;
 		private readonly global::Counter _s0;
+		private readonly global::Ion.SpanId _span1;
 		private readonly global::System.Action<global::Ion.GameTime, global::Counter> _f2;
 		private readonly global::Counter _f2_0;
+		private readonly global::Ion.SpanId _span2;
 		private readonly global::System.Action<global::Ion.GameTime, global::Counter> _f3;
 		private readonly global::Counter _f3_0;
+		private readonly global::Ion.SpanId _span3;
 		private readonly bool _g4;
 		private readonly global::System.Action<global::Ion.GameTime, global::Ion.ILoopContext> _f4;
 		private readonly global::Ion.ILoopContext _f4_0;
+		private readonly global::Ion.SpanId _span4;
 
 		public Schedule0(global::Ion.GeneratedScheduleContext context)
 		{
+			_prof = context.Profiler;
 			_f0 = context.Function<global::System.Action<global::Ion.GameTime>>(1);
+			_span0 = global::Ion.MetricsIds.Register("App.lambda()");
 			_s0 = context.System<global::Counter>(0);
+			_span1 = global::Ion.MetricsIds.Register("Counter.Tick");
 			_f2 = context.Function<global::System.Action<global::Ion.GameTime, global::Counter>>(2);
 			_f2_0 = context.Service<global::Counter>(2);
+			_span2 = global::Ion.MetricsIds.Register("App.lambda(Counter)");
 			_f3 = context.Function<global::System.Action<global::Ion.GameTime, global::Counter>>(3);
 			_f3_0 = context.Service<global::Counter>(3);
+			_span3 = global::Ion.MetricsIds.Register("Hud.Draw");
 			_g4 = context.IsActive(4);
 			_f4 = context.Function<global::System.Action<global::Ion.GameTime, global::Ion.ILoopContext>>(4);
 			_f4_0 = context.Service<global::Ion.ILoopContext>(4);
+			_span4 = global::Ion.MetricsIds.Register("App.lambda(ILoopContext)");
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Init(global::Ion.GameTime dt)
 		{
-			_f0(dt); // 0 App.lambda() (function)
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t0 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span0) : 0L;
+					_f0(dt); // 0 App.lambda() (function)
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span0, t0);
+				}
+			}
+			else
+			{
+				_f0(dt); // 0 App.lambda() (function)
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -180,20 +203,59 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Update(global::Ion.GameTime dt)
 		{
-			_s0.Tick(dt); // 0 Counter.Tick
-			_f2(dt, _f2_0); // -1 App.lambda(Counter) (function)
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t1 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span1) : 0L;
+					_s0.Tick(dt); // 0 Counter.Tick
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span1, t1);
+				}
+				{
+					long t2 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span2) : 0L;
+					_f2(dt, _f2_0); // -1 App.lambda(Counter) (function)
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span2, t2);
+				}
+			}
+			else
+			{
+				_s0.Tick(dt); // 0 Counter.Tick
+				_f2(dt, _f2_0); // -1 App.lambda(Counter) (function)
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Render(global::Ion.GameTime dt)
 		{
-			_f3(dt, _f3_0); // 0 Hud.Draw (function)
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t3 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span3) : 0L;
+					_f3(dt, _f3_0); // 0 Hud.Draw (function)
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span3, t3);
+				}
+			}
+			else
+			{
+				_f3(dt, _f3_0); // 0 Hud.Draw (function)
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Last(global::Ion.GameTime dt)
 		{
-			if (_g4) _f4(dt, _f4_0); // 0 App.lambda(ILoopContext) (function)
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g4)
+				{
+					long t4 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span4) : 0L;
+					_f4(dt, _f4_0); // 0 App.lambda(ILoopContext) (function)
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span4, t4);
+				}
+			}
+			else
+			{
+				if (_g4) _f4(dt, _f4_0); // 0 App.lambda(ILoopContext) (function)
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]

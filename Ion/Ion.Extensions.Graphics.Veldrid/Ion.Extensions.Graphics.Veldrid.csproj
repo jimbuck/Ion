@@ -7,6 +7,9 @@
     <Platforms>AnyCPU</Platforms>
     <IsAotCompatible>true</IsAotCompatible>
     <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+    <!-- This backend still times itself with the obsolete ITraceTimer adapters (recorded into the frame profiler); it is
+         being replaced by the Silk.NET stack, so it is not migrated to MetricsScope. -->
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleToSuffix Include=".Tests" />
@@ -33,7 +36,7 @@
     <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
-    <ProjectReference Include="..\Ion.Extensions.Debug.Abstractions\Ion.Extensions.Debug.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Metrics.Abstractions\Ion.Extensions.Metrics.Abstractions.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
   </ItemGroup>
 </Project>

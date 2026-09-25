@@ -11,7 +11,7 @@
     <ProjectReference Include="..\Ion.Extensions.Assets\Ion.Extensions.Assets.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Audio\Ion.Extensions.Audio.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />
-    <ProjectReference Include="..\Ion.Extensions.Debug\Ion.Extensions.Debug.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Metrics\Ion.Extensions.Metrics.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Null\Ion.Extensions.Graphics.Null.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Headless\Ion.Extensions.Graphics.Headless.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Veldrid\Ion.Extensions.Graphics.Veldrid.csproj" />

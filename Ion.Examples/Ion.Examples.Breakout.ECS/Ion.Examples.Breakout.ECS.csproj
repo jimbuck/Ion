@@ -56,4 +56,11 @@
   <ItemGroup>
     <Using Include="System.Numerics" />
   </ItemGroup>
+  <!-- Tracy (dotnet run -p:IonTracy=true): the native bridge is only referenced, and the TRACY symbol only defined, on request. -->
+  <PropertyGroup Condition="'$(IonTracy)' == 'true'">
+    <DefineConstants>$(DefineConstants);TRACY</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(IonTracy)' == 'true'">
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Metrics.Tracy\Ion.Extensions.Metrics.Tracy.csproj" />
+  </ItemGroup>
 </Project>

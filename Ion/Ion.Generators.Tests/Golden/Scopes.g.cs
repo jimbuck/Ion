@@ -184,17 +184,29 @@ namespace Ion.Generated
 	[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 	file sealed class Schedule0 : global::Ion.GeneratedSchedule
 	{
+		private readonly global::Ion.FrameProfiler _prof;
 		private readonly global::Batch _s1;
+		private readonly global::Ion.SpanId _span0;
 		private readonly global::Sprites _s0;
+		private readonly global::Ion.SpanId _span1;
 		private readonly global::Frame _s2;
+		private readonly global::Ion.SpanId _span2;
 		private readonly global::Ion.ILoopContext _e4_0;
+		private readonly global::Ion.SpanId _span3;
+		private readonly global::Ion.SpanId _span4;
 
 		public Schedule0(global::Ion.GeneratedScheduleContext context)
 		{
+			_prof = context.Profiler;
 			_s1 = context.System<global::Batch>(1);
+			_span0 = global::Ion.MetricsIds.Register("Batch.Start");
 			_s0 = context.System<global::Sprites>(0);
+			_span1 = global::Ion.MetricsIds.Register("Sprites.Tick");
 			_s2 = context.System<global::Frame>(2);
+			_span2 = global::Ion.MetricsIds.Register("Frame.Begin");
 			_e4_0 = context.Service<global::Ion.ILoopContext>(1);
+			_span3 = global::Ion.MetricsIds.Register("Batch.Open");
+			_span4 = global::Ion.MetricsIds.Register("Sprites.Draw");
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -215,39 +227,94 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Update(global::Ion.GameTime dt)
 		{
-			// 0 Batch.Start ... Batch.Stop
-			_s1.Start(dt);
-			try
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
 			{
-				_s0.Tick(dt); // 0 Sprites.Tick
+				// 0 Batch.Start ... Batch.Stop
+				long t0 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span0) : 0L;
+				_s1.Start(dt);
+				try
+				{
+					{
+						long t1 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span1) : 0L;
+						_s0.Tick(dt); // 0 Sprites.Tick
+						if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span1, t1);
+					}
+				}
+				finally
+				{
+					_s1.Stop(dt);
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span0, t0);
+				}
 			}
-			finally
+			else
 			{
-				_s1.Stop(dt);
+				// 0 Batch.Start ... Batch.Stop
+				_s1.Start(dt);
+				try
+				{
+					_s0.Tick(dt); // 0 Sprites.Tick
+				}
+				finally
+				{
+					_s1.Stop(dt);
+				}
 			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Render(global::Ion.GameTime dt)
 		{
-			// -900 Frame.Begin ... Frame.End
-			_s2.Begin(dt);
-			try
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
 			{
-				// -850 Batch.Open ... Batch.Close
-				_s1.Open(dt);
+				// -900 Frame.Begin ... Frame.End
+				long t2 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span2) : 0L;
+				_s2.Begin(dt);
 				try
 				{
-					_s0.Draw(dt); // 0 Sprites.Draw
+					// -850 Batch.Open ... Batch.Close
+					long t3 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span3) : 0L;
+					_s1.Open(dt);
+					try
+					{
+						{
+							long t4 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span4) : 0L;
+							_s0.Draw(dt); // 0 Sprites.Draw
+							if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span4, t4);
+						}
+					}
+					finally
+					{
+						_s1.Close(dt, _e4_0);
+						if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span3, t3);
+					}
 				}
 				finally
 				{
-					_s1.Close(dt, _e4_0);
+					_s2.End();
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span2, t2);
 				}
 			}
-			finally
+			else
 			{
-				_s2.End();
+				// -900 Frame.Begin ... Frame.End
+				_s2.Begin(dt);
+				try
+				{
+					// -850 Batch.Open ... Batch.Close
+					_s1.Open(dt);
+					try
+					{
+						_s0.Draw(dt); // 0 Sprites.Draw
+					}
+					finally
+					{
+						_s1.Close(dt, _e4_0);
+					}
+				}
+				finally
+				{
+					_s2.End();
+				}
 			}
 		}
 

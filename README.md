@@ -217,8 +217,11 @@ IEnumerator<Wait> Blink()
 
 Plain `IEnumerator` coroutines still work, but the routine boxes every struct it yields.
 
-### Ion.Extensions.Debug
-Adds support for debug utils such as a trace profiler and debug renderer.
+### Ion.Extensions.Metrics
+Frame profiling, engine counters and export (Metrics v2). `AddIon`/`UseIon` install it; on its own it is
+`AddMetrics(config)` (bound from `Ion:Metrics`) and `UseMetrics()`. See "Metrics" below. The 0.2 names
+(`Ion.Extensions.Debug`, `AddDebugUtils`, `UseDebugUtils`, `ITraceTimer<T>`, `ITraceManager`) are obsolete adapters over it
+for one release.
 
 ### Ion.Extensions.Graphics.Veldrid
 Adds window, input, and graphics support using the Veldrid API. Includes a built-in sprite batch for easy 2D rendering.
@@ -319,6 +322,94 @@ using var host = new IonTestHost().WithRendering(64, 64).WithSystem<QuadSystem>(
 host.Step(3);
 GoldenImage.AssertMatches(host.Screenshot(), "Golden/quad_64.png", tolerance: 2);
 ```
+
+## Metrics
+Every frame the game loop writes a `FrameStats` (frame and idle time, fixed steps, `draw_calls`, `sprites`, `triangles`,
+`entities`, `events_emitted`, GC collections per generation and the bytes the loop thread allocated) into a preallocated ring of the last
+`Ion:Metrics:HistoryFrames` frames (default 300). With profiling on, the ring also records a span per stage, per step and
+scope of the schedule (the generated schedule brackets every call with `Stopwatch.GetTimestamp()`), and per
+`MetricsScope`, as interned ids with two timestamps: nothing allocates and no string is touched until a trace is exported.
+
+```csharp
+public sealed class PhysicsSystem(IMetrics metrics)
+{
+    private static readonly SpanId Solve = MetricsIds.Register("Physics.Solve");   // registered once
+    private readonly MetricsCounter _contacts = metrics.Counter("contacts");        // handles, no lookup per frame
+    private readonly MetricsGauge _bodies = metrics.Gauge("bodies");
+
+    [FixedUpdate]
+    public void Step(GameTime dt)
+    {
+        using (metrics.Profiler.Scope(Solve)) { /* ... */ }   // a no-op below 1 ns when profiling is off
+        _contacts.Add(3);
+        _bodies.Set(120);
+    }
+}
+```
+
+`metrics.Histogram("name")` records values per frame (count, sum, min and max in the frame log). Engine counters come from
+`IFrameStatsSource` services (the sprite batch through `ISpriteBatchStatistics`, the event bus, and the ECS hook for
+`entities`, which the Breakout ECS sample implements for its Arch world). In tests, `IonTestHost.LastFrame` has the last
+frame's stats and `IonTestHost.Metrics` the rest:
+
+```csharp
+host.Step();
+Assert.Equal(3, host.LastFrame.DrawCalls);
+Assert.Equal(1, host.LastFrame.FixedSteps);
+```
+
+Configuration (`Ion:Metrics`): `HistoryFrames` (300), `SpansPerFrame` (512), `Profiling` (false), `TraceOutput`
+(`trace.json`), `FrameLog` (off), `FrameLogFlushFrames` (60), `CaptureKey` (`F9`), `CaptureFrames` (120), `Meter` (true),
+`Overlay` (false), `OverlayFont`, `OverlayFontSize` (16), `OverlayRefreshSeconds` (0.25).
+
+**Capture a trace.** Press F9 in a running game (or call `IMetrics.Capture(frames)`) to record the next 120 frames with
+profiling on and write them to `Ion:Metrics:TraceOutput` as a Chrome trace; open it in [Perfetto](https://ui.perfetto.dev)
+or `chrome://tracing`. Each frame is a slice with its stats as arguments, every span a nested slice on the thread that
+recorded it, and the counters show as tracks. `--Ion:Metrics:Profiling=true` records from the start and writes the kept
+frames (bounded by the history, so a 10-minute run writes the last 300 frames) when the game exits;
+`IMetrics.WriteTrace(path, frames)` writes them on demand, and `MetricsExporter.WriteChromeTrace(path, frames)` writes any
+list of `FrameProfile`s.
+
+```sh
+dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS -- --Ion:Metrics:Profiling=true --Ion:Metrics:TraceOutput=trace.json
+```
+
+**Read the frame log.** `--Ion:Metrics:FrameLog=frames.jsonl` writes one JSON object per frame (JSON Lines), the format
+agents and scripts read:
+
+```json
+{"frame":299,"delta_ms":8.4,"frame_ms":8.341,"idle_ms":7.943,"work_ms":0.399,"fps":119.89,"fixed_steps":1,"draw_calls":607,"sprites":620,"triangles":1240,"entities":105,"events_emitted":0,"gc_gen0":0,"gc_gen1":0,"gc_gen2":0,"allocated_bytes":37520,"spans":0,"dropped_spans":0,"counters":{"blocks_hit":2},"gauges":{"balls":6}}
+```
+
+```sh
+dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS -- --Ion:Headless=true --Ion:Metrics:FrameLog=frames.jsonl
+jq -s 'map(.work_ms) | add / length' frames.jsonl        # mean work time per frame
+```
+
+**dotnet-counters.** The `Ion` meter publishes `ion.frame.duration` (histogram, ms), `ion.fps`, `ion.frames`, the last
+frame's `ion.frame.*` counters and every game counter, gauge and histogram under its own name:
+
+```sh
+dotnet-counters monitor -n Ion.Examples.Breakout.ECS --counters Ion
+```
+
+**Overlay.** `--Ion:Metrics:Overlay=true --Ion:Metrics:OverlayFont=Bungee-Regular.ttf` draws fps, frame time, draw
+calls and the game counters with the sprite batch (any backend). `IMetricsOverlaySource.Lines` gives the same text to
+anything else that draws.
+
+**Tracy.** `Ion.Extensions.Metrics.Tracy` streams spans as live Tracy zones, frame marks and counter plots. It is a
+separate project because it carries the native TracyClient (win-x64 and linux-x64 only); its bindings are source-generated
+P/Invokes and it publishes with NativeAOT without warnings. The Breakout ECS sample references it behind the `TRACY` symbol:
+
+```sh
+dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS -p:IonTracy=true    # then connect the Tracy profiler
+```
+
+**Compiling profiling out.** Span recording is behind the `Ion.Metrics.Profiling` feature switch. Setting
+`<IonMetricsProfiling>false</IonMetricsProfiling>` in a game's project makes the schedule generator emit no brackets, and a
+trimmed or NativeAOT publish substitutes `FrameProfiler.IsProfilingEnabled` with `false` and removes every other recording
+site (the frame stats, frame log, meter and overlay keep working). The default keeps profiling available in Release
+builds, off until turned on.
 
 ### Ion.Extensions.Scenes
 Adds support for scenes that each have their own scope for dependency injection and their own schedule, run by the `SceneSystem` step (see "Systems and the schedule").

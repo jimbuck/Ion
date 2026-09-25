@@ -29,6 +29,10 @@ internal class SpriteRenderer(
 	private Pipeline? _pipeline;
 
 	private bool _beginCalled = false;
+	private long _framesCompleted;
+
+	/// <summary>What the last <see cref="End"/> submitted: one instanced draw call per texture, two triangles per sprite.</summary>
+	public SpriteBatchStatistics LastFrameStatistics { get; private set; } = new(-1, 0, 0, 0);
 
 	private sealed class BufferContainer(DeviceBuffer buffer, ResourceSet instanceSet, ResourceSet textureSet) : IDisposable
 	{
@@ -288,7 +292,13 @@ void main()
 
 		_beginCalled = false;
 
-		if (_batchManager.IsEmpty || graphicsContext.GraphicsDevice is null || _commandList is null) return;
+		if (_batchManager.IsEmpty || graphicsContext.GraphicsDevice is null || _commandList is null)
+		{
+			LastFrameStatistics = new(_framesCompleted++, 0, 0, 0);
+			return;
+		}
+
+		int drawCalls = 0, sprites = 0;
 
 		var timer = trace.Start("End");
 
@@ -317,7 +327,11 @@ void main()
 			_commandList.SetGraphicsResourceSet(1, pair.TextureSet);
 			_commandList.Draw(4, (uint)group.Count, 0, 0);
 			innerTimer.Stop();
+			drawCalls++;
+			sprites += group.Count;
 		}
+
+		LastFrameStatistics = new(_framesCompleted++, drawCalls, sprites, sprites * 2);
 
 		_commandList.End();
 		graphicsContext.SubmitCommands(_commandList);

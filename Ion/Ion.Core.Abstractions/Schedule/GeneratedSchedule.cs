@@ -221,6 +221,14 @@ public sealed class GeneratedScheduleContext
 	/// <summary>The services the schedule resolves from.</summary>
 	public IServiceProvider Services { get; }
 
+	/// <summary>
+	/// The profiler the generated stage methods record a span per step and scope into (<see cref="FrameProfiler.Disabled"/>
+	/// when none is registered).
+	/// </summary>
+	public FrameProfiler Profiler => _profiler ??= Services.GetService<FrameProfiler>() ?? FrameProfiler.Disabled;
+
+	private FrameProfiler? _profiler;
+
 	/// <summary>Whether registration <paramref name="entry"/> (an index into the generator's list) ran.</summary>
 	public bool IsActive(int entry) => _entries[entry] is not null;
 

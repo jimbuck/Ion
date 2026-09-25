@@ -41,6 +41,9 @@ internal sealed class KnownSymbols
 	public INamedTypeSymbol? ServiceProvider { get; private set; }
 	public INamedTypeSymbol? AsyncStateMachineAttribute { get; private set; }
 
+	// Metrics v2: the frame profiler the generated stage methods record spans into.
+	public INamedTypeSymbol? FrameProfiler { get; private set; }
+
 	// Events v2.
 	public INamedTypeSymbol? Events { get; private set; }
 	public INamedTypeSymbol? EventBus { get; private set; }
@@ -102,6 +105,7 @@ internal sealed class KnownSymbols
 		known.ServiceCollection = Get("Microsoft.Extensions.DependencyInjection.IServiceCollection");
 		known.ServiceProvider = Get("System.IServiceProvider");
 		known.AsyncStateMachineAttribute = Get("System.Runtime.CompilerServices.AsyncStateMachineAttribute");
+		known.FrameProfiler = Get("Ion.FrameProfiler");
 		known.Events = Get("Ion.IEvents");
 		known.EventBus = Get("Ion.EventBus");
 		known.EventReader = Get("Ion.EventReader`1");

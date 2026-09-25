@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Ion.Core;
 using Ion.Extensions.Audio;
 using Ion.Extensions.Graphics;
+using Ion.Extensions.Metrics;
 
 namespace Ion.Testing;
 
@@ -101,6 +102,18 @@ public sealed class IonTestHost : IDisposable
 
 	/// <summary>The headless audio manager: <see cref="NullAudioManager.Plays"/> has every sound played. Starts the host.</summary>
 	public NullAudioManager Audio => Get<NullAudioManager>();
+
+	/// <summary>
+	/// The application's metrics: the frame profiler (set <see cref="IMetrics.IsProfiling"/> to record spans), game
+	/// counters and trace capture. Starts the host.
+	/// </summary>
+	public IMetrics Metrics => Get<IMetrics>();
+
+	/// <summary>
+	/// The stats of the last frame run: draw calls, sprites and triangles from the sprite batch, fixed steps, events,
+	/// allocations and wall-clock timings. Default before the first frame. Starts the host.
+	/// </summary>
+	public FrameStats LastFrame => Loop.Profiler.LastFrame;
 
 	/// <summary>The application's event bus, for emitting events into the game. Starts the host.</summary>
 	public IEvents Events => Get<IEvents>();

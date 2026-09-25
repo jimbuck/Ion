@@ -156,21 +156,42 @@ namespace Ion.Generated
 	[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 	file sealed class Schedule0 : global::Ion.GeneratedSchedule
 	{
+		private readonly global::Ion.FrameProfiler _prof;
 		private readonly global::Physics _s1;
+		private readonly global::Ion.SpanId _span0;
+		private readonly global::Ion.SpanId _span1;
 		private readonly global::Clock _p3_0;
 		private readonly global::Paddle _s0;
+		private readonly global::Ion.SpanId _span2;
+		private readonly global::Ion.SpanId _span3;
 
 		public Schedule0(global::Ion.GeneratedScheduleContext context)
 		{
+			_prof = context.Profiler;
 			_s1 = context.System<global::Physics>(1);
+			_span0 = global::Ion.MetricsIds.Register("Physics.Load");
+			_span1 = global::Ion.MetricsIds.Register("Physics.Step");
 			_p3_0 = context.Service<global::Clock>(0);
 			_s0 = context.System<global::Paddle>(0);
+			_span2 = global::Ion.MetricsIds.Register("Paddle.Move");
+			_span3 = global::Ion.MetricsIds.Register("Paddle.Draw");
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Init(global::Ion.GameTime dt)
 		{
-			_s1.Load(); // 0 Physics.Load
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t0 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span0) : 0L;
+					_s1.Load(); // 0 Physics.Load
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span0, t0);
+				}
+			}
+			else
+			{
+				_s1.Load(); // 0 Physics.Load
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -181,8 +202,24 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void FixedUpdate(global::Ion.GameTime dt)
 		{
-			_s1.Step(dt); // 0 Physics.Step
-			_s0.Move(dt, _p3_0); // -10 Paddle.Move
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t1 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span1) : 0L;
+					_s1.Step(dt); // 0 Physics.Step
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span1, t1);
+				}
+				{
+					long t2 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span2) : 0L;
+					_s0.Move(dt, _p3_0); // -10 Paddle.Move
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span2, t2);
+				}
+			}
+			else
+			{
+				_s1.Step(dt); // 0 Physics.Step
+				_s0.Move(dt, _p3_0); // -10 Paddle.Move
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -193,7 +230,18 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Render(global::Ion.GameTime dt)
 		{
-			global::Paddle.Draw(dt); // 0 Paddle.Draw
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t3 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span3) : 0L;
+					global::Paddle.Draw(dt); // 0 Paddle.Draw
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span3, t3);
+				}
+			}
+			else
+			{
+				global::Paddle.Draw(dt); // 0 Paddle.Draw
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]

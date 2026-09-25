@@ -4,7 +4,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 using Ion;
-using Ion.Extensions.Debug;
+using Ion.Extensions.Metrics;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Scenes;
 using Ion.Extensions.Coroutines;
@@ -17,7 +17,7 @@ var builder = IonApplication.CreateBuilder(args);
 // print every stage's steps (including each scene's) at startup.
 var headless = builder.Configuration.IsHeadless();
 
-builder.Services.AddDebugUtils(builder.Configuration);
+builder.Services.AddMetrics(builder.Configuration);
 if (headless)
 {
 	builder.Services.AddNullGraphics(builder.Configuration);
@@ -55,13 +55,14 @@ var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
 	//Console.WriteLine($"Frame: {dt.Frame}!");
 });
 
-game.First((GameTime dt, IInputState input, ITraceManager traceManager) =>
+// F5 starts profiling, F6 stops it and writes the kept frames (Ion:Metrics:TraceOutput). F9 captures the next 120 frames.
+game.First((GameTime dt, IInputState input, IMetrics metrics) =>
 {
-	if (input.Pressed(Key.F5)) traceManager.Start();
+	if (input.Pressed(Key.F5)) metrics.IsProfiling = true;
 	if (input.Pressed(Key.F6))
 	{
-		traceManager.Stop();
-		traceManager.OutputTrace();
+		metrics.IsProfiling = false;
+		metrics.WriteTrace();
 	}
 
 	logFrameNumber(dt);
@@ -104,7 +105,7 @@ game.UseScene(Scene.Gameplay, scene =>
 });
 
 // The engine systems can be added after the game's own steps: engine steps use the reserved order bands.
-game.UseDebugUtils();
+game.UseMetrics();
 game.UseEvents();
 if (headless) game.UseNullGraphics();
 else game.UseVeldridGraphics();

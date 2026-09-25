@@ -46,45 +46,75 @@ public class InjectionTests
 	}
 
 	[Fact, Trait(CATEGORY, INTEGRATION)]
-	public void AFakeTraceManagerCanBeInjected()
+	public void TheLoopRecordsAStageSpanAndIdleTimeIntoAnInjectedProfiler()
 	{
-		var fake = new FakeTraceManager();
-		var clock = new ManualClock();
-		using var host = new LoopTestHost(clock, c => c.MaxFPS = 100, services: s =>
-		{
-			s.AddDebugUtils(new ConfigurationBuilder().Build());
-			s.AddSingleton<ITraceManager>(fake);
-		}, use: app => app.UseDebugUtils(), systems: typeof(TestSystem));
+		var profiler = new FrameProfiler(historyFrames: 8, spansPerFrame: 64) { IsActive = true };
+		using var host = new LoopTestHost(new ManualClock(), c => c.MaxFPS = 100, services: s => s.AddSingleton(profiler), systems: typeof(TestSystem));
 
 		host.BuildLoop().RunFrames(3);
 
-		// GameLoop's ITraceTimer<GameLoop> came from the fake, and recorded the idle time of every paced frame.
-		Assert.Contains("GameLoop", fake.Prefixes);
-		Assert.Equal(3, fake.Started.Count(n => n == "GameLoop::Idle"));
+		// Init, three frames and Destroy.
+		Assert.Equal(5, profiler.Count);
+		var frame = profiler.GetFrame(1);
+		Assert.Equal(FrameKind.Frame, frame.Kind);
+		var names = frame.Spans.ToArray().Select(s => s.Id.Name).ToList();
+		Assert.Contains("First", names);
+		Assert.Contains("Update", names);
+		Assert.Contains("Idle", names);
+		Assert.Contains("EventSystem.StepEvents", names);
+		Assert.Contains("EventSystem.Step", names);
+		Assert.Equal(1, frame.Stats.FixedSteps);
 		Assert.Equal(3, host.Get<TestSystem>().UpdateCount);
-#if DEBUG
-		// In Debug builds the TraceTimerSystem wraps every stage with timers from the same fake.
-		Assert.Contains("GameLoop::Update", fake.Started);
-#endif
 	}
 
+#pragma warning disable CS0618 // The obsolete trace timer adapters.
 	[Fact, Trait(CATEGORY, INTEGRATION)]
-	public void TheRealTraceManagerIsUsedByDefault()
+	public void TheObsoleteTraceTimersStillRecord()
 	{
-		using var host = new LoopTestHost(new ManualClock(), c => c.MaxFPS = 100, services: s => s.AddDebugUtils(new ConfigurationBuilder().Build(), d => d.TraceOutput = ""), use: app => app.UseDebugUtils());
+		var output = Path.Combine(Path.GetTempPath(), $"ion-trace-{Guid.NewGuid():N}.json");
+		using var host = new LoopTestHost(new ManualClock(), services: s => s.AddDebugUtils(new ConfigurationBuilder().Build(), d => d.TraceOutput = output), use: app => app.UseDebugUtils());
 
 		var traceManager = host.Get<ITraceManager>();
-		traceManager.Start();
-		host.BuildLoop().RunFrames(2);
-		traceManager.Stop();
-		traceManager.OutputTrace();
-		traceManager.Clear();
+		var profiler = host.Get<FrameProfiler>();
+		var loop = host.BuildLoop();
+		loop.Initialize();
 
-		var timer = host.Get<ITraceTimer<GameLoop>>();
-		var instance = timer.Start("Probe");
+		traceManager.Start();
+		Assert.True(profiler.IsActive);
+
+		profiler.BeginFrame(99);
+		var instance = host.Get<ITraceTimer<GameLoop>>().Start("Probe");
 		instance.Then("Probe2");
 		instance.Stop();
+		traceManager.CreateTimer("Custom").Start("Work").Stop();
+		profiler.EndFrame();
+
+		var names = profiler.GetFrame(0).Spans.ToArray().Select(s => s.Id.Name).ToList();
+		Assert.Equal(["GameLoop::Probe", "GameLoop::Probe2", "Custom::Work"], names);
+
+		try
+		{
+			traceManager.OutputTrace();
+			Assert.True(File.Exists(output));
+		}
+		finally
+		{
+			File.Delete(output);
+		}
+
+		traceManager.Stop();
+		Assert.False(profiler.IsActive);
+		traceManager.Clear();
+		Assert.Equal(0, profiler.Count);
+
+		// Not recording: a shared instance, nothing recorded.
+		profiler.BeginFrame(100);
+		host.Get<ITraceTimer<GameLoop>>().Start("Idle").Stop();
+		profiler.EndFrame();
+		Assert.Equal(0, profiler.GetFrame(0).Spans.Length);
+		loop.Shutdown();
 	}
+#pragma warning restore CS0618
 
 	private sealed class FakeEvents : IEvents
 	{
@@ -93,33 +123,5 @@ public class InjectionTests
 		public void Emit<T>(in T e) where T : unmanaged => Emitted++;
 
 		public EventReader<T> Reader<T>() where T : unmanaged => default;
-	}
-
-	private sealed class FakeTraceManager : ITraceManager
-	{
-		public List<string> Prefixes { get; } = [];
-		public List<string> Started { get; } = [];
-
-		public bool IsEnabled { get; set; } = true;
-
-		public void Start() => IsEnabled = true;
-		public void Stop() => IsEnabled = false;
-		public void Clear() => Started.Clear();
-		public void OutputTrace() { }
-
-		public ITraceTimer CreateTimer(string prefix)
-		{
-			Prefixes.Add(prefix);
-			return new FakeTimer(this, prefix);
-		}
-
-		private sealed class FakeTimer(FakeTraceManager manager, string prefix) : ITraceTimer
-		{
-			public ITraceTimerInstance Start(string name)
-			{
-				manager.Started.Add(prefix + "::" + name);
-				return new NullTimerInstance();
-			}
-		}
 	}
 }

@@ -130,11 +130,31 @@ public static class GeneratedApps
 		return new GeneratedBenchmarkApp(app, app.Build());
 	}
 
-	private static IonApplication CreateApplication()
+	/// <summary>
+	/// <see cref="EightStageSystems"/> with a frame profiler (300 frames of history, so the loop writes frame stats every
+	/// frame), recording a span per step, stage and scope when <paramref name="profiling"/> is true.
+	/// </summary>
+	public static GeneratedBenchmarkApp EightStageSystemsWithMetrics(bool profiling)
+	{
+		var app = CreateApplication(new FrameProfiler { IsActive = profiling });
+		app.UseEvents();
+		app.UseSystem<GeneratedStageSystem>();
+		app.UseSystem<GeneratedStageSystem>();
+		app.UseSystem<GeneratedStageSystem>();
+		app.UseSystem<GeneratedStageSystem>();
+		app.UseSystem<GeneratedStageSystem>();
+		app.UseSystem<GeneratedStageSystem>();
+		app.UseSystem<GeneratedStageSystem>();
+		app.UseSystem<GeneratedStageSystem>();
+		return new GeneratedBenchmarkApp(app, app.Build());
+	}
+
+	private static IonApplication CreateApplication(FrameProfiler? profiler = null)
 	{
 		var builder = IonApplication.CreateBuilder([]);
 		builder.Services.AddLogging(logging => logging.ClearProviders());
 		builder.Services.AddSingleton<GeneratedCounterSystem>().AddSingleton<GeneratedStageSystem>();
+		if (profiler is not null) builder.Services.AddSingleton(profiler);
 		return builder.Build();
 	}
 }

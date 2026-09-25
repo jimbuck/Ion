@@ -45,7 +45,9 @@ public static class StageOrder
 	/// <summary>The last order of the engine teardown band.</summary>
 	public const int EngineTeardownLast = 1000;
 
-	/// <summary>Debug trace timers: a scope around every stage (Debug builds).</summary>
+	/// <summary>
+	/// Reserved: the 0.2 trace timer scope around every stage. The game loop now records a span per stage itself.
+	/// </summary>
 	public const int Trace = -1000;
 
 	/// <summary>The window: initialization (Init) and event pumping (First).</summary>
@@ -53,6 +55,9 @@ public static class StageOrder
 
 	/// <summary>Input: the per-frame input snapshot (First).</summary>
 	public const int Input = -940;
+
+	/// <summary>Metrics: the trace capture key (First), after input.</summary>
+	public const int Metrics = -930;
 
 	/// <summary>Asset hot reload: reloading changed assets (First), after input and before any user step.</summary>
 	public const int AssetReload = -920;
@@ -71,6 +76,9 @@ public static class StageOrder
 
 	/// <summary>Scenes: the active scene's schedule, in every stage.</summary>
 	public const int Scenes = -500;
+
+	/// <summary>The metrics overlay (Render), inside the sprite batch scope and after the game's own drawing.</summary>
+	public const int MetricsOverlay = 800;
 
 	/// <summary>The window close check that turns a closed window into an exit request (Render).</summary>
 	public const int WindowClose = 900;

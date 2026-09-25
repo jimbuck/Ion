@@ -153,21 +153,42 @@ namespace Ion.Generated
 	[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 	file sealed class Schedule0 : global::Ion.GeneratedSchedule
 	{
+		private readonly global::Ion.FrameProfiler _prof;
 		private readonly global::Menu _s0;
+		private readonly global::Ion.SpanId _span0;
+		private readonly global::Ion.SpanId _span1;
 		private readonly global::System.Action<global::Ion.GameTime, global::Ion.Extensions.Scenes.ICurrentScene> _f2;
 		private readonly global::Ion.Extensions.Scenes.ICurrentScene _f2_0;
+		private readonly global::Ion.SpanId _span2;
+		private readonly global::Ion.SpanId _span3;
 
 		public Schedule0(global::Ion.GeneratedScheduleContext context)
 		{
+			_prof = context.Profiler;
 			_s0 = context.System<global::Menu>(0);
+			_span0 = global::Ion.MetricsIds.Register("Menu.Open");
+			_span1 = global::Ion.MetricsIds.Register("Menu.Tick");
 			_f2 = context.Function<global::System.Action<global::Ion.GameTime, global::Ion.Extensions.Scenes.ICurrentScene>>(1);
 			_f2_0 = context.Service<global::Ion.Extensions.Scenes.ICurrentScene>(1);
+			_span2 = global::Ion.MetricsIds.Register("App.lambda(ICurrentScene)");
+			_span3 = global::Ion.MetricsIds.Register("Menu.Close");
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Init(global::Ion.GameTime dt)
 		{
-			_s0.Open(dt); // 0 Menu.Open
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t0 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span0) : 0L;
+					_s0.Open(dt); // 0 Menu.Open
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span0, t0);
+				}
+			}
+			else
+			{
+				_s0.Open(dt); // 0 Menu.Open
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -183,13 +204,35 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Update(global::Ion.GameTime dt)
 		{
-			_s0.Tick(dt); // 0 Menu.Tick
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t1 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span1) : 0L;
+					_s0.Tick(dt); // 0 Menu.Tick
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span1, t1);
+				}
+			}
+			else
+			{
+				_s0.Tick(dt); // 0 Menu.Tick
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Render(global::Ion.GameTime dt)
 		{
-			_f2(dt, _f2_0); // 0 App.lambda(ICurrentScene) (function)
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t2 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span2) : 0L;
+					_f2(dt, _f2_0); // 0 App.lambda(ICurrentScene) (function)
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span2, t2);
+				}
+			}
+			else
+			{
+				_f2(dt, _f2_0); // 0 App.lambda(ICurrentScene) (function)
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -200,7 +243,18 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Destroy(global::Ion.GameTime dt)
 		{
-			_s0.Close(dt); // 0 Menu.Close
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				{
+					long t3 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span3) : 0L;
+					_s0.Close(dt); // 0 Menu.Close
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span3, t3);
+				}
+			}
+			else
+			{
+				_s0.Close(dt); // 0 Menu.Close
+			}
 		}
 	}
 
@@ -240,13 +294,17 @@ namespace Ion.Generated
 	[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 	file sealed class Schedule1 : global::Ion.GeneratedSchedule
 	{
+		private readonly global::Ion.FrameProfiler _prof;
 		private readonly bool _g0;
 		private readonly global::System.Action<global::Ion.GameTime> _f0;
+		private readonly global::Ion.SpanId _span0;
 
 		public Schedule1(global::Ion.GeneratedScheduleContext context)
 		{
+			_prof = context.Profiler;
 			_g0 = context.IsActive(0);
 			_f0 = context.Function<global::System.Action<global::Ion.GameTime>>(0);
+			_span0 = global::Ion.MetricsIds.Register("App.lambda()");
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -267,7 +325,19 @@ namespace Ion.Generated
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Update(global::Ion.GameTime dt)
 		{
-			if (_g0) _f0(dt); // 0 App.lambda() (function)
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g0)
+				{
+					long t0 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span0) : 0L;
+					_f0(dt); // 0 App.lambda() (function)
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span0, t0);
+				}
+			}
+			else
+			{
+				if (_g0) _f0(dt); // 0 App.lambda() (function)
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -322,72 +392,242 @@ namespace Ion.Generated
 	[global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 	file sealed class Schedule2 : global::Ion.GeneratedSchedule
 	{
+		private readonly global::Ion.FrameProfiler _prof;
 		private readonly bool _g1;
 		private readonly global::Ion.Extensions.Scenes.SceneSystem _s1;
+		private readonly global::Ion.SpanId _span0;
 		private readonly bool _g2;
 		private readonly global::Ion.Extensions.Scenes.SceneSystem _s2;
+		private readonly global::Ion.SpanId _span1;
+		private readonly global::Ion.SpanId _span2;
+		private readonly global::Ion.SpanId _span3;
+		private readonly global::Ion.SpanId _span4;
+		private readonly global::Ion.SpanId _span5;
+		private readonly global::Ion.SpanId _span6;
+		private readonly global::Ion.SpanId _span7;
 		private readonly global::System.Action<global::Ion.GameTime> _f8;
+		private readonly global::Ion.SpanId _span8;
+		private readonly global::Ion.SpanId _span9;
+		private readonly global::Ion.SpanId _span10;
+		private readonly global::Ion.SpanId _span11;
+		private readonly global::Ion.SpanId _span12;
 		private readonly global::Ion.GameLoopDelegate _d13;
+		private readonly global::Ion.SpanId _span13;
+		private readonly global::Ion.SpanId _span14;
+		private readonly global::Ion.SpanId _span15;
 
 		public Schedule2(global::Ion.GeneratedScheduleContext context)
 		{
+			_prof = context.Profiler;
 			_g1 = context.IsActive(1);
 			_s1 = context.System<global::Ion.Extensions.Scenes.SceneSystem>(1);
+			_span0 = global::Ion.MetricsIds.Register("SceneSystem.Init");
 			_g2 = context.IsActive(2);
 			_s2 = context.System<global::Ion.Extensions.Scenes.SceneSystem>(2);
+			_span1 = global::Ion.MetricsIds.Register("SceneSystem.Init");
+			_span2 = global::Ion.MetricsIds.Register("SceneSystem.First");
+			_span3 = global::Ion.MetricsIds.Register("SceneSystem.First");
+			_span4 = global::Ion.MetricsIds.Register("SceneSystem.FixedUpdate");
+			_span5 = global::Ion.MetricsIds.Register("SceneSystem.FixedUpdate");
+			_span6 = global::Ion.MetricsIds.Register("SceneSystem.Update");
+			_span7 = global::Ion.MetricsIds.Register("SceneSystem.Update");
 			_f8 = context.Function<global::System.Action<global::Ion.GameTime>>(3);
+			_span8 = global::Ion.MetricsIds.Register("App.lambda()");
+			_span9 = global::Ion.MetricsIds.Register("SceneSystem.Render");
+			_span10 = global::Ion.MetricsIds.Register("SceneSystem.Render");
+			_span11 = global::Ion.MetricsIds.Register("SceneSystem.Last");
+			_span12 = global::Ion.MetricsIds.Register("SceneSystem.Last");
 			_d13 = context.Step(0, global::Ion.Stage.Last, "StepEvents", 0);
+			_span13 = global::Ion.MetricsIds.Register("EventSystem.StepEvents");
+			_span14 = global::Ion.MetricsIds.Register("SceneSystem.Destroy");
+			_span15 = global::Ion.MetricsIds.Register("SceneSystem.Destroy");
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Init(global::Ion.GameTime dt)
 		{
-			if (_g1) _s1.Init(dt); // -500 SceneSystem.Init
-			if (_g2) _s2.Init(dt); // -500 SceneSystem.Init
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g1)
+				{
+					long t0 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span0) : 0L;
+					_s1.Init(dt); // -500 SceneSystem.Init
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span0, t0);
+				}
+				if (_g2)
+				{
+					long t1 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span1) : 0L;
+					_s2.Init(dt); // -500 SceneSystem.Init
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span1, t1);
+				}
+			}
+			else
+			{
+				if (_g1) _s1.Init(dt); // -500 SceneSystem.Init
+				if (_g2) _s2.Init(dt); // -500 SceneSystem.Init
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void First(global::Ion.GameTime dt)
 		{
-			if (_g1) _s1.First(dt); // -500 SceneSystem.First
-			if (_g2) _s2.First(dt); // -500 SceneSystem.First
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g1)
+				{
+					long t2 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span2) : 0L;
+					_s1.First(dt); // -500 SceneSystem.First
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span2, t2);
+				}
+				if (_g2)
+				{
+					long t3 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span3) : 0L;
+					_s2.First(dt); // -500 SceneSystem.First
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span3, t3);
+				}
+			}
+			else
+			{
+				if (_g1) _s1.First(dt); // -500 SceneSystem.First
+				if (_g2) _s2.First(dt); // -500 SceneSystem.First
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void FixedUpdate(global::Ion.GameTime dt)
 		{
-			if (_g1) _s1.FixedUpdate(dt); // -500 SceneSystem.FixedUpdate
-			if (_g2) _s2.FixedUpdate(dt); // -500 SceneSystem.FixedUpdate
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g1)
+				{
+					long t4 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span4) : 0L;
+					_s1.FixedUpdate(dt); // -500 SceneSystem.FixedUpdate
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span4, t4);
+				}
+				if (_g2)
+				{
+					long t5 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span5) : 0L;
+					_s2.FixedUpdate(dt); // -500 SceneSystem.FixedUpdate
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span5, t5);
+				}
+			}
+			else
+			{
+				if (_g1) _s1.FixedUpdate(dt); // -500 SceneSystem.FixedUpdate
+				if (_g2) _s2.FixedUpdate(dt); // -500 SceneSystem.FixedUpdate
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Update(global::Ion.GameTime dt)
 		{
-			if (_g1) _s1.Update(dt); // -500 SceneSystem.Update
-			if (_g2) _s2.Update(dt); // -500 SceneSystem.Update
-			_f8(dt); // 0 App.lambda() (function)
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g1)
+				{
+					long t6 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span6) : 0L;
+					_s1.Update(dt); // -500 SceneSystem.Update
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span6, t6);
+				}
+				if (_g2)
+				{
+					long t7 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span7) : 0L;
+					_s2.Update(dt); // -500 SceneSystem.Update
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span7, t7);
+				}
+				{
+					long t8 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span8) : 0L;
+					_f8(dt); // 0 App.lambda() (function)
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span8, t8);
+				}
+			}
+			else
+			{
+				if (_g1) _s1.Update(dt); // -500 SceneSystem.Update
+				if (_g2) _s2.Update(dt); // -500 SceneSystem.Update
+				_f8(dt); // 0 App.lambda() (function)
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Render(global::Ion.GameTime dt)
 		{
-			if (_g1) _s1.Render(dt); // -500 SceneSystem.Render
-			if (_g2) _s2.Render(dt); // -500 SceneSystem.Render
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g1)
+				{
+					long t9 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span9) : 0L;
+					_s1.Render(dt); // -500 SceneSystem.Render
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span9, t9);
+				}
+				if (_g2)
+				{
+					long t10 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span10) : 0L;
+					_s2.Render(dt); // -500 SceneSystem.Render
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span10, t10);
+				}
+			}
+			else
+			{
+				if (_g1) _s1.Render(dt); // -500 SceneSystem.Render
+				if (_g2) _s2.Render(dt); // -500 SceneSystem.Render
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Last(global::Ion.GameTime dt)
 		{
-			if (_g1) _s1.Last(dt); // -500 SceneSystem.Last
-			if (_g2) _s2.Last(dt); // -500 SceneSystem.Last
-			_d13(dt); // 1000 EventSystem.StepEvents
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g1)
+				{
+					long t11 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span11) : 0L;
+					_s1.Last(dt); // -500 SceneSystem.Last
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span11, t11);
+				}
+				if (_g2)
+				{
+					long t12 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span12) : 0L;
+					_s2.Last(dt); // -500 SceneSystem.Last
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span12, t12);
+				}
+				{
+					long t13 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span13) : 0L;
+					_d13(dt); // 1000 EventSystem.StepEvents
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span13, t13);
+				}
+			}
+			else
+			{
+				if (_g1) _s1.Last(dt); // -500 SceneSystem.Last
+				if (_g2) _s2.Last(dt); // -500 SceneSystem.Last
+				_d13(dt); // 1000 EventSystem.StepEvents
+			}
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
 		public override void Destroy(global::Ion.GameTime dt)
 		{
-			if (_g1) _s1.Destroy(dt); // -500 SceneSystem.Destroy
-			if (_g2) _s2.Destroy(dt); // -500 SceneSystem.Destroy
+			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
+			{
+				if (_g1)
+				{
+					long t14 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span14) : 0L;
+					_s1.Destroy(dt); // -500 SceneSystem.Destroy
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span14, t14);
+				}
+				if (_g2)
+				{
+					long t15 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span15) : 0L;
+					_s2.Destroy(dt); // -500 SceneSystem.Destroy
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span15, t15);
+				}
+			}
+			else
+			{
+				if (_g1) _s1.Destroy(dt); // -500 SceneSystem.Destroy
+				if (_g2) _s2.Destroy(dt); // -500 SceneSystem.Destroy
+			}
 		}
 	}
 }
