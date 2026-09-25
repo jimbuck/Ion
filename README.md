@@ -57,7 +57,34 @@ A headless graphics backend with no window, GPU or SDL, for tests, servers and C
 dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS -- --Ion:Headless=true
 ```
 
-In tests, resolve `NullInputState` to script input and `NullSpriteBatch` / `NullAudioManager` to assert on what was drawn and played.
+In tests, resolve `NullInputState` to script input and `NullSpriteBatch` / `NullAudioManager` to assert on what was drawn and played, or use `IonTestHost` (below).
+
+### Input and fixed steps
+`IInputState` edges (`Pressed`, `Released`) and deltas (`WheelDelta`, `MouseDelta`) depend on the stage that reads them. From `First`, `Update`, `Render` and `Last` they describe the current frame. From `FixedUpdate` they describe everything since the previous fixed step, so a click is seen by exactly one fixed step even when `MaxFPS` is above `FixedUpdateRate` and some frames run no fixed step. Events get the same guarantee: an event that leaves the two-frame window before any fixed step ran is still delivered to `FixedUpdate` listeners. The loop publishes the running stage through `ILoopContext`.
+
+## Testing
+`Ion.Testing` runs a game headless on a deterministic `FixedStepClock` (one 60 Hz fixed step per frame by default), so tests can step it frame by frame and assert on services, draw counts, sounds and events:
+
+```csharp
+using Ion.Testing;
+
+using var host = new IonTestHost()          // or new IonTestHost(TimeSpan.FromSeconds(1.0 / 120))
+    .WithConfiguration("Ion:Seed", "42")
+    .Configure(services => services.AddSingleton<ScoreSystem>())
+    .WithSystem<PlayerSystem>();              // added after UseIon(), in order
+
+var scores = host.Collect<ScoredEvent>();     // records every ScoredEvent the game emits
+
+host.Step(10);                                // builds the app, runs Init, then 10 frames
+host.Input.Click(MouseButton.Left);           // applied at the start of the next frame
+Assert.True(host.RunUntil(() => scores.Count > 0, maxFrames: 600));
+
+Assert.True(host.SpriteBatch.LastFrame.Sprites > 0);
+Assert.NotEmpty(host.Audio.Plays);
+Assert.Equal(1, host.Get<ScoreSystem>().Lives);
+```
+
+`Configure` and `ConfigureApp` add service registrations and pipeline setup, `WithConfiguration` adds settings, and `UseGame(configure, use)` builds a whole game that calls `AddIon`/`UseIon` itself (see `Ion.Examples/Ion.Examples.Breakout.ECS.Tests`, which plays 600 frames of Breakout with the autopilot and checks the run is deterministic). Disposing the host runs Destroy and disposes the application. `Screenshot()` throws `NotSupportedException` until the headless renderer lands.
 
 ### Ion.Extensions.Scenes
 Adds support for scenes that each have thier own scope for dependency injection!

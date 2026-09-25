@@ -10,9 +10,15 @@ namespace Ion.Extensions.Graphics;
 /// <see cref="NullInputState"/> to script input.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Every scripted event of a frame counts: a key pressed and released before the same frame (or <see cref="Tap"/>) reports
 /// both <c>Pressed</c> and <c>Released</c> for that frame and is not <c>Down</c> afterwards. The scripting methods are
 /// thread-safe, so a test may script input while the game loop runs on another thread.
+/// </para>
+/// <para>
+/// Edges and deltas follow the stage rules of <see cref="IInputState"/>: FixedUpdate systems see each scripted edge in
+/// exactly one fixed step, even on frames that run no fixed step.
+/// </para>
 /// </remarks>
 public sealed class NullInputState : IInputState
 {
@@ -22,11 +28,28 @@ public sealed class NullInputState : IInputState
 
 	private readonly Lock _lock = new();
 	private readonly List<Pending> _pending = [];
-	private readonly InputTracker _tracker = new();
+	private readonly InputTracker _tracker;
 
-	public Vector2 MousePosition { get; private set; } = Vector2.Zero;
+	/// <summary>
+	/// Creates a scripted input state.
+	/// </summary>
+	/// <param name="loop">
+	/// The game loop context used to give FixedUpdate systems their own view of edges and deltas. Without it (a bare
+	/// instance driven by <see cref="Step"/>) every query uses the per-frame view.
+	/// </param>
+	public NullInputState(ILoopContext? loop = null)
+	{
+		_tracker = new InputTracker(loop);
+	}
 
-	public float WheelDelta { get; private set; }
+	/// <inheritdoc/>
+	public Vector2 MousePosition => _tracker.MousePosition;
+
+	/// <inheritdoc/>
+	public float WheelDelta => _tracker.WheelDelta;
+
+	/// <inheritdoc/>
+	public Vector2 MouseDelta => _tracker.MouseDelta;
 
 	/// <summary>
 	/// Queues a key press (not a repeat) for the next frame.
@@ -77,7 +100,8 @@ public sealed class NullInputState : IInputState
 	public void ReleaseAll() => _queue(new Pending(PendingKind.ReleaseAll));
 
 	/// <summary>
-	/// Moves the mouse at the start of the next frame, like the Veldrid backend warping the cursor.
+	/// Moves the mouse at the start of the next frame, like the Veldrid backend warping the cursor. The movement counts
+	/// towards <see cref="MouseDelta"/>.
 	/// </summary>
 	public void SetMousePosition(Vector2 position) => _queue(new Pending(PendingKind.MousePosition, Value: position));
 
@@ -91,7 +115,6 @@ public sealed class NullInputState : IInputState
 	public void Step()
 	{
 		_tracker.BeginFrame();
-		WheelDelta = 0;
 
 		Pending[] pending;
 		lock (_lock)
@@ -112,10 +135,10 @@ public sealed class NullInputState : IInputState
 					_tracker.OnMouseButton(e.Button, e.Down);
 					break;
 				case PendingKind.MousePosition:
-					MousePosition = e.Value;
+					_tracker.OnMouseMove(e.Value);
 					break;
 				case PendingKind.Wheel:
-					WheelDelta += e.Value.X;
+					_tracker.OnWheel(e.Value.X);
 					break;
 				case PendingKind.ReleaseAll:
 					_tracker.ReleaseAll();

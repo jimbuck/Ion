@@ -19,6 +19,12 @@ namespace Ion.Core;
 /// Frame pacing only limits rendering: unless <see cref="GameConfig.VSync"/> is set or <see cref="GameConfig.MaxFPS"/>
 /// is below 1, the loop asks the clock to <see cref="IClock.Sleep"/> for what is left of <c>1 / MaxFPS</c> seconds.
 /// </para>
+/// <para>
+/// Before invoking each stage the loop sets <see cref="ILoopContext.Stage"/> on <see cref="Context"/> (and increments
+/// <see cref="ILoopContext.FixedStepCount"/> before each fixed step), so engine services can tell fixed-step consumers
+/// from per-frame ones. This is how an input edge or an event that happens on a frame without a fixed step still reaches
+/// the next fixed step exactly once.
+/// </para>
 /// </remarks>
 public class GameLoop
 {
@@ -30,6 +36,7 @@ public class GameLoop
 	private readonly IEventListener _events;
 	private readonly ITraceTimer _trace;
 	private readonly IClock _clock;
+	private readonly GameLoopContext _context;
 
 	private volatile bool _shouldExit;
 	private TimeSpan _frameStart;
@@ -42,12 +49,17 @@ public class GameLoop
 	/// <param name="events">The listener used to detect <see cref="ExitGameEvent"/>.</param>
 	/// <param name="trace">The trace timer used to record idle time.</param>
 	/// <param name="clock">The time source for every frame.</param>
-	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events, ITraceTimer<GameLoop> trace, IClock clock)
+	/// <param name="context">
+	/// The loop context to keep up to date (the application's singleton <see cref="GameLoopContext"/>). When omitted the loop
+	/// uses a private one, which only this loop's <see cref="Context"/> exposes.
+	/// </param>
+	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events, ITraceTimer<GameLoop> trace, IClock clock, GameLoopContext? context = null)
 	{
 		_gameConfig = gameConfig;
 		_events = events;
 		_trace = trace;
 		_clock = clock;
+		_context = context ?? new GameLoopContext();
 
 		_frameStart = clock.Elapsed;
 		FixedGameTime.Alpha = 1;
@@ -58,6 +70,11 @@ public class GameLoop
 	/// The clock that drives this loop.
 	/// </summary>
 	public IClock Clock => _clock;
+
+	/// <summary>
+	/// Where the loop is: the running stage, the frame and the number of fixed steps started. Set before each stage runs.
+	/// </summary>
+	public ILoopContext Context => _context;
 
 	/// <summary>
 	/// The variable-rate time passed to First, Update, Render and Last.
@@ -141,10 +158,7 @@ public class GameLoop
 
 		try
 		{
-			Init(GameTime);
-
-			// Start timing after Init so that loading time does not count as the first frame.
-			_frameStart = _clock.Elapsed;
+			Initialize();
 
 			using var timerResolution = _gameConfig.CurrentValue.VSync ? default : WindowsTimerResolution.Begin();
 
@@ -153,13 +167,59 @@ public class GameLoop
 				Step();
 			}
 
+			Shutdown();
+		}
+		finally
+		{
+			_context.Stage = GameLoopStage.None;
+			IsRunning = false;
+		}
+	}
+
+	/// <summary>
+	/// Runs the Init stage and restarts frame timing, so that loading time does not count as the first frame. Called by
+	/// <see cref="Run"/> and <see cref="RunFrames"/>; call it directly only when driving the loop with <see cref="Step()"/>
+	/// (as test hosts do), once, before the first frame.
+	/// </summary>
+	public void Initialize()
+	{
+		_shouldExit = false;
+		_context.Frame = GameTime.Frame;
+		_context.Stage = GameLoopStage.Init;
+		try
+		{
+			Init(GameTime);
+		}
+		finally
+		{
+			_context.Stage = GameLoopStage.None;
+		}
+
+		_frameStart = _clock.Elapsed;
+	}
+
+	/// <summary>
+	/// Runs the Destroy stage. Called by <see cref="Run"/> and <see cref="RunFrames"/> after the last frame; call it
+	/// directly only when driving the loop with <see cref="Step()"/>, once, after the last frame.
+	/// </summary>
+	public void Shutdown()
+	{
+		_context.Stage = GameLoopStage.Destroy;
+		try
+		{
 			Destroy(GameTime);
 		}
 		finally
 		{
-			IsRunning = false;
+			_context.Stage = GameLoopStage.None;
 		}
 	}
+
+	/// <summary>
+	/// Whether the loop has been asked to exit, by <see cref="Stop"/> or an <see cref="ExitGameEvent"/>. <see cref="Run"/>
+	/// and <see cref="RunFrames"/> return after the frame in which this becomes true; <see cref="Step()"/> ignores it.
+	/// </summary>
+	public bool IsExitRequested => _shouldExit;
 
 	/// <summary>
 	/// Runs one complete, timed frame: First, as many FixedUpdate steps as the accumulated time allows, Update, Render,
@@ -186,11 +246,17 @@ public class GameLoop
 
 		_accumulator += delta.TotalSeconds;
 
+		var context = _context;
+		context.Frame = GameTime.Frame;
+
+		context.Stage = GameLoopStage.First;
 		First(GameTime);
 
 		while (_accumulator + AccumulatorEpsilon >= fixedStep)
 		{
 			FixedGameTime.Elapsed += TimeSpan.FromSeconds(fixedStep);
+			context.FixedStepCount++;
+			context.Stage = GameLoopStage.FixedUpdate;
 			FixedUpdate(FixedGameTime);
 			_accumulator -= fixedStep;
 		}
@@ -198,17 +264,23 @@ public class GameLoop
 		if (_accumulator < 0) _accumulator = 0;
 		GameTime.Alpha = (float)(_accumulator / fixedStep);
 
+		context.Stage = GameLoopStage.Update;
 		Update(GameTime);
 
+		context.Stage = GameLoopStage.Render;
 		Render(GameTime);
 
 		if (_events.On<ExitGameEvent>()) _shouldExit = true;
 
+		context.Stage = GameLoopStage.Last;
 		Last(GameTime);
+
+		context.Stage = GameLoopStage.None;
 
 		Pace(config, frameStart);
 
 		GameTime.Frame = FixedGameTime.Frame = GameTime.Frame + 1;
+		context.Frame = GameTime.Frame;
 
 		if (Rebuild)
 		{
@@ -225,16 +297,29 @@ public class GameLoop
 	/// <param name="time">The time passed to every stage.</param>
 	public void Step(GameTime time)
 	{
+		var context = _context;
+		context.Frame = time.Frame;
+
+		context.Stage = GameLoopStage.First;
 		First(time);
 
+		context.FixedStepCount++;
+		context.Stage = GameLoopStage.FixedUpdate;
 		FixedUpdate(time);
+
+		context.Stage = GameLoopStage.Update;
 		Update(time);
 
-		if (_shouldExit) return;
+		if (!_shouldExit)
+		{
+			context.Stage = GameLoopStage.Render;
+			Render(time);
 
-		Render(time);
+			context.Stage = GameLoopStage.Last;
+			Last(time);
+		}
 
-		Last(time);
+		context.Stage = GameLoopStage.None;
 	}
 
 	/// <summary>

@@ -35,6 +35,8 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 
 		Services.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(NullTraceTimer<>)));
 		Services.AddSingleton<IClock, StopwatchClock>();
+		Services.AddSingleton<GameLoopContext>();
+		Services.AddSingleton<ILoopContext>(static sp => sp.GetRequiredService<GameLoopContext>());
 
 		// The concrete emitter is registered for the engine's own event plumbing (listeners, EventSystem); the interface
 		// forwards to it by default and can be replaced by a fake without breaking that plumbing.

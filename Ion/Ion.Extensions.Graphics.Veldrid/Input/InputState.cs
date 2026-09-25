@@ -5,22 +5,26 @@ namespace Ion;
 
 /// <summary>
 /// Veldrid implementation of <see cref="IInputState"/>. Each <see cref="Step"/> feeds the window's latest
-/// input snapshot into an <see cref="InputTracker"/>, which holds the actual state.
+/// input snapshot into an <see cref="InputTracker"/>, which holds the actual state and selects the per-frame or
+/// fixed-step view from <see cref="ILoopContext"/> (see <see cref="IInputState"/>).
 /// </summary>
 internal class InputState : IInputState
 {
 	private readonly Window _window;
 	private readonly IEventListener _events;
-	private readonly InputTracker _tracker = new();
+	private readonly InputTracker _tracker;
 
-	public Vector2 MousePosition { get; private set; } = Vector2.Zero;
+	public Vector2 MousePosition => _tracker.MousePosition;
 
-	public float WheelDelta { get; private set; } = 0;
+	public float WheelDelta => _tracker.WheelDelta;
 
-	public InputState(Window window, IEventListener events)
+	public Vector2 MouseDelta => _tracker.MouseDelta;
+
+	public InputState(Window window, IEventListener events, ILoopContext? loop = null)
 	{
 		_window = window;
 		_events = events;
+		_tracker = new InputTracker(loop);
 	}
 
 	public void Step()
@@ -29,11 +33,11 @@ internal class InputState : IInputState
 
 		_tracker.BeginFrame();
 
-		MousePosition = snapshot?.MousePosition ?? Vector2.Zero;
-		WheelDelta = snapshot?.WheelDelta ?? 0;
-
 		if (snapshot is not null)
 		{
+			_tracker.OnMouseMove(snapshot.MousePosition);
+			if (snapshot.WheelDelta != 0) _tracker.OnWheel(snapshot.WheelDelta);
+
 			var keyEvents = snapshot.KeyEvents;
 			for (var i = 0; i < keyEvents.Count; i++)
 			{

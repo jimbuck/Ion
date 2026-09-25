@@ -15,56 +15,17 @@ using nkast.Aether.Physics2D.Dynamics;
 using nkast.Aether.Physics2D.Dynamics.Contacts;
 
 using Ion.Examples.Breakout.ECS.Physics;
+using Ion.Examples.Breakout.ECS;
 using Ion.Examples.Breakout.ECS.Common;
 
-// Arch creates component arrays with Array.CreateInstance unless the array type is registered up front,
-// which NativeAOT cannot do for types it has not seen. Register every component so the sample runs under PublishAot.
-ArrayRegistry.Add<Block>();
-ArrayRegistry.Add<Paddle>();
-ArrayRegistry.Add<Ball>();
-ArrayRegistry.Add<Transform2D>();
-ArrayRegistry.Add<Sprite>();
-ArrayRegistry.Add<DynamicRigidBody>();
-ArrayRegistry.Add<KinematicRigidBody>();
-ArrayRegistry.Add<StaticBody>();
-
+// The game setup lives in BreakoutGame so tests (Ion.Examples.Breakout.ECS.Tests) can build exactly the same game.
+// Run with --Ion:Headless=true to use the headless graphics and audio backends (no GPU, window or audio device), and
+// --Ion:Seed=<n> to change the random seed.
 var builder = IonApplication.CreateBuilder(args);
+BreakoutGame.Configure(builder);
 
-// Run with --Ion:Headless=true to use the headless graphics and audio backends (no GPU, window or audio device).
-var headless = builder.Configuration.IsHeadless();
-
-builder.Services.AddIon(builder.Configuration, graphics =>
-{
-	graphics.ClearColor = new Color(0x333);
-});
-
-builder.Services.AddSingleton<MouseCaptureSystem>()
-				.AddSingleton<SpriteRendererSystem>()
-				.AddScoped(services => World.Create())
-				.AddScoped<ScoreSystem>()
-				.AddScoped<SoundEffectsSystem>()
-				.AddScoped<PaddleSystem>()
-				.AddScoped<BallSystem>()
-				.AddScoped<BlockSystem>()
-				.AddScoped<PhysicsManager>()
-				.AddScoped<PhysicsSystem>()
-				.AddScoped<LevelSystem>();
-
-if (headless) builder.Services.AddScoped<HeadlessAutopilotSystem>();
-
-var game = builder.Build();
-game.UseIon()
-	.UseSystem<MouseCaptureSystem>()
-	.UseSystem<PhysicsSystem>()
-	.UseSystem<LevelSystem>()
-	.UseSystem<SoundEffectsSystem>()
-	.UseSystem<PaddleSystem>()
-	.UseSystem<BallSystem>()
-	.UseSystem<BlockSystem>()
-	.UseSystem<SpriteRendererSystem>()
-	.UseSystem<ScoreSystem>();
-
-if (headless) game.UseSystem<HeadlessAutopilotSystem>();
+using var game = builder.Build();
+BreakoutGame.Use(game);
 
 game.Run();
 
@@ -179,6 +140,9 @@ public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBat
 
 	private int _ballCount = 0;
 
+	/// <summary>The current score: 10 points per block hit.</summary>
+	public int Score => _score;
+
 	[Init]
 	public void Init(GameTime dt, GameLoopDelegate next)
 	{
@@ -212,9 +176,9 @@ public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBat
 	}
 }
 
-public class SoundEffectsSystem(IAssetManager assets, IEventListener events, IAudioManager audio)
+public class SoundEffectsSystem(IAssetManager assets, IEventListener events, IAudioManager audio, BreakoutSettings settings)
 {
-	private readonly Random _rand = new(6014);
+	private readonly Random _rand = settings.CreateRandom(1);
 
 	private ISoundEffect _bonkSound = default!;
 	private ISoundEffect _pingSound = default!;
@@ -351,13 +315,13 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 }
 
 
-public unsafe class BlockSystem(IEventListener events, IAssetManager assets, World world, PhysicsManager physics)
+public unsafe class BlockSystem(IEventListener events, IAssetManager assets, World world, PhysicsManager physics, BreakoutSettings settings)
 {
 	private readonly QueryDescription _blockQuery = new QueryDescription().WithAll<Block>();
 	private readonly QueryDescription _paddleQuery = new QueryDescription().WithAll<Paddle>();
 	private Entity _paddle = Entity.Null;
 
-	private readonly Random _rand = new();
+	private readonly Random _rand = settings.CreateRandom(2);
 
 	[Init]
 	public void SetupBlocks(GameTime dt, GameLoopDelegate next)

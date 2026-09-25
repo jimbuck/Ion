@@ -1,0 +1,337 @@
+using System.Diagnostics.CodeAnalysis;
+
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using Ion.Core;
+using Ion.Extensions.Audio;
+using Ion.Extensions.Graphics;
+
+namespace Ion.Testing;
+
+/// <summary>
+/// Runs an Ion game headless and deterministically for tests: no GPU, window or audio device, and a
+/// <see cref="FixedStepClock"/> so every frame lasts exactly <see cref="FrameTime"/>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Configure the host with the <c>With*</c> and <c>Configure*</c> methods, then drive it with <see cref="Step"/> or
+/// <see cref="RunUntil"/>. The application is built, and the Init stage run, on the first <see cref="Step"/>,
+/// <see cref="RunUntil"/> or access to <see cref="Services"/> (or an explicit <see cref="Start"/>); configuring after that
+/// throws <see cref="InvalidOperationException"/>. <see cref="Dispose"/> runs the Destroy stage and disposes the application.
+/// </para>
+/// <para>
+/// By default the host registers every extension with <c>AddIon</c> (headless) and wires <c>UseIon</c>, then the systems
+/// added with <see cref="WithSystem{T}"/>, in order. To test a whole game whose setup already calls <c>AddIon</c> and
+/// <c>UseIon</c>, pass its setup to <see cref="UseGame"/> instead. Console logging is off; add providers in
+/// <see cref="Configure"/> to see logs.
+/// </para>
+/// <para>
+/// Exceptions thrown by systems propagate out of <see cref="Step"/>. A frame in which the game asks to exit
+/// (<see cref="ExitGameEvent"/>) ends the current <see cref="Step"/> call early; <see cref="IsExitRequested"/> tells.
+/// </para>
+/// </remarks>
+public sealed class IonTestHost : IDisposable
+{
+	/// <summary>
+	/// The default frame time: one 60 Hz step, rounded up to a whole tick so that every frame runs exactly one fixed step
+	/// at the default <see cref="GameConfig.FixedUpdateRate"/>.
+	/// </summary>
+	public static readonly TimeSpan DefaultFrameTime = TimeSpan.FromTicks((TimeSpan.TicksPerSecond + 59) / 60);
+
+	private readonly List<Action<IServiceCollection>> _services = [];
+	private readonly List<Action<IIonApplication>> _app = [];
+	private readonly List<(Action<IServiceCollection> Register, Action<IIonApplication> Use)> _systems = [];
+	private const string HeadlessKey = "Ion:Headless";
+
+	private readonly Dictionary<string, string?> _settings = new() { [HeadlessKey] = "true" };
+	private readonly List<IEventCollector> _collectors = [];
+
+	private Action<IonApplicationBuilder>? _gameBuilder;
+	private Action<IIonApplication>? _gameApp;
+	private string[] _args = [];
+
+	private IonApplication? _application;
+	private GameLoop? _loop;
+	private bool _disposed;
+
+	/// <summary>
+	/// Creates a host whose frames last <paramref name="frameTime"/> (<see cref="DefaultFrameTime"/> when omitted).
+	/// </summary>
+	public IonTestHost(TimeSpan? frameTime = null)
+	{
+		FrameTime = frameTime ?? DefaultFrameTime;
+		ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(FrameTime, TimeSpan.Zero, nameof(frameTime));
+		Clock = new FixedStepClock(FrameTime);
+	}
+
+	/// <summary>The duration of every frame.</summary>
+	public TimeSpan FrameTime { get; }
+
+	/// <summary>The deterministic clock driving the game loop.</summary>
+	public FixedStepClock Clock { get; }
+
+	/// <summary>Whether the application has been built and initialized.</summary>
+	public bool IsStarted => _loop is not null;
+
+	/// <summary>The application. Starts the host.</summary>
+	public IonApplication Application => _started().Application;
+
+	/// <summary>The application's services. Starts the host.</summary>
+	public IServiceProvider Services => Application.Services;
+
+	/// <summary>The game loop. Starts the host.</summary>
+	public GameLoop Loop => _started().Loop;
+
+	/// <summary>The number of frames run so far.</summary>
+	public long Frame => _loop?.GameTime.Frame ?? 0;
+
+	/// <summary>The scripted input. Input queued now is applied at the start of the next frame. Starts the host.</summary>
+	public NullInputState Input => Get<NullInputState>();
+
+	/// <summary>The headless window. Starts the host.</summary>
+	public NullWindow Window => Get<NullWindow>();
+
+	/// <summary>The headless sprite batch: <see cref="NullSpriteBatch.LastFrame"/> has the last frame's draw counts. Starts the host.</summary>
+	public NullSpriteBatch SpriteBatch => Get<NullSpriteBatch>();
+
+	/// <summary>The headless audio manager: <see cref="NullAudioManager.Plays"/> has every sound played. Starts the host.</summary>
+	public NullAudioManager Audio => Get<NullAudioManager>();
+
+	/// <summary>The application's event emitter, for emitting events into the game. Starts the host.</summary>
+	public IEventEmitter Events => Get<IEventEmitter>();
+
+	/// <summary>Whether the game asked to exit (<see cref="ExitGameEvent"/> or <see cref="GameLoop.Stop"/>).</summary>
+	public bool IsExitRequested => _loop?.IsExitRequested ?? false;
+
+	/// <summary>
+	/// Resolves a required service. Starts the host.
+	/// </summary>
+	public T Get<T>() where T : notnull => Services.GetRequiredService<T>();
+
+	/// <summary>
+	/// Registers <typeparamref name="T"/> as a singleton and adds it to the pipeline after the engine's systems (and after
+	/// the systems added before it).
+	/// </summary>
+	public IonTestHost WithSystem<[DynamicallyAccessedMembers(SystemMembers)] T>() where T : class => WithSystem(typeof(T));
+
+	/// <summary>
+	/// Registers <paramref name="system"/> as a singleton and adds it to the pipeline, like <see cref="WithSystem{T}"/>.
+	/// </summary>
+	public IonTestHost WithSystem([DynamicallyAccessedMembers(SystemMembers)] Type system)
+	{
+		ArgumentNullException.ThrowIfNull(system);
+		_ensureNotStarted();
+		_systems.Add((services => services.AddSingleton(system), app => app.UseSystem(system)));
+		return this;
+	}
+
+	private const DynamicallyAccessedMemberTypes SystemMembers = DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicMethods;
+
+	/// <summary>
+	/// Adds service registrations. Runs after the engine's registrations, so it can replace them.
+	/// </summary>
+	public IonTestHost Configure(Action<IServiceCollection> services)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+		_ensureNotStarted();
+		_services.Add(services);
+		return this;
+	}
+
+	/// <summary>
+	/// Adds pipeline setup (for example <c>app.UseSystem&lt;T&gt;()</c> or <c>app.UseUpdate(...)</c>). Runs after
+	/// <c>UseIon</c> (or the game's own setup) and before the systems added with <see cref="WithSystem{T}"/>.
+	/// </summary>
+	public IonTestHost ConfigureApp(Action<IIonApplication> app)
+	{
+		ArgumentNullException.ThrowIfNull(app);
+		_ensureNotStarted();
+		_app.Add(app);
+		return this;
+	}
+
+	/// <summary>
+	/// Adds configuration values (for example <c>["Ion:Seed"] = "42"</c>). Later values win. <c>Ion:Headless</c> is always
+	/// <c>true</c>.
+	/// </summary>
+	public IonTestHost WithConfiguration(IEnumerable<KeyValuePair<string, string?>> settings)
+	{
+		ArgumentNullException.ThrowIfNull(settings);
+		_ensureNotStarted();
+		foreach (var (key, value) in settings) _settings[key] = value;
+		_settings[HeadlessKey] = "true";
+		return this;
+	}
+
+	/// <summary>
+	/// Adds one configuration value, like <see cref="WithConfiguration(IEnumerable{KeyValuePair{string, string}})"/>.
+	/// </summary>
+	public IonTestHost WithConfiguration(string key, string? value) => WithConfiguration([new(key, value)]);
+
+	/// <summary>
+	/// Passes command line arguments to <see cref="IonApplication.CreateBuilder(string[])"/>.
+	/// </summary>
+	public IonTestHost WithArgs(params string[] args)
+	{
+		ArgumentNullException.ThrowIfNull(args);
+		_ensureNotStarted();
+		_args = args;
+		return this;
+	}
+
+	/// <summary>
+	/// Builds a whole game with its own setup instead of the default <c>AddIon</c>/<c>UseIon</c>: <paramref name="configure"/>
+	/// registers its services (and is expected to call <c>AddIon</c>) and <paramref name="use"/> wires its pipeline (and is
+	/// expected to call <c>UseIon</c>). The host still forces headless mode and the deterministic clock.
+	/// </summary>
+	public IonTestHost UseGame(Action<IonApplicationBuilder> configure, Action<IIonApplication> use)
+	{
+		ArgumentNullException.ThrowIfNull(configure);
+		ArgumentNullException.ThrowIfNull(use);
+		_ensureNotStarted();
+		_gameBuilder = configure;
+		_gameApp = use;
+		return this;
+	}
+
+	/// <summary>
+	/// Records every event of type <typeparamref name="T"/> the game emits from now on (polled at the end of each frame's
+	/// Last stage, so events emitted late in Last are recorded the next frame). Events marked handled before the poll are
+	/// not recorded. Starts the host.
+	/// </summary>
+	public EventCollector<T> Collect<T>() where T : unmanaged
+	{
+		var collector = new EventCollector<T>(Get<IEventListenerFactory>().CreateListener());
+		_collectors.Add(collector);
+		return collector;
+	}
+
+	/// <summary>
+	/// Builds the application and runs the Init stage. Called implicitly by the members that need a running game.
+	/// </summary>
+	public IonTestHost Start()
+	{
+		_started();
+		return this;
+	}
+
+	/// <summary>
+	/// Runs <paramref name="frames"/> frames (fewer if the game asks to exit). Returns the number of frames run.
+	/// </summary>
+	public int Step(int frames = 1)
+	{
+		ArgumentOutOfRangeException.ThrowIfNegative(frames);
+		var loop = _started().Loop;
+
+		for (var i = 0; i < frames; i++)
+		{
+			loop.Step();
+			if (loop.IsExitRequested) return i + 1;
+		}
+
+		return frames;
+	}
+
+	/// <summary>
+	/// Runs frames until <paramref name="condition"/> is true (checked before the first frame and after each one), the
+	/// game asks to exit or <paramref name="maxFrames"/> frames have run. Returns whether the condition was met.
+	/// </summary>
+	public bool RunUntil(Func<bool> condition, int maxFrames = 10_000)
+	{
+		ArgumentNullException.ThrowIfNull(condition);
+		ArgumentOutOfRangeException.ThrowIfNegative(maxFrames);
+		var loop = _started().Loop;
+
+		if (condition()) return true;
+
+		for (var i = 0; i < maxFrames; i++)
+		{
+			loop.Step();
+			if (condition()) return true;
+			if (loop.IsExitRequested) return false;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Captures the last rendered frame. Not supported yet: the headless backend does not rasterize, so this always throws
+	/// <see cref="NotSupportedException"/>. It will return an image once the headless renderer (Veldrid on lavapipe)
+	/// exists; until then assert on <see cref="SpriteBatch"/> commands and counts instead.
+	/// </summary>
+	/// <exception cref="NotSupportedException">Always.</exception>
+	public byte[] Screenshot() =>
+		throw new NotSupportedException("IonTestHost cannot capture frames yet: the headless backend records draw calls (see SpriteBatch) but does not rasterize them.");
+
+	/// <summary>
+	/// Runs the Destroy stage (when the game was started) and disposes the application and its services.
+	/// </summary>
+	public void Dispose()
+	{
+		if (_disposed) return;
+		_disposed = true;
+
+		try
+		{
+			_loop?.Shutdown();
+		}
+		finally
+		{
+			foreach (var collector in _collectors) collector.Dispose();
+			_collectors.Clear();
+			_application?.Dispose();
+		}
+	}
+
+	private (IonApplication Application, GameLoop Loop) _started()
+	{
+		ObjectDisposedException.ThrowIf(_disposed, this);
+
+		if (_application is not null && _loop is not null) return (_application, _loop);
+		if (_application is not null) throw new InvalidOperationException("The game failed to start; create a new IonTestHost.");
+
+		var builder = IonApplication.CreateBuilder(_args);
+		builder.Configuration.AddInMemoryCollection(_settings);
+		builder.Services.AddLogging(logging => logging.ClearProviders());
+
+		if (_gameBuilder is not null) _gameBuilder(builder);
+		else builder.Services.AddIon(builder.Configuration);
+
+		foreach (var system in _systems) system.Register(builder.Services);
+		foreach (var configure in _services) configure(builder.Services);
+
+		// Registered last so it wins over the default clock and anything the game registers.
+		builder.Services.AddSingleton<IClock>(Clock);
+
+		var application = builder.Build();
+		_application = application;
+
+		if (_gameApp is not null) _gameApp(application);
+		else application.UseIon();
+
+		foreach (var use in _app) use(application);
+		foreach (var system in _systems) system.Use(application);
+
+		// Innermost Last middleware: runs after every system's Last code that runs before next(), and before the event
+		// system steps the frame buffers.
+		application.UseLast(next => dt =>
+		{
+			next(dt);
+			for (var i = 0; i < _collectors.Count; i++) _collectors[i].Poll(dt.Frame);
+		});
+
+		var loop = application.Build();
+		loop.Initialize();
+		_loop = loop;
+
+		return (application, loop);
+	}
+
+	private void _ensureNotStarted()
+	{
+		ObjectDisposedException.ThrowIf(_disposed, this);
+		if (_application is not null) throw new InvalidOperationException("The host has already started; configure it before the first Step, RunUntil or service access.");
+	}
+}

@@ -439,4 +439,58 @@ public class CoroutineSystemTests
 
 		Assert.Equal(3, log.Count);
 	}
+
+	[Theory, Trait(CATEGORY, INTEGRATION)]
+	[InlineData(1)]
+	[InlineData(2)]
+	[InlineData(3)]
+	[InlineData(4)]
+	public void WaitForEventSeesAFixedUpdateEventOnceAt120FpsAnd60Hz(int emitOnFixedStep)
+	{
+		var clock = new ManualClock();
+		var builder = IonApplication.CreateBuilder();
+		builder.Services.AddSingleton<IClock>(clock);
+		builder.Services.Configure<GameConfig>(c => { c.MaxFPS = 120; c.FixedUpdateRate = 60; });
+		builder.Services.AddCoroutines();
+		using var app = builder.Build();
+		app.UseEvents();
+		app.UseCoroutines();
+
+		var fixedSteps = 0;
+		var emitter = app.Services.GetRequiredService<IEventEmitter>();
+		app.UseFixedUpdate(next => dt =>
+		{
+			if (++fixedSteps == emitOnFixedStep) emitter.Emit(new CoroutineRunnerTests.TestEvent(fixedSteps));
+			next(dt);
+		});
+
+		var runner = app.Services.GetRequiredService<ICoroutineRunner>();
+		var resumed = 0;
+		var frames = 0;
+		IEnumerator Routine()
+		{
+			while (true)
+			{
+				yield return Wait.For<CoroutineRunnerTests.TestEvent>();
+				resumed++;
+			}
+		}
+		IEnumerator EveryFrame()
+		{
+			while (true)
+			{
+				frames++;
+				yield return null;
+			}
+		}
+		runner.Start(Routine());
+		runner.Start(EveryFrame());
+
+		app.RunFrames(20);
+
+		// Coroutines step once per frame in Update, whether or not the frame ran a fixed step, and see the event once.
+		Assert.Equal(1, resumed);
+		Assert.Equal(20, frames);
+		Assert.InRange(fixedSteps, emitOnFixedStep, 10);
+	}
 }
