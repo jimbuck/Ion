@@ -6,8 +6,10 @@ namespace Ion.Extensions.Graphics;
 /// Initializes the <see cref="NullWindow"/> (emitting the initial <see cref="WindowResizeEvent"/>) and turns
 /// <see cref="WindowClosedEvent"/> into <see cref="ExitGameEvent"/>, like the Veldrid window system.
 /// </summary>
-internal sealed class NullWindowSystem(NullWindow window, IEventListener events, ILogger<NullWindowSystem> logger)
+internal sealed class NullWindowSystem(NullWindow window, IEvents events, ILogger<NullWindowSystem> logger)
 {
+	private EventReader<WindowClosedEvent> _closed = events.Reader<WindowClosedEvent>();
+
 	[Init(Order = StageOrder.Window)]
 	public void Init(GameTime dt)
 	{
@@ -18,7 +20,7 @@ internal sealed class NullWindowSystem(NullWindow window, IEventListener events,
 	[Render(Order = StageOrder.WindowClose)]
 	public void CheckClosed(GameTime dt)
 	{
-		if (events.On<WindowClosedEvent>())
+		if (_closed.Read().Length > 0)
 		{
 			window.MarkClosed();
 			events.Emit<ExitGameEvent>();

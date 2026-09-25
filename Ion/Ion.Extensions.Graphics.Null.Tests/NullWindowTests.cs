@@ -34,10 +34,14 @@ public class NullWindowTests
 
 		using var app = TestApp.CreateNullGraphics(
 			new() { ["Ion:Window:Width"] = "320", ["Ion:Window:Height"] = "200" },
-			use: app => app.UseUpdate((GameLoopDelegate next, IEventListener events) => dt =>
+			use: app => app.UseUpdate((GameLoopDelegate next, IEvents events) =>
 			{
-				while (events.On<WindowResizeEvent>(out var e)) resizes.Add(e.Data);
-				next(dt);
+				var reader = events.Reader<WindowResizeEvent>();
+				return dt =>
+				{
+					while (reader.TryRead(out var e)) resizes.Add(e);
+					next(dt);
+				};
 			}));
 
 		var loop = app.Build();
@@ -58,18 +62,18 @@ public class NullWindowTests
 	{
 		using var app = TestApp.CreateNullGraphics();
 		var window = app.Services.GetRequiredService<NullWindow>();
-		var events = app.Services.GetRequiredService<IEventListener>();
+		var exits = app.Services.GetRequiredService<IEvents>().Reader<ExitGameEvent>();
 
 		var loop = app.Build();
 		loop.Init(TestApp.FrameTime);
 		loop.Step(TestApp.FrameTime);
-		Assert.False(events.On<ExitGameEvent>());
+		Assert.False(exits.TryRead(out _));
 
 		window.Close();
 		Assert.True(window.IsClosing);
 		loop.Step(TestApp.FrameTime);
 
-		Assert.True(events.On<ExitGameEvent>());
+		Assert.True(exits.TryRead(out _));
 		Assert.True(window.IsClosed);
 	}
 

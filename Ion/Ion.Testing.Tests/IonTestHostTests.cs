@@ -11,7 +11,7 @@ public record struct PingEvent(int Value);
 /// <summary>
 /// A small game system written only against the abstractions.
 /// </summary>
-public sealed class ProbeSystem(IInputState input, ISpriteBatch spriteBatch, IAudioManager audio, IAssetManager assets, IEventEmitter events)
+public sealed class ProbeSystem(IInputState input, ISpriteBatch spriteBatch, IAudioManager audio, IAssetManager assets, IEvents events)
 {
 	private ISoundEffect _sound = default!;
 

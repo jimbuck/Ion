@@ -22,12 +22,13 @@ internal delegate SceneInstance SceneBuilderFactory(IConfiguration config, IServ
 public sealed class SceneSystem(
 	IServiceProvider serviceProvider,
 	ILogger<SceneSystem> logger, IConfiguration config,
-	IEventListener events,
+	IEvents events,
 	ITraceTimer<SceneSystem> trace
 	) : IDisposable
 {
 	private readonly ILogger _logger = logger;
 	private readonly ITraceTimer _trace = trace;
+	private EventReader<ChangeSceneEvent> _changeScene = events.Reader<ChangeSceneEvent>();
 	private readonly Dictionary<int, SceneBuilderFactory> _scenesBuilders = new();
 
 	private SceneInstance? _activeScene;
@@ -201,17 +202,15 @@ public sealed class SceneSystem(
 
 	private void _handleChangeSceneEvents()
 	{
-		if (events.OnLatest<ChangeSceneEvent>(out var e))
+		if (_changeScene.TryReadLatest(out var e))
 		{
-			e.Handled = true;
-
-			if (!_scenesBuilders.ContainsKey(e.Data.NextSceneId))
+			if (!_scenesBuilders.ContainsKey(e.NextSceneId))
 			{
-				_logger.LogError("Tried to load unknown scene '{NextSceneId}'; staying on scene '{CurrentSceneId}'.", e.Data.NextSceneId, CurrentSceneId);
+				_logger.LogError("Tried to load unknown scene '{NextSceneId}'; staying on scene '{CurrentSceneId}'.", e.NextSceneId, CurrentSceneId);
 				return;
 			}
 
-			_nextSceneId = e.Data.NextSceneId;
+			_nextSceneId = e.NextSceneId;
 		}
 	}
 }

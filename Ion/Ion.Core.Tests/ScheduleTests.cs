@@ -175,7 +175,7 @@ public class ScheduleTests
 		using var host = Host(systems: typeof(OrderB), use: app => app
 			.Update(dt => calls.Add("plain"), order: 100)
 			.Update((GameTime dt, CallLog log) => log.Entries.Add("with-log"))
-			.Update((GameTime dt, CallLog log, IEventEmitter events) => log.Entries.Add("two-services"), order: -10, name: "Named")
+			.Update((GameTime dt, CallLog log, IEvents events) => log.Entries.Add("two-services"), order: -10, name: "Named")
 			// A method group with services needs its service types spelled out (C# does not infer them from a method group).
 			.Update<CallLog>(StaticSteps.Tick));
 

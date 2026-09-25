@@ -43,7 +43,7 @@ public class FullFrameBenchmarks
 			services => { services.AddScenes(); services.AddScoped<CounterSystem>(); },
 			app => app.UseScene(1, scene => { for (var i = 0; i < 8; i++) scene.UseSystem<CounterSystem>(); })));
 		_eightSystemsInScene = scoped.Build();
-		var events = scoped.Services.GetRequiredService<IEventEmitter>();
+		var events = scoped.Services.GetRequiredService<IEvents>();
 		events.EmitChangeScene(1);
 		_eightSystemsInScene.Init(_dt);
 		_eightSystemsInScene.Step(_dt);

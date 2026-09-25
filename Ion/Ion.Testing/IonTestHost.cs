@@ -102,8 +102,8 @@ public sealed class IonTestHost : IDisposable
 	/// <summary>The headless audio manager: <see cref="NullAudioManager.Plays"/> has every sound played. Starts the host.</summary>
 	public NullAudioManager Audio => Get<NullAudioManager>();
 
-	/// <summary>The application's event emitter, for emitting events into the game. Starts the host.</summary>
-	public IEventEmitter Events => Get<IEventEmitter>();
+	/// <summary>The application's event bus, for emitting events into the game. Starts the host.</summary>
+	public IEvents Events => Get<IEvents>();
 
 	/// <summary>Whether the game asked to exit (<see cref="ExitGameEvent"/> or <see cref="GameLoop.Stop"/>).</summary>
 	public bool IsExitRequested => _loop?.IsExitRequested ?? false;
@@ -204,12 +204,13 @@ public sealed class IonTestHost : IDisposable
 
 	/// <summary>
 	/// Records every event of type <typeparamref name="T"/> the game emits from now on (polled by a Last step at
-	/// <see cref="CollectorOrder"/>, so events emitted by Last steps with a higher order are recorded the next frame). Events marked handled before the poll are
-	/// not recorded. Starts the host.
+	/// <see cref="CollectorOrder"/>, so events emitted by Last steps with a higher order are recorded the next frame).
+	/// Starts the host.
 	/// </summary>
+	[ReadsEvent]
 	public EventCollector<T> Collect<T>() where T : unmanaged
 	{
-		var collector = new EventCollector<T>(Get<IEventListenerFactory>().CreateListener());
+		var collector = new EventCollector<T>(Get<IEvents>().Reader<T>());
 		_collectors.Add(collector);
 		return collector;
 	}

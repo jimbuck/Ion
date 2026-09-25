@@ -111,7 +111,7 @@ public class GeneratedScheduleTests(ITestOutputHelper output)
 		Assert.True(loop.Schedule!.IsGenerated);
 
 		loop.Initialize();
-		app.Services.GetRequiredService<IEventEmitter>().EmitChangeScene(1);
+		app.Services.GetRequiredService<IEvents>().EmitChangeScene(1);
 		loop.Step(new GameTime());
 		loop.Step(new GameTime());
 		loop.Shutdown();
@@ -299,7 +299,7 @@ public sealed class LegacySystem(Probe probe)
 public sealed class InjectedSystem(Probe probe)
 {
 	[Update, After<DerivedSystem>]
-	public void Update(GameTime dt, IEventListener events, ILoopContext context) => probe.Calls.Add("injected update");
+	public void Update(GameTime dt, IEvents events, ILoopContext context) => probe.Calls.Add("injected update");
 
 	[First]
 	public void NoArguments() => probe.Calls.Add("injected first");

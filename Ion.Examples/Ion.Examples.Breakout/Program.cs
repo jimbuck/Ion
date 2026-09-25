@@ -24,8 +24,10 @@ game.UseIon()
 game.Run();
 
 
-public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events, IAssetManager assets, IAudioManager audio)
+public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEvents events, IAssetManager assets, IAudioManager audio)
 {
+	private EventReader<WindowResizeEvent> _resizes = events.Reader<WindowResizeEvent>();
+
 	private const int ROWS = 10;
 	private const int COLS = 10;
 
@@ -96,7 +98,7 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 	[First]
 	public void HandleWindowResize(GameTime dt)
 	{
-		if (events.On<WindowResizeEvent>()) _repositionBlocks();
+		if (_resizes.Read().Length > 0) _repositionBlocks();
 	}
 
 	[Update]

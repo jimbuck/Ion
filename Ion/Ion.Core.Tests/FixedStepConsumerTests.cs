@@ -114,43 +114,80 @@ public class FixedStepConsumerTests
 		using var host = new LoopTestHost(clock, systems: typeof(EventProducer));
 		var producer = host.Get<EventProducer>();
 		producer.EmitEveryUpdate = true;
-		var emitter = host.Get<EventEmitter>();
+		var bus = host.Get<EventBus>();
 		var loop = host.BuildLoop();
 
-		for (var i = 0; i < EventEmitter.MaxBacklogFrames + 50; i++) loop.Step();
+		for (var i = 0; i < EventBus.MaxBacklogFrames + 50; i++) loop.Step();
 
+		var channel = bus.Channel<PingEvent>();
 		Assert.Equal(0, loop.Context.FixedStepCount);
-		Assert.InRange(emitter.FixedStepBacklog.Count, 1, EventEmitter.MaxBacklogFrames);
+		// One event per frame: the backlog holds the frames before the two-frame window, up to the bound.
+		Assert.Equal(EventBus.MaxBacklogFrames - 1, channel.BacklogCount);
+		Assert.Equal(1, channel.PreviousFrameCount);
+		Assert.True(channel.Capacity <= 4 * EventBus.MaxBacklogFrames, $"capacity {channel.Capacity}");
 	}
 
-	[Fact, Trait(CATEGORY, UNIT)]
-	public void EmitterWithoutALoopKeepsTheTwoFrameWindow()
-	{
-		var emitter = new EventEmitter();
-		using var listener = new EventListener(emitter);
-
-		emitter.Emit(new PingEvent(1));
-		emitter.Step();
-		emitter.Step();
-
-		Assert.Equal(0, emitter.FixedStepBacklog.Count);
-		Assert.False(listener.On<PingEvent>());
-	}
-
-	[Fact, Trait(CATEGORY, UNIT)]
-	public void HandledEventsAreNotKeptForFixedSteps()
+	[Fact, Trait(CATEGORY, INTEGRATION)]
+	public void AFixedReaderSeesTheWholeBacklogOnceAndItIsThenDropped()
 	{
 		var clock = new ManualClock { AdvanceOnSleep = false };
 		using var host = new LoopTestHost(clock, systems: typeof(EventProducer));
 		var producer = host.Get<EventProducer>();
+		producer.EmitEveryUpdate = true;
+		var bus = host.Get<EventBus>();
+		var context = host.Get<GameLoopContext>();
+		var loop = host.BuildLoop();
+		var fixedReader = bus.Reader<PingEvent>();
+		var frameReader = bus.Reader<PingEvent>();
+
+		for (var i = 0; i < 10; i++) loop.Step();
+
+		// Outside a fixed step only the two-frame window is visible.
+		Assert.Equal(1, frameReader.Count);
+		Assert.Equal(9, bus.Channel<PingEvent>().BacklogCount);
+
+		// In a fixed step the backlog is visible too, oldest first.
+		bus.BeginFixedStep();
+		Assert.True(bus.InFixedStep);
+		var seen = fixedReader.Read().ToArray().Select(e => e.Value).ToList();
+		bus.EndFixedSteps();
+		Assert.Equal(Enumerable.Range(0, 10), seen);
+
+		// A fixed step has started since, so the backlog is dropped at the end of the frame.
+		context.Stage = GameLoopStage.Last;
+		bus.Step();
+		context.Stage = GameLoopStage.None;
+		Assert.Equal(0, bus.Channel<PingEvent>().BacklogCount);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void BusWithoutALoopKeepsTheTwoFrameWindow()
+	{
+		var bus = new EventBus();
+		var reader = bus.Reader<PingEvent>();
+
+		bus.Emit(new PingEvent(1));
+		bus.Step();
+		bus.Step();
+
+		Assert.Equal(0, bus.Channel<PingEvent>().BacklogCount);
+		Assert.False(reader.TryRead(out _));
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void EventsSeenByAFixedStepAreNotKept()
+	{
+		var clock = new ManualClock();
+		using var host = new LoopTestHost(clock, systems: typeof(EventProducer));
+		var producer = host.Get<EventProducer>();
 		producer.EmitInUpdateOnFrame = 0;
-		producer.MarkHandled = true;
-		var emitter = host.Get<EventEmitter>();
+		var bus = host.Get<EventBus>();
 		var loop = host.BuildLoop();
 
-		for (var i = 0; i < 4; i++) loop.Step();
+		// Step() runs one fixed step every frame, so nothing is ever kept past the two-frame window.
+		for (var i = 0; i < 4; i++) loop.Step(new GameTime { Delta = 1f / 60f, Frame = (uint)i });
 
-		Assert.Equal(0, emitter.FixedStepBacklog.Count);
+		Assert.Equal(0, bus.Channel<PingEvent>().BacklogCount);
 	}
 
 	public sealed class StageRecorder(ILoopContext context)
@@ -181,67 +218,55 @@ public class FixedStepConsumerTests
 		[Destroy] public void Destroy(GameTime dt, GameLoopDelegate next) { Stages.Add(context.Stage); next(dt); }
 	}
 
-	public sealed class EventConsumers(IEventListenerFactory listeners)
+	public sealed class EventConsumers(IEvents events)
 	{
-		private readonly IEventListener _fixed = listeners.CreateListener();
-		private readonly IEventListener _update = listeners.CreateListener();
-		private readonly IEventListener _poll = listeners.CreateListener();
+		private EventReader<PingEvent> _fixed = events.Reader<PingEvent>();
+		private EventReader<PingEvent> _update = events.Reader<PingEvent>();
+		private EventReader<PingEvent> _poll = events.Reader<PingEvent>();
 
 		public int SeenInFixedUpdate { get; private set; }
 		public int SeenInUpdate { get; private set; }
 		public int SeenByCoroutineStyleUpdatePoll { get; private set; }
 
 		[FixedUpdate]
-		public void FixedUpdate(GameTime dt, GameLoopDelegate next)
+		public void FixedUpdate(GameTime dt)
 		{
-			while (_fixed.On<PingEvent>()) SeenInFixedUpdate++;
-			next(dt);
+			while (_fixed.TryRead(out _)) SeenInFixedUpdate++;
 		}
 
 		[Update]
-		public void Update(GameTime dt, GameLoopDelegate next)
+		public void Update(GameTime dt)
 		{
-			// Before the producer in the pipeline, like a coroutine runner registered early.
-			if (_poll.OnLatest<PingEvent>()) SeenByCoroutineStyleUpdatePoll++;
-			next(dt);
+			// Before the producer in the schedule, like a coroutine runner registered early.
+			if (_poll.TryReadLatest(out _)) SeenByCoroutineStyleUpdatePoll++;
 		}
 
 		[Last]
-		public void Last(GameTime dt, GameLoopDelegate next)
+		public void Last(GameTime dt)
 		{
-			while (_update.On<PingEvent>()) SeenInUpdate++;
-			next(dt);
+			SeenInUpdate += _update.Read().Length;
 		}
 	}
 
-	public sealed class EventProducer(IEventEmitter emitter, IEventListenerFactory listeners)
+	public sealed class EventProducer(IEvents events)
 	{
-		private readonly IEventListener _marker = listeners.CreateListener();
 		private int _fixedSteps;
 
 		public uint? EmitInUpdateOnFrame { get; set; }
 		public int? EmitInFixedStep { get; set; }
 		public bool EmitEveryUpdate { get; set; }
-		public bool MarkHandled { get; set; }
 
 		[FixedUpdate]
-		public void FixedUpdate(GameTime dt, GameLoopDelegate next)
+		public void FixedUpdate(GameTime dt)
 		{
 			_fixedSteps++;
-			if (_fixedSteps == EmitInFixedStep) emitter.Emit(new PingEvent(_fixedSteps));
-			next(dt);
+			if (_fixedSteps == EmitInFixedStep) events.Emit(new PingEvent(_fixedSteps));
 		}
 
 		[Update]
-		public void Update(GameTime dt, GameLoopDelegate next)
+		public void Update(GameTime dt)
 		{
-			if (EmitEveryUpdate || dt.Frame == EmitInUpdateOnFrame)
-			{
-				emitter.Emit(new PingEvent((int)dt.Frame));
-				if (MarkHandled && _marker.On<PingEvent>(out var e)) e.Handled = true;
-			}
-
-			next(dt);
+			if (EmitEveryUpdate || dt.Frame == EmitInUpdateOnFrame) events.Emit(new PingEvent((int)dt.Frame));
 		}
 	}
 }

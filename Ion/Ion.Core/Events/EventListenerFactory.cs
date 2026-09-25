@@ -1,10 +1,11 @@
 namespace Ion;
 
 /// <summary>
-/// Default <see cref="IEventListenerFactory"/>: creates <see cref="EventListener"/> instances attached to the
-/// application's <see cref="EventEmitter"/>. The listeners are not tracked by the container.
+/// Obsolete adapter: creates <see cref="EventListener"/> instances over the application's <see cref="IEvents"/>.
 /// </summary>
-internal sealed class EventListenerFactory(EventEmitter eventEmitter) : IEventListenerFactory
+#pragma warning disable CS0618 // The adapters are obsolete together.
+internal sealed class EventListenerFactory(IEvents events) : IEventListenerFactory
 {
-	public IEventListener CreateListener() => new EventListener(eventEmitter);
+	public IEventListener CreateListener() => new EventListener(events);
 }
+#pragma warning restore CS0618

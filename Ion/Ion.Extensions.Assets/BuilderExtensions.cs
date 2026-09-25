@@ -24,7 +24,7 @@ public static class BuilderExtensions
 			.AddSingleton(static sp => new AssetReloadSystem(
 				sp.GetRequiredService<IAssetWatcher>(),
 				sp.GetRequiredService<GlobalAssetManager>(),
-				sp.GetRequiredService<IEventEmitter>()));
+				sp.GetRequiredService<IEvents>()));
 
 		return services;
 	}

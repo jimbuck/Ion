@@ -19,3 +19,9 @@ ION011 | Ion.Schedule | Error | Ambiguous scope
 ION012 | Ion.Schedule | Warning | Constraint on a system that is not in the schedule
 ION013 | Ion.Schedule | Warning | System without steps
 ION014 | Ion.Schedule | Warning | Ion schedule generator is disabled
+ION101 | Ion.Events | Warning | Event emitted but never read
+ION102 | Ion.Events | Warning | Event read but never emitted
+ION103 | Ion.Events | Warning | Event reader created in a stage method
+ION104 | Ion.Events | Error | Event payload is not unmanaged
+ION105 | Ion.Events | Info | Event read in an earlier stage than it is emitted
+ION106 | Ion.Events | Warning | Event reader in a readonly field or a property

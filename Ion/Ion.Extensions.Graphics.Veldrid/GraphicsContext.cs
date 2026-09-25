@@ -41,7 +41,7 @@ internal static class VeldridBackendMapper
 internal class GraphicsContext : IGraphicsContext, IDisposable
 {
 	private readonly IOptionsMonitor<GraphicsConfig> _config;
-	private readonly IEventListener _events;
+	private EventReader<WindowResizeEvent> _resizes;
 	private readonly ILogger _logger;
 	private readonly Window _window;
 	private readonly ITraceTimer<GraphicsContext> _trace;
@@ -56,10 +56,10 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 	public bool NoRender { get; }
 
-	public GraphicsContext(IOptionsMonitor<GraphicsConfig> config, IEventListener events, ILogger<GraphicsContext> logger, Window window, ITraceTimer<GraphicsContext> trace)
+	public GraphicsContext(IOptionsMonitor<GraphicsConfig> config, IEvents events, ILogger<GraphicsContext> logger, Window window, ITraceTimer<GraphicsContext> trace)
 	{
 		_config = config;
-		_events = events;
+		_resizes = events.Reader<WindowResizeEvent>();
 		_logger = logger;
 		_window = window;
 		_trace = trace;
@@ -146,11 +146,11 @@ internal class GraphicsContext : IGraphicsContext, IDisposable
 
 		timer.Then("EndFrame::HandleResize");
 
-		if (_events.OnLatest<WindowResizeEvent>(out var e))
+		if (_resizes.TryReadLatest(out var e))
 		{
-			_logger.LogInformation($"Updating projection {e.Data.Width}x{e.Data.Height}!");
-			GraphicsDevice.ResizeMainWindow(e.Data.Width, e.Data.Height);
-			UpdateProjection(e.Data.Width, e.Data.Height);
+			_logger.LogInformation($"Updating projection {e.Width}x{e.Height}!");
+			GraphicsDevice.ResizeMainWindow(e.Width, e.Height);
+			UpdateProjection(e.Width, e.Height);
 		}
 	}
 

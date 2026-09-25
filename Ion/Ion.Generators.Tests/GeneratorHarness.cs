@@ -49,8 +49,11 @@ internal static class GeneratorHarness
 		GeneratorDriver driver = CSharpGeneratorDriver.Create([new ScheduleGenerator().AsSourceGenerator()], parseOptions: ParseOptions);
 		driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var generatorDiagnostics);
 		var run = driver.GetRunResult();
-		var generated = run.GeneratedTrees.Select(t => t.GetText().ToString()).SingleOrDefault() ?? "";
-		return new GeneratorResult(compilation, (CSharpCompilation)output, generated, [.. run.Diagnostics.Concat(generatorDiagnostics).Distinct()]);
+		string Tree(string name) => run.GeneratedTrees.Where(t => Path.GetFileName(t.FilePath) == name).Select(t => t.GetText().ToString()).SingleOrDefault() ?? "";
+		return new GeneratorResult(compilation, (CSharpCompilation)output, Tree("IonSchedule.g.cs"), [.. run.Diagnostics.Concat(generatorDiagnostics).Distinct()])
+		{
+			GeneratedEvents = Tree("IonEvents.g.cs"),
+		};
 	}
 
 	/// <summary>Compares <paramref name="actual"/> with the golden file <paramref name="name"/> (or rewrites it).</summary>
@@ -84,6 +87,9 @@ internal static class GeneratorHarness
 
 internal sealed record GeneratorResult(CSharpCompilation Input, CSharpCompilation Output, string Generated, ImmutableArray<Diagnostic> Diagnostics)
 {
+	/// <summary>The generated <c>IonEvents.g.cs</c> (event summary and generated bus), or empty.</summary>
+	public string GeneratedEvents { get; init; } = "";
+
 	/// <summary>The errors of the compilation with the generated code (there should be none).</summary>
 	public IEnumerable<Diagnostic> CompilationErrors => Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);
 

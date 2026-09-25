@@ -37,6 +37,17 @@ internal static class Diagnostics
 		description: "The Ion source generator needs C# interceptors in the Ion.Generated namespace. Without them the schedule is bound by reflection at run time.",
 		helpLinkUri: HelpLink);
 
+	// Events (ION1xx): compile-time checks of the event bus usage, reported by the event generator.
+	private const string EventsCategory = "Ion.Events";
+	private const string EventsHelpLink = "https://github.com/jimbuck/Ion/blob/main/docs/plans/2026-09-engine-review-and-roadmap.md#44-events-v2-stage-3-typed-channels-source-generated";
+
+	public static readonly DiagnosticDescriptor EventNeverRead = Event("ION101", "Event emitted but never read", DiagnosticSeverity.Warning);
+	public static readonly DiagnosticDescriptor EventNeverEmitted = Event("ION102", "Event read but never emitted", DiagnosticSeverity.Warning);
+	public static readonly DiagnosticDescriptor ReaderInStage = Event("ION103", "Event reader created in a stage method", DiagnosticSeverity.Warning);
+	public static readonly DiagnosticDescriptor NotUnmanaged = Event("ION104", "Event payload is not unmanaged", DiagnosticSeverity.Error);
+	public static readonly DiagnosticDescriptor ReadBeforeEmit = Event("ION105", "Event read in an earlier stage than it is emitted", DiagnosticSeverity.Info);
+	public static readonly DiagnosticDescriptor ReadonlyReader = Event("ION106", "Event reader in a readonly field or a property", DiagnosticSeverity.Warning);
+
 	public static DiagnosticDescriptor ForCode(string code) => code switch
 	{
 		"ION001" => UnknownStage,
@@ -54,6 +65,8 @@ internal static class Diagnostics
 		"ION013" => SystemWithoutSteps,
 		_ => throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown schedule diagnostic."),
 	};
+
+	private static DiagnosticDescriptor Event(string id, string title, DiagnosticSeverity severity) => new(id, title, "{0}", EventsCategory, severity, isEnabledByDefault: true, helpLinkUri: EventsHelpLink);
 
 	private static DiagnosticDescriptor Error(string id, string title) => new(id, title, "{0}", Category, DiagnosticSeverity.Error, isEnabledByDefault: true, helpLinkUri: HelpLink);
 

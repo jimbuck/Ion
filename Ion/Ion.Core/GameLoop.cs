@@ -34,7 +34,8 @@ public class GameLoop
 	private const double AccumulatorEpsilon = 1e-9;
 
 	private readonly IOptionsMonitor<GameConfig> _gameConfig;
-	private readonly IEventListener _events;
+	private readonly EventBus _events;
+	private EventReader<ExitGameEvent> _exitRequests;
 	private readonly ITraceTimer _trace;
 	private readonly IClock _clock;
 	private readonly GameLoopContext _context;
@@ -47,17 +48,18 @@ public class GameLoop
 	/// Creates a game loop. Normally created by <see cref="IonApplication.Build"/>.
 	/// </summary>
 	/// <param name="gameConfig">The game configuration (fixed-step rate, frame time clamp, pacing).</param>
-	/// <param name="events">The listener used to detect <see cref="ExitGameEvent"/>.</param>
+	/// <param name="events">The event bus: the loop marks the start of every fixed step on it and reads <see cref="ExitGameEvent"/>.</param>
 	/// <param name="trace">The trace timer used to record idle time.</param>
 	/// <param name="clock">The time source for every frame.</param>
 	/// <param name="context">
 	/// The loop context to keep up to date (the application's singleton <see cref="GameLoopContext"/>). When omitted the loop
 	/// uses a private one, which only this loop's <see cref="Context"/> exposes.
 	/// </param>
-	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events, ITraceTimer<GameLoop> trace, IClock clock, GameLoopContext? context = null)
+	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, EventBus events, ITraceTimer<GameLoop> trace, IClock clock, GameLoopContext? context = null)
 	{
 		_gameConfig = gameConfig;
 		_events = events;
+		_exitRequests = events.Reader<ExitGameEvent>();
 		_trace = trace;
 		_clock = clock;
 		_context = context ?? new GameLoopContext();
@@ -282,6 +284,7 @@ public class GameLoop
 		{
 			FixedGameTime.Elapsed += TimeSpan.FromSeconds(fixedStep);
 			context.FixedStepCount++;
+			_events.BeginFixedStep();
 			context.Stage = GameLoopStage.FixedUpdate;
 			FixedUpdate(FixedGameTime);
 			_accumulator -= fixedStep;
@@ -290,13 +293,14 @@ public class GameLoop
 		if (_accumulator < 0) _accumulator = 0;
 		GameTime.Alpha = (float)(_accumulator / fixedStep);
 
+		_events.EndFixedSteps();
 		context.Stage = GameLoopStage.Update;
 		Update(GameTime);
 
 		context.Stage = GameLoopStage.Render;
 		Render(GameTime);
 
-		if (_events.On<ExitGameEvent>()) _shouldExit = true;
+		if (_exitRequests.Read().Length > 0) _shouldExit = true;
 
 		context.Stage = GameLoopStage.Last;
 		Last(GameTime);
@@ -331,9 +335,11 @@ public class GameLoop
 		First(time);
 
 		context.FixedStepCount++;
+		_events.BeginFixedStep();
 		context.Stage = GameLoopStage.FixedUpdate;
 		FixedUpdate(time);
 
+		_events.EndFixedSteps();
 		context.Stage = GameLoopStage.Update;
 		Update(time);
 

@@ -105,7 +105,7 @@ public static class PhysicsManagerExtensions
 	}
 }
 
-public class LevelSystem(IWindow window, PhysicsManager physics)
+public class LevelSystem(IWindow window, PhysicsManager physics, IEvents events)
 {
 	[Init]
 	public unsafe void Init(GameTime dt)
@@ -121,15 +121,27 @@ public class LevelSystem(IWindow window, PhysicsManager physics)
 		var topWallPosition = new Vector2(windowHalfExtent.X, -wallThickness / 2f);
 		var bottomWallPosition = new Vector2(windowHalfExtent.X, window.Height + (wallThickness / 2f) - 1f);
 
-		physics.AddStaticBox(sideWallSize / physics.PhysicsScale, leftWallPosition / physics.PhysicsScale);
-		physics.AddStaticBox(sideWallSize / physics.PhysicsScale, rightWallPosition / physics.PhysicsScale);
-		physics.AddStaticBox(topWallSize / physics.PhysicsScale, topWallPosition / physics.PhysicsScale);
-		physics.AddStaticBox(topWallSize / physics.PhysicsScale, bottomWallPosition / physics.PhysicsScale);
+		_addWall(physics.AddStaticBox(sideWallSize / physics.PhysicsScale, leftWallPosition / physics.PhysicsScale));
+		_addWall(physics.AddStaticBox(sideWallSize / physics.PhysicsScale, rightWallPosition / physics.PhysicsScale));
+		_addWall(physics.AddStaticBox(topWallSize / physics.PhysicsScale, topWallPosition / physics.PhysicsScale));
+		_addWall(physics.AddStaticBox(topWallSize / physics.PhysicsScale, bottomWallPosition / physics.PhysicsScale));
+	}
+
+	private void _addWall(Body wall)
+	{
+		wall.OnCollision += (Fixture sender, Fixture other, Contact contact) =>
+		{
+			events.Emit(new WallHitEvent());
+			return true;
+		};
 	}
 }
 
-public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBatch spriteBatch, World world)
+public class ScoreSystem(IEvents events, IAssetManager assets, ISpriteBatch spriteBatch, World world)
 {
+	private EventReader<BlockHitEvent> _blockHits = events.Reader<BlockHitEvent>();
+	private EventReader<BallLostEvent> _ballsLost = events.Reader<BallLostEvent>();
+
 	private readonly QueryDescription _ballQuery = new QueryDescription().WithAll<Ball>();
 
 	private IFontSet _scoreFontSet = default!;
@@ -137,9 +149,13 @@ public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBat
 	private int _score = 0;
 
 	private int _ballCount = 0;
+	private int _lost = 0;
 
 	/// <summary>The current score: 10 points per block hit.</summary>
 	public int Score => _score;
+
+	/// <summary>The number of balls that fell past the paddle.</summary>
+	public int BallsLost => _lost;
 
 	[Init]
 	public void Init(GameTime dt)
@@ -151,7 +167,8 @@ public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBat
 	[First]
 	public void UpdateScore(GameTime dt)
 	{
-		while (events.On<BlockHitEvent>(out var e)) _score += 10;
+		_score += 10 * _blockHits.Read().Length;
+		_lost += _ballsLost.Read().Length;
 	}
 
 	[Update]
@@ -165,11 +182,16 @@ public class ScoreSystem(IEventListener events, IAssetManager assets, ISpriteBat
 	{
 		spriteBatch.DrawString(_scoreFont, $"Score:  {_score}", new Vector2(20f), Color.Red);
 		spriteBatch.DrawString(_scoreFont, $"Balls:  {_ballCount}", new Vector2(20f, 44), Color.Red);
+		if (_lost > 0) spriteBatch.DrawString(_scoreFont, $"Lost:  {_lost}", new Vector2(20f, 68), Color.Red);
 	}
 }
 
-public class SoundEffectsSystem(IAssetManager assets, IEventListener events, IAudioManager audio, BreakoutSettings settings)
+public class SoundEffectsSystem(IAssetManager assets, IEvents events, IAudioManager audio, BreakoutSettings settings)
 {
+	private EventReader<WallHitEvent> _wallHits = events.Reader<WallHitEvent>();
+	private EventReader<PaddleHitEvent> _paddleHits = events.Reader<PaddleHitEvent>();
+	private EventReader<BlockHitEvent> _blockHits = events.Reader<BlockHitEvent>();
+
 	private readonly Random _rand = settings.CreateRandom(1);
 
 	private ISoundEffect _bonkSound = default!;
@@ -186,12 +208,14 @@ public class SoundEffectsSystem(IAssetManager assets, IEventListener events, IAu
 	[Update(Order = 10)]
 	public void Update(GameTime dt)
 	{
-		if (events.OnLatest<WallHitEvent>() || events.OnLatest<PaddleHitEvent>()) audio.Play(_bonkSound, pitchShift: (_rand.NextSingle() - 0.5f) / 16f);
-		if (events.OnLatest<BlockHitEvent>()) audio.Play(_pingSound, pitchShift: (_rand.NextSingle() - 0.5f) / 4f);
+		// Read both channels every frame (a short-circuit would leave paddle hits for the next frame).
+		var bonks = _wallHits.Read().Length + _paddleHits.Read().Length;
+		if (bonks > 0) audio.Play(_bonkSound, pitchShift: (_rand.NextSingle() - 0.5f) / 16f);
+		if (_blockHits.Read().Length > 0) audio.Play(_pingSound, pitchShift: (_rand.NextSingle() - 0.5f) / 4f);
 	}
 }
 
-public class PaddleSystem(IWindow window, World world, IInputState input, IEventListener events, IAssetManager assets, PhysicsManager physics)
+public class PaddleSystem(IWindow window, World world, IInputState input, IEvents events, IAssetManager assets, PhysicsManager physics)
 {
 	private Entity _paddle = Entity.Null;
 
@@ -202,6 +226,13 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 		var paddlePosition = new Vector2(window.Width / 2f, window.Height - (BreakoutConstants.BOTTOM_GAP + (BreakoutConstants.PADDLE_SIZE.Y/2)));
 
 		var paddleBody = physics.AddKinematicPaddle(BreakoutConstants.PADDLE_SIZE / physics.PhysicsScale, paddlePosition / physics.PhysicsScale);
+		paddleBody.OnCollision += (Fixture sender, Fixture other, Contact contact) =>
+		{
+			// Where on the paddle the ball hit, from -1 (left end) to 1 (right end).
+			var offset = (other.Body.Position.X - sender.Body.Position.X) * physics.PhysicsScale / (BreakoutConstants.PADDLE_SIZE.X / 2f);
+			events.Emit(new PaddleHitEvent(Math.Clamp(offset, -1f, 1f)));
+			return true;
+		};
 		
 		_paddle = world.Create(new Paddle(true), new Transform2D(paddlePosition), new Sprite(paddleTexture, BreakoutConstants.PADDLE_SIZE), new KinematicRigidBody(paddleBody));
 	}
@@ -223,8 +254,11 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 	}
 }
 
-public unsafe class BallSystem(IWindow window, World world, IEventListener events, IAssetManager assets, PhysicsManager physics)
-{	
+public unsafe class BallSystem(IWindow window, World world, IEvents events, IAssetManager assets, PhysicsManager physics)
+{
+	private EventReader<LaunchBallCommand> _launches = events.Reader<LaunchBallCommand>();
+	private EventReader<BlocksClearedEvent> _cleared = events.Reader<BlocksClearedEvent>();
+	
 	private ITexture2D _ballTexture = default!;
 	private Entity _paddle = Entity.Null;
 
@@ -250,7 +284,7 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 	{
 		var totalBalls = world.CountEntities(in _ballQuery);
 
-		if (events.OnLatest<LaunchBallCommand>() && totalBalls < BreakoutConstants.MAX_BALLS)
+		if (_launches.TryReadLatest(out _) && totalBalls < BreakoutConstants.MAX_BALLS)
 		{
 			ref var paddleTransform = ref _paddle.Get<Transform2D>();
 			var radius = BreakoutConstants.BALL_SIZE.X / 2f;
@@ -279,7 +313,7 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 			}
 		});
 
-		if (events.On<BlocksClearedEvent>())
+		if (_cleared.Read().Length > 0)
 		{
 			world.Query(in _ballQuery, (Entity entity, ref DynamicRigidBody body) =>
 			{
@@ -297,8 +331,11 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 }
 
 
-public unsafe class BlockSystem(IEventListener events, IAssetManager assets, World world, PhysicsManager physics, BreakoutSettings settings)
+public unsafe class BlockSystem(IEvents events, IAssetManager assets, World world, PhysicsManager physics, BreakoutSettings settings)
 {
+	private EventReader<BlockHitEvent> _blockHits = events.Reader<BlockHitEvent>();
+	private EventReader<BlocksClearedEvent> _cleared = events.Reader<BlocksClearedEvent>();
+
 	private readonly QueryDescription _blockQuery = new QueryDescription().WithAll<Block>();
 	private readonly QueryDescription _paddleQuery = new QueryDescription().WithAll<Paddle>();
 	private Entity _paddle = Entity.Null;
@@ -318,9 +355,9 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 	[FixedUpdate]
 	public void FixedUpdate(GameTime dt)
 	{
-		while (events.On<BlockHitEvent>(out var e))
+		foreach (ref readonly var e in _blockHits.Read())
 		{
-			var entity = e.Data.Block;
+			var entity = e.Block;
 			if (entity.IsAlive() && entity.Has<StaticBody>())
 			{
 				ref var fixture = ref entity.Get<StaticBody>();
@@ -334,7 +371,7 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 	[Update]
 	public void Update(GameTime dt)
 	{
-		if (events.On<BlocksClearedEvent>())
+		if (_cleared.Read().Length > 0)
 		{
 			ref var paddle = ref _paddle.Get<Paddle>();
 

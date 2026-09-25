@@ -8,7 +8,7 @@ BenchmarkDotNet micro-benchmarks that measure the engine's own per-frame overhea
 | `PipelineBuildBenchmarks` | Startup cost of building the host, binding systems and building the seven stage pipelines |
 | `InliningBenchmarks` | Closure chain vs a struct-generic (constrained call) chain prototype vs direct calls, depth 8 |
 | `FullFrameBenchmarks` | One headless `GameLoop.Step` with events only, with 8 systems, with the Debug trace package, and inside a scene scope |
-| `EventBenchmarks` | Emit/poll cost and allocations of the boxed `IEvent` ring buffer vs an unboxed typed-channel prototype |
+| `EventBenchmarks` | Emit/read cost and allocations of Events v2: the runtime `EventBus` (direct and through `IEvents`), the generated bus of `Ion.Benchmarks.GeneratedApp`, the obsolete `IEventEmitter`/`IEventListener` adapters, and the typed-channel prototype it was designed from |
 | `TraceBenchmarks` | `trace.Start()/Stop()` cost for the Core null timer and the Debug package timer |
 | `SpriteBatchBenchmarks` | CPU cost of batching 10k sprites across 1/16 textures, with and without the per-sprite scissor transform |
 | `CoroutineBenchmarks` | Stepping 100 coroutines that yield `Wait.For` every frame, as `IEnumerator<Wait>` (unboxed) and as plain `IEnumerator` |

@@ -13,8 +13,8 @@ internal class Window : IWindow
 	private readonly IOptionsMonitor<GraphicsConfig> _graphicsConfig;
 	private readonly IOptionsMonitor<WindowConfig> _windowConfig;
 	private readonly ILogger _logger;
-	private readonly IEventEmitter _eventEmitter;
-	private readonly IEventListener _events;
+	private readonly IEvents _eventEmitter;
+	private EventReader<WindowClosedEvent> _closedEvents;
 
 	public VeldridLib.InputSnapshot? InputSnapshot { get; private set; }
 
@@ -135,7 +135,7 @@ internal class Window : IWindow
 		set { if (Sdl2Window != null) Sdl2Window.BorderVisible = value; }
 	}
 
-	public Window(IOptionsMonitor<GameConfig> gameConfig, IOptionsMonitor<GraphicsConfig> graphicsConfig, IOptionsMonitor<WindowConfig> windowConfig, ILogger<Window> logger, IEventEmitter eventEmitter, IEventListener events)
+	public Window(IOptionsMonitor<GameConfig> gameConfig, IOptionsMonitor<GraphicsConfig> graphicsConfig, IOptionsMonitor<WindowConfig> windowConfig, ILogger<Window> logger, IEvents eventEmitter)
     {
 		_gameConfig = gameConfig;
 		_graphicsConfig = graphicsConfig;
@@ -143,7 +143,7 @@ internal class Window : IWindow
 
 		_logger = logger;
         _eventEmitter = eventEmitter;
-		_events = events;
+		_closedEvents = eventEmitter.Reader<WindowClosedEvent>();
 
 		_windowCreateInfo = new()
         {
@@ -216,7 +216,7 @@ internal class Window : IWindow
 			return;
 		}
 
-		if (_events.OnLatest<WindowClosedEvent>()) _closeHandled = true;
+		if (_closedEvents.Read().Length > 0) _closeHandled = true;
 
 		InputSnapshot = Sdl2Window.PumpEvents();
 	}

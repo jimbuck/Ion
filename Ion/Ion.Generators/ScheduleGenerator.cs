@@ -17,7 +17,10 @@ namespace Ion.Generators;
 /// match what the generator saw;</item>
 /// <item>a <c>ScheduleRegistrations</c> summary of every method that takes a builder, so that applications calling into
 /// this assembly see its registrations too;</item>
-/// <item>the schedule diagnostics (ION001 to ION013) as compiler diagnostics.</item>
+/// <item>the schedule diagnostics (ION001 to ION013) as compiler diagnostics;</item>
+/// <item>Events v2 (<c>IonEvents.g.cs</c>, see <see cref="EventBusEmitter"/>): an <c>EventUsage</c> summary of the event
+/// types the assembly emits and reads, and for an application a closed, typed event bus with interceptors that route its
+/// <c>Emit</c>/<c>Reader</c> calls to typed fields, with the event diagnostics ION101 to ION106.</item>
 /// </list>
 /// Everything it cannot see stays on the runtime (reflection) path, which remains the reference behaviour.
 /// </summary>
@@ -31,6 +34,7 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 		var relevant = context.SyntaxProvider
 			.CreateSyntaxProvider(
 				static (node, _) => node is InvocationExpressionSyntax invocation && RegistrationAnalyzer.IsCandidateName(invocation)
+					|| EventAnalyzer.IsCandidate(node)
 					|| node is ParameterSyntax { Type: { } type } && type.ToString() is var name && (name.EndsWith("IIonApplication", StringComparison.Ordinal) || name.EndsWith("ISceneBuilder", StringComparison.Ordinal) || name.EndsWith("IScheduleBuilder", StringComparison.Ordinal) || name.EndsWith("IonApplication", StringComparison.Ordinal)),
 				static (_, _) => true)
 			.Collect()
@@ -56,6 +60,24 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 
 		var namespaceEnabled = InterceptableLocations.IsNamespaceEnabled(compilation);
 		var canIntercept = InterceptableLocations.IsSupported && namespaceEnabled;
+
+		ExecuteSchedule(known, context, Report, canIntercept, namespaceEnabled);
+		if (known.HasEvents) ExecuteEvents(known, context, Report, canIntercept);
+	}
+
+	private static void ExecuteEvents(KnownSymbols known, SourceProductionContext context, Action<DiagnosticDescriptor, Location?, string> Report, bool canIntercept)
+	{
+		var events = new EventAnalyzer(known, Report);
+		events.Analyze(context.CancellationToken);
+		events.Report();
+
+		var source = new EventBusEmitter(known, events).Emit(canIntercept, context.CancellationToken);
+		if (source is not null) context.AddSource("IonEvents.g.cs", source);
+	}
+
+	private static void ExecuteSchedule(KnownSymbols known, SourceProductionContext context, Action<DiagnosticDescriptor, Location?, string> Report, bool canIntercept, bool namespaceEnabled)
+	{
+		var compilation = known.Compilation;
 
 		var systems = new SystemAnalyzer(known);
 		var analyzer = new RegistrationAnalyzer(known, systems, canIntercept);

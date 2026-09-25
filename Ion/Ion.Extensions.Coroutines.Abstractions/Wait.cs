@@ -80,7 +80,8 @@ public readonly struct Wait
 	/// <summary>Waits <paramref name="delay"/> of game time.</summary>
 	public static Wait For(TimeSpan delay) => new(WaitKind.Seconds, (float)delay.TotalSeconds, null);
 
-	/// <summary>Waits until an event of type <typeparamref name="TEvent"/> is emitted (seen by the coroutine's listener).</summary>
+	/// <summary>Waits until an event of type <typeparamref name="TEvent"/> is emitted (read by the coroutine's own reader).</summary>
+	[ReadsEvent]
 	public static Wait For<TEvent>() where TEvent : unmanaged => new(WaitKind.Event, 0, EventWait<TEvent>.Instance);
 
 	/// <summary>Runs <paramref name="routine"/> as a nested coroutine and resumes when it finishes.</summary>
@@ -133,10 +134,10 @@ public readonly struct Wait
 	};
 
 	/// <summary>
-	/// For <see cref="WaitKind.Event"/>: polls <paramref name="listener"/> for the event type and returns true when one
+	/// For <see cref="WaitKind.Event"/>: reads the event type from <paramref name="events"/> and returns true when one
 	/// was seen. False for every other kind.
 	/// </summary>
-	public bool PollEvent(IEventListener listener) => _ref is EventWait e && e.Check(listener);
+	public bool PollEvent(EventReaderSet events) => _ref is EventWait e && e.Check(events);
 
 	/// <inheritdoc/>
 	public override string ToString() => Kind switch
@@ -150,13 +151,13 @@ public readonly struct Wait
 	private abstract class EventWait
 	{
 		public abstract Type EventType { get; }
-		public abstract bool Check(IEventListener listener);
+		public abstract bool Check(EventReaderSet events);
 	}
 
 	private sealed class EventWait<TEvent> : EventWait where TEvent : unmanaged
 	{
 		public static readonly EventWait<TEvent> Instance = new();
 		public override Type EventType => typeof(TEvent);
-		public override bool Check(IEventListener listener) => listener.On<TEvent>();
+		public override bool Check(EventReaderSet events) => events.TryRead<TEvent>(out _);
 	}
 }

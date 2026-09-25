@@ -10,15 +10,15 @@ namespace Ion.Extensions.Coroutines;
 /// or by calling <see cref="Update"/> manually. When both are used, only the first of the two to run in a given
 /// frame (by <see cref="GameTime.Frame"/>) steps the coroutines, so a manual call next to the system is harmless.
 /// Repeated manual calls within one frame still step every time, as before.
-/// Each running coroutine owns an <see cref="IEventListener"/> created through <see cref="IEventListenerFactory"/>;
-/// it is disposed (detached from the emitter) when the coroutine finishes or is stopped, and when the runner is disposed.
+/// Each running coroutine owns an <see cref="EventReaderSet"/> over the application's <see cref="IEvents"/> (its own
+/// cursors, so an event resumes each waiting coroutine once and a later wait does not see it again).
 /// <para>
 /// The current <see cref="Wait"/> of each coroutine is stored inline in its handle (a struct union, see <see cref="Wait"/>),
 /// so stepping allocates nothing for <c>IEnumerator&lt;Wait&gt;</c> coroutines. A non-generic <see cref="IEnumerator"/>
 /// coroutine works the same way, but the routine itself boxes every struct it yields.
 /// </para>
 /// </remarks>
-public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoroutineRunner, IDisposable
+public class CoroutineRunner(IEvents events) : ICoroutineRunner, IDisposable
 {
 	private readonly List<CoroutineHandle> _routines = [];
 
@@ -34,7 +34,7 @@ public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoro
 	/// <inheritdoc/>
 	public void Start(IEnumerator routine)
 	{
-		_routines.Add(new CoroutineHandle(routine, eventListenerFactory.CreateListener()));
+		_routines.Add(new CoroutineHandle(routine, new EventReaderSet(events)));
 	}
 
 	/// <inheritdoc/>
@@ -53,14 +53,13 @@ public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoro
 		foreach (var routine in _routines)
 		{
 			routine.IsStopped = true;
-			routine.EventListener?.Dispose();
 		}
 		_routines.Clear();
 		if (_current >= 0) _current = -1;
 	}
 
 	/// <summary>
-	/// Stops every coroutine and releases their event listeners.
+	/// Stops every coroutine.
 	/// </summary>
 	public void Dispose()
 	{
@@ -128,7 +127,6 @@ public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoro
 	{
 		var handle = _routines[index];
 		handle.IsStopped = true;
-		handle.EventListener?.Dispose();
 		_routines.RemoveAt(index);
 
 		if (_current >= 0 && index <= _current) _current--;
@@ -154,7 +152,7 @@ public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoro
 	// IEnumerator<Wait> is read without boxing; a non-generic routine's Current is already an object (boxed by the routine).
 	private static Wait _currentOf(IEnumerator routine) => routine is IEnumerator<Wait> typed ? typed.Current : Wait.FromYield(routine.Current);
 
-	private sealed class CoroutineHandle(IEnumerator enumerator, IEventListener eventListener)
+	private sealed class CoroutineHandle(IEnumerator enumerator, EventReaderSet events)
 	{
 		// The current wait, stored inline, and its running state.
 		private Wait _wait;
@@ -162,7 +160,7 @@ public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoro
 		private bool _eventSeen;
 
 		public IEnumerator Enumerator { get; } = enumerator;
-		public IEventListener EventListener { get; } = eventListener;
+		public EventReaderSet Events { get; } = events;
 		public bool IsStopped { get; set; }
 
 		public void SetWait(in Wait wait)
@@ -185,11 +183,11 @@ public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoro
 				case WaitKind.While:
 					return !_wait.Predicate!();
 				case WaitKind.Event:
-					if (!_eventSeen && _wait.PollEvent(EventListener)) _eventSeen = true;
+					if (!_eventSeen && _wait.PollEvent(Events)) _eventSeen = true;
 					return _eventSeen;
 				case WaitKind.Custom:
 					var custom = _wait.Custom!;
-					custom.Update(dt, EventListener);
+					custom.Update(dt, Events);
 					return custom.IsReady;
 				default:
 					// None, and Routine: the nested routine is stepped by _moveNext.

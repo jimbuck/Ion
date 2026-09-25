@@ -111,6 +111,45 @@ Per-frame dispatch is direct calls (32 systems in a stage: 15.7 ns against 13.3 
 
 **Limits.** The generator cannot see the output of other source generators, so registrations whose arguments depend on generated code are left to the runtime (the scenes generator's enum overloads are library methods for this reason). `ION006`, `ION008` and `ION009` are reported only for types declared in the project that no service registration call in the project mentions; if a project registers its systems by assembly scanning, turn them off with `dotnet_diagnostic.ION009.severity = none` (the runtime check still applies).
 
+## Events
+
+Events are unmanaged structs on typed channels. Inject `IEvents`, emit with `Emit`, and read with an `EventReader<T>` created once (in the constructor or a field initializer) and kept in a field that is not `readonly`:
+
+```csharp
+public record struct BlockHitEvent(Entity Block);
+
+public class ScoreSystem(IEvents events)
+{
+    private EventReader<BlockHitEvent> _hits = events.Reader<BlockHitEvent>();
+    public int Score { get; private set; }
+
+    [Update] public void Tally(GameTime dt) => Score += 10 * _hits.Read().Length;   // a span of every unread event
+}
+
+public class BlockSystem(IEvents events)
+{
+    [FixedUpdate] public void Hit(GameTime dt) => events.Emit(new BlockHitEvent(block));
+}
+```
+
+- **Semantics.** An event is visible in the frame it is emitted (after the emit) and in the next one, and each reader sees each event once (two readers each see every event). `TryRead(out e)` reads one, `Read()` returns every unread event as a `ReadOnlySpan<T>` (valid until the end of the frame), `TryReadLatest(out e)` reads all and returns the newest, `Any()` peeks, `Skip()` marks everything read. A reader that reads during `FixedUpdate` also sees older events no fixed step has seen yet, so fixed-step consumers never miss an event on frames that run no fixed step (the backlog is bounded by `EventBus.MaxBacklogFrames`).
+- **Cost.** One array per event type, reused frame after frame (it grows when a frame emits more than it holds and never shrinks); a reader is a struct holding the channel and a cursor. Emitting and reading do not allocate. 100 events of 4 types, each read by 8 readers: 650 ns per frame (it was 1.5 ms with the old listeners).
+- **Generated bus.** With the source generator, the application's `IonApplication.CreateBuilder` call installs a generated bus: one typed channel field per event type the game (or an Ion assembly it references) uses, with a compile-time integer id per type (`EventId<T>.Value`, used in logs and traces) and an initial capacity chosen from how the type is emitted (larger when emitted in `FixedUpdate`/`Update`, larger still in a loop there). The game's own `Emit`/`Reader` calls are intercepted and write to the field directly. Types the generator cannot see (a plugin's events, calls through generic helpers) get a channel at run time on the same bus, so both coexist.
+- **Diagnostics.** The generator checks event usage at compile time:
+
+| Id | Severity | Reported when |
+|---|---|---|
+| `ION101` | Warning | An event type is emitted but nothing in the application or the Ion assemblies it references reads it. |
+| `ION102` | Warning | An event type is read but nothing emits it. |
+| `ION103` | Warning | A reader is created inside a per-frame stage method (it would start over and re-read the previous frame every time). |
+| `ION104` | Error | An event payload is not an unmanaged struct (the message names the offending field). |
+| `ION105` | Info | A reader reads an event in an earlier stage than the only stages that emit it, so it sees each event a frame late. |
+| `ION106` | Warning | A reader is stored in a `readonly` field or exposed as a property, so reads advance a copy and never move on. |
+
+Methods that emit or read an event type for their caller (such as `EmitChangeScene`, `Wait.For<T>()` or `IonTestHost.Collect<T>()`) are marked `[EmitsEvent]`/`[ReadsEvent]` so the generator counts their call sites; libraries compiled with the generator publish an `[assembly: EventUsage(...)]` summary of their event types.
+
+`IEventEmitter`, `IEventListener`, `IEventListenerFactory`, `EventEmitter` and `EventListener` still work as obsolete adapters over `IEvents` for one release.
+
 ## Modules
 
 ### Ion.Core
@@ -134,7 +173,8 @@ Loading the same path twice returns the cached instance.
 **Hot reload.** With `Ion:Assets:HotReload = true` (the default in Debug builds; `IonTestHost` turns it off) an `IAssetWatcher` watches the assets folder, and `AssetReloadSystem` (added by `UseAssets()`, which `UseIon()` calls; First stage, `StageOrder.AssetReload`) reloads every cached asset loaded from a changed file at the start of the next frame, in the global cache and in every live scene scope. Loaders that implement `IReloadableAssetLoader` update the asset in place, so every holder sees the change: the headless texture and font loaders do, and the Veldrid texture loader re-uploads the pixels into the same GPU texture when the image keeps its size. Other assets (a texture whose size changed, Veldrid fonts, sounds) are loaded again and the new instance replaces the old one in the cache. Each reload emits `AssetReloadedEvent(AssetId, PreviousAssetId)` (`InPlace` when they are equal); a failed reload (a half-written or deleted file) logs a warning and keeps the loaded asset. `watcher.Enqueue(path)` queues a reload by hand, with or without the file system watcher.
 
 ```csharp
-if (events.On<AssetReloadedEvent>(out var e) && !e.Data.InPlace) _tiles = assets.Load<ITexture2D>("tiles.png");
+// _reloads = events.Reader<AssetReloadedEvent>(), created once in the constructor.
+while (_reloads.TryRead(out var e)) if (!e.InPlace) _tiles = assets.Load<ITexture2D>("tiles.png");
 ```
 
 ### Ion.Extensions.Audio
@@ -220,7 +260,7 @@ foreach (var p in input.Gamepads) { /* connected gamepads */ }
 **Recording and playback.** `services.AddInputRecording("input.ioni")` writes every frame's input events to a compact binary file (completed when the application is disposed); `services.AddInputPlayback("input.ioni")` replays it at the recorded frame numbers, replacing device and scripted input until the recording ends. Replaying into an `IonTestHost` reproduces the same `Pressed`/`Down` sequence frame by frame, which makes a recorded play session a deterministic test. `InputRecorder` and `InputPlayer` can also be used directly (`InputTracker.Recorder`, `InputTracker.Playback`, or `InputPlayer.Play(frame, sink)` into any `IInputEventSink`).
 
 #### Input and fixed steps
-`IInputState` edges (`Pressed`, `Released`), deltas (`WheelDelta`, `MouseDelta`) and `Text` depend on the stage that reads them. From `First`, `Update`, `Render` and `Last` they describe the current frame. From `FixedUpdate` they describe everything since the previous fixed step, so a click is seen by exactly one fixed step even when `MaxFPS` is above `FixedUpdateRate` and some frames run no fixed step. Events get the same guarantee: an event that leaves the two-frame window before any fixed step ran is still delivered to `FixedUpdate` listeners. The loop publishes the running stage through `ILoopContext`.
+`IInputState` edges (`Pressed`, `Released`), deltas (`WheelDelta`, `MouseDelta`) and `Text` depend on the stage that reads them. From `First`, `Update`, `Render` and `Last` they describe the current frame. From `FixedUpdate` they describe everything since the previous fixed step, so a click is seen by exactly one fixed step even when `MaxFPS` is above `FixedUpdateRate` and some frames run no fixed step. Events get the same guarantee: an event that leaves the two-frame window before any fixed step ran is still delivered to readers in `FixedUpdate`. The loop publishes the running stage through `ILoopContext`.
 
 ## Testing
 `Ion.Testing` runs a game headless on a deterministic `FixedStepClock` (one 60 Hz fixed step per frame by default), so tests can step it frame by frame and assert on services, draw counts, sounds and events:

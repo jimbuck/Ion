@@ -19,11 +19,11 @@ public sealed class NullWindow : IWindow
 	public const uint DefaultWidth = 960;
 	public const uint DefaultHeight = 540;
 
-	private readonly IEventEmitter _events;
+	private readonly IEvents _events;
 	private uint _width;
 	private uint _height;
 
-	public NullWindow(IOptionsMonitor<WindowConfig> windowConfig, IOptionsMonitor<GameConfig> gameConfig, IEventEmitter events)
+	public NullWindow(IOptionsMonitor<WindowConfig> windowConfig, IOptionsMonitor<GameConfig> gameConfig, IEvents events)
 	{
 		_events = events;
 

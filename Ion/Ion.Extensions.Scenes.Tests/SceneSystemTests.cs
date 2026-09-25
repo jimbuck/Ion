@@ -25,8 +25,8 @@ public class SceneSystemTests
 		Assert.Equal(1, servicesA.GetRequiredService<ICurrentScene>().SceneId);
 		Assert.Equal(1, servicesB.GetRequiredService<ICurrentScene>().SceneId);
 
-		servicesA.GetRequiredService<IEventEmitter>().EmitChangeScene(2);
-		servicesB.GetRequiredService<IEventEmitter>().EmitChangeScene(2);
+		servicesA.GetRequiredService<IEvents>().EmitChangeScene(2);
+		servicesB.GetRequiredService<IEvents>().EmitChangeScene(2);
 		loopA.Step(dt);
 		loopB.Step(dt);
 
@@ -94,7 +94,7 @@ public class SceneSystemTests
 		var dt = NewGameTime();
 		using var _ = TestUtils.SetupWithScenes(2, out var services, out var game);
 
-		var eventEmitter = services.GetRequiredService<IEventEmitter>();
+		var eventEmitter = services.GetRequiredService<IEvents>();
 		var currentScene = services.GetRequiredService<ICurrentScene>();
 		var loop = game.Build();
 

@@ -391,7 +391,7 @@ public class GameLoopTests
 }
 
 /// <summary>Emits <see cref="ExitGameEvent"/> during the Update stage of frame number <see cref="Frames"/> (1-based).</summary>
-public sealed class ExitAfterFramesSystem(IEventEmitter events)
+public sealed class ExitAfterFramesSystem(IEvents events)
 {
 	private int _frames;
 

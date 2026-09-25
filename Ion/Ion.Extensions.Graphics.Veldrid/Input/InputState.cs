@@ -17,15 +17,15 @@ namespace Ion;
 internal sealed class InputState : TrackedInputState
 {
 	private readonly Window _window;
-	private readonly IEventListener _events;
+	private EventReader<WindowFocusLostEvent> _focusLost;
 
-	public InputState(Window window, IEventListener events, InputTracker tracker) : base(tracker)
+	public InputState(Window window, IEvents events, InputTracker tracker) : base(tracker)
 	{
 		_window = window;
-		_events = events;
+		_focusLost = events.Reader<WindowFocusLostEvent>();
 	}
 
-	public InputState(Window window, IEventListener events, ILoopContext? loop = null) : this(window, events, new InputTracker(loop))
+	public InputState(Window window, IEvents events, ILoopContext? loop = null) : this(window, events, new InputTracker(loop))
 	{
 	}
 
@@ -60,7 +60,7 @@ internal sealed class InputState : TrackedInputState
 		}
 
 		// Key up events that happen while another window has focus never reach us, so forget held keys.
-		if (_events.On<WindowFocusLostEvent>()) tracker.ReleaseAll();
+		if (_focusLost.Read().Length > 0) tracker.ReleaseAll();
 	}
 
 	public override void SetMousePosition(Vector2 position)

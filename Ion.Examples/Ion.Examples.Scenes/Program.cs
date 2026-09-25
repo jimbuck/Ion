@@ -39,10 +39,10 @@ var game = builder.Build();
 
 // Function steps: services in the parameter list are resolved once when the schedule is built. They run at the default
 // order (0), after the engine's setup steps and the active scene, whatever the registration order.
-game.Init((GameTime dt, IEventEmitter eventEmitter, IWindow window) =>
+game.Init((GameTime dt, IEvents events, IWindow window) =>
 {
 	window.IsResizable = true;
-	eventEmitter.Emit<int>(42);
+	events.Emit(42);
 });
 
 game.First((GameTime dt, IInputState input, ICoroutineRunner coroutine) =>
@@ -68,24 +68,27 @@ game.First((GameTime dt, IInputState input, ITraceManager traceManager) =>
 });
 
 var gameplay = false;
-game.Update((GameTime dt, IEventEmitter eventEmitter, IEventListener events, IInputState input) =>
+// A reader is created once, outside the step, so it remembers what it has read (ION103).
+var intEvents = game.Services.GetRequiredService<IEvents>().Reader<int>();
+
+game.Update((GameTime dt, IEvents events, IInputState input) =>
 {
-	if (events.On<int>(out var e)) Console.WriteLine($"Int event! {e.Data}");
+	while (intEvents.TryRead(out var e)) Console.WriteLine($"Int event! {e}");
 
 	// Tab switches between the two scenes.
 	if (input.Pressed(Key.Tab))
 	{
 		gameplay = !gameplay;
-		eventEmitter.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu);
+		events.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu);
 	}
 });
 
-game.Render((GameTime dt, IEventEmitter eventEmitter, IInputState input) =>
+game.Render((GameTime dt, IEvents events, IInputState input) =>
 {
 	if (input.Down(Key.Escape))
 	{
 		Console.WriteLine("Escape Pressed!");
-		eventEmitter.Emit<ExitGameEvent>();
+		events.Emit<ExitGameEvent>();
 	}
 });
 

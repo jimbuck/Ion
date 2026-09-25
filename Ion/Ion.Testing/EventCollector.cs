@@ -13,13 +13,14 @@ internal interface IEventCollector : IDisposable
 /// </summary>
 public sealed class EventCollector<T> : IReadOnlyList<T>, IEventCollector where T : unmanaged
 {
-	private readonly IEventListener _listener;
+	private EventReader<T> _reader;
+	private bool _disposed;
 	private readonly List<T> _events = [];
 	private readonly List<uint> _frames = [];
 
-	internal EventCollector(IEventListener listener)
+	internal EventCollector(EventReader<T> reader)
 	{
-		_listener = listener;
+		_reader = reader;
 	}
 
 	/// <summary>The number of events recorded.</summary>
@@ -48,13 +49,15 @@ public sealed class EventCollector<T> : IReadOnlyList<T>, IEventCollector where 
 
 	void IEventCollector.Poll(uint frame)
 	{
-		while (_listener.On<T>(out var e))
+		if (_disposed) return;
+
+		foreach (ref readonly var e in _reader.Read())
 		{
-			_events.Add(e.Data);
+			_events.Add(e);
 			_frames.Add(frame);
 		}
 	}
 
 	/// <summary>Stops recording.</summary>
-	public void Dispose() => _listener.Dispose();
+	public void Dispose() => _disposed = true;
 }

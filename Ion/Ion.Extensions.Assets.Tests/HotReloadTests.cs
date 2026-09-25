@@ -38,13 +38,13 @@ internal sealed class TempStorage(string root) : IPersistentStorage
 	public IPersistentStorageProvider Saves => _provider;
 }
 
-internal sealed class RecordingEmitter : IEventEmitter
+internal sealed class RecordingEmitter : IEvents
 {
 	public List<object> Emitted { get; } = [];
 
-	public void Emit<T>() where T : unmanaged => Emitted.Add(default(T));
+	public void Emit<T>(in T e) where T : unmanaged => Emitted.Add(e);
 
-	public void Emit<T>(T data) where T : unmanaged => Emitted.Add(data);
+	public EventReader<T> Reader<T>() where T : unmanaged => default;
 }
 
 /// <summary>
@@ -278,10 +278,10 @@ public sealed class HotReloadTests : IDisposable
 		app.UseAssets();
 
 		var seen = new List<AssetReloadedEvent>();
-		var listener = app.Services.GetRequiredService<IEventListenerFactory>().CreateListener();
+		var reloads = app.Services.GetRequiredService<IEvents>().Reader<AssetReloadedEvent>();
 		app.Update(dt =>
 		{
-			if (listener.On<AssetReloadedEvent>(out var e)) seen.Add(e.Data);
+			while (reloads.TryRead(out var e)) seen.Add(e);
 		});
 
 		var assets = app.Services.GetRequiredService<GlobalAssetManager>();
@@ -302,6 +302,5 @@ public sealed class HotReloadTests : IDisposable
 		Assert.Equal(6u, texture.Width);
 		var reloaded = Assert.Single(seen);
 		Assert.Equal(texture.Id, reloaded.AssetId);
-		listener.Dispose();
 	}
 }

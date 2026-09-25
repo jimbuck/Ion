@@ -14,11 +14,11 @@ public sealed class AssetReloadSystem
 {
 	private readonly IAssetWatcher _watcher;
 	private readonly GlobalAssetManager _assets;
-	private readonly IEventEmitter _events;
+	private readonly IEvents _events;
 	private readonly List<string> _changed = [];
 	private readonly List<AssetReloadedEvent> _reloaded = [];
 
-	internal AssetReloadSystem(IAssetWatcher watcher, GlobalAssetManager assets, IEventEmitter events)
+	internal AssetReloadSystem(IAssetWatcher watcher, GlobalAssetManager assets, IEvents events)
 	{
 		_watcher = watcher;
 		_assets = assets;
@@ -43,7 +43,7 @@ public sealed class AssetReloadSystem
 		foreach (var path in _changed) _assets.Reload(path, _reloaded);
 		_changed.Clear();
 
-		foreach (var e in _reloaded) _events.Emit(e);
+		foreach (var e in _reloaded) _events.Emit(in e);
 		return _reloaded.Count;
 	}
 }

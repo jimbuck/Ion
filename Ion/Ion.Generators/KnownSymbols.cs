@@ -41,6 +41,19 @@ internal sealed class KnownSymbols
 	public INamedTypeSymbol? ServiceProvider { get; private set; }
 	public INamedTypeSymbol? AsyncStateMachineAttribute { get; private set; }
 
+	// Events v2.
+	public INamedTypeSymbol? Events { get; private set; }
+	public INamedTypeSymbol? EventBus { get; private set; }
+	public INamedTypeSymbol? EventReader { get; private set; }
+	public INamedTypeSymbol? EventsExtensions { get; private set; }
+	public INamedTypeSymbol? EmitsEventAttribute { get; private set; }
+	public INamedTypeSymbol? ReadsEventAttribute { get; private set; }
+	public INamedTypeSymbol? EventUsageAttribute { get; private set; }
+	public INamedTypeSymbol? IonApplicationBuilder { get; private set; }
+
+	/// <summary>Whether the compilation references the Events v2 API.</summary>
+	public bool HasEvents => Events is not null && EventBus is not null && EventReader is not null && EmitsEventAttribute is not null && ReadsEventAttribute is not null;
+
 	/// <summary>The stage attribute classes by stage (1 = Init ... 7 = Destroy).</summary>
 	public Dictionary<INamedTypeSymbol, int> StageAttributes { get; } = new(SymbolEqualityComparer.Default);
 
@@ -89,6 +102,14 @@ internal sealed class KnownSymbols
 		known.ServiceCollection = Get("Microsoft.Extensions.DependencyInjection.IServiceCollection");
 		known.ServiceProvider = Get("System.IServiceProvider");
 		known.AsyncStateMachineAttribute = Get("System.Runtime.CompilerServices.AsyncStateMachineAttribute");
+		known.Events = Get("Ion.IEvents");
+		known.EventBus = Get("Ion.EventBus");
+		known.EventReader = Get("Ion.EventReader`1");
+		known.EventsExtensions = Get("Ion.EventsExtensions");
+		known.EmitsEventAttribute = Get("Ion.EmitsEventAttribute");
+		known.ReadsEventAttribute = Get("Ion.ReadsEventAttribute");
+		known.EventUsageAttribute = Get("Ion.EventUsageAttribute");
+		known.IonApplicationBuilder = Get("Ion.IonApplicationBuilder");
 
 		for (var i = 0; i < StageNames.Length; i++)
 		{

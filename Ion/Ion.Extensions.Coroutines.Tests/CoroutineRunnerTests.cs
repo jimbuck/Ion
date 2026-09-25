@@ -208,7 +208,7 @@ public class CoroutineRunnerTests : IDisposable
 	[Fact, Trait(CATEGORY, UNIT)]
 	public void WaitForEventResumesAfterEmit()
 	{
-		var emitter = _app.Services.GetRequiredService<IEventEmitter>();
+		var emitter = _app.Services.GetRequiredService<IEvents>();
 		var log = new List<string>();
 		IEnumerator Routine()
 		{
@@ -255,7 +255,7 @@ public class CoroutineRunnerTests : IDisposable
 	{
 		var flag = false;
 		var log = new List<string>();
-		var emitter = _app.Services.GetRequiredService<IEventEmitter>();
+		var emitter = _app.Services.GetRequiredService<IEvents>();
 		IEnumerator<Wait> Inner()
 		{
 			log.Add("inner");
@@ -319,7 +319,7 @@ public class CoroutineRunnerTests : IDisposable
 	{
 		private int _frames = frames;
 		public bool IsReady => _frames <= 0;
-		public void Update(GameTime dt, IEventListener eventListener) => _frames--;
+		public void Update(GameTime dt, EventReaderSet events) => _frames--;
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
@@ -400,84 +400,36 @@ public class CoroutineRunnerTests : IDisposable
 
 	public record struct TestEvent(int Value);
 
-	private sealed class CountingListenerFactory(IEventEmitter emitter) : IEventListenerFactory
-	{
-		private readonly List<CountingListener> _created = [];
-
-		public int Created => _created.Count;
-		public int Disposed => _created.Count(l => l.IsDisposed);
-
-		public IEventListener CreateListener()
-		{
-			var listener = new CountingListener(new EventListener(emitter));
-			_created.Add(listener);
-			return listener;
-		}
-	}
-
-	private sealed class CountingListener(IEventListener inner) : IEventListener
-	{
-		public bool IsDisposed { get; private set; }
-
-		public bool On<T>() where T : unmanaged => inner.On<T>();
-		public bool On<T>([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IEvent<T>? data) where T : unmanaged => inner.On(out data);
-		public bool OnLatest<T>() where T : unmanaged => inner.OnLatest<T>();
-		public bool OnLatest<T>([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IEvent<T>? data) where T : unmanaged => inner.OnLatest(out data);
-		public void Emit<T>() where T : unmanaged => inner.Emit<T>();
-		public void Emit<T>(T data) where T : unmanaged => inner.Emit(data);
-
-		public void Dispose()
-		{
-			IsDisposed = true;
-			inner.Dispose();
-		}
-	}
-
 	[Fact, Trait(CATEGORY, UNIT)]
-	public void EventListenerFactoryIsRegisteredAndCreatesDistinctListeners()
+	public void EachCoroutineSeesAnEventOnceAndALaterWaitDoesNotSeeItAgain()
 	{
-		var factory = _app.Services.GetRequiredService<IEventListenerFactory>();
+		var events = _app.Services.GetRequiredService<IEvents>();
+		var log = new List<string>();
+		IEnumerator Routine(string name)
+		{
+			yield return Wait.For<TestEvent>();
+			log.Add(name + " 1");
+			yield return Wait.For<TestEvent>();
+			log.Add(name + " 2");
+		}
 
-		using var a = factory.CreateListener();
-		using var b = factory.CreateListener();
+		_runner.Start(Routine("a"));
+		_runner.Start(Routine("b"));
+		NextFrame();
 
-		Assert.NotSame(a, b);
-		Assert.NotNull(_app.Services.GetRequiredService<IEventListener>());
-	}
+		events.Emit(new TestEvent(1));
+		NextFrame();
+		Assert.Equal(["a 1", "b 1"], log);
 
-	[Fact, Trait(CATEGORY, UNIT)]
-	public void ListenersAreReleasedWhenCoroutinesFinishOrStop()
-	{
-		var builder = IonApplication.CreateBuilder();
-		builder.Services.AddCoroutines();
-		builder.Services.AddSingleton<CountingListenerFactory>();
-		builder.Services.AddSingleton<IEventListenerFactory>(sp => sp.GetRequiredService<CountingListenerFactory>());
-		using var app = builder.Build();
-		var factory = app.Services.GetRequiredService<CountingListenerFactory>();
-		var runner = app.Services.GetRequiredService<ICoroutineRunner>();
-		var dt = new GameTime { Delta = 0.1f };
+		// The event is still visible this frame, but each coroutine has already read it.
+		NextFrame();
+		NextFrame();
+		Assert.Equal(["a 1", "b 1"], log);
 
-		var finishes = Counter([], 1, 1);
-		var stopped = Counter([], 2, 10);
-		var remaining = Counter([], 3, 10);
-		runner.Start(finishes);
-		runner.Start(stopped);
-		runner.Start(remaining);
-		Assert.Equal(3, factory.Created);
-
-		runner.Stop(stopped);
-		Assert.Equal(1, factory.Disposed);
-
-		dt.Frame = 1;
-		runner.Update(dt);
-		dt.Frame = 2;
-		runner.Update(dt);
-		Assert.False(runner.IsActive(finishes));
-		Assert.Equal(2, factory.Disposed);
-
-		((IDisposable)runner).Dispose();
-		Assert.Equal(3, factory.Disposed);
-		Assert.Equal(0, runner.Count);
+		events.Emit(new TestEvent(2));
+		NextFrame();
+		Assert.Equal(["a 1", "b 1", "a 2", "b 2"], log);
+		Assert.Equal(0, _runner.Count);
 	}
 }
 
@@ -593,7 +545,7 @@ public class CoroutineSystemTests
 		app.UseCoroutines();
 
 		var fixedSteps = 0;
-		var emitter = app.Services.GetRequiredService<IEventEmitter>();
+		var emitter = app.Services.GetRequiredService<IEvents>();
 		app.UseFixedUpdate(next => dt =>
 		{
 			if (++fixedSteps == emitOnFixedStep) emitter.Emit(new CoroutineRunnerTests.TestEvent(fixedSteps));

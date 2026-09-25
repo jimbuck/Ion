@@ -17,6 +17,6 @@ public interface IWait
 
 	/// <summary>Advances the wait by one frame.</summary>
 	/// <param name="dt">The frame time.</param>
-	/// <param name="eventListener">The coroutine's own event listener.</param>
-	void Update(GameTime dt, IEventListener eventListener);
+	/// <param name="events">The coroutine's own event cursors (one reader per event type).</param>
+	void Update(GameTime dt, EventReaderSet events);
 }
