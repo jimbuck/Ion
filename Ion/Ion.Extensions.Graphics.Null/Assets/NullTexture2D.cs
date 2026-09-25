@@ -23,14 +23,30 @@ public sealed class NullTexture2D : ITexture2D
 
 	public string Name { get; }
 
-	public uint Width { get; }
+	public uint Width { get; private set; }
 
-	public uint Height { get; }
+	public uint Height { get; private set; }
 
 	/// <summary>
 	/// The mip level count the Veldrid backend would generate for this size (a full chain down to 1x1).
 	/// </summary>
-	public uint MipLevels { get; }
+	public uint MipLevels { get; private set; }
+
+	/// <summary>
+	/// How many times the texture has been reloaded in place (asset hot reload).
+	/// </summary>
+	public int ReloadCount { get; private set; }
+
+	/// <summary>
+	/// Takes the size of <paramref name="source"/>, as a hot reload does.
+	/// </summary>
+	internal void ReloadFrom(NullTexture2D source)
+	{
+		Width = source.Width;
+		Height = source.Height;
+		MipLevels = source.MipLevels;
+		ReloadCount++;
+	}
 
 	/// <summary>
 	/// True once the asset has been disposed.
@@ -48,9 +64,10 @@ public sealed class NullTexture2D : ITexture2D
 
 /// <summary>
 /// Loads <see cref="ITexture2D"/> assets for the headless backend: reads the image header (with ImageSharp's
-/// <see cref="Image.Identify(Stream)"/>) for its width and height without decoding pixels or touching a GPU.
+/// <see cref="Image.Identify(Stream)"/>) for its width and height without decoding pixels or touching a GPU. Supports hot
+/// reload in place: a reloaded <see cref="NullTexture2D"/> takes the new file's size.
 /// </summary>
-public sealed class NullTexture2DLoader(IPersistentStorage storage) : IAssetLoader<ITexture2D>
+public sealed class NullTexture2DLoader(IPersistentStorage storage) : IAssetLoader<ITexture2D>, IReloadableAssetLoader
 {
 	public Type AssetType { get; } = typeof(ITexture2D);
 
@@ -60,6 +77,21 @@ public sealed class NullTexture2DLoader(IPersistentStorage storage) : IAssetLoad
 	{
 		using var stream = storage.Assets.Read(path);
 		return Read(path, stream);
+	}
+
+	/// <summary>
+	/// Reads the file again and updates <paramref name="asset"/> (a <see cref="NullTexture2D"/>) in place. Returns false for
+	/// any other asset type.
+	/// </summary>
+	/// <exception cref="FileNotFoundException">The file does not exist.</exception>
+	/// <exception cref="InvalidDataException">The file is not an image format ImageSharp recognizes.</exception>
+	public bool TryReload(IAsset asset, string path)
+	{
+		if (asset is not NullTexture2D texture) return false;
+
+		using var stream = storage.Assets.Read(path);
+		texture.ReloadFrom(Read(texture.Name, stream));
+		return true;
 	}
 
 	/// <summary>

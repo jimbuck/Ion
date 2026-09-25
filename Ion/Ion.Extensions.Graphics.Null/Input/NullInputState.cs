@@ -3,11 +3,11 @@ using System.Numerics;
 namespace Ion.Extensions.Graphics;
 
 /// <summary>
-/// An <see cref="IInputState"/> driven by a script instead of a device. Calls such as <see cref="Press(Key, ModifierKeys)"/>
-/// or <see cref="Click"/> are queued and applied, in order, at the start of the next frame (the First stage), so a key
-/// pressed between frames reads as <see cref="Pressed(Key)"/> and <see cref="Down(Key)"/> for that frame, then only
-/// <see cref="Down(Key)"/> until it is released. Registered by <c>AddNullGraphics</c>; resolve it as
-/// <see cref="NullInputState"/> to script input.
+/// An <see cref="IInputState"/> driven by a script instead of a device. Calls such as <see cref="Press(Key, ModifierKeys)"/>,
+/// <see cref="Click"/>, <see cref="Type"/> or <see cref="Press(int, GamepadButton)"/> are queued and applied, in order, at the
+/// start of the next frame (the First stage), so a key pressed between frames reads as <see cref="TrackedInputState.Pressed(Key)"/>
+/// and <see cref="TrackedInputState.Down(Key)"/> for that frame, then only <c>Down</c> until it is released. Registered by
+/// <c>AddNullGraphics</c>; resolve it as <see cref="NullInputState"/> to script input.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -17,49 +17,44 @@ namespace Ion.Extensions.Graphics;
 /// </para>
 /// <para>
 /// Edges and deltas follow the stage rules of <see cref="IInputState"/>: FixedUpdate systems see each scripted edge in
-/// exactly one fixed step, even on frames that run no fixed step.
+/// exactly one fixed step, even on frames that run no fixed step. While an input playback is attached
+/// (<c>AddInputPlayback</c>) scripted input is ignored until the recording ends.
 /// </para>
 /// </remarks>
-public sealed class NullInputState : IInputState
+public sealed class NullInputState : TrackedInputState
 {
-	private enum PendingKind { Key, Button, MousePosition, Wheel, ReleaseAll }
-
-	private readonly record struct Pending(PendingKind Kind, Key Key = default, MouseButton Button = default, bool Down = false, ModifierKeys Modifiers = ModifierKeys.None, Vector2 Value = default);
-
 	private readonly Lock _lock = new();
-	private readonly List<Pending> _pending = [];
-	private readonly InputTracker _tracker;
+	private readonly List<InputEvent> _pending = [];
+	private InputEvent[] _applying = new InputEvent[16];
 
 	/// <summary>
-	/// Creates a scripted input state.
+	/// Creates a scripted input state with its own <see cref="InputTracker"/>.
 	/// </summary>
 	/// <param name="loop">
 	/// The game loop context used to give FixedUpdate systems their own view of edges and deltas. Without it (a bare
 	/// instance driven by <see cref="Step"/>) every query uses the per-frame view.
 	/// </param>
-	public NullInputState(ILoopContext? loop = null)
+	public NullInputState(ILoopContext? loop = null) : base(new InputTracker(loop))
 	{
-		_tracker = new InputTracker(loop);
 	}
 
-	/// <inheritdoc/>
-	public Vector2 MousePosition => _tracker.MousePosition;
-
-	/// <inheritdoc/>
-	public float WheelDelta => _tracker.WheelDelta;
-
-	/// <inheritdoc/>
-	public Vector2 MouseDelta => _tracker.MouseDelta;
+	/// <summary>
+	/// Creates a scripted input state over <paramref name="tracker"/> (the application's shared tracker, which recording
+	/// and playback attach to).
+	/// </summary>
+	public NullInputState(InputTracker tracker) : base(tracker)
+	{
+	}
 
 	/// <summary>
 	/// Queues a key press (not a repeat) for the next frame.
 	/// </summary>
-	public void Press(Key key, ModifierKeys modifiers = ModifierKeys.None) => _queue(new Pending(PendingKind.Key, Key: key, Down: true, Modifiers: modifiers));
+	public void Press(Key key, ModifierKeys modifiers = ModifierKeys.None) => _queue(InputEvent.ForKey(key, down: true, modifiers: modifiers));
 
 	/// <summary>
 	/// Queues a key release for the next frame.
 	/// </summary>
-	public void Release(Key key, ModifierKeys modifiers = ModifierKeys.None) => _queue(new Pending(PendingKind.Key, Key: key, Down: false, Modifiers: modifiers));
+	public void Release(Key key, ModifierKeys modifiers = ModifierKeys.None) => _queue(InputEvent.ForKey(key, down: false, modifiers: modifiers));
 
 	/// <summary>
 	/// Queues a press and a release of <paramref name="key"/> within the next frame.
@@ -71,14 +66,19 @@ public sealed class NullInputState : IInputState
 	}
 
 	/// <summary>
+	/// Queues a key repeat (the key held down long enough to auto-repeat): marks it down without a <c>Pressed</c> edge.
+	/// </summary>
+	public void Repeat(Key key, ModifierKeys modifiers = ModifierKeys.None) => _queue(InputEvent.ForKey(key, down: true, repeat: true, modifiers: modifiers));
+
+	/// <summary>
 	/// Queues a mouse button press for the next frame. The button stays down until <see cref="Release(MouseButton)"/>.
 	/// </summary>
-	public void Press(MouseButton button) => _queue(new Pending(PendingKind.Button, Button: button, Down: true));
+	public void Press(MouseButton button) => _queue(InputEvent.ForMouseButton(button, true));
 
 	/// <summary>
 	/// Queues a mouse button release for the next frame.
 	/// </summary>
-	public void Release(MouseButton button) => _queue(new Pending(PendingKind.Button, Button: button, Down: false));
+	public void Release(MouseButton button) => _queue(InputEvent.ForMouseButton(button, false));
 
 	/// <summary>
 	/// Queues a press and a release of <paramref name="button"/> within the next frame, like a quick click.
@@ -92,21 +92,86 @@ public sealed class NullInputState : IInputState
 	/// <summary>
 	/// Queues a scroll of <paramref name="delta"/> for the next frame (deltas queued before one frame add up).
 	/// </summary>
-	public void Scroll(float delta) => _queue(new Pending(PendingKind.Wheel, Value: new Vector2(delta, 0)));
+	public void Scroll(float delta) => _queue(InputEvent.ForWheel(delta));
+
+	/// <summary>
+	/// Queues <paramref name="text"/> as text input for the next frame: it becomes <see cref="TrackedInputState.Text"/>
+	/// (text queued before one frame is concatenated). Only text: no key events are generated.
+	/// </summary>
+	public void Type(string text)
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		lock (_lock)
+		{
+			foreach (var c in text) _pending.Add(InputEvent.ForText(c));
+		}
+	}
 
 	/// <summary>
 	/// Queues releasing every held key and button without a <c>Released</c> edge, as when the window loses focus.
 	/// </summary>
-	public void ReleaseAll() => _queue(new Pending(PendingKind.ReleaseAll));
+	public void ReleaseAll() => _queue(InputEvent.ForReleaseAll());
+
+	/// <summary>
+	/// Queues connecting a gamepad to slot <paramref name="index"/> (0 to <see cref="InputTracker.MaxGamepads"/> minus one).
+	/// Scripting a button or axis of a slot connects it too.
+	/// </summary>
+	public void ConnectGamepad(int index = 0) => _queue(InputEvent.ForGamepadConnection(index, true));
+
+	/// <summary>
+	/// Queues disconnecting the gamepad in slot <paramref name="index"/>: its buttons are released without edges and its
+	/// axes return to zero.
+	/// </summary>
+	public void DisconnectGamepad(int index = 0) => _queue(InputEvent.ForGamepadConnection(index, false));
+
+	/// <summary>
+	/// Queues a gamepad button press for the next frame.
+	/// </summary>
+	public void Press(int gamepad, GamepadButton button) => _queue(InputEvent.ForGamepadButton(gamepad, button, true));
+
+	/// <summary>
+	/// Queues a gamepad button release for the next frame.
+	/// </summary>
+	public void Release(int gamepad, GamepadButton button) => _queue(InputEvent.ForGamepadButton(gamepad, button, false));
+
+	/// <summary>
+	/// Queues a press and a release of a gamepad button within the next frame.
+	/// </summary>
+	public void Tap(int gamepad, GamepadButton button)
+	{
+		Press(gamepad, button);
+		Release(gamepad, button);
+	}
+
+	/// <summary>
+	/// Queues setting a gamepad axis to <paramref name="value"/> (raw, before the dead zone) for the next frame. It keeps
+	/// that value until set again.
+	/// </summary>
+	public void SetAxis(int gamepad, GamepadAxis axis, float value) => _queue(InputEvent.ForGamepadAxis(gamepad, axis, value));
+
+	/// <summary>
+	/// Queues setting both axes of the left stick.
+	/// </summary>
+	public void SetLeftStick(int gamepad, Vector2 value)
+	{
+		SetAxis(gamepad, GamepadAxis.LeftX, value.X);
+		SetAxis(gamepad, GamepadAxis.LeftY, value.Y);
+	}
+
+	/// <summary>
+	/// Queues setting both axes of the right stick.
+	/// </summary>
+	public void SetRightStick(int gamepad, Vector2 value)
+	{
+		SetAxis(gamepad, GamepadAxis.RightX, value.X);
+		SetAxis(gamepad, GamepadAxis.RightY, value.Y);
+	}
 
 	/// <summary>
 	/// Moves the mouse at the start of the next frame, like the Veldrid backend warping the cursor. The movement counts
-	/// towards <see cref="MouseDelta"/>.
+	/// towards <see cref="TrackedInputState.MouseDelta"/>.
 	/// </summary>
-	public void SetMousePosition(Vector2 position) => _queue(new Pending(PendingKind.MousePosition, Value: position));
-
-	/// <inheritdoc cref="SetMousePosition(Vector2)"/>
-	public void SetMousePosition(int x, int y) => SetMousePosition(new Vector2(x, y));
+	public override void SetMousePosition(Vector2 position) => _queue(InputEvent.ForMouseMove(position));
 
 	/// <summary>
 	/// Starts a new input frame: clears last frame's edges and applies the queued script. Called by the input system in
@@ -114,55 +179,23 @@ public sealed class NullInputState : IInputState
 	/// </summary>
 	public void Step()
 	{
-		_tracker.BeginFrame();
+		Tracker.BeginFrame();
 
-		Pending[] pending;
+		int count;
 		lock (_lock)
 		{
-			if (_pending.Count == 0) return;
-			pending = [.. _pending];
+			count = _pending.Count;
+			if (count == 0) return;
+			if (_applying.Length < count) _applying = new InputEvent[Math.Max(count, _applying.Length * 2)];
+			_pending.CopyTo(_applying);
 			_pending.Clear();
 		}
 
-		foreach (var e in pending)
-		{
-			switch (e.Kind)
-			{
-				case PendingKind.Key:
-					_tracker.OnKey(e.Key, e.Down, repeat: false, e.Modifiers);
-					break;
-				case PendingKind.Button:
-					_tracker.OnMouseButton(e.Button, e.Down);
-					break;
-				case PendingKind.MousePosition:
-					_tracker.OnMouseMove(e.Value);
-					break;
-				case PendingKind.Wheel:
-					_tracker.OnWheel(e.Value.X);
-					break;
-				case PendingKind.ReleaseAll:
-					_tracker.ReleaseAll();
-					break;
-			}
-		}
+		for (var i = 0; i < count; i++) _applying[i].ApplyTo(Tracker);
 	}
 
-	public bool Pressed(MouseButton btn) => _tracker.Pressed(btn);
-	public bool Released(MouseButton btn) => _tracker.Released(btn);
-	public bool Down(MouseButton btn) => _tracker.Down(btn);
-	public bool Up(MouseButton btn) => !Down(btn);
-
-	public bool Pressed(Key key) => _tracker.Pressed(key);
-	public bool Pressed(Key key, ModifierKeys modifiers) => _tracker.Pressed(key, modifiers);
-
-	public bool Released(Key key) => _tracker.Released(key);
-	public bool Released(Key key, ModifierKeys modifiers) => _tracker.Released(key, modifiers);
-
-	public bool Down(Key key) => _tracker.Down(key);
-	public bool Up(Key key) => !Down(key);
-
-	private void _queue(Pending pending)
+	private void _queue(InputEvent e)
 	{
-		lock (_lock) _pending.Add(pending);
+		lock (_lock) _pending.Add(e);
 	}
 }

@@ -3,7 +3,8 @@ using System.Numerics;
 namespace Ion;
 
 /// <summary>
-/// Keyboard and mouse state, updated once per frame at the start of the First stage.
+/// Keyboard, mouse, text and gamepad state, captured once per frame at the start of the First stage and read-only for the
+/// rest of the frame.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,6 +29,12 @@ namespace Ion;
 /// So a click is seen exactly once by a FixedUpdate system and exactly once by an Update system. The stage is read from
 /// <see cref="ILoopContext"/>; when no game loop is running every query uses the per-frame view.
 /// </para>
+/// <para>
+/// Both backends keep their state in one shared <see cref="InputTracker"/> (bitsets, no per-frame allocation); see it for
+/// the modifier and focus-loss rules. Gamepads: the Veldrid backend reports no gamepads (its SDL2 input snapshot has no
+/// controller events), the headless backend's <c>NullInputState</c> can script them, and the Silk.NET backend (Stage 4)
+/// will feed real ones. Input can be recorded and replayed with <c>AddInputRecording</c> and <c>AddInputPlayback</c>.
+/// </para>
 /// </remarks>
 public interface IInputState
 {
@@ -40,19 +47,43 @@ public interface IInputState
 	/// <summary>The mouse movement of this frame (from FixedUpdate: since the previous fixed step).</summary>
 	Vector2 MouseDelta { get; }
 
+	/// <summary>
+	/// The text typed this frame (from FixedUpdate: since the previous fixed step), after keyboard layout and IME
+	/// processing. Only valid until the next frame starts.
+	/// </summary>
+	ReadOnlySpan<char> Text { get; }
+
+	/// <summary>The modifiers held now, derived from the held modifier keys.</summary>
+	ModifierKeys Modifiers { get; }
+
+	/// <summary>The connected gamepads, by ascending slot index.</summary>
+	IReadOnlyList<IGamepadState> Gamepads { get; }
+
+	/// <summary>
+	/// The gamepad in slot <paramref name="index"/> (0 to <see cref="InputTracker.MaxGamepads"/> minus one). Never null: a
+	/// slot with no gamepad (or an out-of-range index) reports <see cref="IGamepadState.IsConnected"/> false and nothing held.
+	/// </summary>
+	IGamepadState Gamepad(int index);
+
 	/// <summary>True while <paramref name="key"/> is held.</summary>
 	bool Down(Key key);
 	/// <summary>True while <paramref name="btn"/> is held.</summary>
 	bool Down(MouseButton btn);
 	/// <summary>True when <paramref name="key"/> went down this frame (from FixedUpdate: since the previous fixed step). Repeats do not count.</summary>
 	bool Pressed(Key key);
-	/// <summary>As <see cref="Pressed(Key)"/>, and at least one of <paramref name="modifiers"/> was held.</summary>
+	/// <summary>
+	/// As <see cref="Pressed(Key)"/>, and at least one of <paramref name="modifiers"/> was held with the press (as reported
+	/// with the key event). <see cref="ModifierKeys.None"/> never matches.
+	/// </summary>
 	bool Pressed(Key key, ModifierKeys modifiers);
 	/// <summary>True when <paramref name="btn"/> went down this frame (from FixedUpdate: since the previous fixed step).</summary>
 	bool Pressed(MouseButton btn);
 	/// <summary>True when <paramref name="key"/> went up this frame (from FixedUpdate: since the previous fixed step).</summary>
 	bool Released(Key key);
-	/// <summary>As <see cref="Released(Key)"/>, and at least one of <paramref name="modifiers"/> was held.</summary>
+	/// <summary>
+	/// As <see cref="Released(Key)"/>, and at least one of <paramref name="modifiers"/> was held with the release.
+	/// <see cref="ModifierKeys.None"/> never matches.
+	/// </summary>
 	bool Released(Key key, ModifierKeys modifiers);
 	/// <summary>True when <paramref name="btn"/> went up this frame (from FixedUpdate: since the previous fixed step).</summary>
 	bool Released(MouseButton btn);

@@ -22,8 +22,4 @@
   <ItemGroup>
     <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <!-- Backend-independent input state logic from the Veldrid backend, compiled in so it can be tested without Veldrid. -->
-    <Compile Include="..\Ion.Extensions.Graphics.Veldrid\Input\InputTracker.cs" Link="Input\InputTracker.cs" />
-  </ItemGroup>
 </Project>

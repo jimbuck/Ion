@@ -11,7 +11,7 @@ BenchmarkDotNet micro-benchmarks that measure the engine's own per-frame overhea
 | `EventBenchmarks` | Emit/poll cost and allocations of the boxed `IEvent` ring buffer vs an unboxed typed-channel prototype |
 | `TraceBenchmarks` | `trace.Start()/Stop()` cost for the Core null timer and the Debug package timer |
 | `SpriteBatchBenchmarks` | CPU cost of batching 10k sprites across 1/16 textures, with and without the per-sprite scissor transform |
-| `CoroutineBenchmarks` | Stepping 100 coroutines that yield `Wait.For` every frame |
+| `CoroutineBenchmarks` | Stepping 100 coroutines that yield `Wait.For` every frame, as `IEnumerator<Wait>` (unboxed) and as plain `IEnumerator` |
 | `ArchQueryBenchmarks` | Arch 2.1 delegate query vs inline struct query vs chunk spans over 10k entities |
 | `EcsComparisonBenchmarks` | Arch 2.1 vs Friflo.Engine.ECS 3.6: iteration styles, entity creation and structural churn on 10k entities |
 

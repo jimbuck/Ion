@@ -104,6 +104,31 @@ internal abstract class AssetStore(ILogger logger)
 		asset.Dispose();
 	}
 
+	/// <summary>
+	/// Adds every cached (type, path, asset) whose path is <paramref name="normalizedPath"/> to <paramref name="into"/>.
+	/// </summary>
+	internal void CollectCached(string normalizedPath, List<(AssetStore Store, Type Type, string Path, IAsset Asset)> into)
+	{
+		foreach (var ((type, path), asset) in _pathCache)
+		{
+			if (AssetPaths.Equals(AssetPaths.Normalize(path), normalizedPath)) into.Add((this, type, path, asset));
+		}
+	}
+
+	/// <summary>
+	/// Replaces the cached <paramref name="previous"/> for (<paramref name="type"/>, <paramref name="path"/>) with
+	/// <paramref name="fresh"/>. The previous instance stays owned (holders may still use it) and is disposed with the store.
+	/// </summary>
+	internal void ReplaceCached(Type type, string path, IAsset previous, IAsset fresh)
+	{
+		_pathCache[(type, path)] = fresh;
+		_idCache[fresh.Id] = fresh;
+		_nameCache[fresh.Name] = fresh;
+		_own(fresh);
+
+		Logger.LogDebug("Replaced {AssetType} asset '{AssetPath}' (id {PreviousId}) with a reloaded instance (id {AssetId}).", type.Name, path, previous.Id, fresh.Id);
+	}
+
 	protected void DisposeAll()
 	{
 		for (var i = _owned.Count - 1; i >= 0; i--)
@@ -142,6 +167,67 @@ internal abstract class AssetStore(ILogger logger)
 internal class GlobalAssetManager(ILogger<GlobalAssetManager> logger, IEnumerable<IAssetLoader> loaders) : AssetStore(logger), IBaseAssetManager
 {
 	private readonly ImmutableDictionary<Type, IAssetLoader> _loaders = loaders.ToImmutableDictionary(l => l.AssetType);
+
+	// Live scene (scope) managers, so a hot reload reaches their caches too.
+	private readonly Lock _scopesLock = new();
+	private readonly List<ScopedAssetManager> _scopes = [];
+	private readonly List<(AssetStore Store, Type Type, string Path, IAsset Asset)> _reloadScratch = [];
+
+	internal void Track(ScopedAssetManager scope)
+	{
+		lock (_scopesLock) _scopes.Add(scope);
+	}
+
+	internal void Untrack(ScopedAssetManager scope)
+	{
+		lock (_scopesLock) _scopes.Remove(scope);
+	}
+
+	/// <summary>
+	/// Reloads every asset cached (here and in every live scope) from <paramref name="path"/>: in place through an
+	/// <see cref="IReloadableAssetLoader"/>, otherwise by loading a new instance and swapping it into the cache. Adds one
+	/// <see cref="AssetReloadedEvent"/> per reloaded asset to <paramref name="reloaded"/>. Failures (for example a file
+	/// that is being written) are logged and leave the cached asset unchanged.
+	/// </summary>
+	internal void Reload(string path, List<AssetReloadedEvent> reloaded)
+	{
+		var normalized = AssetPaths.Normalize(path);
+		var matches = _reloadScratch;
+		matches.Clear();
+
+		CollectCached(normalized, matches);
+		lock (_scopesLock)
+		{
+			foreach (var scope in _scopes) scope.CollectCached(normalized, matches);
+		}
+
+		foreach (var (store, type, cachedPath, asset) in matches)
+		{
+			try
+			{
+				// The loader registered for the cache type (Load<T>), or for an interface of it (GetOrLoad with a concrete type).
+				var registered = _loaders.TryGetValue(type, out var exact) ? exact : ResolveLoader(type).Loader;
+				if (registered is IReloadableAssetLoader reloadable && reloadable.TryReload(asset, cachedPath))
+				{
+					Logger.LogInformation("Reloaded {AssetType} asset '{AssetPath}' in place.", type.Name, cachedPath);
+					reloaded.Add(new AssetReloadedEvent(asset.Id, asset.Id));
+					continue;
+				}
+
+				var loader = registered as IAssetLoader<IAsset> ?? ResolveLoader(type).Loader;
+				var fresh = loader.Load(cachedPath);
+				store.ReplaceCached(type, cachedPath, asset, fresh);
+				Logger.LogInformation("Reloaded {AssetType} asset '{AssetPath}' as a new instance; code holding the previous instance should load it again.", type.Name, cachedPath);
+				reloaded.Add(new AssetReloadedEvent(fresh.Id, asset.Id));
+			}
+			catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or NotSupportedException)
+			{
+				Logger.LogWarning(ex, "Could not reload {AssetType} asset '{AssetPath}'; keeping the loaded version.", type.Name, cachedPath);
+			}
+		}
+
+		matches.Clear();
+	}
 
 	public IAssetLoader GetLoader(Type assetType)
 	{
@@ -207,15 +293,22 @@ internal class GlobalAssetManager(ILogger<GlobalAssetManager> logger, IEnumerabl
 /// <summary>
 /// Scene (DI scope) assets. Loads that are not already cached globally are owned by the scope and disposed with it.
 /// </summary>
-internal sealed class ScopedAssetManager(ILogger<ScopedAssetManager> logger, GlobalAssetManager globalAssetManager) : AssetStore(logger), IAssetManager, IDisposable
+internal sealed class ScopedAssetManager : AssetStore, IAssetManager, IDisposable
 {
+	private readonly GlobalAssetManager _globalAssetManager;
 	private bool _disposed;
 
-	public IBaseAssetManager Global => globalAssetManager;
+	public ScopedAssetManager(ILogger<ScopedAssetManager> logger, GlobalAssetManager globalAssetManager) : base(logger)
+	{
+		_globalAssetManager = globalAssetManager;
+		globalAssetManager.Track(this);
+	}
+
+	public IBaseAssetManager Global => _globalAssetManager;
 
 	public IAssetLoader GetLoader(Type assetType)
 	{
-		return globalAssetManager.GetLoader(assetType);
+		return _globalAssetManager.GetLoader(assetType);
 	}
 
 	public T GetOrLoad<T>(string path, Func<string, T> load) where T : class, IAsset
@@ -223,7 +316,7 @@ internal sealed class ScopedAssetManager(ILogger<ScopedAssetManager> logger, Glo
 		ObjectDisposedException.ThrowIf(_disposed, this);
 
 		if (TryGetCached<T>(path, out var cached)) return cached;
-		if (globalAssetManager.TryGetCached(path, out cached)) return cached;
+		if (_globalAssetManager.TryGetCached(path, out cached)) return cached;
 
 		return LoadAndCache(path, load);
 	}
@@ -232,9 +325,9 @@ internal sealed class ScopedAssetManager(ILogger<ScopedAssetManager> logger, Glo
 	{
 		ObjectDisposedException.ThrowIf(_disposed, this);
 
-		var (cacheType, loader) = globalAssetManager.ResolveLoader(typeof(T));
+		var (cacheType, loader) = _globalAssetManager.ResolveLoader(typeof(T));
 
-		if (!TryGetCached(cacheType, path, out var asset) && !globalAssetManager.TryGetCached(cacheType, path, out asset))
+		if (!TryGetCached(cacheType, path, out var asset) && !_globalAssetManager.TryGetCached(cacheType, path, out asset))
 		{
 			asset = LoadAndCache(cacheType, path, loader.Load);
 		}
@@ -247,6 +340,22 @@ internal sealed class ScopedAssetManager(ILogger<ScopedAssetManager> logger, Glo
 		if (_disposed) return;
 		_disposed = true;
 
+		_globalAssetManager.Untrack(this);
 		DisposeAll();
 	}
+}
+
+/// <summary>
+/// Asset path comparison for hot reload: forward slashes, no leading <c>./</c> or slash; case-insensitive on Windows.
+/// </summary>
+internal static class AssetPaths
+{
+	public static string Normalize(string path)
+	{
+		var normalized = path.Replace('\\', '/');
+		while (normalized.StartsWith("./", StringComparison.Ordinal)) normalized = normalized[2..];
+		return normalized.TrimStart('/');
+	}
+
+	public static bool Equals(string a, string b) => string.Equals(a, b, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 }

@@ -50,7 +50,7 @@ public static class BuilderExtensions
 			// Implementation-specific, resolvable both as the concrete type (for tests) and as the interface (for games).
 			.AddSingleton<NullWindow>()
 			.AddSingleton<IWindow>(sp => sp.GetRequiredService<NullWindow>())
-			.AddSingleton<NullInputState>()
+			.AddSingleton(static sp => new NullInputState(sp.GetRequiredService<InputTracker>()))
 			.AddSingleton<IInputState>(sp => sp.GetRequiredService<NullInputState>())
 			.AddSingleton<NullSpriteBatch>()
 			.AddSingleton<ISpriteBatch>(sp => sp.GetRequiredService<NullSpriteBatch>())
@@ -63,6 +63,8 @@ public static class BuilderExtensions
 			.AddSingleton<NullWindowSystem>()
 			.AddSingleton<NullInputSystem>()
 			.AddSingleton<NullSpriteBatchSystem>();
+
+		services.AddInputTracker();
 
 		if (configureOptions != null) services.Configure(configureOptions);
 

@@ -131,6 +131,12 @@ var bonk = assets.Load<ISoundEffect>("bonk.wav");
 
 Loading the same path twice returns the cached instance.
 
+**Hot reload.** With `Ion:Assets:HotReload = true` (the default in Debug builds; `IonTestHost` turns it off) an `IAssetWatcher` watches the assets folder, and `AssetReloadSystem` (added by `UseAssets()`, which `UseIon()` calls; First stage, `StageOrder.AssetReload`) reloads every cached asset loaded from a changed file at the start of the next frame, in the global cache and in every live scene scope. Loaders that implement `IReloadableAssetLoader` update the asset in place, so every holder sees the change: the headless texture and font loaders do, and the Veldrid texture loader re-uploads the pixels into the same GPU texture when the image keeps its size. Other assets (a texture whose size changed, Veldrid fonts, sounds) are loaded again and the new instance replaces the old one in the cache. Each reload emits `AssetReloadedEvent(AssetId, PreviousAssetId)` (`InPlace` when they are equal); a failed reload (a half-written or deleted file) logs a warning and keeps the loaded asset. `watcher.Enqueue(path)` queues a reload by hand, with or without the file system watcher.
+
+```csharp
+if (events.On<AssetReloadedEvent>(out var e) && !e.Data.InPlace) _tiles = assets.Load<ITexture2D>("tiles.png");
+```
+
 ### Ion.Extensions.Audio
 An engine-owned mixer that runs on Windows, macOS, Linux (x64 and arm64, including handhelds), iOS and Android, with no NAudio and nothing platform-specific above the output:
 
@@ -154,7 +160,22 @@ if (!audio.IsPlaying(music)) { /* finished */ }
 ```
 
 ### Ion.Extensions.Coroutines
-Adds support for coroutines, allowing for async code to be run in a synchronous manner.
+Adds support for coroutines, allowing for async code to be run in a synchronous manner. `UseCoroutines()` steps the shared `ICoroutineRunner` once per frame in Update. A coroutine yields `null` (next frame), a number of seconds, `Wait.For(seconds)`, `Wait.Until(predicate)`, `Wait.While(predicate)`, `Wait.For<TEvent>()`, a custom `IWait`, or a nested routine. `Wait` is an unboxed struct union stored inline in the runner, so `IEnumerator<Wait>` coroutines allocate nothing per frame (100 coroutines: 0 B per frame):
+
+```csharp
+IEnumerator<Wait> Blink()
+{
+    while (true)
+    {
+        visible = !visible;
+        yield return 0.5f;                       // or Wait.For(TimeSpan.FromSeconds(0.5))
+        yield return Wait.For(FadeOut());        // runs a nested routine to completion
+        yield return Wait.For<PlayerHitEvent>();
+    }
+}
+```
+
+Plain `IEnumerator` coroutines still work, but the routine boxes every struct it yields.
 
 ### Ion.Extensions.Debug
 Adds support for debug utils such as a trace profiler and debug renderer.
@@ -165,7 +186,7 @@ Adds window, input, and graphics support using the Veldrid API. Includes a built
 ### Ion.Extensions.Graphics.Null
 A headless graphics backend with no window, GPU or SDL, for tests, servers and CI. `AddNullGraphics(config)` / `UseNullGraphics()` register everything the Veldrid backend does:
   - `NullWindow`: sized from `Ion:Window`, emits `WindowResizeEvent` at Init and `WindowClosedEvent` from `Close()` (which ends the game loop).
-  - `NullInputState`: scripted input (`Press`, `Release`, `Tap`, `Click`, `SetMousePosition`, `Scroll`) applied at the start of the next frame.
+  - `NullInputState`: scripted input applied at the start of the next frame: keys and buttons (`Press`, `Release`, `Tap`, `Repeat`, `Click`, `ReleaseAll`), the mouse (`SetMousePosition`, `Scroll`), text (`Type`) and gamepads (`ConnectGamepad`, `DisconnectGamepad`, `Press(pad, button)`, `Release`, `Tap`, `SetAxis`, `SetLeftStick`, `SetRightStick`).
   - `NullSpriteBatch`: draws nothing and records per-frame statistics (`LastFrame.DrawCalls`, `Sprites`, `Strings`, and the last draw commands).
   - Loaders that read texture sizes from image headers and fonts that measure text with a fixed glyph width.
 
@@ -178,8 +199,28 @@ dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS -- --Ion:Headless=tr
 
 In tests, resolve `NullInputState` to script input and `NullSpriteBatch` / `NullAudioManager` to assert on what was drawn and played, or use `IonTestHost` (below).
 
-### Input and fixed steps
-`IInputState` edges (`Pressed`, `Released`) and deltas (`WheelDelta`, `MouseDelta`) depend on the stage that reads them. From `First`, `Update`, `Render` and `Last` they describe the current frame. From `FixedUpdate` they describe everything since the previous fixed step, so a click is seen by exactly one fixed step even when `MaxFPS` is above `FixedUpdateRate` and some frames run no fixed step. Events get the same guarantee: an event that leaves the two-frame window before any fixed step ran is still delivered to `FixedUpdate` listeners. The loop publishes the running stage through `ILoopContext`.
+### Input
+`IInputState` is captured once per frame at the start of `First` and is read-only for the rest of the frame. Both backends keep it in one shared `InputTracker` (in `Ion.Core.Abstractions`) with fixed-size storage and no per-frame allocation: `ulong` bitsets indexed by `Key` for held, pressed and released keys, a 32-bit mask for mouse buttons, mouse position and delta, the wheel, the frame's text input and eight gamepad slots.
+
+```csharp
+if (input.Pressed(Key.S, ModifierKeys.Control)) Save();         // Ctrl+S, whichever key went down first
+if (input.Modifiers.HasFlag(ModifierKeys.Shift)) speed *= 2;     // held modifiers, from the held keys
+name += input.Text.ToString();                                    // text typed this frame (layout and IME applied)
+var pad = input.Gamepad(0);                                       // never null; IsConnected tells
+if (pad.Pressed(GamepadButton.A)) Jump();
+var move = pad.LeftStick;                                         // dead zone applied (Ion:Input:GamepadDeadZone, default 0.15)
+foreach (var p in input.Gamepads) { /* connected gamepads */ }
+```
+
+  - **Edges.** A key pressed and released within one frame reports both `Pressed` and `Released` for that frame. Key repeats mark a key held without a `Pressed` edge.
+  - **Modifiers.** `Pressed(key, modifiers)` and `Released(key, modifiers)` test the modifiers reported with that key event and match when at least one of the requested flags was held; `ModifierKeys.None` never matches (use `Pressed(key)`). `Modifiers` is the level state derived from the held modifier keys, which are also ordinary keys (`Down(Key.ShiftLeft)`).
+  - **Focus loss** releases every held key and mouse button without a `Released` edge, since the key up events go to another window. Gamepads are not affected.
+  - **Gamepads.** Buttons use the SDL game controller layout (`GamepadButton`), sticks range from -1 to 1 with a radial dead zone and triggers from 0 to 1. The Veldrid backend reports no gamepads (its SDL2 input snapshot carries no controller events); the headless backend scripts them, and the Silk.NET backend of Stage 4 will feed real ones into the same tracker.
+
+**Recording and playback.** `services.AddInputRecording("input.ioni")` writes every frame's input events to a compact binary file (completed when the application is disposed); `services.AddInputPlayback("input.ioni")` replays it at the recorded frame numbers, replacing device and scripted input until the recording ends. Replaying into an `IonTestHost` reproduces the same `Pressed`/`Down` sequence frame by frame, which makes a recorded play session a deterministic test. `InputRecorder` and `InputPlayer` can also be used directly (`InputTracker.Recorder`, `InputTracker.Playback`, or `InputPlayer.Play(frame, sink)` into any `IInputEventSink`).
+
+#### Input and fixed steps
+`IInputState` edges (`Pressed`, `Released`), deltas (`WheelDelta`, `MouseDelta`) and `Text` depend on the stage that reads them. From `First`, `Update`, `Render` and `Last` they describe the current frame. From `FixedUpdate` they describe everything since the previous fixed step, so a click is seen by exactly one fixed step even when `MaxFPS` is above `FixedUpdateRate` and some frames run no fixed step. Events get the same guarantee: an event that leaves the two-frame window before any fixed step ran is still delivered to `FixedUpdate` listeners. The loop publishes the running stage through `ILoopContext`.
 
 ## Testing
 `Ion.Testing` runs a game headless on a deterministic `FixedStepClock` (one 60 Hz fixed step per frame by default), so tests can step it frame by frame and assert on services, draw counts, sounds and events:

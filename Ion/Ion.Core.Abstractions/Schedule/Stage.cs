@@ -54,6 +54,9 @@ public static class StageOrder
 	/// <summary>Input: the per-frame input snapshot (First).</summary>
 	public const int Input = -940;
 
+	/// <summary>Asset hot reload: reloading changed assets (First), after input and before any user step.</summary>
+	public const int AssetReload = -920;
+
 	/// <summary>Graphics: device initialization (Init) and the frame scope (Render).</summary>
 	public const int Graphics = -900;
 

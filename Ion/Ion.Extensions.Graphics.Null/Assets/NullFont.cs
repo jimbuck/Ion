@@ -1,3 +1,4 @@
+using Ion.Extensions.Assets;
 using System.Numerics;
 
 namespace Ion.Extensions.Graphics;
@@ -29,6 +30,13 @@ public sealed class NullFontSet : IFontSet
 	/// True once the asset has been disposed.
 	/// </summary>
 	public bool IsDisposed { get; private set; }
+
+	/// <summary>
+	/// How many times the font set has been reloaded in place (asset hot reload).
+	/// </summary>
+	public int ReloadCount { get; private set; }
+
+	internal void MarkReloaded() => ReloadCount++;
 
 	public IFont CreateStyle(float size) => new NullFont(this, size);
 
@@ -89,16 +97,37 @@ public sealed class NullFont(NullFontSet fontSet, float fontSize) : IFont
 
 /// <summary>
 /// Loads <see cref="IFontSet"/> assets for the headless backend. Checks that every font file exists but reads no glyphs.
+/// Supports hot reload in place (the files are checked again).
 /// </summary>
-public sealed class NullFontLoader(IPersistentStorage storage) : IFontSetLoader
+public sealed class NullFontLoader(IPersistentStorage storage) : IFontSetLoader, IReloadableAssetLoader
 {
 	public Type AssetType { get; } = typeof(IFontSet);
 
 	/// <exception cref="FileNotFoundException">The font file does not exist.</exception>
 	public IFontSet Load(string path) => Load(path, [path]);
 
+	/// <summary>
+	/// Checks the files of <paramref name="asset"/> (a <see cref="NullFontSet"/>) again and counts the reload. Returns false
+	/// for any other asset type.
+	/// </summary>
+	/// <exception cref="FileNotFoundException">One of the font files does not exist.</exception>
+	public bool TryReload(IAsset asset, string path)
+	{
+		if (asset is not NullFontSet fontSet) return false;
+
+		_checkFiles(fontSet.Fonts);
+		fontSet.MarkReloaded();
+		return true;
+	}
+
 	/// <exception cref="FileNotFoundException">One of the font files does not exist.</exception>
 	public IFontSet Load(string name, IReadOnlyList<string> fonts)
+	{
+		_checkFiles(fonts);
+		return new NullFontSet(name, [.. fonts]);
+	}
+
+	private void _checkFiles(IReadOnlyList<string> fonts)
 	{
 		foreach (var font in fonts)
 		{
@@ -108,7 +137,5 @@ public sealed class NullFontLoader(IPersistentStorage storage) : IFontSetLoader
 				throw new FileNotFoundException($"Font '{font}' was not found at '{filepath}'. File names are case-sensitive on Linux and macOS; check the casing of the name.", filepath);
 			}
 		}
-
-		return new NullFontSet(name, [.. fonts]);
 	}
 }

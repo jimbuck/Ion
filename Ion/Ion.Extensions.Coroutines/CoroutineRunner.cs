@@ -12,6 +12,11 @@ namespace Ion.Extensions.Coroutines;
 /// Repeated manual calls within one frame still step every time, as before.
 /// Each running coroutine owns an <see cref="IEventListener"/> created through <see cref="IEventListenerFactory"/>;
 /// it is disposed (detached from the emitter) when the coroutine finishes or is stopped, and when the runner is disposed.
+/// <para>
+/// The current <see cref="Wait"/> of each coroutine is stored inline in its handle (a struct union, see <see cref="Wait"/>),
+/// so stepping allocates nothing for <c>IEnumerator&lt;Wait&gt;</c> coroutines. A non-generic <see cref="IEnumerator"/>
+/// coroutine works the same way, but the routine itself boxes every struct it yields.
+/// </para>
 /// </remarks>
 public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoroutineRunner, IDisposable
 {
@@ -95,9 +100,7 @@ public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoro
 		{
 			var handle = _routines[_current];
 
-			handle.Wait?.Update(dt, handle.EventListener);
-
-			if (handle.Wait is null || handle.Wait.IsReady)
+			if (handle.IsReady(dt))
 			{
 				var alive = _moveNext(handle, handle.Enumerator);
 
@@ -133,26 +136,65 @@ public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoro
 
 	private static bool _moveNext(CoroutineHandle handle, IEnumerator routine)
 	{
-		if (routine.Current is IEnumerator enumerator)
+		// A routine that yielded a nested routine resumes only once the nested one (and its own nesting) finishes.
+		var current = _currentOf(routine);
+		if (current.Kind == WaitKind.Routine && current.Routine is { } nested)
 		{
-			if (_moveNext(handle, enumerator)) return true;
+			if (_moveNext(handle, nested)) return true;
 
-			handle.Wait = new WaitFor(0);
+			handle.SetWait(default);
 		}
 
-		bool result = routine.MoveNext();
+		var alive = routine.MoveNext();
+		handle.SetWait(alive ? _currentOf(routine) : default);
 
-		if (routine.Current is float delay) handle.Wait = new WaitFor(delay);
-		else if (routine.Current is IWait wait) handle.Wait = wait;
-
-		return result;
+		return alive;
 	}
+
+	// IEnumerator<Wait> is read without boxing; a non-generic routine's Current is already an object (boxed by the routine).
+	private static Wait _currentOf(IEnumerator routine) => routine is IEnumerator<Wait> typed ? typed.Current : Wait.FromYield(routine.Current);
 
 	private sealed class CoroutineHandle(IEnumerator enumerator, IEventListener eventListener)
 	{
+		// The current wait, stored inline, and its running state.
+		private Wait _wait;
+		private float _remaining;
+		private bool _eventSeen;
+
 		public IEnumerator Enumerator { get; } = enumerator;
 		public IEventListener EventListener { get; } = eventListener;
-		public IWait? Wait { get; set; }
 		public bool IsStopped { get; set; }
+
+		public void SetWait(in Wait wait)
+		{
+			_wait = wait;
+			_remaining = wait.Seconds;
+			_eventSeen = false;
+		}
+
+		/// <summary>Advances the current wait by one frame and returns whether the routine may resume.</summary>
+		public bool IsReady(GameTime dt)
+		{
+			switch (_wait.Kind)
+			{
+				case WaitKind.Seconds:
+					_remaining -= dt.Delta;
+					return _remaining <= 0f;
+				case WaitKind.Until:
+					return _wait.Predicate!();
+				case WaitKind.While:
+					return !_wait.Predicate!();
+				case WaitKind.Event:
+					if (!_eventSeen && _wait.PollEvent(EventListener)) _eventSeen = true;
+					return _eventSeen;
+				case WaitKind.Custom:
+					var custom = _wait.Custom!;
+					custom.Update(dt, EventListener);
+					return custom.IsReady;
+				default:
+					// None, and Routine: the nested routine is stepped by _moveNext.
+					return true;
+			}
+		}
 	}
 }

@@ -45,7 +45,10 @@ public sealed class IonTestHost : IDisposable
 	private readonly List<(Action<IServiceCollection> Register, Action<IIonApplication> Use)> _systems = [];
 	private const string HeadlessKey = "Ion:Headless";
 
-	private readonly Dictionary<string, string?> _settings = new() { [HeadlessKey] = "true" };
+	private const string HotReloadKey = "Ion:Assets:HotReload";
+
+	// Asset hot reload is off by default so no file system watcher runs; tests may turn it on with WithConfiguration.
+	private readonly Dictionary<string, string?> _settings = new() { [HeadlessKey] = "true", [HotReloadKey] = "false" };
 	private readonly List<IEventCollector> _collectors = [];
 
 	private Action<IonApplicationBuilder>? _gameBuilder;
@@ -157,7 +160,7 @@ public sealed class IonTestHost : IDisposable
 
 	/// <summary>
 	/// Adds configuration values (for example <c>["Ion:Seed"] = "42"</c>). Later values win. <c>Ion:Headless</c> is always
-	/// <c>true</c>.
+	/// <c>true</c>. Asset hot reload (<c>Ion:Assets:HotReload</c>) defaults to <c>false</c> in the test host.
 	/// </summary>
 	public IonTestHost WithConfiguration(IEnumerable<KeyValuePair<string, string?>> settings)
 	{

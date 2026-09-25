@@ -32,6 +32,7 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 
 		Services.Configure<GameConfig>(Configuration.GetSection("Ion"));
 		Services.Configure<StorageConfig>(Configuration.GetSection("Ion:Storage"));
+		Services.Configure<InputConfig>(Configuration.GetSection("Ion:Input"));
 
 		Services.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(NullTraceTimer<>)));
 		Services.AddSingleton<IClock, StopwatchClock>();

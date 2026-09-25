@@ -251,6 +251,142 @@ public class CoroutineRunnerTests : IDisposable
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
+	public void TypedRoutinesSupportEveryWaitKind()
+	{
+		var flag = false;
+		var log = new List<string>();
+		var emitter = _app.Services.GetRequiredService<IEventEmitter>();
+		IEnumerator<Wait> Inner()
+		{
+			log.Add("inner");
+			yield return Wait.None;
+			log.Add("inner-done");
+		}
+		IEnumerator<Wait> Routine()
+		{
+			yield return 0.15f;
+			log.Add("seconds");
+			yield return Wait.Until(() => flag);
+			log.Add("until");
+			yield return Wait.For<TestEvent>();
+			log.Add("event");
+			yield return Wait.For(Inner());
+			log.Add("nested");
+		}
+
+		_runner.Start(Routine());
+		NextFrame(); // starts, waits 0.15
+		NextFrame(); // 0.05
+		Assert.Empty(log);
+		NextFrame(); // ready, waits until flag
+		Assert.Equal(["seconds"], log);
+		NextFrame();
+		flag = true;
+		NextFrame(); // until, waits for the event
+		Assert.Equal(["seconds", "until"], log);
+		NextFrame();
+		emitter.Emit(new TestEvent(1));
+		NextFrame(); // event, yields the nested routine
+		Assert.Equal(["seconds", "until", "event"], log);
+		NextFrame(); // inner
+		NextFrame(); // inner-done, nested
+		Assert.Equal(["seconds", "until", "event", "inner", "inner-done", "nested"], log);
+		Assert.Equal(0, _runner.Count);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void NullAfterAPredicateWaitResumesNextFrame()
+	{
+		var flag = true;
+		var log = new List<int>();
+		IEnumerator Routine()
+		{
+			yield return Wait.Until(() => flag);
+			log.Add(1);
+			flag = false;
+			yield return null;
+			log.Add(2);
+		}
+
+		_runner.Start(Routine());
+		NextFrame();
+		NextFrame();
+		NextFrame();
+		Assert.Equal([1, 2], log);
+	}
+
+	private sealed class CountdownWait(int frames) : IWait
+	{
+		private int _frames = frames;
+		public bool IsReady => _frames <= 0;
+		public void Update(GameTime dt, IEventListener eventListener) => _frames--;
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void CustomWaitIsUpdatedEveryFrame()
+	{
+		var log = new List<string>();
+		IEnumerator<Wait> Typed()
+		{
+			yield return Wait.For(new CountdownWait(2));
+			log.Add("typed");
+		}
+		IEnumerator Untyped()
+		{
+			yield return new CountdownWait(2);
+			log.Add("untyped");
+		}
+
+		_runner.Start(Typed());
+		_runner.Start(Untyped());
+		NextFrame();
+		NextFrame();
+		Assert.Empty(log);
+		NextFrame();
+		Assert.Equal(["typed", "untyped"], log);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void WaitCarriesItsKindAndPayload()
+	{
+		Func<bool> predicate = () => true;
+		Assert.Equal(WaitKind.None, Wait.None.Kind);
+		Assert.Equal(WaitKind.Seconds, Wait.For(2f).Kind);
+		Assert.Equal(2f, Wait.For(TimeSpan.FromSeconds(2)).Seconds);
+		Assert.Equal(1.5f, ((Wait)1.5f).Seconds);
+		Assert.Same(predicate, Wait.Until(predicate).Predicate);
+		Assert.Equal(WaitKind.While, Wait.While(predicate).Kind);
+		Assert.Equal(typeof(TestEvent), Wait.For<TestEvent>().EventType);
+		Assert.Equal(WaitKind.Routine, Wait.FromYield(Counter([], 1, 1)).Kind);
+		Assert.Equal(WaitKind.Seconds, Wait.FromYield(0.5f).Kind);
+		Assert.Equal(WaitKind.None, Wait.FromYield("unknown").Kind);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void SteppingTypedRoutinesAllocatesNothing()
+	{
+		static IEnumerator<Wait> Forever()
+		{
+			while (true)
+			{
+				yield return Wait.For(0.001f);
+				yield return Wait.None;
+				yield return Wait.For<TestEvent>();
+			}
+		}
+
+		for (var i = 0; i < 100; i++) _runner.Start(Forever());
+
+		// Warm up (JIT, list growth), then measure.
+		for (var i = 0; i < 10; i++) NextFrame();
+		var before = GC.GetAllocatedBytesForCurrentThread();
+		for (var i = 0; i < 100; i++) NextFrame();
+		var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+		Assert.Equal(0, allocated);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
 	public void RepeatedManualUpdateInSameFrameStillSteps()
 	{
 		var log = new List<int>();

@@ -75,7 +75,8 @@ public static class BuilderExtensions
 
 		app
 			.UseDebugUtils()
-			.UseEvents();
+			.UseEvents()
+			.UseAssets();
 
 		if (headless)
 		{

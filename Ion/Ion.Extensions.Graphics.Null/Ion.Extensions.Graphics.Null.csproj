@@ -21,8 +21,4 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
   </ItemGroup>
-  <ItemGroup>
-    <!-- Backend-independent input state logic shared with the Veldrid backend. -->
-    <Compile Include="..\Ion.Extensions.Graphics.Veldrid\Input\InputTracker.cs" Link="Input\InputTracker.cs" />
-  </ItemGroup>
 </Project>

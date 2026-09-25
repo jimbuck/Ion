@@ -26,5 +26,6 @@
     <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Assets.Abstractions\Ion.Extensions.Assets.Abstractions.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Assets\Ion.Extensions.Assets.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Null\Ion.Extensions.Graphics.Null.csproj" />
   </ItemGroup>
 </Project>

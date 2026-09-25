@@ -38,7 +38,13 @@ public static class Texture2DAssetManagerExtensions
 	}
 }
 
-internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStorage storage) : IAssetLoader<ITexture2D>
+/// <summary>
+/// Loads <see cref="ITexture2D"/> assets: decodes the image, generates a full mip chain and uploads it. Supports hot reload in
+/// place when the image keeps its size: the pixels are uploaded again into the same device texture, so sprite batches and
+/// holders keep working. A reloaded image of a different size cannot reuse the device texture (its size is fixed at
+/// creation), so <see cref="TryReload"/> returns false and the asset manager swaps in a new texture instead.
+/// </summary>
+internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStorage storage) : IAssetLoader<ITexture2D>, IReloadableAssetLoader
 {
 	private readonly IGraphicsContext _graphicsContext = graphicsContext;
 	private readonly IPersistentStorage _storage = storage;
@@ -52,6 +58,36 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 	{
 		using var stream = _storage.Assets.Read(assetPath);
 		return _loadTexture2D(assetPath, stream);
+	}
+
+	/// <summary>
+	/// Decodes the file again and re-uploads its pixels into the device texture of <paramref name="asset"/> when the size is
+	/// unchanged. Returns false for a different size or a texture from another backend.
+	/// </summary>
+	public bool TryReload(IAsset asset, string path)
+	{
+		if (asset is not IVeldridTexture veldridTexture) return false;
+		var gd = _graphicsContext.GraphicsDevice;
+		if (gd is null) return false;
+
+		var texture = veldridTexture.DeviceTexture;
+		if (texture.IsDisposed) return false;
+
+		using var stream = _storage.Assets.Read(path);
+		using var image = Image.Load<Rgba32>(stream);
+		if ((uint)image.Width != texture.Width || (uint)image.Height != texture.Height) return false;
+
+		var mipmaps = _generateMipmaps(image, out int totalSize);
+		try
+		{
+			if ((uint)mipmaps.Length != texture.MipLevels) return false;
+			_uploadLevels(gd, texture, _packLevels(mipmaps, totalSize));
+			return true;
+		}
+		finally
+		{
+			for (var i = 1; i < mipmaps.Length; i++) mipmaps[i].Dispose();
+		}
 	}
 
 	private unsafe Texture2D _loadTexture2D(string name, Stream stream)
@@ -74,6 +110,20 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 	private unsafe Texture2D _uploadTexture2D(string name, Image<Rgba32> image, Image<Rgba32>[] mipmaps, int totalSize)
 	{
 
+		var allTexData = _packLevels(mipmaps, totalSize);
+
+		var texture = _createDeviceTexture(
+				VeldridLib.PixelFormat.R8_G8_B8_A8_UNorm, VeldridLib.TextureType.Texture2D,
+				(uint)image.Width, (uint)image.Height, 1,
+				(uint)mipmaps.Length, 1,
+				allTexData,
+				_graphicsContext.GraphicsDevice!, VeldridLib.TextureUsage.Sampled);
+
+		return new Texture2D(name, texture);
+	}
+
+	private static unsafe byte[] _packLevels(Image<Rgba32>[] mipmaps, int totalSize)
+	{
 		var allTexData = new byte[totalSize];
 		long offset = 0;
 		fixed (byte* allTexDataPtr = allTexData)
@@ -87,14 +137,7 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 			}
 		}
 
-		var texture = _createDeviceTexture(
-				VeldridLib.PixelFormat.R8_G8_B8_A8_UNorm, VeldridLib.TextureType.Texture2D,
-				(uint)image.Width, (uint)image.Height, 1,
-				(uint)mipmaps.Length, 1,
-				allTexData,
-				_graphicsContext.GraphicsDevice!, VeldridLib.TextureUsage.Sampled);
-
-		return new Texture2D(name, texture);
+		return allTexData;
 	}
 
 	// Taken from Veldrid.ImageSharp
@@ -145,6 +188,19 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 		VeldridLib.GraphicsDevice gd, VeldridLib.TextureUsage usage)
 	{
 		VeldridLib.Texture texture = gd.ResourceFactory.CreateTexture(new VeldridLib.TextureDescription(width, height, depth, mipLevels, arrayLayers, format, usage, type));
+		_uploadLevels(gd, texture, textureData);
+		return texture;
+	}
+
+	/// <summary>
+	/// Uploads every mip level and array layer of <paramref name="texture"/> from <paramref name="textureData"/> (packed level
+	/// by level) through a staging texture, and waits for the copy to finish.
+	/// </summary>
+	private static unsafe void _uploadLevels(VeldridLib.GraphicsDevice gd, VeldridLib.Texture texture, byte[] textureData)
+	{
+		var format = texture.Format;
+		var type = texture.Type;
+		uint width = texture.Width, height = texture.Height, depth = texture.Depth, mipLevels = texture.MipLevels, arrayLayers = texture.ArrayLayers;
 
 		VeldridLib.Texture staging = gd.ResourceFactory.CreateTexture(new VeldridLib.TextureDescription(width, height, depth, mipLevels, arrayLayers, format, VeldridLib.TextureUsage.Staging, type));
 
@@ -176,8 +232,6 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 			// The copy must finish before the staging texture and command list are destroyed.
 			gd.WaitForIdle();
 		}
-
-		return texture;
 	}
 
 	private static uint _getFormatSize(VeldridLib.PixelFormat format)

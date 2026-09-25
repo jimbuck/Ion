@@ -51,7 +51,7 @@ public static class BuilderExtensions
 			.AddSingleton<ITexture2DManager, FontStashTexture2DManager>()
 			.AddSingleton<SpriteBatch>()
 			.AddSingleton<ISpriteBatch>(sp => sp.GetRequiredService<SpriteBatch>())
-			.AddSingleton<InputState>()
+			.AddSingleton(static sp => new InputState(sp.GetRequiredService<Window>(), sp.GetRequiredService<IEventListener>(), sp.GetRequiredService<InputTracker>()))
 			.AddSingleton<IInputState>(sp => sp.GetRequiredService<InputState>())
 
 			// Loaders
@@ -63,6 +63,8 @@ public static class BuilderExtensions
 			.AddSingleton<InputSystem>()
 			.AddSingleton<GraphicsSystem>()
 			.AddSingleton<SpriteBatchSystem>();
+
+		services.AddInputTracker();
 
 		if (configureOptions != null) services.Configure(configureOptions);
 
