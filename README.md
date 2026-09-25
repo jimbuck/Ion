@@ -48,6 +48,10 @@ Adds support for scenes that each have thier own scope for dependency injection!
   - [Peridot by Ezequias Silva](https://github.com/ezequias2d/peridot) for Sprite Batch
   - [Coroutines by ChevyRay](https://github.com/ChevyRay/Coroutines)
 
+## Roadmap
+
+See [docs/plans/2026-09-engine-review-and-roadmap.md](./docs/plans/2026-09-engine-review-and-roadmap.md) for the current review, benchmark baseline and staged plan. Micro-benchmarks live in `Ion/Ion.Benchmarks`.
+
 ## Contributing
 
 Feel free to check out the samples and open any issues or pull requests. If you have any questions, feel free to ask in the discussions tab.
