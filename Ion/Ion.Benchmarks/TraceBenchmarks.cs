@@ -13,16 +13,28 @@ namespace Ion.Benchmarks;
 [MemoryDiagnoser]
 public class TraceBenchmarks
 {
+	private IonApplication _coreApp = null!;
+	private IonApplication _debugApp = null!;
 	private ITraceTimer<TraceBenchmarks> _coreNullTimer = null!;
 	private ITraceTimer<TraceBenchmarks> _debugTimer = null!;
 
 	[GlobalSetup]
 	public void Setup()
 	{
-		_coreNullTimer = BenchUtils.BuildHeadless(null, null).Services.GetRequiredService<ITraceTimer<TraceBenchmarks>>();
-		_debugTimer = BenchUtils.BuildHeadless(
+		_coreApp = BenchUtils.BuildHeadless(null, null);
+		_coreNullTimer = _coreApp.Services.GetRequiredService<ITraceTimer<TraceBenchmarks>>();
+
+		_debugApp = BenchUtils.BuildHeadless(
 			services => services.AddDebugUtils(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()),
-			null).Services.GetRequiredService<ITraceTimer<TraceBenchmarks>>();
+			null);
+		_debugTimer = _debugApp.Services.GetRequiredService<ITraceTimer<TraceBenchmarks>>();
+	}
+
+	[GlobalCleanup]
+	public void Cleanup()
+	{
+		_coreApp.Dispose();
+		_debugApp.Dispose();
 	}
 
 	[Benchmark(Baseline = true)]

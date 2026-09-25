@@ -14,6 +14,7 @@ public class PipelineBenchmarks
 	public int SystemCount { get; set; }
 
 	private GameTime _dt = null!;
+	private IonApplication _app = null!;
 	private CounterSystem _system = null!;
 	private GameLoopDelegate _ionUpdate = null!;
 	private GameLoopDelegate _manualClosureChain = null!;
@@ -25,11 +26,11 @@ public class PipelineBenchmarks
 		_dt = BenchUtils.NewGameTime();
 
 		// Engine path: UseSystem<T>() N times -> reflection binder -> MiddlewarePipelineBuilder.Build().
-		var app = BenchUtils.BuildHeadless(null, null, typeof(CounterSystem));
-		for (var i = 1; i < SystemCount; i++) app.UseSystem<CounterSystem>();
-		var loop = app.Build();
+		_app = BenchUtils.BuildHeadless(null, null, typeof(CounterSystem));
+		for (var i = 1; i < SystemCount; i++) _app.UseSystem<CounterSystem>();
+		var loop = _app.Build();
 		_ionUpdate = loop.Update;
-		_system = (CounterSystem)app.Services.GetService(typeof(CounterSystem))!;
+		_system = (CounterSystem)_app.Services.GetService(typeof(CounterSystem))!;
 
 		// Same shape, hand-built: `next => dt => system.OnUpdate(dt, next)`.
 		GameLoopDelegate chain = static _ => { };
@@ -44,6 +45,9 @@ public class PipelineBenchmarks
 		_flat = new CounterSystem[SystemCount];
 		Array.Fill(_flat, _system);
 	}
+
+	[GlobalCleanup]
+	public void Cleanup() => _app.Dispose();
 
 	[Benchmark(Baseline = true)]
 	public int DirectCalls_FlatLoop()

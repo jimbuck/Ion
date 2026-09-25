@@ -16,6 +16,7 @@ public class CoroutineBenchmarks
 	[Params(100)]
 	public int Coroutines { get; set; }
 
+	private IonApplication _app = null!;
 	private ICoroutineRunner _runner = null!;
 	private GameTime _dt = null!;
 
@@ -23,9 +24,16 @@ public class CoroutineBenchmarks
 	public void Setup()
 	{
 		_dt = BenchUtils.NewGameTime();
-		var app = BenchUtils.BuildHeadless(services => services.AddCoroutines(), null);
-		_runner = app.Services.GetRequiredService<ICoroutineRunner>();
+		_app = BenchUtils.BuildHeadless(services => services.AddCoroutines(), null);
+		_runner = _app.Services.GetRequiredService<ICoroutineRunner>();
 		for (var i = 0; i < Coroutines; i++) _runner.Start(Forever());
+	}
+
+	[GlobalCleanup]
+	public void Cleanup()
+	{
+		_runner.StopAll();
+		_app.Dispose();
 	}
 
 	private static IEnumerator Forever()
