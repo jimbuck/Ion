@@ -1,7 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using SourceGeneratorUtils;
+using Ion.Generators;
 
 using System.Diagnostics;
 using System.Collections.Immutable;

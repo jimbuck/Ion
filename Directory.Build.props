@@ -1,0 +1,39 @@
+<Project>
+  <!--
+    Shared build settings for every project in the repository.
+    A project can still override any of these in its own csproj.
+  -->
+  <PropertyGroup>
+    <!--
+      Pinned to C# 12 so every SDK (8.0 and 10.0) compiles the same language.
+      "latest" on the 10.0 SDK selects C# 14, whose first-class span conversions make
+      MemUtils.Copy(Span<T>, IntPtr) ambiguous (CS0121). Switch to latest with the net10.0 move.
+    -->
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <!-- Warnings stay warnings; WarningLevel is left at the SDK default. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    Classify the project by name so engine libraries get AOT settings by default.
+    Tests (*.Tests), benchmarks (*.Benchmarks), source generators (*.Generators,
+    *.InternalGenerators) and samples (Ion.Examples*) are excluded.
+    To opt a project out, set IsAotCompatible and EnableConfigurationBindingGenerator
+    to false in its csproj (project properties are evaluated after this file).
+  -->
+  <PropertyGroup Condition="'$(IonAotLibrary)' == ''">
+    <IonAotLibrary>true</IonAotLibrary>
+    <IonAotLibrary Condition="$(MSBuildProjectName.EndsWith('.Tests'))">false</IonAotLibrary>
+    <IonAotLibrary Condition="$(MSBuildProjectName.EndsWith('.Benchmarks'))">false</IonAotLibrary>
+    <IonAotLibrary Condition="$(MSBuildProjectName.EndsWith('Generators'))">false</IonAotLibrary>
+    <IonAotLibrary Condition="$(MSBuildProjectName.StartsWith('Ion.Examples'))">false</IonAotLibrary>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IonAotLibrary)' == 'true'">
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+  </PropertyGroup>
+</Project>

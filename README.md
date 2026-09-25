@@ -31,6 +31,9 @@ Adds support for debug utils such as a trace profiler and debug renderer.
 ### Ion.Extensions.Graphics.Veldrid
 Adds window, input, and graphics support using the Veldrid API. Includes a built-in sprite batch for easy 2D rendering.
 
+### Ion.Extensions.Graphics.Null
+A headless graphics backend with no window or GPU, for tests, servers and CI.
+
 ### Ion.Extensions.Scenes
 Adds support for scenes that each have thier own scope for dependency injection!
 
@@ -44,7 +47,6 @@ Adds support for scenes that each have thier own scope for dependency injection!
 
 ## Built Using/Inspired By
   - [Veldrid](https://github.com/veldrid/veldrid) for Graphics
-  - [Assimp.Net](https://github.com/StirlingLabs/Assimp.Net) for asset loading
   - [Peridot by Ezequias Silva](https://github.com/ezequias2d/peridot) for Sprite Batch
   - [Coroutines by ChevyRay](https://github.com/ChevyRay/Coroutines)
 

@@ -1,8 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
-using SourceGeneratorUtils;
-
 namespace Ion.Extensions.Coroutines.Generators;
 
 [Generator]
