@@ -2,22 +2,20 @@
 
 namespace Ion.Extensions.Debug;
 
-
-internal class TraceTimer(ITraceManager traceManager, string prefix) : ITraceTimer
+internal sealed class TraceTimer(TraceManager traceManager, string prefix) : ITraceTimer
 {
-	private readonly TraceManager _traceManager = (TraceManager)traceManager;
 	private readonly string _prefix = prefix + "::";
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public ITraceTimerInstance Start(string name)
 	{
-		return _traceManager.StartTraceTimer(_prefix, name);
+		return traceManager.StartTraceTimer(_prefix, name);
 	}
 }
 
-internal class TraceTimer<T>(ITraceManager traceManager) : ITraceTimer<T>
+internal sealed class TraceTimer<T>(ITraceManager traceManager) : ITraceTimer<T>
 {
-	private readonly TraceTimer _timer = new(traceManager, typeof(T).Name);
+	private readonly ITraceTimer _timer = traceManager.CreateTimer(typeof(T).Name);
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public ITraceTimerInstance Start(string name)

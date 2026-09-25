@@ -61,7 +61,20 @@ public interface IIonApplication
 	IIonApplication UseDestroy(Func<GameLoopDelegate, GameLoopDelegate> middleware);
 
 	/// <summary>
-	/// Builds and runs the game.
+	/// Builds and runs the game until it exits (see <see cref="ExitGameEvent"/>).
 	/// </summary>
 	void Run();
+
+	/// <summary>
+	/// Builds and runs the game until it exits or <paramref name="cancellationToken"/> is cancelled.
+	/// </summary>
+	/// <param name="cancellationToken">Stops the game loop (after the current frame) when cancelled.</param>
+	void Run(CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Builds the game and runs Init, at most <paramref name="frames"/> frames, then Destroy. Useful for headless tests
+	/// and deterministic runs.
+	/// </summary>
+	/// <param name="frames">The number of frames to run. Must not be negative.</param>
+	void RunFrames(int frames);
 }

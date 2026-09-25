@@ -34,8 +34,13 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 		Services.Configure<StorageConfig>(Configuration.GetSection("Ion:Storage"));
 
 		Services.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(NullTraceTimer<>)));
-		Services.AddSingleton<IEventEmitter, EventEmitter>();
-		Services.AddTransient<IEventListener, EventListener>();
+		Services.AddSingleton<IClock, StopwatchClock>();
+
+		// The concrete emitter is registered for the engine's own event plumbing (listeners, EventSystem); the interface
+		// forwards to it by default and can be replaced by a fake without breaking that plumbing.
+		Services.AddSingleton<EventEmitter>();
+		Services.AddSingleton<IEventEmitter>(static sp => sp.GetRequiredService<EventEmitter>());
+		Services.AddTransient<IEventListener>(static sp => new EventListener(sp.GetRequiredService<EventEmitter>()));
 		Services.AddSingleton<IEventListenerFactory, EventListenerFactory>();
 		Services.AddSingleton<EventSystem>();
 

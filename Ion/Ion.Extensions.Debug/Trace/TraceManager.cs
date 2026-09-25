@@ -56,11 +56,21 @@ internal class TraceManager : ITraceManager
 #if DEBUG
 		if (!IsEnabled) return _nullTimer;
 
-		return new TraceTimerInstance(this, prefix, Interlocked.Increment(ref _nextId), name, Stopwatch.GetTimestamp() * _toMicroSeconds);
+		return StartInstance(prefix, name);
 #else
 		return _nullTimer;
 #endif
 	}
+
+	/// <inheritdoc/>
+	public ITraceTimer CreateTimer(string prefix) => new TraceTimer(this, prefix);
+
+#if DEBUG
+	internal TraceTimerInstance StartInstance(string prefix, string name)
+	{
+		return new TraceTimerInstance(this, prefix, Interlocked.Increment(ref _nextId), name, Stopwatch.GetTimestamp() * _toMicroSeconds);
+	}
+#endif
 
 	internal void StopTraceTimer(int id, string name, double start, int threadId)
 	{

@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace Ion;
 
@@ -9,11 +10,28 @@ public class EventListener : IEventListener
 	private HashSet<ulong> _currFrameSeenEvents = new(8);
     private HashSet<ulong> _prevFrameKnownEvents = new(8);
 
-    public EventListener(IEventEmitter eventEmitter)
-    {
-        _eventEmitter = (EventEmitter)eventEmitter;
+	/// <summary>
+	/// Creates a listener attached to <paramref name="eventEmitter"/>. Dispose it to detach it.
+	/// </summary>
+	/// <param name="eventEmitter">The engine's event emitter, whose frame buffers the listener reads.</param>
+	public EventListener(EventEmitter eventEmitter)
+	{
+		ArgumentNullException.ThrowIfNull(eventEmitter);
+		_eventEmitter = eventEmitter;
 		_eventEmitter.AttachListener(this);
-    }
+	}
+
+	/// <summary>
+	/// Compatibility overload for callers that only hold an <see cref="IEventEmitter"/>. The listener reads the engine's
+	/// frame buffers, so <paramref name="eventEmitter"/> must be an <see cref="EventEmitter"/>; prefer the
+	/// <see cref="EventListener(EventEmitter)"/> overload or <see cref="IEventListenerFactory"/>.
+	/// </summary>
+	/// <exception cref="ArgumentException"><paramref name="eventEmitter"/> is not an <see cref="EventEmitter"/>.</exception>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	public EventListener(IEventEmitter eventEmitter)
+		: this(eventEmitter as EventEmitter ?? throw new ArgumentException($"{nameof(EventListener)} needs the engine's {nameof(EventEmitter)}; resolve {nameof(IEventListener)} or {nameof(IEventListenerFactory)} from the container instead.", nameof(eventEmitter)))
+	{
+	}
 
     public bool On<T>() where T : unmanaged
 	{

@@ -103,7 +103,23 @@ public class IonApplication : IIonApplication, IDisposable
 		return gameLoop;
 	}
 
-	public void Run()
+	/// <inheritdoc/>
+	public void Run() => Run(CancellationToken.None);
+
+	/// <inheritdoc/>
+	public void Run(CancellationToken cancellationToken)
+	{
+		BuildForRun().Run(cancellationToken);
+	}
+
+	/// <inheritdoc/>
+	public void RunFrames(int frames)
+	{
+		ArgumentOutOfRangeException.ThrowIfNegative(frames);
+		BuildForRun().RunFrames(frames);
+	}
+
+	private GameLoop BuildForRun()
 	{
 		var gameLoop = Build();
 
@@ -111,7 +127,7 @@ public class IonApplication : IIonApplication, IDisposable
 		HotReloadService.ActiveApplication = this;
 		HotReloadService.ActiveGameLoop = gameLoop;
 #endif
-		gameLoop.Run();
+		return gameLoop;
 	}
 
 	public void Dispose()

@@ -6,14 +6,14 @@ namespace Ion.Extensions.Debug;
 public class TraceTimerSystem
 {
 	private readonly IOptionsMonitor<DebugConfig> _debugConfig;
-	private readonly TraceManager _traceManager;
+	private readonly ITraceManager _traceManager;
 	private readonly ITraceTimer _trace;
 
 	public TraceTimerSystem(IOptionsMonitor<DebugConfig> debugConfig, ITraceManager traceManager)
 	{
 		_debugConfig = debugConfig;
-		_traceManager = (TraceManager)traceManager;
-		_trace = new TraceTimer(_traceManager, "GameLoop");
+		_traceManager = traceManager;
+		_trace = traceManager.CreateTimer("GameLoop");
 	}
 
 #if DEBUG

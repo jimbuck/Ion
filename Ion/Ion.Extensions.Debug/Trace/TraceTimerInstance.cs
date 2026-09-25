@@ -24,11 +24,13 @@ internal struct TraceTimerInstance : ITraceTimerInstance
 		if (!_traceManager.IsEnabled) return;
 
 		_traceManager.StopTraceTimer(_id, _prefix + _name, _start, _threadId);
-		var newInstance = (TraceTimerInstance)_traceManager.StartTraceTimer(_prefix, name);
+#if DEBUG
+		var newInstance = _traceManager.StartInstance(_prefix, name);
 		_id = newInstance._id;
 		_name = newInstance._name;
 		_start = newInstance._start;
 		_threadId = newInstance._threadId;
+#endif
 	}
 
 	public void Stop()
