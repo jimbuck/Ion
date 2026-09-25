@@ -76,7 +76,26 @@ var bonk = assets.Load<ISoundEffect>("bonk.wav");
 Loading the same path twice returns the cached instance.
 
 ### Ion.Extensions.Audio
-Adds support for audio playback and manipulation. `AddAudio()` plays through DirectSound (NAudio); `AddNullAudio()` is a headless `IAudioManager` that records every play in `NullAudioManager.Plays` and reads only WAV headers.
+An engine-owned mixer that runs on Windows, macOS, Linux (x64 and arm64, including handhelds), iOS and Android, with no NAudio and nothing platform-specific above the output:
+
+```csharp
+var music = audio.Play(theme, bus: AudioBus.Music, loop: true, fadeIn: 2f);
+audio.Play(bonk, volume: 0.8f, pitchShift: 0.1f, pan: -0.5f); // pitch in octaves, pan -1 (left) to 1 (right)
+audio.SetBusVolume(AudioBus.Sfx, 0.5f);
+audio.MasterVolume = 0.9f;
+audio.Stop(music, fadeOut: 1f);
+if (!audio.IsPlaying(music)) { /* finished */ }
+```
+
+  - **Mixer.** Float32 interleaved stereo at `Ion:Audio:OutputRate` (default 48 kHz). Voices have volume, pitch (resampled with linear or cubic interpolation), pan (linear balance), loop and fade in/out, and feed the master, sfx and music buses. The voice pool is fixed (`MaxVoices`, default 64); when it is full, `VoiceStealing.Oldest` (default) replaces the voice that started first, preferring one-shots over loops, and `VoiceStealing.Refuse` returns an invalid `VoiceHandle`.
+  - **Threads.** `IAudioManager` calls only queue commands. The audio system flushes them in the `Last` stage (order `StageOrder.Audio`) into a lock-free single-producer single-consumer queue; the audio thread applies them, mixes and reports finished voices on a second queue. The audio thread never blocks and never allocates after warm-up (checked by a test).
+  - **Decoding at load time.** WAV (PCM 8/16/24/32-bit, float 32/64-bit, extensible), OGG Vorbis (NVorbis) and MP3 (NLayer), all managed and NativeAOT-clean, resampled once to the output rate with a windowed-sinc filter. `ISoundEffect` has `Duration`, `Channels` and `SampleRate`. Music is decoded whole: streaming is not implemented yet.
+  - **Outputs.** `IAudioOutput` (`Start(format, callback)`, `Stop`, `BufferSize`). `OpenAlAudioOutput` streams through OpenAL with a ring of `BufferCount` queued buffers of `BufferFrames` frames refilled on a dedicated thread; it loads OpenAL Soft (binaries for Windows, macOS and Linux from `Silk.NET.OpenAL.Soft.Native`) or the system OpenAL (iOS and macOS OpenAL.framework, `libopenal.so` bundled by an Android app). `NullAudioOutput` mixes on the game thread, driven by the game clock, so headless runs are deterministic and tests can capture the mix (`CaptureEnabled`, `Captured`). If the device or library is missing, a warning is logged and the null output takes over: startup never fails because of audio.
+  - **Registration.** `AddAudio(config)` / `UseAudio()` use `Ion:Audio:Backend` (`Auto`, `OpenAL`, `Null`). `AddNullAudio(config)` / `UseNullAudio()` run the same mixer on the null output with `NullAudioManager`, which also records every play in `Plays`.
+
+```json
+{ "Ion": { "Audio": { "OutputRate": 48000, "MaxVoices": 64, "BufferFrames": 512, "BufferCount": 4, "Backend": "Auto", "Interpolation": "Linear", "VoiceStealing": "Oldest" } } }
+```
 
 ### Ion.Extensions.Coroutines
 Adds support for coroutines, allowing for async code to be run in a synchronous manner.
@@ -127,6 +146,8 @@ Assert.True(host.SpriteBatch.LastFrame.Sprites > 0);
 Assert.NotEmpty(host.Audio.Plays);
 Assert.Equal(1, host.Get<ScoreSystem>().Lives);
 ```
+
+`host.Audio` is the headless `NullAudioManager`: set `host.Audio.NullOutput.CaptureEnabled = true` before stepping to assert on the mixed samples (`host.Audio.NullOutput.Captured`).
 
 `Configure` and `ConfigureApp` add service registrations and schedule setup, `WithConfiguration` adds settings, and `UseGame(configure, use)` builds a whole game that calls `AddIon`/`UseIon` itself (see `Ion.Examples/Ion.Examples.Breakout.ECS.Tests`, which plays 600 frames of Breakout with the autopilot and checks the run is deterministic). Disposing the host runs Destroy and disposes the application. `Screenshot()` throws `NotSupportedException` until the headless renderer lands.
 

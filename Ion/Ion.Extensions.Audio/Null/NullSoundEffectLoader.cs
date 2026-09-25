@@ -1,11 +1,14 @@
 using System.Buffers.Binary;
 
+using Microsoft.Extensions.Options;
+
 using Ion.Extensions.Assets;
 
 namespace Ion.Extensions.Audio;
 
 /// <summary>
-/// A sound effect that holds only the facts read from its file header, for the headless audio backend.
+/// A sound effect for the headless audio backend: the facts read from its file header and, when the file could be
+/// decoded, its samples (<see cref="Decoded"/>), so the headless mixer mixes it like the device backend would.
 /// </summary>
 public sealed class NullSoundEffect : ISoundEffect
 {
@@ -40,25 +43,39 @@ public sealed class NullSoundEffect : ISoundEffect
 	/// </summary>
 	public bool IsDisposed { get; private set; }
 
+	/// <summary>
+	/// The decoded samples at the mixer's output rate, or null when only the header was read (or the format is not supported).
+	/// </summary>
+	public SoundEffect? Decoded { get; }
+
 	public NullSoundEffect(string name, float duration, int channels, int sampleRate, int bitsPerSample)
+		: this(name, duration, channels, sampleRate, bitsPerSample, null)
+	{
+	}
+
+	public NullSoundEffect(string name, float duration, int channels, int sampleRate, int bitsPerSample, SoundEffect? decoded)
 	{
 		Name = name;
 		Duration = duration;
 		Channels = channels;
 		SampleRate = sampleRate;
 		BitsPerSample = bitsPerSample;
+		Decoded = decoded;
 	}
 
 	public void Dispose() => IsDisposed = true;
 }
 
 /// <summary>
-/// Loads <see cref="ISoundEffect"/> assets for the headless audio backend: reads the WAV header (duration, channels,
-/// sample rate) without decoding samples or touching an audio device. Files in other formats (for example MP3) load
-/// as a sound with no header data, so a game that uses them still runs headless.
+/// Loads <see cref="ISoundEffect"/> assets for the headless audio backend without touching an audio device: reads the
+/// WAV header (duration, channels, sample rate) and decodes the samples (WAV, OGG Vorbis, MP3) at the mixer's output
+/// rate so the headless mixer can mix them. Files that cannot be decoded load as a header-only sound (silent when
+/// played), so a game that uses them still runs headless.
 /// </summary>
-public sealed class NullSoundEffectLoader(IPersistentStorage storage) : IAssetLoader<ISoundEffect>
+public sealed class NullSoundEffectLoader(IPersistentStorage storage, IOptions<AudioConfig>? config = null) : IAssetLoader<ISoundEffect>
 {
+	private readonly int _outputRate = config?.Value.OutputRate ?? new AudioConfig().OutputRate;
+
 	public Type AssetType { get; } = typeof(ISoundEffect);
 
 	public ISoundEffect Load(string path)
@@ -69,8 +86,30 @@ public sealed class NullSoundEffectLoader(IPersistentStorage storage) : IAssetLo
 			throw new FileNotFoundException($"Sound effect '{path}' was not found at '{filepath}'. File names are case-sensitive on Linux and macOS; check the casing of the name.", filepath);
 		}
 
-		using var stream = storage.Assets.Read(path);
-		return Read(path, stream);
+		byte[] bytes;
+		using (var stream = storage.Assets.Read(path))
+		using (var copy = new MemoryStream())
+		{
+			stream.CopyTo(copy);
+			bytes = copy.ToArray();
+		}
+
+		var header = Read(path, new MemoryStream(bytes, writable: false));
+
+		SoundEffect? decoded;
+		try
+		{
+			decoded = SoundDecoder.Decode(path, bytes, _outputRate);
+		}
+		catch (InvalidDataException)
+		{
+			return header;
+		}
+
+		// Formats without a WAV header take their facts from the decoded sound.
+		return header.SampleRate > 0
+			? new NullSoundEffect(path, header.Duration, header.Channels, header.SampleRate, header.BitsPerSample, decoded)
+			: new NullSoundEffect(path, decoded.Duration, decoded.Channels, decoded.SampleRate, 0, decoded);
 	}
 
 	/// <summary>

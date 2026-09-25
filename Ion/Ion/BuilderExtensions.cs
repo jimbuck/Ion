@@ -26,7 +26,7 @@ public static class BuilderExtensions
 	/// <see cref="GraphicsOutput.None"/> (<c>Ion:Graphics:Output = None</c>, or <paramref name="configureOptions"/> setting
 	/// <see cref="GraphicsConfig.Output"/> to <see cref="GraphicsOutput.None"/>), the headless backends are registered:
 	/// <c>AddNullGraphics</c> (no GPU, window or SDL) and <c>AddNullAudio</c> (no audio device). Otherwise the Veldrid graphics
-	/// and DirectSound audio backends are registered. <see cref="UseIon"/> adds the systems of whichever was chosen.
+	/// and OpenAL audio backends are registered (audio falls back to the null output when no device is available). <see cref="UseIon"/> adds the systems of whichever was chosen.
 	/// A game that depends only on the interfaces (<see cref="IWindow"/>, <see cref="IInputState"/>, <see cref="ISpriteBatch"/>,
 	/// <see cref="IAudioManager"/>, and assets loaded with <c>Load&lt;ITexture2D&gt;</c>, <c>Load&lt;IFontSet&gt;</c> and
 	/// <c>Load&lt;ISoundEffect&gt;</c>) runs unchanged on both.
@@ -49,13 +49,13 @@ public static class BuilderExtensions
 		{
 			services
 				.AddNullGraphics(config, configureOptions)
-				.AddNullAudio();
+				.AddNullAudio(config);
 		}
 		else
 		{
 			services
 				.AddVeldridGraphics(config, configureOptions)
-				.AddAudio();
+				.AddAudio(config);
 		}
 
 		services.AddSingleton(new IonBackendSelection(headless));

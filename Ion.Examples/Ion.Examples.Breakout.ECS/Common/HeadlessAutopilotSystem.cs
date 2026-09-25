@@ -69,7 +69,7 @@ public class HeadlessAutopilotSystem(NullInputState input, NullSpriteBatch sprit
 
 		var drawn = spriteBatch.LastFrame;
 		logger.LogInformation(
-			"Frame {Frame}: {Balls} balls, {Blocks} blocks left, last frame drew {Sprites} sprites and {Strings} strings in {DrawCalls} draw calls, {Sounds} sounds played so far.",
-			_frame, world.CountEntities(in _ballQuery), world.CountEntities(in _blockQuery), drawn.Sprites, drawn.Strings, drawn.DrawCalls, audio.Plays.Count);
+			"Frame {Frame}: {Balls} balls, {Blocks} blocks left, last frame drew {Sprites} sprites and {Strings} strings in {DrawCalls} draw calls, {Sounds} sounds played so far, {Mixed} audio frames mixed ({Voices} voices playing).",
+			_frame, world.CountEntities(in _ballQuery), world.CountEntities(in _blockQuery), drawn.Sprites, drawn.Strings, drawn.DrawCalls, audio.Plays.Count, audio.Mixer.FramesRendered, audio.Mixer.ActiveVoices);
 	}
 }
