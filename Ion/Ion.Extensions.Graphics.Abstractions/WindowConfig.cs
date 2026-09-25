@@ -20,6 +20,20 @@ public class WindowConfig
 	/// </summary>
 	public WindowState WindowState { get; set; }
 
+	/// <summary>
+	/// <c>Ion:Window:Fullscreen = true</c> is shorthand for <see cref="WindowState"/> = <see cref="WindowState.FullScreen"/>
+	/// (handhelds such as the R36S, where the window is the 640x480 panel). Reads true when the state is full screen.
+	/// </summary>
+	public bool Fullscreen
+	{
+		get => WindowState == WindowState.FullScreen;
+		set
+		{
+			if (value) WindowState = WindowState.FullScreen;
+			else if (WindowState == WindowState.FullScreen) WindowState = WindowState.Normal;
+		}
+	}
+
 	/// <summary>Whether the user can resize the window.</summary>
 	public bool Resizable { get; set; } = true;
 

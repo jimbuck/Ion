@@ -1,37 +1,39 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The RHI contract tests shared by the backend test projects (Ion.Extensions.Graphics.Vulkan.Tests and
+    Ion.Extensions.Graphics.GLES.Tests): abstract test classes written against the RHI only, the textured quad pixel
+    asserts and golden PNGs (one set of goldens for every backend), and the test support types. A backend's test project
+    derives one sealed class per contract and marks it with [RhiBackend(...)]; [RhiFact] skips a test when that backend
+    (or a display, for windowed tests) is missing.
+  -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
+    <IsTestProject>false</IsTestProject>
     <Platforms>AnyCPU</Platforms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IonAotLibrary>false</IonAotLibrary>
+    <IsAotCompatible>false</IsAotCompatible>
+    <RootNamespace>Ion.Extensions.Graphics.Rhi.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\Ion.Core.Tests\TestConstants.cs" Link="TestConstants.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="coverlet.collector" Version="10.0.1">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
     <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\Ion.Testing\Ion.Testing.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Vulkan\Ion.Extensions.Graphics.Vulkan.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.GLES\Ion.Extensions.Graphics.GLES.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Headless\Ion.Extensions.Graphics.Headless.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Windowing.SilkNet\Ion.Extensions.Windowing.SilkNet.csproj" />
-    <ProjectReference Include="..\Ion.Shaders\Ion.Shaders.csproj" />
-    <!-- The RHI contract tests shared with the GLES backend, and the golden images. -->
-    <ProjectReference Include="..\Ion.Extensions.Graphics.Rhi.Tests.Shared\Ion.Extensions.Graphics.Rhi.Tests.Shared.csproj" />
     <!-- The textured quad and its build-time compiled shaders. -->
     <ProjectReference Include="..\..\Ion.Examples\Ion.Examples.Quad\Ion.Examples.Quad.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Golden\*.png" CopyToOutputDirectory="PreserveNewest" LinkBase="Golden" />
   </ItemGroup>
 </Project>

@@ -12,7 +12,13 @@ using CrossCompilerOption = Silk.NET.SPIRV.Cross.CompilerOption;
 using CrossCompilerOptions = Silk.NET.SPIRV.Cross.CompilerOptions;
 using CrossContext = Silk.NET.SPIRV.Cross.Context;
 using CrossParsedIr = Silk.NET.SPIRV.Cross.ParsedIr;
+using CrossReflectedResource = Silk.NET.SPIRV.Cross.ReflectedResource;
+using CrossResources = Silk.NET.SPIRV.Cross.Resources;
+using CrossResourceType = Silk.NET.SPIRV.Cross.ResourceType;
 using CrossResult = Silk.NET.SPIRV.Cross.Result;
+using Decoration = Silk.NET.SPIRV.Decoration;
+using ExecutionModel = Silk.NET.SPIRV.ExecutionModel;
+using GlesBindings = Ion.Extensions.Graphics.Rhi.GlesBindings;
 using ShadercCompiler = Silk.NET.Shaderc.Compiler;
 
 namespace Ion.Shaders;
@@ -72,8 +78,11 @@ public static unsafe class ShaderCompiler
 
 	/// <summary>
 	/// Translates SPIR-V to GLSL ES 3.10 source for the GLES backend: separate textures and samplers are combined (GLES has
-	/// only combined samplers; each combined sampler is named <c>texture_sampler</c>), and depth is remapped from
-	/// WebGPU/Vulkan's [0, 1] clip range to GL's [-1, 1].
+	/// only combined samplers; each combined sampler is named <c>texture_sampler</c>), depth is remapped from
+	/// WebGPU/Vulkan's [0, 1] clip range to GL's [-1, 1], clip-space y is negated (the backend renders upside down in GL
+	/// terms so that texture row 0 is the top row, as in WebGPU), (set, binding) pairs are flattened to binding points and
+	/// texture units with <see cref="GlesBindings"/> and listed in a flattening table appended as comments, and the
+	/// varyings between stages are named by location (<c>ion_var_N</c>) so that stages link by name on GLSL ES 3.00 too.
 	/// </summary>
 	/// <exception cref="ShaderCompilationException">SPIRV-Cross cannot translate the module.</exception>
 	public static string TranslateToGlslEs(ReadOnlySpan<byte> spirv, uint version = 310)
@@ -94,6 +103,7 @@ public static unsafe class ShaderCompiler
 			Check(cross, context, cross.CompilerOptionsSetUint(options, CrossCompilerOption.GlslVersion, version));
 			Check(cross, context, cross.CompilerOptionsSetBool(options, CrossCompilerOption.GlslES, 1));
 			Check(cross, context, cross.CompilerOptionsSetBool(options, CrossCompilerOption.FixupDepthConvention, 1));
+			Check(cross, context, cross.CompilerOptionsSetBool(options, CrossCompilerOption.FlipVertexY, 1));
 			Check(cross, context, cross.CompilerInstallCompilerOptions(compiler, options));
 
 			// GLES has no separate samplers: combine every (texture, sampler) pair used together into a sampler2D.
@@ -108,13 +118,107 @@ public static unsafe class ShaderCompiler
 				cross.CompilerSetName(compiler, combined[i].CombinedId, $"{imageName}_{samplerName}");
 			}
 
+			var table = FlattenBindings(cross, context, compiler, combined, count);
+
 			byte* source;
 			Check(cross, context, cross.CompilerCompile(compiler, &source));
-			return SilkMarshal.PtrToString((nint)source) ?? string.Empty;
+			var glsl = SilkMarshal.PtrToString((nint)source) ?? string.Empty;
+			var result = new StringBuilder(glsl);
+			if (table.Count > 0)
+			{
+				if (!glsl.EndsWith('\n')) result.Append('\n');
+				result.Append("\n// Ion GLES binding table: (set, binding) flattened by GlesBindings.Slot.\n");
+				foreach (var line in table) result.Append(line).Append('\n');
+			}
+
+			return result.ToString();
 		}
 		finally
 		{
 			cross.ContextDestroy(context);
+		}
+	}
+
+	/// <summary>
+	/// Rewrites the binding decorations to the flattened GLES slots, names the varyings by location, and returns the lines
+	/// of the flattening table.
+	/// </summary>
+	private static List<string> FlattenBindings(Cross cross, CrossContext* context, CrossCompiler* compiler, CrossCombinedImageSampler* combined, nuint combinedCount)
+	{
+		var table = new List<string>();
+		CrossResources* resources;
+		Check(cross, context, cross.CompilerCreateShaderResources(compiler, &resources));
+
+		foreach (var (type, kind) in (ReadOnlySpan<(CrossResourceType, string)>)[(CrossResourceType.UniformBuffer, "ubo"), (CrossResourceType.StorageBuffer, "ssbo")])
+		{
+			CrossReflectedResource* list;
+			nuint count;
+			Check(cross, context, cross.ResourcesGetResourceListForType(resources, type, &list, &count));
+			for (nuint i = 0; i < count; i++)
+			{
+				var set = cross.CompilerGetDecoration(compiler, list[i].Id, Decoration.DescriptorSet);
+				var binding = cross.CompilerGetDecoration(compiler, list[i].Id, Decoration.Binding);
+				var name = SilkMarshal.PtrToString((nint)cross.CompilerGetName(compiler, list[i].BaseTypeId));
+				if (string.IsNullOrEmpty(name)) name = SilkMarshal.PtrToString((nint)list[i].Name) ?? "block";
+				cross.CompilerSetDecoration(compiler, list[i].Id, Decoration.Binding, (uint)_slot(set, binding));
+				cross.CompilerUnsetDecoration(compiler, list[i].Id, Decoration.DescriptorSet);
+				table.Add(GlesBindings.FormatBlock(kind, name, set, binding));
+			}
+		}
+
+		var units = new Dictionary<int, string>();
+		for (nuint i = 0; i < combinedCount; i++)
+		{
+			var image = combined[i].ImageId;
+			var sampler = combined[i].SamplerId;
+			var set = cross.CompilerGetDecoration(compiler, image, Decoration.DescriptorSet);
+			var binding = cross.CompilerGetDecoration(compiler, image, Decoration.Binding);
+			var samplerSet = cross.CompilerGetDecoration(compiler, sampler, Decoration.DescriptorSet);
+			var samplerBinding = cross.CompilerGetDecoration(compiler, sampler, Decoration.Binding);
+			var name = SilkMarshal.PtrToString((nint)cross.CompilerGetName(compiler, combined[i].CombinedId)) ?? "sampler";
+			var slot = _slot(set, binding);
+			if (units.TryGetValue(slot, out var other))
+			{
+				throw new ShaderCompilationException($"GLES: '{name}' and '{other}' sample the texture at set {set}, binding {binding} with different samplers; the GLES backend binds one sampler per texture unit, so sample each texture with one sampler.");
+			}
+
+			units.Add(slot, name);
+			cross.CompilerSetDecoration(compiler, combined[i].CombinedId, Decoration.Binding, (uint)slot);
+			table.Add(GlesBindings.FormatSampler(name, set, binding, samplerSet, samplerBinding));
+		}
+
+		// Varyings named by location, so the stages also link by name where locations are not allowed (GLSL ES 3.00).
+		var model = cross.CompilerGetExecutionModel(compiler);
+		var varyings = model switch
+		{
+			ExecutionModel.Vertex => CrossResourceType.StageOutput,
+			ExecutionModel.Fragment => CrossResourceType.StageInput,
+			_ => (CrossResourceType?)null,
+		};
+		if (varyings is { } varyingType)
+		{
+			CrossReflectedResource* list;
+			nuint count;
+			Check(cross, context, cross.ResourcesGetResourceListForType(resources, varyingType, &list, &count));
+			for (nuint i = 0; i < count; i++)
+			{
+				var location = cross.CompilerGetDecoration(compiler, list[i].Id, Decoration.Location);
+				cross.CompilerSetName(compiler, list[i].Id, $"ion_var_{location}");
+			}
+		}
+
+		return table;
+	}
+
+	private static int _slot(uint set, uint binding)
+	{
+		try
+		{
+			return GlesBindings.Slot(set, binding);
+		}
+		catch (ArgumentOutOfRangeException ex)
+		{
+			throw new ShaderCompilationException($"GLES: set {set}, binding {binding} cannot be flattened: {ex.Message}");
 		}
 	}
 

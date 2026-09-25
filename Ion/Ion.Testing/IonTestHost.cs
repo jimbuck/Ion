@@ -277,11 +277,12 @@ public sealed class IonTestHost : IDisposable
 	}
 
 	/// <summary>
-	/// Turns on headless rendering (<c>Ion:Headless:Render = true</c>): the Vulkan RHI backend renders every frame into an
-	/// offscreen target sized from <c>Ion:Window</c> (960x540 by default), systems can render through
-	/// <see cref="IGraphicsFrame"/>, and <see cref="Screenshot"/> captures frames. Needs a Vulkan driver (on Linux CI, Mesa
-	/// lavapipe). Sprites drawn with <see cref="ISpriteBatch"/> are still only recorded until the 2D renderer is ported to
-	/// the RHI.
+	/// Turns on headless rendering (<c>Ion:Headless:Render = true</c>): an RHI backend renders every frame into an offscreen
+	/// target sized from <c>Ion:Window</c> (960x540 by default), systems can render through <see cref="IGraphicsFrame"/>, and
+	/// <see cref="Screenshot"/> captures frames. The backend follows <c>Ion:Graphics:PreferredBackend</c>: Vulkan by default
+	/// (on Linux CI, Mesa lavapipe), <c>OpenGLES</c> through EGL (Mesa llvmpipe, no display needed), or <c>Auto</c> for the
+	/// first available. Sprites drawn with <see cref="ISpriteBatch"/> are still only recorded until the 2D renderer is ported
+	/// to the RHI.
 	/// </summary>
 	public IonTestHost WithRendering(uint? width = null, uint? height = null)
 	{

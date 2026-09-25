@@ -130,3 +130,45 @@ The substitutions stub `Window.TryAdd` and `InputWindowExtensions.TryAdd` (never
 and `DefaultPathResolver.TryLocateNativeAssetFromDeps`/`TryLocateNativeAssetInRuntimesFolder` (deps.json and the NuGet
 `runtimes/` folder do not exist in a NativeAOT publish). They are applied only when the assemblies are referenced, so a
 headless-only app (Vulkan without windowing) gets only the Silk.NET.Core one.
+
+## Follow-up: the OpenGL ES backend (Stage 4, second wave)
+
+`Ion.Extensions.Graphics.GLES` implements the same RHI on `Silk.NET.OpenGLES` 2.23 for the R36S (Mali-G31, Panfrost,
+OpenGL ES 3.1) and as the fallback where Vulkan is missing. Checked on the same host: Mesa 25.2.8 llvmpipe, which offers
+OpenGL ES 3.2 through EGL and GLX, and Xvfb.
+
+**Contexts.** Windowed, `SilkWindow` creates the window with `ContextAPI.OpenGLES` 3.1 (no depth or stencil buffer; it
+retries with 3.0 when 3.1 fails) whenever the resolved backend is OpenGL ES, and the backend renders through the window's
+`IGLContext` (GLFW uses GLX under Xvfb, SDL its EGL or GLX path). Headless, the backend creates its own context through EGL:
+Silk.NET 2.x has no EGL bindings (`Silk.NET.EGL` stopped at 1.9), so `EglContext` loads `libEGL.so.1` with `NativeLibrary`
+and calls a dozen entry points through unmanaged function pointers (NativeAOT-clean). It prefers Mesa's surfaceless
+platform (`EGL_MESA_platform_surfaceless` through `eglGetPlatformDisplayEXT`), which needs no X server, GBM device or
+window, and uses no surface at all with `EGL_KHR_surfaceless_context` (a 1x1 pbuffer otherwise). The display is initialized
+once per process and never terminated, because tests create devices in parallel.
+
+**Conventions.** WebGPU's clip space is kept by the shader translation rather than a uniform: SPIRV-Cross negates
+`gl_Position.y` (`FlipVertexY`) and remaps depth (`FixupDepthConvention`). Rendering is therefore upside down in GL terms,
+which makes texture row 0 the top row, as in WebGPU and the Vulkan backend: uploads, render-to-texture, sampling and
+`glReadPixels` readback need no flips, viewports and scissors take top-left origins as given, and front faces are inverted
+(`GL_CW` for WebGPU's counter-clockwise). The one flip is at present, where the offscreen target is blitted to the default
+framebuffer with a reversed destination rectangle. Bind groups are flattened to `group * 8 + binding` for uniform blocks and
+texture units, written into the GLSL ES by the shader build together with a flattening table (the ES 3.0 path, whose GLSL
+ES 3.00 has no binding qualifiers, assigns the slots by name from it); the sampler object bound to a texture unit is the
+sampler the shader combined with that texture.
+
+**Results.**
+
+| Check | Result |
+|---|---|
+| Contract tests (shared with Vulkan) | pass headless at ES 3.2, 3.1 and 3.0 (no display) and windowed on GLFW and SDL (Xvfb): 81 GLES tests, 62 Vulkan tests |
+| Goldens | the same PNGs as Vulkan, pixel for pixel (max channel difference 0), for the textured quad, the test host frame and the quad sample at 320x240, headless and windowed |
+| NativeAOT linux-x64 | 6.9 MB executable (both backends linked in); no `Ion.*` warnings; the same two `Silk.NET.Core` `DefaultPathResolver` warnings (IL3000, IL3002) as before; process start to a written PNG in about 125 ms on either backend |
+| NativeAOT linux-arm64 | cross-published from x64 with clang/lld: against Ubuntu 24.04's cross packages the executable needs glibc 2.34 (too new for ArkOS, glibc 2.30); against an Ubuntu 18.04 arm64 sysroot (`-p:SysRoot=... -p:LinkerFlavor=lld`) it needs `GLIBC_2.17` at most. 7.1 MB. Same warnings as x64 |
+| linux-arm64 run | under `qemu-aarch64` with Ubuntu 18.04's arm64 Mesa 20.0.8 (llvmpipe, OpenGL ES 3.1, the Panfrost level): `Auto` picks OpenGL ES (the linux-arm64 order), headless through EGL, frame identical to the golden at ES 3.1 and ES 3.0 |
+
+**Not verified.** R36S hardware and the Panfrost driver, SDL's KMSDRM video driver on the device (the profile and
+deployment notes are in [../../platforms/r36s.md](../../platforms/r36s.md)), the windowed ES 3.0 context fallback (llvmpipe
+always grants 3.1 or later), multisampled render targets (renderbuffers, attachment only, not exercised), storage buffers,
+float render targets on a driver without `EXT_color_buffer_float`, Windows and macOS (GLES there needs ANGLE, not wired), and
+GPU frame times on a tiler: the per-frame target ring and whole-buffer orphaning are there for Mali, but nothing measured
+them on one.

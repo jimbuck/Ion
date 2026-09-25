@@ -1,8 +1,5 @@
 using System.Numerics;
 
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-
 using Ion.Extensions.Graphics.Rhi;
 
 namespace Ion.Extensions.Graphics;
@@ -10,7 +7,7 @@ namespace Ion.Extensions.Graphics;
 /// <summary>
 /// Drives the frames of an RHI device, windowed (a surface) or offscreen: acquires the frame's color and depth targets,
 /// hands out clear-on-first-use attachments, clears the target when nothing rendered, presents, and captures frames.
-/// Written only against the RHI, so every backend (Vulkan now, GLES next) shares it.
+/// Written only against the RHI, so every backend (Vulkan and GLES) shares it.
 /// </summary>
 public sealed class GraphicsFrameDriver : IGraphicsFrame, IScreenshotSource, IDisposable
 {
@@ -226,10 +223,11 @@ public sealed class GraphicsFrameDriver : IGraphicsFrame, IScreenshotSource, IDi
 	public static void SavePng(Screenshot screenshot, string path)
 	{
 		ArgumentNullException.ThrowIfNull(screenshot);
+		ArgumentException.ThrowIfNullOrEmpty(path);
 		var directory = Path.GetDirectoryName(Path.GetFullPath(path));
 		if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-		using var image = Image.LoadPixelData<Rgba32>(screenshot.Rgba, screenshot.Width, screenshot.Height);
-		image.SaveAsPng(path);
+		using var file = File.Create(path);
+		PngWriter.Write(screenshot, file);
 	}
 
 	/// <summary>Releases the offscreen, depth and readback resources.</summary>

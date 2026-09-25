@@ -7,15 +7,17 @@ using Microsoft.Extensions.Logging;
 using Ion;
 using Ion.Examples.Quad;
 using Ion.Extensions.Graphics;
-using Ion.Extensions.Graphics.Vulkan;
 using Ion.Extensions.Windowing;
 
-// A spinning checkerboard quad on the Silk.NET stack: Silk.NET window (GLFW or SDL, Ion:Window:Platform), Vulkan RHI
-// backend, shaders compiled at build time. Options (command line or appsettings):
-//   --Ion:Headless=true         render offscreen, no window
-//   --Quad:Frames=<n>           exit after n frames
-//   --Quad:Screenshot=<file>    save the last frame as PNG on exit (headless, or windowed with Ion:Graphics:RetainLastFrame=true)
-//   --Ion:Window:Platform=Sdl   use SDL instead of GLFW
+// A spinning checkerboard quad on the Silk.NET stack: Silk.NET window (GLFW or SDL, Ion:Window:Platform), the Vulkan or
+// OpenGL ES RHI backend (Ion:Graphics:PreferredBackend), shaders compiled at build time. Options (command line or
+// appsettings):
+//   --Ion:Headless=true                    render offscreen, no window
+//   --Ion:Graphics:PreferredBackend=<b>    Vulkan (default), OpenGLES, or Auto (Vulkan then OpenGL ES; OpenGL ES first on linux-arm64)
+//   --Quad:Frames=<n>                      exit after n frames
+//   --Quad:Screenshot=<file>               save the last frame as PNG on exit (headless, or windowed with Ion:Graphics:RetainLastFrame=true)
+//   --Quad:Spin=false                      keep the quad still (deterministic screenshots)
+//   --Ion:Window:Platform=Sdl              use SDL instead of GLFW (the R36S: see docs/platforms/r36s.md)
 var builder = IonApplication.CreateBuilder(args);
 QuadApp.Configure(builder.Services, builder.Configuration);
 
@@ -28,18 +30,18 @@ namespace Ion.Examples.Quad
 	/// <summary>The app setup, shared with the tests.</summary>
 	public static class QuadApp
 	{
-		/// <summary>Registers the window (unless headless), the Vulkan backend and the quad system.</summary>
+		/// <summary>Registers the window (unless headless), the backend-selecting RHI graphics and the quad system.</summary>
 		public static void Configure(IServiceCollection services, IConfiguration config)
 		{
 			if (IsHeadless(config))
 			{
 				services.AddInputTracker();
-				services.AddVulkanGraphics(config, VulkanGraphicsMode.Offscreen);
+				services.AddRhiGraphics(config, offscreen: true);
 			}
 			else
 			{
 				services.AddSilkWindowing(config);
-				services.AddVulkanGraphics(config);
+				services.AddRhiGraphics(config);
 			}
 
 			services.AddSingleton<QuadSystem>();
@@ -50,7 +52,7 @@ namespace Ion.Examples.Quad
 		{
 			app.UseEvents();
 			if (!IsHeadless(app.Configuration)) app.UseSilkWindowing();
-			app.UseVulkanGraphics();
+			app.UseRhiGraphics();
 			app.UseSystem<QuadSystem>();
 		}
 
@@ -65,6 +67,7 @@ namespace Ion.Examples.Quad
 	{
 		private readonly long _frames = long.TryParse(config["Quad:Frames"], out var frames) ? frames : 0;
 		private readonly string? _screenshot = config["Quad:Screenshot"];
+		private readonly bool _spin = !bool.TryParse(config["Quad:Spin"], out var spin) || spin;
 		private TexturedQuad? _quad;
 		private float _angle;
 		private long _rendered;
@@ -80,7 +83,7 @@ namespace Ion.Examples.Quad
 		[Update]
 		public void Update(GameTime dt)
 		{
-			_angle += dt.Delta;
+			if (_spin) _angle += dt.Delta;
 		}
 
 		[Render]

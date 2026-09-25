@@ -281,9 +281,15 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 	{
 		RegisterPlatform(platform);
 
-		var options = (_graphicsConfig.CurrentValue.PreferredBackend is GraphicsBackend.OpenGLES or GraphicsBackend.OpenGL
-			? WindowOptions.Default
-			: WindowOptions.DefaultVulkan) with
+		var backend = _graphicsConfig.CurrentValue.PreferredBackend;
+		var options = backend switch
+		{
+			// The GLES backend renders into offscreen targets and blits to the default framebuffer: no depth or stencil.
+			GraphicsBackend.OpenGLES => WindowOptions.Default with { API = GlesApi(3, 1), PreferredDepthBufferBits = 0, PreferredStencilBufferBits = 0 },
+			GraphicsBackend.OpenGL => WindowOptions.Default,
+			_ => WindowOptions.DefaultVulkan,
+		};
+		options = options with
 		{
 			Title = _title,
 			Size = new Vector2D<int>(config.Width is > 0 ? config.Width.Value : 960, config.Height is > 0 ? config.Height.Value : 540),
@@ -305,9 +311,25 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 		};
 
 		var window = Window.Create(options);
-		window.Initialize();
+		try
+		{
+			window.Initialize();
+		}
+		catch (Exception ex) when (backend == GraphicsBackend.OpenGLES && options.API.Version.MinorVersion > 0)
+		{
+			// No OpenGL ES 3.1 context: fall back to 3.0 (the GLES backend has ES 3.0 paths).
+			_logger.LogWarning(ex, "No OpenGL ES 3.1 context; retrying with OpenGL ES 3.0.");
+			window.Dispose();
+			window = Window.Create(options with { API = GlesApi(3, 0) });
+			window.Initialize();
+		}
+
 		return window;
 	}
+
+	/// <summary>The window API for an OpenGL ES <paramref name="major"/>.<paramref name="minor"/> context.</summary>
+	private static GraphicsAPI GlesApi(int major, int minor) =>
+		new(ContextAPI.OpenGLES, ContextProfile.Core, ContextFlags.Default, new APIVersion(major, minor));
 
 	/// <summary>
 	/// The platform <paramref name="requested"/> resolves to on this OS: <see cref="WindowPlatform.Auto"/> is GLFW on

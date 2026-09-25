@@ -26,6 +26,13 @@
     <PackageReference Include="Silk.NET.SPIRV.Cross" Version="2.23.0" />
     <PackageReference Include="Silk.NET.SPIRV.Cross.Native" Version="2.23.0" />
   </ItemGroup>
+  <PropertyGroup>
+    <!-- GlesBindings.cs is shared with Ion.Extensions.Graphics.Abstractions; here it compiles as internal. -->
+    <DefineConstants>$(DefineConstants);ION_SHADERS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Ion.Extensions.Graphics.Abstractions\Rhi\GlesBindings.cs" Link="GlesBindings.cs" />
+  </ItemGroup>
   <ItemGroup>
     <None Include="Ion.Shaders.targets" />
   </ItemGroup>

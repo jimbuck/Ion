@@ -31,7 +31,7 @@ public enum VulkanGraphicsMode
 /// <see cref="Device"/> exists from the graphics Init step (<see cref="StageOrder.Graphics"/>) on; systems create their GPU
 /// resources in an Init step with a higher order (the default order 0 is fine) or later.
 /// </remarks>
-public sealed class VulkanGraphics : IGraphicsFrame, IScreenshotSource, IDisposable
+public sealed class VulkanGraphics : IRhiGraphics
 {
 	private readonly IOptionsMonitor<GraphicsConfig> _graphicsConfig;
 	private readonly IOptionsMonitor<WindowConfig> _windowConfig;

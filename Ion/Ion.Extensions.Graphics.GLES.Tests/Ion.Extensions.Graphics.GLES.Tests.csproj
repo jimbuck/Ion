@@ -25,11 +25,11 @@
     <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
     <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\Ion.Testing\Ion.Testing.csproj" />
-    <ProjectReference Include="..\Ion.Extensions.Graphics.Vulkan\Ion.Extensions.Graphics.Vulkan.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.GLES\Ion.Extensions.Graphics.GLES.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Headless\Ion.Extensions.Graphics.Headless.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Windowing.SilkNet\Ion.Extensions.Windowing.SilkNet.csproj" />
     <ProjectReference Include="..\Ion.Shaders\Ion.Shaders.csproj" />
-    <!-- The RHI contract tests shared with the GLES backend, and the golden images. -->
+    <!-- The RHI contract tests shared with the Vulkan backend, and the golden images. -->
     <ProjectReference Include="..\Ion.Extensions.Graphics.Rhi.Tests.Shared\Ion.Extensions.Graphics.Rhi.Tests.Shared.csproj" />
     <!-- The textured quad and its build-time compiled shaders. -->
     <ProjectReference Include="..\..\Ion.Examples\Ion.Examples.Quad\Ion.Examples.Quad.csproj" />

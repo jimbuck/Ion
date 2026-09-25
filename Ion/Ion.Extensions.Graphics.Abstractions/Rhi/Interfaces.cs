@@ -7,15 +7,19 @@ namespace Ion.Extensions.Graphics.Rhi;
  * Vulkan, Metal and Direct3D 12 and maps onto OpenGL ES 3.1. Renderers (2D, 3D) are written once against it; nothing
  * backend-specific appears above it.
  *
- * Mapping onto OpenGL ES 3.1 (the GLES backend), which constrains what portable code may do:
- * - Bind groups have no GLES equivalent. The backend flattens (group, binding) pairs: uniform buffer entries become uniform
- *   block binding points and texture entries become texture units, numbered in group order. A Sampler entry is combined
- *   with the Texture entry of the same group into one texture unit (SPIRV-Cross builds combined image samplers at build
- *   time), so a group should pair each texture with one sampler. Keep to 4 bind groups and 16 texture units.
+ * Mapping onto OpenGL ES 3.1 (the GLES backend, Ion.Extensions.Graphics.GLES), which constrains what portable code may do:
+ * - Bind groups have no GLES equivalent. The backend flattens (group, binding) pairs with GlesBindings.Slot, group * 8 +
+ *   binding: uniform buffer entries become uniform block binding points and texture entries texture units at that slot.
+ *   The shader tool writes the same numbers into the GLSL ES (layout(binding = N)) and a flattening table. A texture is
+ *   sampled through one combined sampler (SPIRV-Cross builds combined image samplers at build time) whose sampler object
+ *   is the sampler the shader used with it, so sample each texture with one sampler. Keep binding numbers below 8, to 4
+ *   bind groups (3 on ES 3.0 devices with 24 uniform buffer bindings) and 16 textures per stage.
  * - Storage buffers are not guaranteed in the vertex stage (DeviceLimits.VertexStorageBuffers). Per-instance data goes
  *   through vertex buffers with VertexStepMode.Instance.
- * - Render passes become framebuffer binds; LoadOp.Clear is a glClear, StoreOp.Discard a glInvalidateFramebuffer.
- * - Shader modules are GLSL ES 3.10 source translated from the same SPIR-V at build time.
+ * - Render passes become framebuffer binds; LoadOp.Clear is a glClearBuffer, StoreOp.Discard a glInvalidateFramebuffer.
+ * - Shader modules are GLSL ES 3.10 source translated from the same SPIR-V at build time, with clip-space y negated so
+ *   that texture row 0 is the top row as in WebGPU (the window surface is blitted with a flip at present).
+ * - One blend state and write mask apply to every color target (target 0's), without OES_draw_buffers_indexed.
  */
 
 /// <summary>

@@ -234,12 +234,19 @@ A headless graphics backend with no window, GPU or SDL, for tests, servers and C
   - Loaders that read texture sizes from image headers and fonts that measure text with a fixed glyph width.
 
 ### Graphics on Silk.NET (Stage 4, first wave)
-The new graphics stack, next to Veldrid until it passes the same sample and snapshot tests (the 2D sprite batch, the GLES backend and the sample migration are the next wave):
+The new graphics stack, next to Veldrid until it passes the same sample and snapshot tests (the 2D sprite batch and the sample migration are the next wave). Two RHI backends, one set of renderers and golden images:
+
+| Backend | Package | Targets | Windowed | Headless (CI) |
+|---|---|---|---|---|
+| Vulkan | `Ion.Extensions.Graphics.Vulkan` | Windows, Linux, macOS (MoltenVK), Android, iOS | swapchain on the Silk.NET window | Mesa lavapipe, no display |
+| OpenGL ES 3.1 (3.0 fallback) | `Ion.Extensions.Graphics.GLES` | R36S and other linux-arm64 handhelds (Panfrost), and anywhere Vulkan is missing | the window's GL ES context | EGL surfaceless (Mesa llvmpipe), no display |
+
 
   - **RHI** (`Ion.Extensions.Graphics.Rhi`, in `Ion.Extensions.Graphics.Abstractions`): a small WebGPU-shaped abstraction that the renderers are written against once: `IGraphicsDevice`, `IQueue`, `IBuffer`, `ITexture`, `ITextureView`, `ISampler`, `IShaderModule`, `IBindGroupLayout`, `IBindGroup`, `IPipelineLayout`, `IRenderPipeline`, `ICommandEncoder`, `IRenderPassEncoder`, `ICommandBuffer` and `ISurface`, with descriptor structs and enums. Clip space is WebGPU's (y up, depth 0 to 1). Frames in flight are explicit (`BeginFrame`/`EndFrame`, driven by the graphics system) and disposal is deferred until the GPU is done. The GLES 3.1 constraints (bind groups flattened to uniform block bindings and texture units, no storage buffers in the vertex stage) are documented on the types. Systems render through `IGraphicsFrame` (the frame's color and depth targets and clear-on-first-use attachments) and capture frames with `IScreenshotSource`.
   - **`Ion.Extensions.Windowing.SilkNet`**: `AddSilkWindowing(config)` / `UseSilkWindowing()`. A GLFW or SDL window (`Ion:Window:Platform` = `Auto`, `Glfw` or `Sdl`, registered explicitly, no reflection) created at Init and pumped by Ion's loop in `First` (never `IWindow.Run`); resize, focus and close events on `IEvents`; keyboard, mouse, wheel, text and gamepads fed into the shared `InputTracker`; fullscreen, borderless and resizable from `Ion:Window`.
   - **`Ion.Extensions.Graphics.Vulkan`**: `AddVulkanGraphics(config)` / `UseVulkanGraphics()`. The Vulkan backend on `Silk.NET.Vulkan`: swapchain with recreation on resize, 2 or 3 frames in flight (`Ion:Graphics:FramesInFlight`), staging uploads, SPIR-V shaders, validation in Debug builds when the Khronos layer is installed (`Ion:Graphics:Validation`), `Ion:Graphics:Adapter` to pick a GPU. macOS and iOS run it over MoltenVK (ship `libMoltenVK.dylib`, for example from `Silk.NET.MoltenVK.Native`); the portability extensions are enabled automatically. Windowed screenshots need `Ion:Graphics:RetainLastFrame=true` (a copy per frame).
-  - **`Ion.Extensions.Graphics.Headless`**: the Vulkan backend without a window, rendering into an offscreen target sized from `Ion:Window` and capturing RGBA8 frames and PNG files. With `AddIon`, turn it on with `Ion:Headless=true` plus `Ion:Headless:Render=true`; it needs a Vulkan driver, and on Linux CI Mesa lavapipe (`mesa-vulkan-drivers`) renders on the CPU without an X server.
+  - **`Ion.Extensions.Graphics.GLES`**: `AddGlesGraphics(config)` / `UseGlesGraphics()`. The OpenGL ES backend on `Silk.NET.OpenGLES`: command buffers replayed at submit (same queue ordering as Vulkan), frames in flight on fence syncs, bind groups flattened to uniform block binding points and texture units (`group * 8 + binding`, the same numbers the shader build writes into the GLSL ES), sampler objects, cached framebuffer objects, readback through a pixel pack buffer; the window surface renders offscreen and is blitted with a vertical flip at present, so every backend has texture row 0 at the top. Windowed it uses the Silk.NET window's context (the window is created with the GL ES API); headless it creates an EGL context (Mesa's surfaceless platform, or a pbuffer). `Ion:Graphics:Gles:MaxFeatureLevel` (`Es30`, `Es31`, `Es32`) forces the fallbacks for testing. See [docs/platforms/r36s.md](./docs/platforms/r36s.md) for the handheld profile and the linux-arm64 publish.
+  - **`Ion.Extensions.Graphics.Headless`**: an RHI backend without a window, rendering into an offscreen target sized from `Ion:Window` and capturing RGBA8 frames and PNG files. With `AddIon`, turn it on with `Ion:Headless=true` plus `Ion:Headless:Render=true`; the backend follows `Ion:Graphics:PreferredBackend` (`Vulkan` by default: Mesa lavapipe, `mesa-vulkan-drivers`, on Linux CI; `OpenGLES`: EGL with Mesa, `libegl-mesa0`; `Auto`: the first available), so it runs on machines without Vulkan. It also hosts `AddRhiGraphics(config)` / `UseRhiGraphics()`, which picks the backend the same way for a window.
   - **Shaders** are GLSL 4.5 compiled at build time: import `Ion/Ion.Shaders/Ion.Shaders.targets` and add `<IonShader Include="Shaders/*.vert;Shaders/*.frag" />`. Each shader becomes embedded SPIR-V (Shaderc) and GLSL ES 3.10 (SPIRV-Cross), loaded with `EmbeddedShaders`; errors fail the build with file and line.
 
 Choosing a backend: `AddIon`/`UseIon` keep Veldrid for windows and the null backend for headless runs this wave. To use the new stack, register it yourself (see `Ion.Examples/Ion.Examples.Quad`):
@@ -247,15 +254,15 @@ Choosing a backend: `AddIon`/`UseIon` keep Veldrid for windows and the null back
 ```csharp
 var builder = IonApplication.CreateBuilder(args);
 builder.Services.AddSilkWindowing(builder.Configuration);   // Ion:Window:Platform = Auto | Glfw | Sdl
-builder.Services.AddVulkanGraphics(builder.Configuration);  // Ion:Graphics:PreferredBackend = Auto | Vulkan
+builder.Services.AddRhiGraphics(builder.Configuration);     // Ion:Graphics:PreferredBackend = Vulkan | OpenGLES | Auto
 builder.Services.AddSingleton<MyRenderSystem>();            // takes IGraphicsFrame; creates GPU resources in [Init]
 
 using var app = builder.Build();
-app.UseEvents().UseSilkWindowing().UseVulkanGraphics().UseSystem<MyRenderSystem>();
+app.UseEvents().UseSilkWindowing().UseRhiGraphics().UseSystem<MyRenderSystem>();
 app.Run();
 ```
 
-`GraphicsConfig.PreferredBackend` accepts `Auto` (the platform default: Vulkan on the Silk.NET stack, the platform default on Veldrid). The quad sample publishes with NativeAOT (`dotnet publish Ion.Examples/Ion.Examples.Quad -c Release -r linux-x64 -p:PublishAot=true`) with no warnings from Ion; the remaining Silk.NET warnings and why they are harmless are listed in [docs/plans/spikes/2026-silknet-spike.md](./docs/plans/spikes/2026-silknet-spike.md).
+`AddVulkanGraphics`/`UseVulkanGraphics` and `AddGlesGraphics`/`UseGlesGraphics` register one backend directly. `GraphicsConfig.PreferredBackend` forces `Vulkan` or `OpenGLES`; `Auto` takes the first available in platform order, Vulkan then OpenGL ES on desktop and OpenGL ES first on linux-arm64 (`GraphicsBackendSelector`; the Veldrid backend maps `Auto` to its own default). The quad sample publishes with NativeAOT for `linux-x64` and `linux-arm64` (`dotnet publish Ion.Examples/Ion.Examples.Quad -c Release -r linux-x64 -p:PublishAot=true`) with no warnings from Ion; the remaining Silk.NET warnings and why they are harmless are listed in [docs/plans/spikes/2026-silknet-spike.md](./docs/plans/spikes/2026-silknet-spike.md).
 
 ### Running headless
 `AddIon(config)` switches graphics and audio to the headless backends when `Ion:Headless` is `true` or `Ion:Graphics:Output` is `None`, and `UseIon()` adds the matching systems. Any game that depends only on the interfaces (`IWindow`, `IInputState`, `ISpriteBatch`, `IAudioManager`, `ITexture2D`, `IFontSet`, `ISoundEffect`) runs without a GPU, window or audio device:
@@ -264,7 +271,7 @@ app.Run();
 dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS -- --Ion:Headless=true
 ```
 
-In tests, resolve `NullInputState` to script input and `NullSpriteBatch` / `NullAudioManager` to assert on what was drawn and played, or use `IonTestHost` (below). Add `--Ion:Headless:Render=true` to also render through the RHI into an offscreen target (Vulkan, lavapipe on CI) and capture frames.
+In tests, resolve `NullInputState` to script input and `NullSpriteBatch` / `NullAudioManager` to assert on what was drawn and played, or use `IonTestHost` (below). Add `--Ion:Headless:Render=true` to also render through the RHI into an offscreen target (Vulkan on lavapipe, or OpenGL ES through EGL with `--Ion:Graphics:PreferredBackend=OpenGLES`) and capture frames.
 
 ### Input
 `IInputState` is captured once per frame at the start of `First` and is read-only for the rest of the frame. Both backends keep it in one shared `InputTracker` (in `Ion.Core.Abstractions`) with fixed-size storage and no per-frame allocation: `ulong` bitsets indexed by `Key` for held, pressed and released keys, a 32-bit mask for mouse buttons, mouse position and delta, the wheel, the frame's text input and eight gamepad slots.
@@ -315,7 +322,7 @@ Assert.Equal(1, host.Get<ScoreSystem>().Lives);
 
 `Configure` and `ConfigureApp` add service registrations and schedule setup, `WithConfiguration` adds settings, and `UseGame(configure, use)` builds a whole game that calls `AddIon`/`UseIon` itself (see `Ion.Examples/Ion.Examples.Breakout.ECS.Tests`, which plays 600 frames of Breakout with the autopilot and checks the run is deterministic). Disposing the host runs Destroy and disposes the application.
 
-**Screenshots and golden images.** `WithRendering(width, height)` turns on headless rendering (`Ion:Headless:Render=true`, needs a Vulkan driver such as Mesa lavapipe); systems then render through `IGraphicsFrame` and `Screenshot()` returns the last frame as RGBA8 pixels (it throws `NotSupportedException` when rendering is off). `GoldenImage.AssertMatches(shot, "Golden/quad.png", tolerance: 2)` compares it with a golden PNG, writes a missing golden (and fails, so CI never passes silently) and writes `.actual.png` and `.diff.png` next to the golden on a mismatch; `ION_UPDATE_GOLDEN=1` refreshes goldens. The 2D sprite batch is not on the RHI yet, so sprites are still only recorded in this mode.
+**Screenshots and golden images.** `WithRendering(width, height)` turns on headless rendering (`Ion:Headless:Render=true`, on Vulkan by default, or OpenGL ES with `Ion:Graphics:PreferredBackend=OpenGLES`); systems then render through `IGraphicsFrame` and `Screenshot()` returns the last frame as RGBA8 pixels (it throws `NotSupportedException` when rendering is off). `GoldenImage.AssertMatches(shot, "Golden/quad.png", tolerance: 2)` compares it with a golden PNG, writes a missing golden (and fails, so CI never passes silently) and writes `.actual.png` and `.diff.png` next to the golden on a mismatch; `ION_UPDATE_GOLDEN=1` refreshes goldens. The 2D sprite batch is not on the RHI yet, so sprites are still only recorded in this mode.
 
 ```csharp
 using var host = new IonTestHost().WithRendering(64, 64).WithSystem<QuadSystem>();

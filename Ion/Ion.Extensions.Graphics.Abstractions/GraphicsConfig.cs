@@ -8,9 +8,11 @@ namespace Ion.Extensions.Graphics;
 public class GraphicsConfig
 {
 	/// <summary>
-	/// The graphics API to use. <see cref="GraphicsBackend.Auto"/> lets the backend pick the platform default (Vulkan on
-	/// desktop and mobile with the Silk.NET stack). The Veldrid backend maps <see cref="GraphicsBackend.Auto"/> to its own
-	/// platform default.
+	/// The graphics API to use (<c>Ion:Graphics:PreferredBackend</c>). With the Silk.NET stack, <see cref="GraphicsBackend.Vulkan"/>
+	/// and <see cref="GraphicsBackend.OpenGLES"/> force that backend, and <see cref="GraphicsBackend.Auto"/> takes the first
+	/// available one in platform order (<see cref="GraphicsBackendSelector.AutoOrder()"/>: Vulkan then OpenGL ES on desktop,
+	/// OpenGL ES first on Linux arm64) where the backend-selecting registration (<c>AddRhiGraphics</c>, headless rendering)
+	/// is used. The Veldrid backend maps <see cref="GraphicsBackend.Auto"/> to its own platform default.
 	/// </summary>
 	public GraphicsBackend PreferredBackend { get; set; } = GraphicsBackend.Vulkan;
 
@@ -141,8 +143,8 @@ public enum GraphicsBackend : byte
 	WebGPU,
 
 	/// <summary>
-	/// The platform default: Vulkan for the Silk.NET stack (desktop, Android, iOS over MoltenVK), OpenGL ES where Vulkan is
-	/// unavailable (next wave), and the platform default of the Veldrid backend.
+	/// The platform default: for the Silk.NET stack, the first available of Vulkan then OpenGL ES (OpenGL ES first on Linux
+	/// arm64, the R36S); for the Veldrid backend, its own platform default.
 	/// </summary>
 	Auto,
 }
