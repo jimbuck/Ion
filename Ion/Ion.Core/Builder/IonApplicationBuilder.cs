@@ -31,6 +31,7 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 		});
 
 		Services.Configure<GameConfig>(Configuration.GetSection("Ion"));
+		Services.Configure<StorageConfig>(Configuration.GetSection("Ion:Storage"));
 
 		Services.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(NullTraceTimer<>)));
 		Services.AddSingleton<IEventEmitter, EventEmitter>();

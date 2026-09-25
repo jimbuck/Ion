@@ -1,11 +1,9 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Ion.Extensions.Scenes;
 
 public static class BuilderExtensions
 {
-	private static bool _scenesAdded = false;
-
 	public static IServiceCollection AddScenes(this IServiceCollection services)
 	{
 		return services
@@ -13,19 +11,25 @@ public static class BuilderExtensions
 			.AddSingleton<ICurrentScene, CurrentScene>();
 	}
 
+	/// <summary>
+	/// Registers a scene. The first call per application also adds the scene system to the application's pipelines,
+	/// at the position of that call: systems registered before it wrap the scenes, systems registered after it run
+	/// after the active scene's systems in each stage.
+	/// </summary>
 	public static IIonApplication UseScene(this IIonApplication app, int sceneId, Action<ISceneBuilder> configure)
 	{
-		var sceneManager = app.Services.GetRequiredService<SceneSystem>();
-		sceneManager.Register(sceneId, (config, services) =>
+		var sceneSystem = app.Services.GetRequiredService<SceneSystem>();
+		sceneSystem.Register(sceneId, (config, services) =>
 		{
 			var sceneBuilder = new SceneBuilder(sceneId, config, services);
 			configure(sceneBuilder);
 			return sceneBuilder.Build();
 		});
 
-		if (!_scenesAdded)
+		// SceneSystem is a singleton of this application's service provider, so the flag is per application.
+		if (!sceneSystem.IsBound)
 		{
-			_scenesAdded = true;
+			sceneSystem.IsBound = true;
 			app.UseSystem<SceneSystem>();
 		}
 

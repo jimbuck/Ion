@@ -68,8 +68,8 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 		_blockTexture = assets.Load<Texture2D>("15-Breakout-Tiles.png");
 		_paddleTexture = assets.Load<Texture2D>("49-Breakout-Tiles.png");
 		_ballTexture = assets.Load<Texture2D>("58-Breakout-Tiles.png");
-		_bonkSound =  assets.Load<SoundEffect>("Bonk.wav");
-		_pingSound =  assets.Load<SoundEffect>("Ping.mp3");
+		_bonkSound =  assets.Load<SoundEffect>("bonk.wav");
+		_pingSound =  assets.Load<SoundEffect>("ping.mp3");
 		_scoreFontSet = assets.Load<FontSet>("BungeeRegular", "Bungee-Regular.ttf");
 		_scoreFont = _scoreFontSet.CreateStyle(24);
 

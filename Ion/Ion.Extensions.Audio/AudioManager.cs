@@ -1,4 +1,4 @@
-﻿using Ion.Extensions.Debug;
+using Ion.Extensions.Debug;
 
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
@@ -10,7 +10,10 @@ public class AudioManager(ITraceTimer<AudioManager> trace) : IAudioManager, IDis
 	private readonly DirectSoundOut _outputDevice = new();
 	private readonly MixingSampleProvider _mixer = new(WaveFormat.CreateIeeeFloatWaveFormat(48000, 2)) { ReadFully = true };
 
-	public float MasterVolume { get; set; } = 10f;
+	/// <summary>
+	/// Multiplier applied to every sound's volume. Defaults to 1 (unchanged).
+	/// </summary>
+	public float MasterVolume { get; set; } = 1f;
 
 	public void Initialize()
 	{
@@ -22,36 +25,53 @@ public class AudioManager(ITraceTimer<AudioManager> trace) : IAudioManager, IDis
 		timer.Stop();
 	}
 
+	/// <summary>
+	/// Plays a sound effect.
+	/// </summary>
+	/// <param name="genericSoundEffect">The sound to play.</param>
+	/// <param name="volume">Volume of this sound, multiplied by <see cref="MasterVolume"/>.</param>
+	/// <param name="pitchShift">
+	/// Pitch shift in [-1, 1]: -1 is one octave down (factor 0.5), 0 is unchanged, 1 is one octave up (factor 2).
+	/// Applied with NAudio's <see cref="SmbPitchShiftingSampleProvider"/>, which keeps the duration unchanged.
+	/// </param>
 	public void Play(ISoundEffect genericSoundEffect, float volume = 1f, float pitchShift = 0f)
 	{
 		var timer = trace.Start("AudioManager::Play");
 
-		if (genericSoundEffect is not SoundEffect soundEffect)
+		try
 		{
-			throw new NotImplementedException($"ISoundEffect type {genericSoundEffect.GetType().FullName} not supported!");
+			if (genericSoundEffect is not SoundEffect soundEffect)
+			{
+				throw new NotImplementedException($"ISoundEffect type {genericSoundEffect.GetType().FullName} not supported!");
+			}
+
+			var finalVolume = volume * MasterVolume;
+			if (finalVolume <= 0f) return;
+
+			ISampleProvider sampleProvider = new SoundEffectSampleProvider(soundEffect);
+
+			if (pitchShift != 0f)
+			{
+				sampleProvider = new SmbPitchShiftingSampleProvider(sampleProvider) { PitchFactor = ToPitchFactor(pitchShift) };
+			}
+
+			sampleProvider = new VolumeSampleProvider(sampleProvider) { Volume = finalVolume };
+
+			_addMixerInput(sampleProvider);
 		}
-
-		ISampleProvider sampleProvider = new SoundEffectSampleProvider(soundEffect);
-
-		if (volume is 0) return;
-
-		if (volume is not 1)
+		finally
 		{
-			sampleProvider = new VolumeSampleProvider(sampleProvider) { Volume = volume * MasterVolume };
+			timer.Stop();
 		}
+	}
 
-		if (pitchShift is not 0)
-		{
-			// less than zero [-1, 0] -> [0.5, 1]
-			// greater than zero [0, 1] ->  [1, 2]
-			var naudioPitch = pitchShift < 0 ? (pitchShift / 2f) + 1f : (pitchShift + 1f);
-
-			//sampleProvider = new SmbPitchShiftingSampleProvider(sampleProvider) { PitchFactor = naudioPitch };
-		}
-
-		_addMixerInput(sampleProvider);
-
-		timer.Stop();
+	/// <summary>
+	/// Maps a pitch shift in [-1, 1] to a pitch factor in [0.5, 2]: [-1, 0] maps to [0.5, 1] and [0, 1] maps to [1, 2].
+	/// </summary>
+	internal static float ToPitchFactor(float pitchShift)
+	{
+		pitchShift = Math.Clamp(pitchShift, -1f, 1f);
+		return pitchShift < 0 ? (pitchShift / 2f) + 1f : (pitchShift + 1f);
 	}
 
 	private ISampleProvider _convertToRightChannelCount(ISampleProvider input)

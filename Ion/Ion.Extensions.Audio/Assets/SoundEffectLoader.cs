@@ -1,4 +1,4 @@
-﻿using NAudio.Wave;
+using NAudio.Wave;
 
 using Ion.Extensions.Assets;
 
@@ -9,7 +9,7 @@ public static class SoundEffectAssetManagerExtensions
 	public static SoundEffect Load<T>(this IBaseAssetManager assetManager, string path) where T : SoundEffect
 	{
 		var loader = (SoundEffectLoader)assetManager.GetLoader(typeof(SoundEffect));
-		return loader.Load(path);
+		return assetManager.GetOrLoad(path, loader.Load);
 	}
 }
 
@@ -20,6 +20,10 @@ public class SoundEffectLoader(IPersistentStorage storage) : IAssetLoader
 	public SoundEffect Load(string assetPath)
 	{
 		var filepath = storage.Assets.GetPath(assetPath);
+		if (!File.Exists(filepath))
+		{
+			throw new FileNotFoundException($"Sound effect '{assetPath}' was not found at '{filepath}'. File names are case-sensitive on Linux and macOS; check the casing of the name.", filepath);
+		}
 		using var audioFileReader = new AudioFileReader(filepath);
 
 		// TODO: could add resampling in here if required

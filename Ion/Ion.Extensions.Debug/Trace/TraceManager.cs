@@ -17,7 +17,10 @@ internal class TraceManager : ITraceManager
 
 	private readonly ConcurrentBag<TraceTiming> _timings = new();
 
+#if DEBUG
+	// Only read by StartTraceTimer in DEBUG builds; Release builds never create trace instances.
 	private int _nextId = 0;
+#endif
 
 	private readonly ITraceTimerInstance _nullTimer = new NullTimerInstance();
 
