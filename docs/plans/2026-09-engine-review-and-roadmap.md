@@ -230,7 +230,7 @@ Comparison on the three axes the owner named:
 | Failure modes | forgotten `next` kills the stage silently | none | none | diagnostic if a scope has no matching end, if `Before/After` cycle |
 | Agent readability | must understand middleware | very simple | very simple | simple; `--print-schedule` shows the exact nesting |
 
-**Decision: Option D, with C as sugar.** Stages become ordered groups of steps; the only remaining "middleware" is the explicit `Begin`/`End` scope, which keeps everything the pattern was valued for (frame bracketing, profiling, scene scoping) without delegates, without body splitting and without a way to silently drop the rest of a stage. Existing `(GameTime dt, GameLoopDelegate next)` methods keep working through Option A's generated closures for one release, and the generator warns (`ION010`) with the mechanical rewrite. Stateless function systems (`app.Update(Physics.Step)`) are supported by the same generator as a convenience, since they are simply steps without a class.
+**Decision: Option D, with C as sugar.** Stages become ordered groups of steps; the only remaining "middleware" is the explicit `Begin`/`End` scope, which keeps everything the pattern was valued for (frame bracketing, profiling, scene scoping) without delegates, without body splitting and without a way to silently drop the rest of a stage. Existing `(GameTime dt, GameLoopDelegate next)` methods keep working through Option A's generated closures for one release, and the generator warns (`ION010`) with the mechanical rewrite. That fallback wraps the original method body unchanged, so its exception semantics are exactly the author's (no `finally` is added); only the new `Begin`/`End` scopes get the `try/finally`, and they get it by design. Stateless function systems (`app.Update(Physics.Step)`) are supported by the same generator as a convenience, since they are simply steps without a class.
 
 **The seven stages themselves stay**, and they are the right granularity: they match Bevy's `First/PreUpdate/FixedMain/Update/PostUpdate/Last` and Unity's order without exposing a dozen labels. Two refinements: `FixedUpdate` runs zero to N times per frame with its own `GameTime` and the frame's `Alpha` is available to `Render` for interpolation (already so); and engine steps use reserved order bands (`-1000..-500` and `500..1000`) so user steps with the default `Order = 0` always run between engine setup and engine teardown, which removes the "register after UseIon()" trap. Scenes contribute their own steps into the same stages through a generated per-scene schedule invoked by a `SceneSystem` step, so scene systems obey the same ordering rules as root systems.
 
@@ -278,7 +278,14 @@ public interface IEvents
     EventReader<T> Reader<T>() where T : unmanaged;      // stable per-system reader (created once, in the constructor)
 }
 
-public ref struct EventReader<T> { public bool TryRead(out T e); public ReadOnlySpan<T> Read(); public bool Any(); }
+// A plain struct (cursor + channel reference), so it can live in a field of a system class and be stored by the generator;
+// the spans it hands out are the transient part.
+public struct EventReader<T> where T : unmanaged
+{
+    public bool TryRead(out T e);        // advances the cursor
+    public ReadOnlySpan<T> Read();       // everything unread, advances the cursor
+    public bool Any();                   // peek
+}
 ```
 
 Semantics preserved from today: an event is visible for the frame it was emitted in and the next one (so a system earlier in the schedule still sees it), each reader sees each event once, `Emit` from any stage. Removed: `Handled` (it was never set), `EventId`, the type-hash `EventType`. The `EventBenchmarks` prototype in the benchmark project (`TypedChannel<T>`) is the reference for the data layout; the measured difference is in section 5.
@@ -395,7 +402,7 @@ Concrete capabilities, in priority order, each with the engine feature that deli
 3. **Headless rendering + screenshots.** `Graphics.Headless` renders to an offscreen texture and reads back PNG; also available in windowed mode via `window.Screenshot(path)`.
 4. **Snapshot tests.** `Ion.Testing` helpers: `IonTestHost.Run<TGame>(frames)` returns state, counters and an image; golden-image comparison with tolerance and diff output; world state serialized via `Arch.Persistence`.
 5. **Machine-readable output.** JSONL frame log, Chrome trace export, `--print-schedule`, structured exceptions that name stage/system/entity.
-6. **Remote inspection.** `Ion.Extensions.Remote`: JSON-RPC over HTTP or stdio modelled on the Bevy Remote Protocol (`world.query`, `get/insert/mutate/remove_components`, `spawn/despawn`, `resources`, `+watch` streaming, `registry.schema`, `rpc.discover`, `input.send`, `screenshot`, `metrics`), and a small MCP server on top so Claude Code can drive a running game.
+6. **Remote inspection.** `Ion.Extensions.Remote`: JSON-RPC over HTTP or stdio modelled on the Bevy Remote Protocol (`world.query`, `get/insert/mutate/remove_components`, `spawn/despawn`, `resources`, `+watch` streaming, `registry.schema`, `rpc.discover`, `input.send`, `screenshot`, `metrics`), and a small MCP server on top so Claude Code can drive a running game. Access control is part of the design, not an afterthought: the server is off unless enabled by configuration or `--remote`; it binds to `127.0.0.1` only (a non-loopback bind is an explicit, logged opt-in); every session presents a bearer token generated per run (printed once to the console and written to a mode-600 file the CLI and MCP server read); operations are split into `read` (`query`, `get`, `watch`, `schema`, `metrics`, `screenshot`) and `mutate` (`insert/mutate/remove`, `spawn/despawn`, `input.send`, `resources` writes), and the mutate scope is granted only with `--remote-allow-mutations` or the equivalent config key; stdio transport inherits the parent process's trust and needs no token; mutations are applied on the game thread at a stage boundary, are idempotent per request id so a retried or interrupted request cannot double-apply, and are rejected while a scene is loading; the release build compiles the module out unless `IonRemote=true` is set at publish time. The P2 web-server module (4.12) reuses this policy and adds origin checks for browser clients.
 7. **Precise errors.** Generator diagnostics for schedule mistakes, DI errors that name the system and missing service, "system registered after UseScene" warnings, no swallowed exceptions.
 8. **Small, typed, discoverable API.** Few namespaces, `Ion` meta-package, XML docs, analyzers for misuse (missing `next`, `async` in a stage, `Task` in a system).
 9. **Hot reload.** Keep the metadata-update handler; rebuild the generated schedule on reload; reload shaders and assets on file change with results reported on the protocol.
@@ -572,9 +579,9 @@ Each stage is sized so a single agent session (or a small PR series) can deliver
 ### Stage 6: Agentic toolchain (3-4 weeks)
 
 - `Ion.Tools` (`ion` dotnet tool): `new`, `run --headless --frames --seed --screenshot --summary`, `schedule`, `bench`, `trace`.
-- `Ion.Extensions.Remote`: JSON-RPC inspection protocol (4.10) plus MCP server; `input.send`, `screenshot`, `metrics`, `+watch`.
+- `Ion.Extensions.Remote`: JSON-RPC inspection protocol (4.10) plus MCP server; `input.send`, `screenshot`, `metrics`, `+watch`; loopback-only default, per-run bearer token, read versus mutate scopes, idempotent request ids, compiled out of release builds unless opted in.
 - Snapshot testing helpers and templates with `CLAUDE.md`; documentation site generated from XML docs.
-- Acceptance: an agent with only the `ion` CLI and the MCP server can create a game from the template, add a system, run 600 headless frames, take a screenshot, diff it against a golden image, inspect an entity and mutate a component, without reading engine source.
+- Acceptance: an agent with only the `ion` CLI and the MCP server can create a game from the template, add a system, run 600 headless frames, take a screenshot, diff it against a golden image, inspect an entity and mutate a component, without reading engine source; a test proves that a client without the token, or with a read-only token, cannot call any mutate operation, and that the server refuses a non-loopback bind unless explicitly configured.
 
 ### Stage 6b: Web server and multiplayer networking modules (P2, 6-8 weeks, after Stage 6)
 
