@@ -15,6 +15,8 @@ public abstract class BaseTexture : ITexture2D
 
 	public uint MipLevels => _texture.MipLevels;
 
+	internal bool IsDisposed => _texture.IsDisposed;
+
 	internal BaseTexture(string name, VeldridLib.Texture texture)
 	{
 		texture.Name = name;

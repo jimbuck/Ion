@@ -161,7 +161,7 @@ internal class Window : IWindow
         if (_graphicsConfig.CurrentValue.Output != GraphicsOutput.Window) return;
 
 		_logger.LogInformation("Creating window...");
-		Sdl2Window = _createWindow(_windowCreateInfo);
+		Sdl2Window = _createWindow(_windowCreateInfo, _graphicsConfig.CurrentValue.PreferredBackend);
 		Sdl2Window.SetCloseRequestedHandler(() => _closeHandled);
 		Sdl2Window.Closed += _onClosed;
 		Sdl2Window.FocusLost += _onFocusLost;
@@ -176,15 +176,23 @@ internal class Window : IWindow
 		_logger.LogInformation($"Window created! ({Sdl2Window.Width}x{Sdl2Window.Height})");
 	}
 
-	private static Sdl2Window _createWindow(VeldridLib.StartupUtilities.WindowCreateInfo windowCreateInfo)
+	private static Sdl2Window _createWindow(VeldridLib.StartupUtilities.WindowCreateInfo windowCreateInfo, GraphicsBackend backend)
 	{
-		SDL_WindowFlags sDL_WindowFlags = SDL_WindowFlags.OpenGL | SDL_WindowFlags.Resizable | GetWindowFlags(windowCreateInfo.WindowInitialState);
+		SDL_WindowFlags sDL_WindowFlags = SDL_WindowFlags.Resizable | GetWindowFlags(windowCreateInfo.WindowInitialState);
+		// Only GL backends need an SDL OpenGL window; for Vulkan, Metal and Direct3D the flag just creates an unused GL-capable surface.
+		if (_requiresOpenGLWindow(backend)) sDL_WindowFlags |= SDL_WindowFlags.OpenGL;
 		if (windowCreateInfo.WindowInitialState != VeldridLib.WindowState.Hidden)
 		{
 			sDL_WindowFlags |= SDL_WindowFlags.Shown;
 		}
 		return new Sdl2Window(windowCreateInfo.WindowTitle, windowCreateInfo.X, windowCreateInfo.Y, windowCreateInfo.WindowWidth, windowCreateInfo.WindowHeight, sDL_WindowFlags, threadedProcessing: true);
 	}
+
+	private static bool _requiresOpenGLWindow(GraphicsBackend backend) => backend switch
+	{
+		GraphicsBackend.OpenGL or GraphicsBackend.OpenGLES => true,
+		_ => false,
+	};
 
 	private static SDL_WindowFlags GetWindowFlags(VeldridLib.WindowState state)
 	{

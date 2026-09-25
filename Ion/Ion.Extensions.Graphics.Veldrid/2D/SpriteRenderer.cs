@@ -28,7 +28,7 @@ internal class SpriteRenderer(
 
 	private bool _beginCalled = false;
 
-	private class BufferContainer(DeviceBuffer buffer, ResourceSet instanceSet, ResourceSet textureSet)
+	private sealed class BufferContainer(DeviceBuffer buffer, ResourceSet instanceSet, ResourceSet textureSet) : IDisposable
 	{
 		public DeviceBuffer Buffer { get; set; } = buffer;
 		public ResourceSet InstanceSet { get; set; } = instanceSet;
@@ -38,7 +38,7 @@ internal class SpriteRenderer(
 		{
 			Buffer.Dispose();
 			InstanceSet.Dispose();
-			TextureSet.Dispose(); // TODO: Check if this is needed...
+			TextureSet.Dispose(); // Only the resource set; the texture itself is owned by its asset.
 		}
 	}
 
@@ -256,6 +256,7 @@ void main()
 	{
 		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
 
+		// default(Color) == Color.Transparent bitwise; treat it as "no tint" (see ISpriteBatch.Draw remarks).
 		if (color == default) color = Color.White;
 		if (sourceRectangle.IsEmpty) sourceRectangle = new RectangleF(0f, 0f, texture.Width, texture.Height);
 
@@ -265,6 +266,17 @@ void main()
 	public void Draw(ITexture2D texture, Vector2 position, Vector2 size, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
 	{
 		Draw(texture, new RectangleF(position, size), sourceRectangle, color, origin, rotation, depth, options);
+	}
+
+	/// <summary>
+	/// Draws <paramref name="texture"/> with <paramref name="color"/> used verbatim: unlike <see cref="Draw(ITexture2D, RectangleF, RectangleF, Color, Vector2, float, float, SpriteEffect)"/>,
+	/// <c>default</c> is not replaced with <see cref="Color.White"/>. Used for glyphs, whose color has already been resolved by the caller.
+	/// </summary>
+	internal void DrawVerbatim(ITexture2D texture, Vector2 position, Vector2 size, RectangleF sourceRectangle, Color color, Vector2 origin, float rotation, float depth, SpriteEffect options)
+	{
+		if (!_beginCalled) throw new InvalidOperationException("Begin must be called before calling Draw.");
+
+		_addSprite(texture, color, sourceRectangle, new RectangleF(position, size), origin, rotation, depth, _defaultScissor, options);
 	}
 
 	public unsafe void End()
@@ -348,10 +360,25 @@ void main()
 
 	public void Dispose()
 	{
+		foreach (var container in _buffers.Values) container.Dispose();
+		_buffers.Clear();
+
 		_pipeline?.Dispose();
+		_pipeline = null;
 		if (_shaders != null) foreach (var shader in _shaders) shader.Dispose();
+		_shaders = null;
+
+		_instanceResourceLayout?.Dispose();
+		_instanceResourceLayout = null;
+		_fragmentResourceLayout?.Dispose();
+		_fragmentResourceLayout = null;
 
 		_vertexBuffer?.Dispose();
+		_vertexBuffer = null;
+		_whitePixel?.Dispose();
+		_whitePixel = null;
+		_commandList?.Dispose();
+		_commandList = null;
 	}
 
 	private void _addSprite(ITexture2D texture, Color color, RectangleF sourceRect, RectangleF destinationRect, Vector2 origin, float rotation, float depth, RectangleF scissor, SpriteEffect options)

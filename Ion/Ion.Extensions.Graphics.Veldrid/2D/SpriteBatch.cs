@@ -48,9 +48,13 @@ internal class SpriteBatch(
 		spriteRenderer.DrawLine(color, start, length, angle, thickness, depth);
 	}
 
+	/// <inheritdoc />
+	/// <remarks>A <paramref name="color"/> of <c>default</c> (which equals <see cref="Color.Transparent"/>) draws white text, matching <see cref="Draw(ITexture2D, RectangleF, RectangleF, Color, Vector2, float, float, SpriteEffect)"/>.</remarks>
 	public void DrawString(IFont font, string text, Vector2 position, Color color = default, float depth = 0f, Vector2 origin = default, float rotation = 0f, float scale = 1f, SpriteEffect options = SpriteEffect.None)
 	{
 		var fontstyle = (Font)font;
+
+		if (color == default) color = Color.White;
 
 		fontstyle.SpriteFont.DrawText(fontRenderer,
 			text: text,

@@ -13,10 +13,17 @@ namespace Ion.Extensions.Graphics;
 
 public static class Texture2DAssetManagerExtensions
 {
+	/// <summary>
+	/// Loads the texture at <paramref name="path"/> and registers it with <paramref name="assetManager"/>.
+	/// Loading a path whose texture is still alive returns that same texture instead of creating a second GPU texture.
+	/// </summary>
 	public static Texture2D Load<T>(this IBaseAssetManager assetManager, string path) where T : Texture2D
 	{
 		var loader = (Texture2DLoader)assetManager.GetLoader(typeof(Texture2D));
-		return loader.Load(path);
+
+		if (loader.TryGetLoaded(path, out var existing)) return existing;
+
+		return assetManager.Set(loader.Load(path));
 	}
 }
 
@@ -25,19 +32,48 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 	private readonly IGraphicsContext _graphicsContext = graphicsContext;
 	private readonly IPersistentStorage _storage = storage;
 
+	// The asset manager keys its cache by name and rejects duplicates, so remember which textures are live
+	// and hand the same instance back for repeated loads of one path until it is disposed.
+	private readonly Dictionary<string, Texture2D> _loaded = [];
+
 	public Type AssetType { get; } = typeof(Texture2D);
+
+	internal bool TryGetLoaded(string assetPath, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Texture2D? texture)
+	{
+		if (_loaded.TryGetValue(assetPath, out texture) && !texture.IsDisposed) return true;
+
+		_loaded.Remove(assetPath);
+		texture = null;
+		return false;
+	}
 
 	public Texture2D Load(string assetPath)
 	{
-		return _loadTexture2D(assetPath, _storage.Assets.Read(assetPath));
+		using var stream = _storage.Assets.Read(assetPath);
+		var texture = _loadTexture2D(assetPath, stream);
+		_loaded[assetPath] = texture;
+		return texture;
 	}
 
 	private unsafe Texture2D _loadTexture2D(string name, Stream stream)
 	{
 		if (_graphicsContext.GraphicsDevice is null) throw new Exception("GraphicsDevice is not initialized yet!");
 
-		var image = Image.Load<Rgba32>(stream);
+		using var image = Image.Load<Rgba32>(stream);
 		var mipmaps = _generateMipmaps(image, out int totalSize);
+		try
+		{
+			return _uploadTexture2D(name, image, mipmaps, totalSize);
+		}
+		finally
+		{
+			// Level 0 is `image` itself, disposed by the using above.
+			for (var i = 1; i < mipmaps.Length; i++) mipmaps[i].Dispose();
+		}
+	}
+
+	private unsafe Texture2D _uploadTexture2D(string name, Image<Rgba32> image, Image<Rgba32>[] mipmaps, int totalSize)
+	{
 
 		var allTexData = new byte[totalSize];
 		long offset = 0;
@@ -57,7 +93,7 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 				(uint)image.Width, (uint)image.Height, 1,
 				(uint)mipmaps.Length, 1,
 				allTexData,
-				_graphicsContext.GraphicsDevice, VeldridLib.TextureUsage.Sampled);
+				_graphicsContext.GraphicsDevice!, VeldridLib.TextureUsage.Sampled);
 
 		return new Texture2D(name, texture);
 	}
@@ -131,11 +167,16 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 			}
 		}
 
-		VeldridLib.CommandList cl = gd.ResourceFactory.CreateCommandList();
-		cl.Begin();
-		cl.CopyTexture(staging, texture);
-		cl.End();
-		gd.SubmitCommands(cl);
+		using (staging)
+		using (VeldridLib.CommandList cl = gd.ResourceFactory.CreateCommandList())
+		{
+			cl.Begin();
+			cl.CopyTexture(staging, texture);
+			cl.End();
+			gd.SubmitCommands(cl);
+			// The copy must finish before the staging texture and command list are destroyed.
+			gd.WaitForIdle();
+		}
 
 		return texture;
 	}

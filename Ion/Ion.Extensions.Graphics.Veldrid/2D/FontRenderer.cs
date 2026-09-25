@@ -22,7 +22,8 @@ internal class FontRenderer(SpriteRenderer spriteRenderer, ITexture2DManager tex
 
 		var size = sourceRectangle.Size * scale;
 
-		spriteRenderer.Draw(
+		// SpriteBatch.DrawString already resolved the default color, so pass the glyph color through unchanged.
+		spriteRenderer.DrawVerbatim(
 			texture: texture,
 			position: pos,
 			sourceRectangle: sourceRectangle,

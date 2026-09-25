@@ -50,6 +50,8 @@ public class Font : IFont
 
 	float IFont.FontSize => FontSize;
 
+	float IFont.LineHeight => LineHeight;
+
 	internal Font(DynamicSpriteFont spriteFont, FontSet fontSet, float fontSize)
 	{
 		SpriteFont = spriteFont;
@@ -58,18 +60,18 @@ public class Font : IFont
 	}
 
 	/// <summary>
-	/// Gets the size of a string when rendered in this font.
+	/// The distance in pixels between the baselines of two consecutive lines of text in this font.
+	/// </summary>
+	public float LineHeight => SpriteFont.LineHeight;
+
+	/// <summary>
+	/// Gets the size in pixels of <paramref name="text"/> when rendered in this font at scale 1.
 	/// </summary>
 	/// <param name="text">The text to measure.</param>
-	/// <param name="fontSize">The font size to measure.</param>
-	/// <returns>The size of <paramref name="text"/> rendered with <paramref name="fontSize"/> font size.</returns>
+	/// <returns>The width and height of the rendered text. An empty string measures as <see cref="Vector2.Zero"/>.</returns>
 	public Vector2 MeasureString(string text)
 	{
+		if (string.IsNullOrEmpty(text)) return Vector2.Zero;
 		return SpriteFont.MeasureString(text);
-	}
-
-	Vector2 IFont.MeasureString(string text)
-	{
-		throw new NotImplementedException();
 	}
 }
