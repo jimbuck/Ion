@@ -17,6 +17,17 @@ using nkast.Aether.Physics2D.Dynamics.Contacts;
 using Ion.Examples.Breakout.ECS.Physics;
 using Ion.Examples.Breakout.ECS.Common;
 
+// Arch creates component arrays with Array.CreateInstance unless the array type is registered up front,
+// which NativeAOT cannot do for types it has not seen. Register every component so the sample runs under PublishAot.
+ArrayRegistry.Add<Block>();
+ArrayRegistry.Add<Paddle>();
+ArrayRegistry.Add<Ball>();
+ArrayRegistry.Add<Transform2D>();
+ArrayRegistry.Add<Sprite>();
+ArrayRegistry.Add<DynamicRigidBody>();
+ArrayRegistry.Add<KinematicRigidBody>();
+ArrayRegistry.Add<StaticBody>();
+
 var builder = IonApplication.CreateBuilder(args);
 
 builder.Services.AddIon(builder.Configuration, graphics =>
@@ -56,7 +67,7 @@ public record struct Paddle(bool HasBall);
 public record struct Ball();
 
 public record struct PaddleHitEvent(float PaddleOffset);
-public record struct BlockHitEvent(EntityReference Block);
+public record struct BlockHitEvent(Entity Block);
 public record struct WallHitEvent();
 public record struct BallLostEvent();
 public record struct BlocksClearedEvent();
@@ -223,7 +234,7 @@ public class SoundEffectsSystem(IAssetManager assets, IEventListener events, IAu
 
 public class PaddleSystem(IWindow window, World world, IInputState input, IEventListener events, IAssetManager assets, PhysicsManager physics)
 {
-	private EntityReference _paddle = EntityReference.Null;
+	private Entity _paddle = Entity.Null;
 
 	[Init]
 	public unsafe void Init(GameTime dt, GameLoopDelegate next)
@@ -233,7 +244,7 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 
 		var paddleBody = physics.AddKinematicPaddle(BreakoutConstants.PADDLE_SIZE / physics.PhysicsScale, paddlePosition / physics.PhysicsScale);
 		
-		_paddle = world.Create(new Paddle(true), new Transform2D(paddlePosition), new Sprite(paddleTexture, BreakoutConstants.PADDLE_SIZE), new KinematicRigidBody(paddleBody)).Reference();
+		_paddle = world.Create(new Paddle(true), new Transform2D(paddlePosition), new Sprite(paddleTexture, BreakoutConstants.PADDLE_SIZE), new KinematicRigidBody(paddleBody));
 
 		next(dt);
 	}
@@ -243,7 +254,7 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 	{
 		if (window.IsMouseGrabbed)
 		{
-			ref var paddleTransform = ref _paddle.Entity.Get<Transform2D>();
+			ref var paddleTransform = ref _paddle.Get<Transform2D>();
 
 			paddleTransform.Position = new Vector2(input.MousePosition.X, paddleTransform.Position.Y);
 
@@ -260,7 +271,7 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 public unsafe class BallSystem(IWindow window, World world, IEventListener events, IAssetManager assets, PhysicsManager physics)
 {	
 	private Texture2D _ballTexture = default!;
-	private EntityReference _paddle = EntityReference.Null;
+	private Entity _paddle = Entity.Null;
 
 	private readonly QueryDescription _ballQuery = new QueryDescription().WithAll<Ball>();
 	private readonly QueryDescription _paddleQuery = new QueryDescription().WithAll<Paddle>();
@@ -276,7 +287,7 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 
 		world.Query(in _paddleQuery, (Entity entity) =>
 		{
-			_paddle = entity.Reference();
+			_paddle = entity;
 		});
 	}
 
@@ -287,7 +298,7 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 
 		if (events.OnLatest<LaunchBallCommand>() && totalBalls < BreakoutConstants.MAX_BALLS)
 		{
-			ref var paddleTransform = ref _paddle.Entity.Get<Transform2D>();
+			ref var paddleTransform = ref _paddle.Get<Transform2D>();
 			var radius = BreakoutConstants.BALL_SIZE.X / 2f;
 
 			var ballTransform = paddleTransform.Position + _paddleBallOffset;
@@ -302,7 +313,7 @@ public unsafe class BallSystem(IWindow window, World world, IEventListener event
 		world.Query(in _ballQuery, (Entity entity) =>
 		{
 			ref var ballTransform = ref entity.Get<Transform2D>();
-			ref var paddle = ref _paddle.Entity.Get<Paddle>();
+			ref var paddle = ref _paddle.Get<Paddle>();
 
 			if (ballTransform.Position.Y > window.Height && entity.Has<DynamicRigidBody>())
 			{
@@ -338,7 +349,7 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 {
 	private readonly QueryDescription _blockQuery = new QueryDescription().WithAll<Block>();
 	private readonly QueryDescription _paddleQuery = new QueryDescription().WithAll<Paddle>();
-	private EntityReference _paddle = EntityReference.Null;
+	private Entity _paddle = Entity.Null;
 
 	private readonly Random _rand = new();
 
@@ -350,7 +361,7 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 		next(dt);
 
 		world.Query(in _paddleQuery, (Entity entity) => {
-			_paddle = entity.Reference();
+			_paddle = entity;
 		});
 	}
 
@@ -361,7 +372,7 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 
 		while (events.On<BlockHitEvent>(out var e))
 		{
-			var entity = e.Data.Block.Entity;
+			var entity = e.Data.Block;
 			if (entity.IsAlive() && entity.Has<StaticBody>())
 			{
 				ref var fixture = ref entity.Get<StaticBody>();
@@ -379,7 +390,7 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 
 		if (events.On<BlocksClearedEvent>())
 		{
-			ref var paddle = ref _paddle.Entity.Get<Paddle>();
+			ref var paddle = ref _paddle.Get<Paddle>();
 
 			paddle.HasBall = true;
 
@@ -418,7 +429,7 @@ public unsafe class BlockSystem(IEventListener events, IAssetManager assets, Wor
 				var transform = new Transform2D(new Vector2(colOffset, rowOffset), ((float)_rand.NextDouble() - 0.5f) * maxTilt);
 				var body = physics.AddStaticBox(BreakoutConstants.BLOCK_SIZE / physics.PhysicsScale, transform.Position / physics.PhysicsScale, transform.Rotation);
 				
-				var blockEntity = world.Create(transform, new Block(row, col), new Sprite(blockTexture, BreakoutConstants.BLOCK_SIZE), new StaticBody(body)).Reference();
+				var blockEntity = world.Create(transform, new Block(row, col), new Sprite(blockTexture, BreakoutConstants.BLOCK_SIZE), new StaticBody(body));
 
 				body.OnCollision += (Fixture sender, Fixture other, Contact contact) => {
 					events.Emit(new BlockHitEvent(blockEntity));

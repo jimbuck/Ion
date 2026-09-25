@@ -263,6 +263,86 @@ public class CoroutineRunnerTests : IDisposable
 	}
 
 	public record struct TestEvent(int Value);
+
+	private sealed class CountingListenerFactory(IEventEmitter emitter) : IEventListenerFactory
+	{
+		private readonly List<CountingListener> _created = [];
+
+		public int Created => _created.Count;
+		public int Disposed => _created.Count(l => l.IsDisposed);
+
+		public IEventListener CreateListener()
+		{
+			var listener = new CountingListener(new EventListener(emitter));
+			_created.Add(listener);
+			return listener;
+		}
+	}
+
+	private sealed class CountingListener(IEventListener inner) : IEventListener
+	{
+		public bool IsDisposed { get; private set; }
+
+		public bool On<T>() where T : unmanaged => inner.On<T>();
+		public bool On<T>([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IEvent<T>? data) where T : unmanaged => inner.On(out data);
+		public bool OnLatest<T>() where T : unmanaged => inner.OnLatest<T>();
+		public bool OnLatest<T>([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IEvent<T>? data) where T : unmanaged => inner.OnLatest(out data);
+		public void Emit<T>() where T : unmanaged => inner.Emit<T>();
+		public void Emit<T>(T data) where T : unmanaged => inner.Emit(data);
+
+		public void Dispose()
+		{
+			IsDisposed = true;
+			inner.Dispose();
+		}
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void EventListenerFactoryIsRegisteredAndCreatesDistinctListeners()
+	{
+		var factory = _app.Services.GetRequiredService<IEventListenerFactory>();
+
+		using var a = factory.CreateListener();
+		using var b = factory.CreateListener();
+
+		Assert.NotSame(a, b);
+		Assert.NotNull(_app.Services.GetRequiredService<IEventListener>());
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void ListenersAreReleasedWhenCoroutinesFinishOrStop()
+	{
+		var builder = IonApplication.CreateBuilder();
+		builder.Services.AddCoroutines();
+		builder.Services.AddSingleton<CountingListenerFactory>();
+		builder.Services.AddSingleton<IEventListenerFactory>(sp => sp.GetRequiredService<CountingListenerFactory>());
+		using var app = builder.Build();
+		var factory = app.Services.GetRequiredService<CountingListenerFactory>();
+		var runner = app.Services.GetRequiredService<ICoroutineRunner>();
+		var dt = new GameTime { Delta = 0.1f };
+
+		var finishes = Counter([], 1, 1);
+		var stopped = Counter([], 2, 10);
+		var remaining = Counter([], 3, 10);
+		runner.Start(finishes);
+		runner.Start(stopped);
+		runner.Start(remaining);
+		Assert.Equal(3, factory.Created);
+
+		runner.Stop(stopped);
+		Assert.Equal(1, factory.Disposed);
+
+		dt.Frame = 1;
+		runner.Update(dt);
+		dt.Frame = 2;
+		runner.Update(dt);
+		Assert.False(runner.IsActive(finishes));
+		Assert.Equal(2, factory.Disposed);
+
+		((IDisposable)runner).Dispose();
+		Assert.Equal(3, factory.Disposed);
+		Assert.Equal(0, runner.Count);
+	}
 }
 
 public class CoroutineSystemTests

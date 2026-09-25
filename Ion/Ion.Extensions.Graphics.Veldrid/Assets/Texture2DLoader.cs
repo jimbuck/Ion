@@ -14,16 +14,22 @@ namespace Ion.Extensions.Graphics;
 public static class Texture2DAssetManagerExtensions
 {
 	/// <summary>
-	/// Loads the texture at <paramref name="path"/> and registers it with <paramref name="assetManager"/>.
-	/// Loading a path whose texture is still alive returns that same texture instead of creating a second GPU texture.
+	/// Loads the texture at <paramref name="path"/> through <see cref="IBaseAssetManager.GetOrLoad{T}"/>, so the texture is
+	/// cached and owned by <paramref name="assetManager"/>. Loading a path whose texture is still alive returns that same
+	/// texture instead of creating a second GPU texture; a texture that was disposed directly is loaded again.
 	/// </summary>
 	public static Texture2D Load<T>(this IBaseAssetManager assetManager, string path) where T : Texture2D
 	{
 		var loader = (Texture2DLoader)assetManager.GetLoader(typeof(Texture2D));
 
-		if (loader.TryGetLoaded(path, out var existing)) return existing;
+		var texture = assetManager.GetOrLoad(path, loader.Load);
+		if (!texture.IsDisposed) return texture;
 
-		return assetManager.Set(loader.Load(path));
+		// Disposed outside the asset manager: drop the stale cache entry (wherever it lives) and load it again.
+		assetManager.Unload(texture);
+		if (assetManager is IAssetManager scoped) scoped.Global.Unload(texture);
+
+		return assetManager.GetOrLoad(path, loader.Load);
 	}
 }
 
@@ -32,27 +38,15 @@ internal class Texture2DLoader(IGraphicsContext graphicsContext, IPersistentStor
 	private readonly IGraphicsContext _graphicsContext = graphicsContext;
 	private readonly IPersistentStorage _storage = storage;
 
-	// The asset manager keys its cache by name and rejects duplicates, so remember which textures are live
-	// and hand the same instance back for repeated loads of one path until it is disposed.
-	private readonly Dictionary<string, Texture2D> _loaded = [];
-
 	public Type AssetType { get; } = typeof(Texture2D);
 
-	internal bool TryGetLoaded(string assetPath, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Texture2D? texture)
-	{
-		if (_loaded.TryGetValue(assetPath, out texture) && !texture.IsDisposed) return true;
-
-		_loaded.Remove(assetPath);
-		texture = null;
-		return false;
-	}
-
+	/// <summary>
+	/// Decodes and uploads a new texture on every call. Use <c>IBaseAssetManager.Load&lt;Texture2D&gt;(path)</c> to get the cached one.
+	/// </summary>
 	public Texture2D Load(string assetPath)
 	{
 		using var stream = _storage.Assets.Read(assetPath);
-		var texture = _loadTexture2D(assetPath, stream);
-		_loaded[assetPath] = texture;
-		return texture;
+		return _loadTexture2D(assetPath, stream);
 	}
 
 	private unsafe Texture2D _loadTexture2D(string name, Stream stream)

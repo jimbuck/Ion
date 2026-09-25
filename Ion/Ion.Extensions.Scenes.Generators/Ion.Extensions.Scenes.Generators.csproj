@@ -1,7 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot">
   <!-- LangVersion, Nullable, ImplicitUsings and Deterministic come from Directory.Build.props. -->
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Analyzers never publish natively; ignore PublishAot passed on the command line (avoids NETSDK1207). -->
+    <PublishAot>false</PublishAot>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>

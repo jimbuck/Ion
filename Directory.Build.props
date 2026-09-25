@@ -4,12 +4,8 @@
     A project can still override any of these in its own csproj.
   -->
   <PropertyGroup>
-    <!--
-      Pinned to C# 12 so every SDK (8.0 and 10.0) compiles the same language.
-      "latest" on the 10.0 SDK selects C# 14, whose first-class span conversions make
-      MemUtils.Copy(Span<T>, IntPtr) ambiguous (CS0121). Switch to latest with the net10.0 move.
-    -->
-    <LangVersion>12</LangVersion>
+    <!-- The repository builds with the .NET 10 SDK (see global.json), so "latest" is C# 14. -->
+    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Deterministic>true</Deterministic>

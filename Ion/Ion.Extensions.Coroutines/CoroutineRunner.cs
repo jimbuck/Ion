@@ -1,5 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-
 using System.Collections;
 
 namespace Ion.Extensions.Coroutines;
@@ -12,8 +10,10 @@ namespace Ion.Extensions.Coroutines;
 /// or by calling <see cref="Update"/> manually. When both are used, only the first of the two to run in a given
 /// frame (by <see cref="GameTime.Frame"/>) steps the coroutines, so a manual call next to the system is harmless.
 /// Repeated manual calls within one frame still step every time, as before.
+/// Each running coroutine owns an <see cref="IEventListener"/> created through <see cref="IEventListenerFactory"/>;
+/// it is disposed (detached from the emitter) when the coroutine finishes or is stopped, and when the runner is disposed.
 /// </remarks>
-public class CoroutineRunner(IServiceProvider services) : ICoroutineRunner
+public class CoroutineRunner(IEventListenerFactory eventListenerFactory) : ICoroutineRunner, IDisposable
 {
 	private readonly List<CoroutineHandle> _routines = [];
 
@@ -29,7 +29,7 @@ public class CoroutineRunner(IServiceProvider services) : ICoroutineRunner
 	/// <inheritdoc/>
 	public void Start(IEnumerator routine)
 	{
-		_routines.Add(new CoroutineHandle(routine, services.GetRequiredService<IEventListener>()));
+		_routines.Add(new CoroutineHandle(routine, eventListenerFactory.CreateListener()));
 	}
 
 	/// <inheritdoc/>
@@ -52,6 +52,15 @@ public class CoroutineRunner(IServiceProvider services) : ICoroutineRunner
 		}
 		_routines.Clear();
 		if (_current >= 0) _current = -1;
+	}
+
+	/// <summary>
+	/// Stops every coroutine and releases their event listeners.
+	/// </summary>
+	public void Dispose()
+	{
+		StopAll();
+		GC.SuppressFinalize(this);
 	}
 
 	/// <inheritdoc/>

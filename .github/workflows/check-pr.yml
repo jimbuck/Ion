@@ -4,9 +4,14 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
@@ -23,7 +28,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: 10.0.x
     - name: Restore dependencies
       run: dotnet restore
     - name: Restore tools
@@ -32,7 +37,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
     - name: Unit Tests
       if: ${{ matrix.os != 'windows-latest' }}
-      run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category!=E2E" --collect:"XPlat Code Coverage" --results-directory ./coverage
+      run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category!=E2E" --collect:"XPlat Code Coverage" --results-directory ./coverage --settings coverage.runsettings
     - name: Unit Tests & E2E Tests
       if: ${{ matrix.os == 'windows-latest' }}
       run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage --settings coverage.runsettings
@@ -66,3 +71,58 @@ jobs:
       with:
         recreate: true
         path: CoverageReports\Summary.md
+
+  # Proves every benchmark still builds and runs (dry job: one invocation, no statistics). Not a perf gate.
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+    - name: Run benchmarks (dry)
+      run: dotnet run -c Release --project Ion/Ion.Benchmarks -- --filter '*' --job dry --artifacts ./bench
+    - uses: actions/upload-artifact@v5
+      name: Upload benchmark results
+      if: ${{ always() }}
+      with:
+        name: BenchmarkResults
+        path: bench/
+        if-no-files-found: warn
+
+  # NativeAOT publish of the ECS sample. Fails on any trim/AOT warning whose subject is Ion's own code;
+  # warnings from third-party packages (Aether.Physics2D, NAudio, Vortice, DependencyModel) are reported only.
+  aot:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+    - name: Install NativeAOT prerequisites
+      run: sudo apt-get update -y -qq && sudo apt-get install -y -qq clang zlib1g-dev
+    - name: Publish ECS sample with NativeAOT
+      shell: bash
+      run: |
+        set -o pipefail
+        # TrimmerSingleWarn=false reports every warning instead of one summary line per assembly.
+        dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -c Release -r linux-x64 \
+          -p:PublishAot=true -p:TrimmerSingleWarn=false -o ./aot 2>&1 | tee aot-publish.log
+    - name: Check for Ion AOT warnings
+      shell: bash
+      run: |
+        echo "Trim/AOT warnings by source:"
+        grep -E "warning IL[0-9]+:" aot-publish.log | sort -u \
+          | sed -E "s/.*warning IL[0-9]+: ([A-Za-z0-9_]+(\.[A-Za-z0-9_]+)?).*/\1/" | sort | uniq -c | sort -rn || true
+        if grep -E "warning IL[0-9]+: (Ion\.|Assembly 'Ion\.)" aot-publish.log; then
+          echo "::error::NativeAOT publish produced trim/AOT warnings in Ion code."
+          exit 1
+        fi
+    - uses: actions/upload-artifact@v5
+      name: Upload AOT publish log
+      if: ${{ always() }}
+      with:
+        name: AotPublishLog
+        path: aot-publish.log

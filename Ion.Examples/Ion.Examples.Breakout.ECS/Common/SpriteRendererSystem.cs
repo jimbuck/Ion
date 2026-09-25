@@ -9,9 +9,9 @@ namespace Ion.Examples.Breakout.ECS.Common;
 
 public record struct Sprite(Texture2D Texture, Vector2 Size);
 
-public class SpriteRendererSystem(ISpriteBatch spriteBatch, World world, IWindow window)
+public class SpriteRendererSystem(ISpriteBatch spriteBatch, World world)
 {
-	private QueryDescription _spriteQuery = new QueryDescription().WithAll<Sprite, Transform2D>();
+	private readonly QueryDescription _spriteQuery = new QueryDescription().WithAll<Sprite, Transform2D>();
 
 	[Render]
 	public void Render(GameTime dt, GameLoopDelegate next)

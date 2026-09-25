@@ -36,6 +36,7 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 		Services.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(NullTraceTimer<>)));
 		Services.AddSingleton<IEventEmitter, EventEmitter>();
 		Services.AddTransient<IEventListener, EventListener>();
+		Services.AddSingleton<IEventListenerFactory, EventListenerFactory>();
 		Services.AddSingleton<EventSystem>();
 
 		Services.AddSingleton<IPersistentStorage, PersistentStorage>();

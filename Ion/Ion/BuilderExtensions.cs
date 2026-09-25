@@ -29,6 +29,7 @@ public static class BuilderExtensions
 			.UseDebugUtils()
 			.UseEvents()
 			.UseVeldridGraphics()
-			.UseAudio();
+			.UseAudio()
+			.UseCoroutines();
 	}
 }

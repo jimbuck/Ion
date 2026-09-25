@@ -1,4 +1,29 @@
 My Changelog
+<a name="unreleased"></a>
+## Unreleased
+
+### ⚠ Breaking and behaviour changes
+
+* **.NET 10.** Every engine, test, benchmark and sample project targets `net10.0` and the repository builds with the .NET 10 SDK (`global.json`: `10.0.100`, `rollForward: latestFeature`, C# `latest`). Source generators stay `netstandard2.0` on Roslyn 4.4. `Microsoft.Extensions.*` packages move to 10.0.x.
+* **User data folder.** `IPersistentStorage.User` (and `Saves` under it) now lives in a per-game folder named after `GameConfig.Title` under the user's local application data folder in every build configuration (it was the working directory in Debug builds). Game content and assets are resolved from `AppContext.BaseDirectory` instead of the working directory. All three can be overridden with the new `Ion:Storage` section (`StorageConfig.GamePath`, `AssetsPath`, `UserPath`). `OpenWrite` now truncates existing files.
+* **Asset caching.** `IBaseAssetManager.GetOrLoad(path, load)` caches assets by (type, path) and returns the same instance on repeated loads; scene-scoped asset managers own and dispose what they load. `Load<SoundEffect>`, `Load<Texture2D>` and `Load<FontSet>` all go through it (font sets are keyed by their name). Reloading a texture that was disposed directly loads it again.
+* **Coroutines.** `CoroutineRunner` moved from the `Ion` namespace to `Ion.Extensions.Coroutines`. `ICoroutineRunner` is a singleton (it was transient, so every consumer had its own runner), and `UseCoroutines()` adds a `CoroutineSystem` that steps it in the Update stage; `UseIon()` now calls `UseCoroutines()`. `Stop` of an unknown or finished routine is a no-op. `CoroutineRunner` takes an `IEventListenerFactory` instead of `IServiceProvider`, releases each coroutine's event listener when the coroutine ends, and is `IDisposable`.
+* **Events.** New `IEventListenerFactory` (registered by default) creates listeners the caller owns and disposes. Resolving `IEventListener` from the container still works.
+* **Graphics configuration.** `GraphicsConfig.ClearColorHex` binds the clear color from configuration (`Ion:Graphics:ClearColorHex`, `RGB`/`RGBA`/`RRGGBB`/`RRGGBBAA`). `WindowConfig` is now bound from `Ion:Window` (it was ignored).
+* **Graphics backend mapping.** `GraphicsConfig.PreferredBackend` is mapped explicitly onto Veldrid's backends (the old enum cast was off by one: Vulkan selected OpenGL, OpenGL selected Metal). Unsupported backends fall back to the platform default with a warning; `Direct3D12` and `WebGPU` throw `NotSupportedException`.
+
+### 🐛 Fixes
+
+* Null trace timer no longer allocates per `Start`; scenes call `next` in every stage, register per application and ignore unknown scene ids; `DrawString` defaults to white; `IFont.MeasureString` implemented; `Color(uint)` 4-digit parsing; input press and release in one frame and focus loss; texture loader and sprite renderer release their GPU resources; audio pitch shift and master volume; `Bonk.wav` casing in the Breakout sample.
+* Generators pin Roslyn 4.4 so they load in every SDK from 8.0 onwards.
+* Publishing a sample with `-p:PublishAot=true` no longer fails with `NETSDK1207` (generator projects ignore `PublishAot`).
+* Veldrid's transitive `Newtonsoft.Json` 9.0.1 (GHSA-5crp-9r3c-p9vr) is lifted to 13.0.4.
+
+### Other
+
+* The ECS sample uses Arch 2.1 (versioned `Entity` instead of `EntityReference`) and registers its component arrays so it runs under NativeAOT.
+* CI builds and tests on Windows, macOS and Linux with the .NET 10 SDK, runs the benchmarks as a dry job and uploads the results, and publishes the ECS sample with NativeAOT, failing on trim/AOT warnings from Ion code.
+
 <a name="0.2.5"></a>
 ## [0.2.5](https://www.github.com/jimbuck/Ion/releases/tag/v0.2.5) (2025-1-2)
 

@@ -7,7 +7,7 @@ namespace Ion.Benchmarks;
 /// <summary>
 /// Cost of a `trace.Start("x")` / `timer.Stop()` bracket, which the engine's own systems put around nearly every stage
 /// (and the font renderer puts around every glyph). Two configurations:
-///  - Core default: `NullTraceTimer&lt;T&gt;` (used when AddDebugUtils is not called). Returns `new NullTimerInstance()` through an interface => boxes.
+///  - Core default: `NullTraceTimer&lt;T&gt;` (used when AddDebugUtils is not called). Returns a shared, pre-boxed `NullTimerInstance`, so Start allocates nothing.
 ///  - Debug package installed: `TraceTimer&lt;T&gt;` -> `TraceManager.StartTraceTimer`, which in Release builds returns a cached boxed null instance.
 /// </summary>
 [MemoryDiagnoser]

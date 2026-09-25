@@ -29,6 +29,8 @@ var game = builder.Build();
 game.UseDebugUtils();
 game.UseEvents();
 game.UseVeldridGraphics();
+// Steps the shared ICoroutineRunner once per frame in the Update stage.
+game.UseCoroutines();
 
 game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner coroutine) =>
 {
@@ -50,8 +52,6 @@ game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner corout
 			coroutine.Start(CountDown(5));
 		}
 
-		coroutine.Update(dt);
-		
 		next(dt);
 	};
 });

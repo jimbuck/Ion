@@ -7,6 +7,10 @@ A small, positively-charged, middleware-based game engine for C#.
 
 ----
 
+## Requirements
+
+Ion targets `net10.0` and builds with the .NET 10 SDK (pinned in `global.json`, `rollForward: latestFeature`). The source generators target `netstandard2.0` on Roslyn 4.4, so they load in any compiler from the .NET 8 SDK onwards. Games can be published with NativeAOT (`dotnet publish -r <rid> -p:PublishAot=true`).
+
 ## Modules
 
 ### Ion.Core

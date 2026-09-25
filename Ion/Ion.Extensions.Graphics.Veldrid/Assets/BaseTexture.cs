@@ -25,7 +25,8 @@ public abstract class BaseTexture : ITexture2D
 
 	public void Dispose()
 	{
-		_texture.Dispose();
+		// Idempotent: the asset manager may dispose a texture that user code already disposed.
+		if (!_texture.IsDisposed) _texture.Dispose();
 	}
 
 	public static implicit operator VeldridLib.Texture(BaseTexture texture) => texture._texture;
