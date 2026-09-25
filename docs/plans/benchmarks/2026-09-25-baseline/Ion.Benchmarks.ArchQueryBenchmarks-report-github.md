@@ -10,8 +10,8 @@ Job=ShortRun  IterationCount=3  LaunchCount=1
 WarmupCount=3  
 
 ```
-| Method            | Mean      | Error     | StdDev   | Ratio | RatioSD | Allocated | Alloc Ratio |
-|------------------ |----------:|----------:|---------:|------:|--------:|----------:|------------:|
-| DelegateQuery     | 215.08 μs |  25.16 μs | 1.379 μs |  1.00 |    0.01 |      88 B |        1.00 |
-| InlineStructQuery | 206.26 μs |  64.04 μs | 3.510 μs |  0.96 |    0.02 |         - |        0.00 |
-| ChunkSpans        |  84.09 μs | 130.41 μs | 7.148 μs |  0.39 |    0.03 |         - |        0.00 |
+| Method            | Mean     | Error     | StdDev   | Ratio | RatioSD | Allocated | Alloc Ratio |
+|------------------ |---------:|----------:|---------:|------:|--------:|----------:|------------:|
+| DelegateQuery     | 82.47 μs | 40.759 μs | 2.234 μs |  1.00 |    0.03 |      88 B |        1.00 |
+| InlineStructQuery | 79.79 μs |  6.219 μs | 0.341 μs |  0.97 |    0.02 |         - |        0.00 |
+| ChunkSpans        | 86.28 μs | 30.658 μs | 1.680 μs |  1.05 |    0.03 |         - |        0.00 |

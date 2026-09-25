@@ -12,7 +12,8 @@ BenchmarkDotNet micro-benchmarks that measure the engine's own per-frame overhea
 | `TraceBenchmarks` | `trace.Start()/Stop()` cost for the Core null timer and the Debug package timer |
 | `SpriteBatchBenchmarks` | CPU cost of batching 10k sprites across 1/16 textures, with and without the per-sprite scissor transform |
 | `CoroutineBenchmarks` | Stepping 100 coroutines that yield `Wait.For` every frame |
-| `ArchQueryBenchmarks` | Arch 1.2.8 delegate query vs inline struct query vs chunk spans over 10k entities |
+| `ArchQueryBenchmarks` | Arch 2.1 delegate query vs inline struct query vs chunk spans over 10k entities |
+| `EcsComparisonBenchmarks` | Arch 2.1 vs Friflo.Engine.ECS 3.6: iteration styles, entity creation and structural churn on 10k entities |
 
 Run everything (slow, precise):
 

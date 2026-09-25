@@ -9,7 +9,7 @@ public record struct Transform2D(Vector2 Position, float Rotation);
 public record struct SpriteRef(int TextureId, Vector2 Size);
 
 /// <summary>
-/// Baseline for the ECS integration work: iterating 10k renderable entities in Arch 1.2.8 (the version the ECS sample uses)
+/// Baseline for the ECS integration work: iterating 10k renderable entities in Arch 2.1 (the ECS sample still uses 1.2.8)
 /// with the delegate-based query the sample uses versus the delegate-free alternatives (struct IForEach inline query and raw chunk spans).
 /// The body mirrors SpriteRendererSystem: compute a rotated top-left corner from Transform2D + size.
 /// </summary>
@@ -77,7 +77,7 @@ public class ArchQueryBenchmarks
 		{
 			var transforms = chunk.GetSpan<Transform2D>();
 			var sprites = chunk.GetSpan<SpriteRef>();
-			for (var i = 0; i < chunk.Size; i++) sum += Work(ref transforms[i], ref sprites[i]);
+			for (var i = 0; i < chunk.Count; i++) sum += Work(ref transforms[i], ref sprites[i]);
 		}
 		return sum;
 	}
