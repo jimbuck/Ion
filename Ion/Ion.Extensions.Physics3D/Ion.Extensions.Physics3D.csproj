@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The 3D physics module on BepuPhysics v2 (pure managed, SIMD, no native dependency): a PhysicsWorld3D per scope, the
+    ECS adapter step in FixedUpdate, events on IEvents, queries, and a debug drawing through the 3D renderer. BepuPhysics
+    2.5.0-beta.29 is used rather than 2.4.0: 2.4.0 (2022) targets net6.0 and the 2.5 betas are the maintained line (the
+    author publishes only betas since).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Physics3D</RootNamespace>
+    <Description>Ion's 3D physics module on BepuPhysics v2: AddPhysics3D()/UsePhysics3D(), a PhysicsWorld3D per scene scope, RigidBody3D/Collider3D/Joint3D synchronized with Transform in FixedUpdate, Collision3D/Trigger3D events, ray cast and overlap queries, deterministic fixed stepping (single-threaded by default, an optional ThreadDispatcher) and a debug drawing through the 3D renderer.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Physics3D.Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="BepuPhysics" Version="2.5.0-beta.29" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations and summarizes its Use* helpers. -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Extensions.Physics3D.Abstractions\Ion.Extensions.Physics3D.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Scenes.Abstractions\Ion.Extensions.Scenes.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

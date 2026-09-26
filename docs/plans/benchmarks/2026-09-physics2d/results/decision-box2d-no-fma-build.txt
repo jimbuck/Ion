@@ -1,0 +1,6 @@
+# 10000 bodies, 600 steps, 1 repeats, linux-x64, X64, AOT=True, 4 cpus
+engine | repeat | setup ms | total step ms | mean ms/step | p50 | p95 | max | first 60 mean | last 60 mean | awake/total | hash
+box2d-native | 0 | 15.5 | 8485 | 14.141 | 14.507 | 20.762 | 30.424 | 7.281 | 12.790 | 9999/10000 | E6EB68195CC5DCD4
+# 10000 bodies, 600 steps, 1 repeats, linux-arm64, Arm64, AOT=True, 4 cpus
+engine | repeat | setup ms | total step ms | mean ms/step | p50 | p95 | max | first 60 mean | last 60 mean | awake/total | hash
+box2d-native | 0 | 119.6 | 222678 | 371.130 | 405.510 | 498.538 | 709.303 | 100.022 | 403.469 | 9999/10000 | E6EB68195CC5DCD4

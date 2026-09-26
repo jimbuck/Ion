@@ -78,6 +78,16 @@ public static class StageOrder
 	/// <summary>The sprite batch: initialization (Init) and the batch scope (Render).</summary>
 	public const int SpriteBatch = -850;
 
+	/// <summary>
+	/// Physics (FixedUpdate): the 2D and 3D physics steps push the entities' changed transforms and bodies into the physics
+	/// world, step it by the fixed delta, pull the simulated transforms back and emit the collision and trigger events. In
+	/// the engine setup band, so every fixed step of the game (order <see cref="Default"/>) sees the result of the physics
+	/// step it follows and its changes are simulated by the next one (the order of Unity's and Bevy's fixed schedules),
+	/// and before the scenes (<see cref="Scenes"/>), whose own physics steps use the same order inside the scene's
+	/// schedule.
+	/// </summary>
+	public const int Physics = -700;
+
 	/// <summary>Coroutines: stepping the shared runner (Update).</summary>
 	public const int Coroutines = -600;
 
@@ -116,6 +126,13 @@ public static class StageOrder
 	/// before <see cref="MetricsOverlay"/> (so the overlay stays on top of the UI).
 	/// </summary>
 	public const int Ui = 700;
+
+	/// <summary>
+	/// The physics debug drawing (Render): the 2D colliders and joints drawn through the sprite batch, inside its scope
+	/// (<see cref="SpriteBatch"/>) and after the extraction and the game's own drawing, so the outlines are on top; the 3D
+	/// colliders submitted to the 3D renderer, whose scope (<see cref="Rendering3D"/>) is open too. Runs before <see cref="Ui"/> so the UI stays on top.
+	/// </summary>
+	public const int PhysicsDebugDraw = 650;
 
 	/// <summary>The metrics overlay (Render), inside the sprite batch scope and after the game's own drawing.</summary>
 	public const int MetricsOverlay = 800;

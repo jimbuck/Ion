@@ -12,11 +12,8 @@ using Ion.Extensions.Metrics;
 
 using World = Arch.Core.World;
 using Vector2 = System.Numerics.Vector2;
-using AetherVector2 = nkast.Aether.Physics2D.Common.Vector2;
-using nkast.Aether.Physics2D.Dynamics;
-using nkast.Aether.Physics2D.Dynamics.Contacts;
 
-using Ion.Examples.Breakout.ECS.Physics;
+using Ion.Extensions.Physics2D;
 using Ion.Examples.Breakout.ECS;
 using Ion.Examples.Breakout.ECS.Common;
 
@@ -65,57 +62,31 @@ public static class BreakoutConstants
 	public static readonly float INITIAL_BALL_SPEED = 400f;
 }
 
-public static class PhysicsManagerExtensions
+/// <summary>A wall around the play field (a physics body without a sprite).</summary>
+public record struct Wall();
+
+public static class BreakoutPhysics
 {
-	public static Body AddDynamicSphere(this PhysicsManager physics, float radius, Vector2 position, float rotation = 0)
-	{
-		var body = physics.CreateBody(position, rotation, BodyType.Dynamic);
-		body.IsBullet = true;
-		var fixture = body.CreateCircle(radius, 10f);
-		fixture.Restitution = 1.05f;
-		fixture.Friction = 0f;
+	/// <summary>
+	/// Pixels per meter for the physics world: a ball (32 px) is half a meter and a block three meters, the sizes Box2D is
+	/// tuned for.
+	/// </summary>
+	public const float PixelsPerMeter = 64f;
 
-		return body;
-	}
+	/// <summary>A ball: a bouncy, frictionless circle.</summary>
+	public static Collider2D BallCollider(float radius) => Collider2D.Circle(radius) with { Restitution = 1.05f, Friction = 0f };
 
-	public static Body AddStaticBox(this PhysicsManager physics, Vector2 size, Vector2 position, float rotation = 0)
-	{
-		var body = physics.CreateBody(position, rotation, BodyType.Static);
-		var fixture = body.CreateRectangle(size.X, size.Y, 0.9f, AetherVector2.Zero);
-		fixture.Restitution = 1f;
-		fixture.Friction = 0f;
+	/// <summary>A wall or a block: a perfectly bouncy, frictionless box.</summary>
+	public static Collider2D BoxCollider(Vector2 size) => Collider2D.Box(size) with { Restitution = 1f, Friction = 0f };
 
-		return body;
-	}
-
-	public static Body AddKinematicPaddle(this PhysicsManager physics, Vector2 size, Vector2 position, float rotation = 0)
-	{
-		var radius = size.Y / 2f;
-		var rectSizeX = size.X - size.Y;
-		var restitution = 1f;
-		var friction = 0f;
-
-		var body = physics.CreateBody(position, rotation, BodyType.Kinematic);
-		var rect = body.CreateRectangle(rectSizeX, size.Y, 0.9f, AetherVector2.Zero);
-		rect.Restitution = restitution;
-		rect.Friction = friction;
-
-		var circleR = body.CreateCircle(radius, 10f, new AetherVector2(rectSizeX / 2f, 0));
-		circleR.Restitution = restitution;
-		circleR.Friction = friction;
-
-		var circleL = body.CreateCircle(radius, 10f, new AetherVector2(-rectSizeX / 2f, 0));
-		circleL.Restitution = restitution;
-		circleL.Friction = friction;
-
-		return body;
-	}
+	/// <summary>The paddle: a pill (a rectangle with two half circles), perfectly bouncy and frictionless.</summary>
+	public static Collider2D PaddleCollider(Vector2 size) => Collider2D.Capsule(size) with { Restitution = 1f, Friction = 0f };
 }
 
-public class LevelSystem(IWindow window, PhysicsManager physics, IEvents events)
+public class LevelSystem(IWindow window, World world)
 {
 	[Init]
-	public unsafe void Init(GameTime dt)
+	public void Init(GameTime dt)
 	{
 		var wallThickness = BreakoutConstants.BALL_SIZE.X * 2;
 		var windowHalfExtent = window.Size / 2f;
@@ -128,19 +99,50 @@ public class LevelSystem(IWindow window, PhysicsManager physics, IEvents events)
 		var topWallPosition = new Vector2(windowHalfExtent.X, -wallThickness / 2f);
 		var bottomWallPosition = new Vector2(windowHalfExtent.X, window.Height + (wallThickness / 2f) - 1f);
 
-		_addWall(physics.AddStaticBox(sideWallSize / physics.PhysicsScale, leftWallPosition / physics.PhysicsScale));
-		_addWall(physics.AddStaticBox(sideWallSize / physics.PhysicsScale, rightWallPosition / physics.PhysicsScale));
-		_addWall(physics.AddStaticBox(topWallSize / physics.PhysicsScale, topWallPosition / physics.PhysicsScale));
-		_addWall(physics.AddStaticBox(topWallSize / physics.PhysicsScale, bottomWallPosition / physics.PhysicsScale));
+		// Static bodies: a collider without a RigidBody2D. Their contacts become WallHitEvents in CollisionEventSystem.
+		world.Create(new Wall(), new Transform2D(leftWallPosition), BreakoutPhysics.BoxCollider(sideWallSize));
+		world.Create(new Wall(), new Transform2D(rightWallPosition), BreakoutPhysics.BoxCollider(sideWallSize));
+		world.Create(new Wall(), new Transform2D(topWallPosition), BreakoutPhysics.BoxCollider(topWallSize));
+		world.Create(new Wall(), new Transform2D(bottomWallPosition), BreakoutPhysics.BoxCollider(topWallSize));
 	}
+}
 
-	private void _addWall(Body wall)
+/// <summary>
+/// Turns the physics module's <see cref="Collision2D"/> events into the game's events: a ball touching a wall, the paddle
+/// (with where on the paddle it hit) or a block. Runs in every fixed step right after the physics step
+/// (<see cref="StageOrder.Physics"/>) and before the game's own fixed steps (order 0), which react to the game events.
+/// </summary>
+public class CollisionEventSystem(World world, IEvents events)
+{
+	private EventReader<Collision2D> _collisions = events.Reader<Collision2D>();
+
+	[FixedUpdate(Order = -10)]
+	public void Translate(GameTime dt)
 	{
-		wall.OnCollision += (Fixture sender, Fixture other, Contact contact) =>
+		foreach (ref readonly var collision in _collisions.Read())
 		{
-			events.Emit(new WallHitEvent());
-			return true;
-		};
+			if (collision.Phase != ContactPhase.Begin) continue;
+			if (!world.IsAlive(collision.A) || !world.IsAlive(collision.B)) continue;
+
+			var ball = world.Has<Ball>(collision.A) ? collision.A : world.Has<Ball>(collision.B) ? collision.B : Entity.Null;
+			if (ball == Entity.Null) continue;
+			var other = collision.Other(ball);
+
+			if (world.Has<Block>(other))
+			{
+				events.Emit(new BlockHitEvent(other));
+			}
+			else if (world.Has<Paddle>(other))
+			{
+				// Where on the paddle the ball hit, from -1 (left end) to 1 (right end).
+				var offset = (world.Get<Transform2D>(ball).Position.X - world.Get<Transform2D>(other).Position.X) / (BreakoutConstants.PADDLE_SIZE.X / 2f);
+				events.Emit(new PaddleHitEvent(Math.Clamp(offset, -1f, 1f)));
+			}
+			else if (world.Has<Wall>(other))
+			{
+				events.Emit(new WallHitEvent());
+			}
+		}
 	}
 }
 
@@ -229,26 +231,19 @@ public class SoundEffectsSystem(IAssetManager assets, IEvents events, IAudioMana
 	}
 }
 
-public class PaddleSystem(IWindow window, World world, IInputState input, IEvents events, IAssetManager assets, PhysicsManager physics)
+public class PaddleSystem(IWindow window, World world, IInputState input, IEvents events, IAssetManager assets)
 {
 	private Entity _paddle = Entity.Null;
 
 	[Init]
-	public unsafe void Init(GameTime dt)
+	public void Init(GameTime dt)
 	{
 		var paddleTexture = assets.Load<ITexture2D>("49-Breakout-Tiles.png");
 		var paddlePosition = new Vector2(window.Width / 2f, window.Height - (BreakoutConstants.BOTTOM_GAP + (BreakoutConstants.PADDLE_SIZE.Y/2)));
 
-		var paddleBody = physics.AddKinematicPaddle(BreakoutConstants.PADDLE_SIZE / physics.PhysicsScale, paddlePosition / physics.PhysicsScale);
-		paddleBody.OnCollision += (Fixture sender, Fixture other, Contact contact) =>
-		{
-			// Where on the paddle the ball hit, from -1 (left end) to 1 (right end).
-			var offset = (other.Body.Position.X - sender.Body.Position.X) * physics.PhysicsScale / (BreakoutConstants.PADDLE_SIZE.X / 2f);
-			events.Emit(new PaddleHitEvent(Math.Clamp(offset, -1f, 1f)));
-			return true;
-		};
-		
-		_paddle = world.Create(new Paddle(true), new Transform2D(paddlePosition), new Sprite(paddleTexture, BreakoutConstants.PADDLE_SIZE), new KinematicRigidBody(paddleBody));
+		// A kinematic body: the physics step drives it to its Transform2D, which Update below moves with the mouse.
+		_paddle = world.Create(new Paddle(true), new Transform2D(paddlePosition), new Sprite(paddleTexture, BreakoutConstants.PADDLE_SIZE),
+			BreakoutPhysics.PaddleCollider(BreakoutConstants.PADDLE_SIZE), RigidBody2D.Kinematic());
 	}
 
 	[FixedUpdate]
@@ -273,7 +268,7 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 /// the score counts it this frame); the per-ball checks are [Query] steps that record their structural changes with
 /// <see cref="Commands"/>, played back at the end of Update.
 /// </summary>
-public unsafe partial class BallSystem(IWindow window, World world, IEvents events, IAssetManager assets, PhysicsManager physics)
+public partial class BallSystem(IWindow window, World world, IEvents events, IAssetManager assets)
 {
 	private EventReader<LaunchBallCommand> _launches = events.Reader<LaunchBallCommand>();
 	private EventReader<BlocksClearedEvent> _cleared = events.Reader<BlocksClearedEvent>();
@@ -291,7 +286,7 @@ public unsafe partial class BallSystem(IWindow window, World world, IEvents even
 
 	// The paddle entity exists once PaddleSystem's Init step has run.
 	[Init, After<PaddleSystem>]
-	public unsafe void Init(GameTime dt)
+	public void Init(GameTime dt)
 	{
 		_ballTexture = assets.Load<ITexture2D>("58-Breakout-Tiles.png");
 
@@ -312,12 +307,7 @@ public unsafe partial class BallSystem(IWindow window, World world, IEvents even
 			var radius = BreakoutConstants.BALL_SIZE.X / 2f;
 
 			var ballTransform = paddleTransform.Position + _paddleBallOffset;
-			var entity = _createBall(ballTransform);
-
-			var ballBody = physics.AddDynamicSphere(radius / physics.PhysicsScale, ballTransform / physics.PhysicsScale);
-
-			entity.Add(new DynamicRigidBody(ballBody));
-			ballBody.LinearVelocity = new AetherVector2(0, -100f / physics.PhysicsScale);
+			_createBall(ballTransform, radius);
 		}
 
 		_clearing = _cleared.Read().Length > 0;
@@ -325,35 +315,38 @@ public unsafe partial class BallSystem(IWindow window, World world, IEvents even
 
 	/// <summary>A ball that fell below the window loses its body (the paddle gets a ball back).</summary>
 	[Update(Order = 1), Query, All<Ball>]
-	private void CheckLost(Entity entity, in Transform2D transform, in DynamicRigidBody body, Commands commands)
+	private void CheckLost(Entity entity, in Transform2D transform, in RigidBody2D body, Commands commands)
 	{
 		if (transform.Position.Y <= window.Height) return;
 
-		physics.Remove(body.Body);
-		commands.Remove<DynamicRigidBody>(entity);
+		// Without its collider the physics step removes the body; the ball stays where it is, drawn but out of play.
+		commands.Remove<RigidBody2D>(entity);
+		commands.Remove<Collider2D>(entity);
 		_paddle.Get<Paddle>().HasBall = true;
 		events.Emit(new BallLostEvent());
 	}
 
 	/// <summary>When every block is gone, the balls in play are removed.</summary>
 	[Update(Order = 2), Query, All<Ball>]
-	private void ClearBall(Entity entity, in DynamicRigidBody body, Commands commands)
+	private void ClearBall(Entity entity, in RigidBody2D body, Commands commands)
 	{
 		if (!_clearing) return;
 
-		physics.Remove(body.Body);
+		// Destroying the entity removes its body at the next physics step.
 		commands.Destroy(entity);
 	}
 
-	private Entity _createBall(Vector2 position)
+	private Entity _createBall(Vector2 position, float radius)
 	{
-		// In front of the blocks and the paddle (depth 0).
-		return world.Create(new Ball(), new Transform2D(position), new Sprite(_ballTexture, BreakoutConstants.BALL_SIZE, depth: 1));
+		// In front of the blocks and the paddle (depth 0); launched upwards as a bullet (continuous collision against the
+		// other moving bodies too).
+		return world.Create(new Ball(), new Transform2D(position), new Sprite(_ballTexture, BreakoutConstants.BALL_SIZE, depth: 1),
+			BreakoutPhysics.BallCollider(radius), RigidBody2D.Dynamic(new Vector2(0, -100f)) with { IsBullet = true });
 	}
 }
 
 
-public unsafe class BlockSystem(IEvents events, IAssetManager assets, World world, PhysicsManager physics, BreakoutSettings settings)
+public class BlockSystem(IEvents events, IAssetManager assets, World world, BreakoutSettings settings)
 {
 	private EventReader<BlockHitEvent> _blockHits = events.Reader<BlockHitEvent>();
 	private EventReader<BlocksClearedEvent> _cleared = events.Reader<BlocksClearedEvent>();
@@ -380,13 +373,8 @@ public unsafe class BlockSystem(IEvents events, IAssetManager assets, World worl
 		foreach (ref readonly var e in _blockHits.Read())
 		{
 			var entity = e.Block;
-			if (entity.IsAlive() && entity.Has<StaticBody>())
-			{
-				ref var fixture = ref entity.Get<StaticBody>();
-
-				physics.Remove(fixture.Body);
-				world.Destroy(entity);
-			}
+			// Destroying the block removes its body at the next physics step.
+			if (entity.IsAlive() && entity.Has<Block>()) world.Destroy(entity);
 		}
 	}
 
@@ -411,7 +399,7 @@ public unsafe class BlockSystem(IEvents events, IAssetManager assets, World worl
 		if (world.CountEntities(in _blockQuery) == 0) events.Emit(new BlocksClearedEvent());
 	}
 
-	private unsafe void _resetBlocks()
+	private void _resetBlocks()
 	{
 		var blockTexture = assets.Load<ITexture2D>("15-Breakout-Tiles.png");
 
@@ -430,14 +418,9 @@ public unsafe class BlockSystem(IEvents events, IAssetManager assets, World worl
 				var colOffset = blockHalfExtent.X + BreakoutConstants.BLOCK_GAP + (col * (BreakoutConstants.BLOCK_SIZE.X + BreakoutConstants.BLOCK_GAP));
 
 				var transform = new Transform2D(new Vector2(colOffset, rowOffset), ((float)_rand.NextDouble() - 0.5f) * maxTilt);
-				var body = physics.AddStaticBox(BreakoutConstants.BLOCK_SIZE / physics.PhysicsScale, transform.Position / physics.PhysicsScale, transform.Rotation);
-				
-				var blockEntity = world.Create(transform, new Block(row, col), new Sprite(blockTexture, BreakoutConstants.BLOCK_SIZE), new StaticBody(body));
 
-				body.OnCollision += (Fixture sender, Fixture other, Contact contact) => {
-					events.Emit(new BlockHitEvent(blockEntity));
-					return true;
-				};
+				// A static body; its contacts become BlockHitEvents in CollisionEventSystem.
+				world.Create(transform, new Block(row, col), new Sprite(blockTexture, BreakoutConstants.BLOCK_SIZE), BreakoutPhysics.BoxCollider(BreakoutConstants.BLOCK_SIZE));
 			}
 		}
 	}

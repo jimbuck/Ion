@@ -28,6 +28,8 @@
     <ProjectReference Include="..\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Null\Ion.Extensions.Graphics.Null.csproj" />
     <ProjectReference Include="..\Ion.Extensions.UI\Ion.Extensions.UI.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics3D\Ion.Extensions.Physics3D.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Numerics" />

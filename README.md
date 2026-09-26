@@ -49,7 +49,7 @@ app.Render(Hud.Draw, order: 50);                                         // a st
       -400    TransformPropagationSystem.PropagateBeforeRender
       -300    SpriteExtractionSystem.Extract
          0    ScoreSystem.RenderScore
-        10    PhysicsSystem.Render
+       700    Physics2DDebugDrawSystem.Draw
        800    MetricsOverlaySystem.Draw
        900    NullWindowSystem.CheckClosed
        950    EcsCommandsSystem.FlushRender
@@ -632,6 +632,16 @@ trimmed or NativeAOT publish substitutes `FrameProfiler.IsProfilingEnabled` with
 site (the frame stats, frame log, meter and overlay keep working). The default keeps profiling available in Release
 builds, off until turned on.
 
+### Ion.Extensions.Physics2D and Ion.Extensions.Physics3D
+ECS physics: `Ion.Extensions.Physics2D` on Box2D v3 (picked by a 10,000-body benchmark on x64 and arm64) and `Ion.Extensions.Physics3D` on BepuPhysics v2. An entity with a `Collider2D` (or `Collider3D`) and a transform is a body, static unless it has a `RigidBody2D`/`RigidBody3D`; `Joint2D`/`Joint3D` connect two bodies. The physics step runs in FixedUpdate at `StageOrder.Physics` (-700), before the game's fixed steps: it pushes what game code changed (kinematic bodies are driven to their transform), steps with the fixed delta, writes the moved bodies back into their transforms and velocities, and emits `Collision2D`/`Trigger2D` (`Collision3D`/`Trigger3D`) begin and end events on `IEvents`. `IPhysicsWorld2D`/`IPhysicsWorld3D` (one per scope, like the ECS `World`) has ray casts, overlaps and impulses. `--Ion:Physics2D:DebugDraw=true` draws every collider over the frame. Stepping is deterministic (replay tests hash 10,000 steps); see `docs/design/ion-physics.md`.
+
+```csharp
+builder.Services.AddEcs().AddPhysics2D(builder.Configuration, physics => physics.UnitsPerMeter = 64);
+app.UseIon().UseEcs().UsePhysics2D();
+
+world.Create(new Transform2D(position), Collider2D.Circle(16) with { Restitution = 1 }, RigidBody2D.Dynamic(new Vector2(0, -100)));
+```
+
 ### Ion.Extensions.Scenes
 Adds support for scenes that each have their own scope for dependency injection and their own schedule, run by the `SceneSystem` step (see "Systems and the schedule").
 
@@ -640,7 +650,6 @@ Adds support for scenes that each have their own scope for dependency injection 
 ## Planned Modules
  - Web-based UI Framework
  - Low-level Networking
- - Plugin-in Physics Engine Support
  - Multi-platform build support
 
 ## Built Using/Inspired By
@@ -659,7 +668,7 @@ Feel free to check out the samples and open any issues or pull requests. If you 
 
 ## Examples
 
-Check out the Breakout ECS example for a simple game using the Ion Engine (on the ECS module: built-in transforms and sprites, the sprite extraction, `Commands` and `[Query]` steps, with Aether physics as an adapter), and `Ion.Examples.Quad` for the smallest app on the Silk.NET stack (a textured quad through the RHI; `--Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png` renders offscreen and saves a PNG). `Ion.Examples.Sprites100k` is the sprite batch stress test (100,000 moving sprites across 16 textures, one draw call per texture; `--Sprites:Count=N`, `--Sprites:Frames=N`). Every sample renders headless with `--Ion:Headless=true --Ion:Headless:Render=true`, and the `Ion.Examples.*.Tests` projects compare their frames with golden images.
+Check out the Breakout ECS example for a simple game using the Ion Engine (on the ECS module: built-in transforms and sprites, the sprite extraction, `Commands` and `[Query]` steps, and the 2D physics module), and `Ion.Examples.Quad` for the smallest app on the Silk.NET stack (a textured quad through the RHI; `--Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png` renders offscreen and saves a PNG). `Ion.Examples.Sprites100k` is the sprite batch stress test (100,000 moving sprites across 16 textures, one draw call per texture; `--Sprites:Count=N`, `--Sprites:Frames=N`). Every sample renders headless with `--Ion:Headless=true --Ion:Headless:Render=true`, and the `Ion.Examples.*.Tests` projects compare their frames with golden images.
 UI: `Ion.Examples.Menu` is a main menu with an options screen (toggle, slider, list, text input) on the UI module, driven by mouse, keyboard or gamepad; its tests drive it through `IUiTree` only.
 3D, both on the ECS module and its 3D extraction: `Ion.Examples.Cubes` animates 1,000 instanced cube entities in two materials with a `[Query]` step (shadows, an orbiting camera entity, a HUD drawn on top; `--Cubes:Frames=N --Cubes:Screenshot=cubes.png`) and `Ion.Examples.Model` spawns a glTF 2.0 model (Microsoft's CC0 Avocado) as entities with PBR materials, point lights and a skybox (`--Model:Frames=N --Model:Screenshot=model.png`). The immediate-mode API they used before (`IRenderer3D.Submit`, `Draw`, `SetCamera`, `AddLight`) is shown in the 3D section above.
 

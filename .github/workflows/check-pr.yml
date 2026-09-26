@@ -102,7 +102,7 @@ jobs:
         if-no-files-found: warn
 
   # NativeAOT publish of the ECS sample, the Silk.NET quad sample and the UI menu sample. Fails on any trim/AOT warning whose subject is Ion's
-  # own code; warnings from third-party packages (Aether.Physics2D, Vortice, DependencyModel, Silk.NET.Core) are reported only.
+  # own code; warnings from third-party packages (Silk.NET.Core, DependencyModel) are reported only.
   aot:
     runs-on: ubuntu-latest
     steps:

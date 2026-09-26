@@ -110,7 +110,7 @@ public class BreakoutHeadlessTests(ITestOutputHelper output)
 		Assert.Equal(first.Frames[^1].Blocks, second.Frames[^1].Blocks);
 		Assert.Equal(first.Launches, second.Launches);
 
-		// Frame by frame, down to the bits of every ball position (Aether is deterministic on one machine).
+		// Frame by frame, down to the bits of every ball position (Box2D is deterministic).
 		Assert.Equal(first.Frames, second.Frames);
 	}
 

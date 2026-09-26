@@ -5,7 +5,7 @@ using Ion.Extensions.Ecs;
 using Ion.Extensions.Ecs.Rendering;
 using Ion.Extensions.Graphics;
 using Ion.Examples.Breakout.ECS.Common;
-using Ion.Examples.Breakout.ECS.Physics;
+using Ion.Extensions.Physics2D;
 
 namespace Ion.Examples.Breakout.ECS;
 
@@ -57,6 +57,16 @@ public static class BreakoutGame
 		builder.Services.AddEcs()
 						.AddEcsRendering();
 
+		// The 2D physics module (Box2D v3): no gravity, the world in pixels (64 px to the meter), and the debug drawing of
+		// every collider on unless Ion:Physics2D:DebugDraw says otherwise.
+		var debugDraw = builder.Configuration[$"{Physics2DConfig.Section}:DebugDraw"] is null;
+		builder.Services.AddPhysics2D(builder.Configuration, physics =>
+		{
+			physics.GravityY = 0;
+			physics.UnitsPerMeter = BreakoutPhysics.PixelsPerMeter;
+			physics.DebugDraw |= debugDraw;
+		});
+
 		builder.Services.AddSingleton(new BreakoutSettings(seed))
 						.AddSingleton<MouseCaptureSystem>()
 						.AddSingleton<ScoreSystem>()
@@ -64,8 +74,7 @@ public static class BreakoutGame
 						.AddSingleton<PaddleSystem>()
 						.AddSingleton<BallSystem>()
 						.AddSingleton<BlockSystem>()
-						.AddSingleton<PhysicsManager>()
-						.AddSingleton<PhysicsSystem>()
+						.AddSingleton<CollisionEventSystem>()
 						.AddSingleton<LevelSystem>();
 
 		// The game runs in the root schedule (no scenes), so its systems are singletons: a scoped system there is error ION006.
@@ -91,7 +100,8 @@ public static class BreakoutGame
 			.UseIon()
 			.UseEcs()
 			.UseEcsRendering()
-			.UseSystem<PhysicsSystem>()
+			.UsePhysics2D()
+			.UseSystem<CollisionEventSystem>()
 			.UseSystem<LevelSystem>()
 			.UseSystem<SoundEffectsSystem>()
 			.UseSystem<PaddleSystem>()
@@ -115,8 +125,6 @@ public static class BreakoutGame
 		EcsComponents.Register<Block>();
 		EcsComponents.Register<Paddle>();
 		EcsComponents.Register<Ball>();
-		EcsComponents.Register<DynamicRigidBody>();
-		EcsComponents.Register<KinematicRigidBody>();
-		EcsComponents.Register<StaticBody>();
+		EcsComponents.Register<Wall>();
 	}
 }
