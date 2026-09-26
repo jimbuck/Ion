@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Ion.Extensions.Graphics.Headless\Ion.Extensions.Graphics.Headless.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Windowing.SilkNet\Ion.Extensions.Windowing.SilkNet.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Rendering2D\Ion.Extensions.Rendering2D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Rendering3D\Ion.Extensions.Rendering3D.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" PackAsAnalyzer="true" />
     <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
   </ItemGroup>

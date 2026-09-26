@@ -5,7 +5,11 @@ namespace Ion.Extensions.Graphics.Rhi;
 /// <summary>Describes a buffer for <see cref="IGraphicsDevice.CreateBuffer"/>.</summary>
 public readonly record struct BufferDescriptor(ulong Size, BufferUsage Usage, string? Label = null);
 
-/// <summary>Describes a 2D texture for <see cref="IGraphicsDevice.CreateTexture"/>.</summary>
+/// <summary>
+/// Describes a texture for <see cref="IGraphicsDevice.CreateTexture"/>: a 2D texture, or with
+/// <see cref="TextureDimension.Cube"/> a cube map of six <paramref name="Width"/> by <paramref name="Height"/> faces
+/// (which must be square; write each face with <see cref="TextureRegion.ArrayLayer"/>).
+/// </summary>
 public readonly record struct TextureDescriptor(
 	uint Width,
 	uint Height,
@@ -13,7 +17,8 @@ public readonly record struct TextureDescriptor(
 	TextureUsage Usage,
 	uint MipLevelCount = 1,
 	uint SampleCount = 1,
-	string? Label = null);
+	string? Label = null,
+	TextureDimension Dimension = TextureDimension.D2);
 
 /// <summary>Describes a view of a texture for <see cref="ITexture.CreateView"/>. The default views every mip level.</summary>
 public readonly record struct TextureViewDescriptor(uint BaseMipLevel = 0, uint MipLevelCount = 0, string? Label = null);
@@ -226,8 +231,8 @@ public readonly ref struct RenderPassDescriptor
 	public string? Label { get; }
 }
 
-/// <summary>A rectangle of a texture's mip level, for copies.</summary>
-public readonly record struct TextureRegion(uint X, uint Y, uint Width, uint Height, uint MipLevel = 0)
+/// <summary>A rectangle of a texture's mip level (and, for a cube map, of one face: <paramref name="ArrayLayer"/> 0 to 5), for copies.</summary>
+public readonly record struct TextureRegion(uint X, uint Y, uint Width, uint Height, uint MipLevel = 0, uint ArrayLayer = 0)
 {
 	/// <summary>The whole of mip level 0 of <paramref name="texture"/>.</summary>
 	public static TextureRegion Whole(ITexture texture) => new(0, 0, texture.Width, texture.Height);

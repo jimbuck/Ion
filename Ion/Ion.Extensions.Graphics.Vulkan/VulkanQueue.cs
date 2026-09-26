@@ -69,15 +69,16 @@ internal sealed unsafe class VulkanQueue(VulkanDevice device) : IQueue
 		var staging = device.CurrentFrame.AllocateStaging(size, Math.Max(16u, bpp));
 		data[..(int)size].CopyTo(new Span<byte>(staging.Pointer, (int)size));
 
+		if (region.ArrayLayer >= target.ArrayLayerCount) throw new ArgumentOutOfRangeException(nameof(region), region.ArrayLayer, $"The texture has {target.ArrayLayerCount} array layer(s).");
 		var cmd = _ensureUpload();
-		var range = new ImageSubresourceRange(target.Format.Aspect(), region.MipLevel, 1, 0, 1);
+		var range = new ImageSubresourceRange(target.Format.Aspect(), region.MipLevel, 1, region.ArrayLayer, 1);
 		var final = (target.Usage & TextureUsage.TextureBinding) != 0 ? ImageLayout.ShaderReadOnlyOptimal : ImageLayout.TransferDstOptimal;
 
-		// Layouts are tracked per image: before the first write to a mipmapped image, bring every level to the final
-		// layout, so a write to one level leaves the others in the tracked layout too.
-		if (target.Layout == ImageLayout.Undefined && target.MipLevelCount > 1)
+		// Layouts are tracked per image: before the first write to a mipmapped or layered image (a cube map), bring every
+		// level and layer to the final layout, so a write to one leaves the others in the tracked layout too.
+		if (target.Layout == ImageLayout.Undefined && (target.MipLevelCount > 1 || target.ArrayLayerCount > 1))
 		{
-			var all = new ImageSubresourceRange(target.Format.Aspect(), 0, target.MipLevelCount, 0, 1);
+			var all = new ImageSubresourceRange(target.Format.Aspect(), 0, target.MipLevelCount, 0, target.ArrayLayerCount);
 			VulkanCommandEncoder.Transition(device.Vk, cmd, target.Image, ImageLayout.Undefined, final, all);
 			target.Layout = final;
 		}
@@ -88,7 +89,7 @@ internal sealed unsafe class VulkanQueue(VulkanDevice device) : IQueue
 			BufferOffset = staging.Offset,
 			BufferRowLength = bytesPerRow / bpp,
 			BufferImageHeight = region.Height,
-			ImageSubresource = new ImageSubresourceLayers(target.Format.Aspect(), region.MipLevel, 0, 1),
+			ImageSubresource = new ImageSubresourceLayers(target.Format.Aspect(), region.MipLevel, region.ArrayLayer, 1),
 			ImageOffset = new Offset3D((int)region.X, (int)region.Y, 0),
 			ImageExtent = new Extent3D(region.Width, region.Height, 1),
 		};

@@ -2,7 +2,7 @@ using Ion.Shaders;
 
 // Usage: Ion.Shaders --out <dir> [--gles] [--no-optimize] <shader>...
 // For every shader (.vert/.frag/.comp, GLSL 4.5 Vulkan dialect) writes <dir>/<file>.spv and, with --gles,
-// <dir>/<file>.es.glsl (GLSL ES 3.10). Exit code 1 on the first compilation error, printed in MSBuild's error format.
+// <dir>/<file>.es.glsl (GLSL ES 3.10). #include "file" lines are resolved relative to the shader. Exit code 1 on the first compilation error, printed in MSBuild's error format.
 
 string? outDir = null;
 var gles = false;
@@ -31,7 +31,8 @@ foreach (var input in inputs)
 	var name = Path.GetFileName(input);
 	try
 	{
-		var spirv = ShaderCompiler.CompileToSpirV(File.ReadAllText(input), ShaderCompiler.KindOf(input), name, optimize);
+		var source = ShaderCompiler.ResolveIncludes(File.ReadAllText(input), Path.GetDirectoryName(Path.GetFullPath(input))!);
+		var spirv = ShaderCompiler.CompileToSpirV(source, ShaderCompiler.KindOf(input), name, optimize);
 		File.WriteAllBytes(Path.Combine(outDir, name + ".spv"), spirv);
 		if (gles) File.WriteAllText(Path.Combine(outDir, name + ".es.glsl"), ShaderCompiler.TranslateToGlslEs(spirv));
 		Console.WriteLine($"Ion.Shaders: {name} -> {name}.spv ({spirv.Length} bytes){(gles ? $", {name}.es.glsl" : "")}");

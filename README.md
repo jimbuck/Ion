@@ -316,6 +316,67 @@ NativeAOT: the samples publish with `-p:PublishAot=true` (the quad sample also f
 [docs/platforms/r36s.md](./docs/platforms/r36s.md)) with no warnings from Ion; the remaining third-party warnings and
 why they are harmless are listed in [docs/plans/spikes/2026-silknet-spike.md](./docs/plans/spikes/2026-silknet-spike.md).
 
+### 3D
+`Ion.Extensions.Rendering3D` is the 3D renderer, written once against the RHI (Vulkan and OpenGL ES render the same
+pixels). It is immediate mode: every frame, Render steps submit cameras, lights and mesh renderers, and the renderer
+culls, sorts, batches and draws them when the Render stage closes, with the sprite batch drawn on top as the last pass.
+The ECS extraction will call the same API. Register it after `AddIon`:
+
+```csharp
+builder.Services.AddIon(builder.Configuration);
+builder.Services.AddRendering3D(builder.Configuration);     // Ion:Rendering3D: ShadowMapSize, ShadowDistance, DepthPrepass, MaxCameras
+app.UseIon().UseRendering3D();
+
+public sealed class Scene(IRenderer3D renderer, IAssetManager assets)
+{
+    MeshHandle _cube; MaterialHandle _red; IModel _model = null!;
+
+    [Init] public void Load(GameTime dt)
+    {
+        _cube = renderer.CreateMesh(MeshPrimitives.Cube());
+        _red = renderer.CreateMaterial(new PbrMaterial(Color.Red, metallic: 0f, roughness: 0.4f));
+        _model = assets.Load<IModel>("Avocado/Avocado.gltf");
+        renderer.SetEnvironment(new SceneEnvironment { Skybox = assets.Load<ICubemap>("Skybox").Handle });
+    }
+
+    [Render] public void Draw(GameTime dt)
+    {
+        renderer.SetCamera(new Camera { Clear = CameraClear.Skybox }, Transform.LookAt(new Vector3(0, 3, 8), Vector3.Zero));
+        renderer.AddLight(new DirectionalLight(Color.White, 3f), new Vector3(-0.5f, -1f, -0.3f));
+        renderer.Draw(_cube, _red, Matrix4x4.CreateTranslation(2, 0.5f, 0));
+        renderer.Draw(_model, Matrix4x4.CreateScale(40));
+    }
+}
+```
+
+  - **Data types** (plain unmanaged structs in `Ion.Extensions.Graphics`, usable as ECS components): `Transform`,
+    `Camera` (perspective or orthographic, viewport, clear color or skybox, priority, render target, culling mask),
+    `MeshRenderer` (mesh, material, shadows, layer mask), `DirectionalLight`, `PointLight`, `SpotLight`,
+    `SceneEnvironment` (ambient, skybox), `UnlitMaterial`, `PbrMaterial` (metallic-roughness with normal, occlusion and
+    emissive maps, `AlphaMode` opaque, mask or blend, double sided), handles (`MeshHandle`, `MaterialHandle`,
+    `TextureHandle`, `RenderTargetHandle`), `Aabb`, `BoundingSphere` and `Frustum`; `MeshData` and `MeshPrimitives` (cube,
+    sphere, plane, cylinder).
+  - **Pipeline**: extract (submissions copied into flat arrays), prepare (world bounds, views, light lists, a shadow fit
+    snapped to shadow map texels; view uniforms and 96-byte instance data uploaded into per-frame rings), queue and sort
+    (frustum and layer culling per camera; opaque binned by pipeline, material and mesh, front to back; blended back to
+    front; one instanced draw per run of mesh and material), then a render graph: shadow map, optional depth prepass,
+    opaque, skybox, transparent, your passes, the 2D overlay. 10,000 mesh renderers take about 1.2 ms of CPU with shadows
+    and allocate nothing per frame (`Renderer3DBenchmarks`).
+  - **Shading**: unlit and PBR (Cook-Torrance GGX, Lambert, one shadowed directional light with PCF, up to 8 point, spot
+    and extra directional lights per camera, ambient from the skybox's mips), a skybox from a cube map, standard depth
+    in WebGPU clip space. Custom material shaders plug into the same passes (`CreateMaterialShader`). Several cameras
+    per frame (split screen, priorities), render targets that materials and sprites can sample.
+  - **Render graph**: `RenderGraphPass` with declared texture reads and writes; the graph orders, culls unused passes
+    and pools transient textures by lifetime. Add a post effect with `Renderer3D.AddPass`.
+  - **Assets**: `Load<IModel>("model.gltf")` (glTF 2.0 and GLB: meshes, metallic-roughness materials, textures, node
+    tree; no skinning yet) and `Load<ICubemap>("Folder")` (six faces: `px nx py ny pz nz`).
+  - Without a GPU (`--Ion:Headless=true`) the CPU pipeline still runs, so `IRenderer3D.LastFrameStatistics` (visible,
+    culled, batches, draw calls, triangles, shadow casters) can be asserted in tests; the draw calls and triangles also
+    reach `FrameStats`.
+
+The design (pipeline, graph API, bind group conventions for custom materials, what the ECS extraction does) is in
+[docs/design/ion-rendering3d.md](./docs/design/ion-rendering3d.md).
+
 ### Running headless
 `AddIon(config)` switches graphics and audio to the headless backends when `Ion:Headless` is `true` or `Ion:Graphics:Output` is `None`, and `UseIon()` adds the matching systems. Any game that depends only on the interfaces (`IWindow`, `IInputState`, `ISpriteBatch`, `IAudioManager`, `ITexture2D`, `IFontSet`, `ISoundEffect`) runs without a GPU, window or audio device:
 
@@ -498,6 +559,8 @@ Feel free to check out the samples and open any issues or pull requests. If you 
 ## Examples
 
 Check out the Breakout ECS example for a simple game using the Ion Engine, and `Ion.Examples.Quad` for the smallest app on the Silk.NET stack (a textured quad through the RHI; `--Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png` renders offscreen and saves a PNG). `Ion.Examples.Sprites100k` is the sprite batch stress test (100,000 moving sprites across 16 textures, one draw call per texture; `--Sprites:Count=N`, `--Sprites:Frames=N`). Every sample renders headless with `--Ion:Headless=true --Ion:Headless:Render=true`, and the `Ion.Examples.*.Tests` projects compare their frames with golden images.
+3D: `Ion.Examples.Cubes` is immediate-mode 3D (1,000 instanced cubes in two materials, shadows, an orbiting camera, a HUD drawn on top; `--Cubes:Frames=N --Cubes:Screenshot=cubes.png`) and `Ion.Examples.Model` loads a glTF 2.0 model (Microsoft's CC0 Avocado) with PBR materials, point lights and a skybox (`--Model:Frames=N --Model:Screenshot=model.png`).
+
 ![Breakout ECS Screenshot](./breakout-physics-debug.png)
 
 ----

@@ -41,6 +41,7 @@ public sealed class SpriteBatch : ISpriteBatch, ISpriteBatchStatistics, IDisposa
 	private long _frames;
 	private Vector128<float> _lastTint;
 	private uint _lastPacked = 0xFFFF_FFFFu;
+	private bool _deferred;
 
 	/// <summary>Creates a sprite batch drawing into <paramref name="frame"/>. GPU resources are created by <see cref="Initialize"/>.</summary>
 	public SpriteBatch(IGraphicsFrame frame, ILogger<SpriteBatch>? logger = null)
@@ -55,6 +56,24 @@ public sealed class SpriteBatch : ISpriteBatch, ISpriteBatchStatistics, IDisposa
 
 	/// <summary>True once <see cref="Initialize"/> created the GPU resources.</summary>
 	public bool IsInitialized => _renderer is not null;
+
+	/// <summary>
+	/// When true, the outermost <see cref="End"/> closes the frame's segments but leaves the GPU submission to
+	/// <see cref="SubmitDeferred"/>. Set by a renderer that composites the 2D overlay as a pass of its own frame (the 3D
+	/// renderer's render graph draws it after the transparent pass); games never need it.
+	/// </summary>
+	public bool DeferSubmission { get; set; }
+
+	/// <summary>True when a frame was closed with <see cref="DeferSubmission"/> on and has not been submitted yet.</summary>
+	public bool HasDeferredSubmission => _deferred;
+
+	/// <summary>Submits the frame closed while <see cref="DeferSubmission"/> was on (nothing when there is none).</summary>
+	public void SubmitDeferred()
+	{
+		if (!_deferred) return;
+		_deferred = false;
+		_submit();
+	}
 
 	internal SpriteBatcher Batcher => _batcher;
 
@@ -77,6 +96,8 @@ public sealed class SpriteBatch : ISpriteBatch, ISpriteBatchStatistics, IDisposa
 	{
 		if (_depth == 0)
 		{
+			// A deferred frame nobody submitted is dropped.
+			_deferred = false;
 			_batcher.Reset();
 			_target = null;
 			_pendingClear = null;
@@ -100,6 +121,12 @@ public sealed class SpriteBatch : ISpriteBatch, ISpriteBatchStatistics, IDisposa
 		if (_depth > 0)
 		{
 			_open(_stack[_depth - 1]);
+			return;
+		}
+
+		if (DeferSubmission)
+		{
+			_deferred = true;
 			return;
 		}
 

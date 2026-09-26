@@ -44,6 +44,17 @@ public sealed class GlesEs30HeadlessContractTests : HeadlessContractTests
 	protected override void ConfigureSample(IDictionary<string, string?> settings) => settings["Ion:Graphics:Gles:MaxFeatureLevel"] = nameof(GlesFeatureLevel.Es30);
 }
 
+/// <summary>The shared texture contract (cube maps, sampled depth) on OpenGL ES at the driver's feature level.</summary>
+[RhiBackend(GraphicsBackend.OpenGLES)]
+public sealed class GlesTextureContractTests : TextureContractTests;
+
+/// <summary>The shared texture contract on the OpenGL ES 3.0 fallback (GLSL ES 3.00, slots assigned by name).</summary>
+[RhiBackend(GraphicsBackend.OpenGLES)]
+public sealed class GlesEs30TextureContractTests : TextureContractTests
+{
+	protected override IGraphicsDevice CreateDevice(ValidationLog log) => log.CreateDevice(Backend, 2, GlesFeatureLevel.Es30);
+}
+
 /// <summary>The shared windowed RHI contract on OpenGL ES (the window's GL ES context, an offscreen target blitted at present).</summary>
 [RhiBackend(GraphicsBackend.OpenGLES)]
 [Collection(WindowedContractTests.Collection)]

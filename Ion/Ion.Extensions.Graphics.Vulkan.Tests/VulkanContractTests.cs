@@ -14,6 +14,10 @@ namespace Ion.Extensions.Graphics.Vulkan.Tests;
 [RhiBackend(GraphicsBackend.Vulkan)]
 public sealed class VulkanHeadlessContractTests : HeadlessContractTests;
 
+/// <summary>The shared texture contract (cube maps, sampled depth) on Vulkan.</summary>
+[RhiBackend(GraphicsBackend.Vulkan)]
+public sealed class VulkanTextureContractTests : TextureContractTests;
+
 /// <summary>The shared windowed RHI contract on Vulkan (a swapchain on a GLFW or SDL window).</summary>
 [RhiBackend(GraphicsBackend.Vulkan)]
 [Collection(WindowedContractTests.Collection)]

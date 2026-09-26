@@ -12,6 +12,9 @@
     with Ion.Extensions.Graphics.Rhi.EmbeddedShaders. Compilation errors fail the build with the file and line.
 
     Properties: IonShaderGles (default true) also emits GLSL ES; IonShaderOptimize (default true) optimizes the SPIR-V.
+
+    Shaders may #include "file" (resolved relative to the shader). List included files as IonShaderInclude items so that
+    editing one recompiles the shaders: <IonShaderInclude Include="Shaders/*.glsl" />.
   -->
   <PropertyGroup>
     <IonShaderGles Condition="'$(IonShaderGles)' == ''">true</IonShaderGles>
@@ -40,7 +43,7 @@
           DependsOnTargets="_IonShaderPaths;ResolveProjectReferences"
           BeforeTargets="AssignTargetPaths"
           Condition="'@(IonShader)' != ''"
-          Inputs="@(IonShader);$(IonShadersTool);$(MSBuildThisFileFullPath)"
+          Inputs="@(IonShader);@(IonShaderInclude);$(IonShadersTool);$(MSBuildThisFileFullPath)"
           Outputs="@(IonShader->'$(IonShaderOutDir)%(Filename)%(Extension).spv')">
     <PropertyGroup>
       <_IonShaderArgs>--out &quot;$(IonShaderOutDir)&quot;</_IonShaderArgs>

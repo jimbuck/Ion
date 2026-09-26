@@ -20,6 +20,10 @@ namespace Ion.Extensions.Graphics.Rhi;
  * - Shader modules are GLSL ES 3.10 source translated from the same SPIR-V at build time, with clip-space y negated so
  *   that texture row 0 is the top row as in WebGPU (the window surface is blitted with a flip at present).
  * - One blend state and write mask apply to every color target (target 0's), without OES_draw_buffers_indexed.
+ * - Cube maps (TextureDimension.Cube) are GL_TEXTURE_CUBE_MAP textures whose faces are written as array layers 0 to 5;
+ *   sample them with samplerCube (textureCube plus sampler in the GLSL 4.5 source). Depth textures can be sampled, with
+ *   a comparison sampler (sampler2DShadow after translation) for shadow maps. A depth-only pipeline (no fragment state)
+ *   gets an empty fragment stage of the vertex stage's GLSL ES version.
  */
 
 /// <summary>
@@ -70,7 +74,7 @@ public interface IGraphicsDevice : IDisposable
 	/// <summary>Creates a buffer.</summary>
 	IBuffer CreateBuffer(in BufferDescriptor descriptor);
 
-	/// <summary>Creates a 2D texture.</summary>
+	/// <summary>Creates a 2D texture or a cube map (<see cref="TextureDescriptor.Dimension"/>).</summary>
 	ITexture CreateTexture(in TextureDescriptor descriptor);
 
 	/// <summary>Creates a sampler.</summary>
@@ -167,9 +171,12 @@ public interface IBuffer : IDisposable
 	void Read(ulong offset, Span<byte> destination);
 }
 
-/// <summary>A 2D texture (optionally mipmapped or multisampled).</summary>
+/// <summary>A 2D texture (optionally mipmapped or multisampled) or a cube map.</summary>
 public interface ITexture : IDisposable
 {
+	/// <summary>A 2D texture or a cube map (six faces as array layers 0 to 5).</summary>
+	TextureDimension Dimension { get; }
+
 	/// <summary>The width of mip level 0 in texels.</summary>
 	uint Width { get; }
 

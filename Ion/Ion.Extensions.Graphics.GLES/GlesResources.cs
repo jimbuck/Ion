@@ -93,7 +93,17 @@ internal sealed class GlesTexture : ITexture
 		Usage = descriptor.Usage;
 		MipLevelCount = Math.Max(1, descriptor.MipLevelCount);
 		SampleCount = Math.Max(1, descriptor.SampleCount);
+		Dimension = descriptor.Dimension;
+		Target = Dimension == TextureDimension.Cube ? GLEnum.TextureCubeMap : GLEnum.Texture2D;
 		Gles = Format.ToGles();
+		if (Dimension == TextureDimension.Cube)
+		{
+			if (Width != Height) throw new ArgumentException("The faces of a cube map must be square.", nameof(descriptor));
+			if ((Usage & (TextureUsage.RenderAttachment | TextureUsage.CopySrc)) != 0 || SampleCount > 1)
+			{
+				throw new NotSupportedException("Cube maps are sampled textures only (no render attachment, copy source or multisampling).");
+			}
+		}
 
 		if ((Usage & TextureUsage.RenderAttachment) != 0 && Format.IsFloat())
 		{
@@ -119,15 +129,20 @@ internal sealed class GlesTexture : ITexture
 		}
 
 		Handle = gl.GenTexture();
-		gl.BindTexture(GLEnum.Texture2D, Handle);
-		gl.TexStorage2D(GLEnum.Texture2D, MipLevelCount, Gles.Internal, Width, Height);
-		gl.TexParameter(GLEnum.Texture2D, GLEnum.TextureBaseLevel, 0);
-		gl.TexParameter(GLEnum.Texture2D, GLEnum.TextureMaxLevel, (int)MipLevelCount - 1);
-		gl.BindTexture(GLEnum.Texture2D, 0);
+		gl.BindTexture(Target, Handle);
+		gl.TexStorage2D(Target, MipLevelCount, Gles.Internal, Width, Height);
+		gl.TexParameter(Target, GLEnum.TextureBaseLevel, 0);
+		gl.TexParameter(Target, GLEnum.TextureMaxLevel, (int)MipLevelCount - 1);
+		gl.BindTexture(Target, 0);
 		AppliedMips = (0, MipLevelCount);
 	}
 
 	public readonly uint Handle;
+
+	/// <summary>The GL texture target: <c>GL_TEXTURE_2D</c>, or <c>GL_TEXTURE_CUBE_MAP</c> for a cube map.</summary>
+	public readonly GLEnum Target;
+
+	public TextureDimension Dimension { get; }
 
 	public readonly bool IsRenderbuffer;
 
@@ -421,7 +436,7 @@ internal readonly record struct GlesAttribute(uint Location, uint Slot, uint Off
 
 internal sealed class GlesRenderPipeline : IRenderPipeline
 {
-	private const string DepthOnlyFragment = "#version 300 es\nvoid main() { }\n";
+	private const string DepthOnlyFragmentBody = "void main() { }\n";
 
 	private readonly GlesDevice _device;
 	private bool _disposed;
@@ -448,7 +463,10 @@ internal sealed class GlesRenderPipeline : IRenderPipeline
 		else
 		{
 			// GLES programs need a fragment stage; a depth-only pipeline gets an empty one.
-			depthOnly = GlesShaderModule.Compile(gl, DepthOnlyFragment, ShaderStage.Fragment, "depth-only");
+			// Stages must declare the same GLSL ES version to link: take the vertex stage's version line.
+			var version = vertex.Source.TrimStart();
+			version = version[..version.IndexOf('\n')].Trim();
+			depthOnly = GlesShaderModule.Compile(gl, version + "\n" + DepthOnlyFragmentBody, ShaderStage.Fragment, "depth-only");
 			gl.AttachShader(Program, depthOnly);
 		}
 

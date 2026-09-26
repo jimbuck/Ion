@@ -68,6 +68,13 @@ public static class StageOrder
 	/// <summary>Audio: device initialization (Init).</summary>
 	public const int Audio = -880;
 
+	/// <summary>
+	/// The 3D renderer: initialization (Init) and the frame scope (Render). Its scope opens before the sprite batch's and
+	/// closes after it, so when it closes every 3D and 2D submission of the frame is in and its render graph draws the
+	/// 3D passes and then the 2D overlay.
+	/// </summary>
+	public const int Rendering3D = -860;
+
 	/// <summary>The sprite batch: initialization (Init) and the batch scope (Render).</summary>
 	public const int SpriteBatch = -850;
 

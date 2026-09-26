@@ -249,11 +249,11 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 					var view = binding.View;
 					var texture = view.TextureImpl;
 					Gl.ActiveTexture(GLEnum.Texture0 + GlesBindings.Slot((uint)g, binding.Binding));
-					Gl.BindTexture(GLEnum.Texture2D, texture.Handle);
+					Gl.BindTexture(texture.Target, texture.Handle);
 					if (texture.AppliedMips != (view.BaseMip, view.MipCount))
 					{
-						Gl.TexParameter(GLEnum.Texture2D, GLEnum.TextureBaseLevel, (int)view.BaseMip);
-						Gl.TexParameter(GLEnum.Texture2D, GLEnum.TextureMaxLevel, (int)(view.BaseMip + view.MipCount - 1));
+						Gl.TexParameter(texture.Target, GLEnum.TextureBaseLevel, (int)view.BaseMip);
+						Gl.TexParameter(texture.Target, GLEnum.TextureMaxLevel, (int)(view.BaseMip + view.MipCount - 1));
 						texture.AppliedMips = (view.BaseMip, view.MipCount);
 					}
 				}

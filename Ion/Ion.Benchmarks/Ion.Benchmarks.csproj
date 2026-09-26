@@ -24,6 +24,7 @@
     <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Rendering2D\Ion.Extensions.Rendering2D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Rendering3D\Ion.Extensions.Rendering3D.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Numerics" />

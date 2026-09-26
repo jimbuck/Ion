@@ -69,12 +69,13 @@ internal sealed class Texture2DLoader(IGraphicsFrame frame, IPersistentStorage s
 	public static int MipLevelCount(int width, int height) => 1 + (int)Math.Floor(Math.Log2(Math.Max(1, Math.Max(width, height))));
 
 	/// <summary>
-	/// Premultiplies <paramref name="rgba"/> (straight RGBA8, rows top to bottom) in place and returns it followed by every
-	/// smaller level (each texel the average of the 2x2 block above it, edge texels repeated for odd sizes).
+	/// Premultiplies <paramref name="rgba"/> (straight RGBA8, rows top to bottom) in place (unless
+	/// <paramref name="premultiply"/> is false) and returns it followed by every smaller level (each texel the average of
+	/// the 2x2 block above it, edge texels repeated for odd sizes).
 	/// </summary>
-	public static List<byte[]> BuildMipChain(byte[] rgba, int width, int height)
+	public static List<byte[]> BuildMipChain(byte[] rgba, int width, int height, bool premultiply = true)
 	{
-		Premultiply(rgba);
+		if (premultiply) Premultiply(rgba);
 		var levels = new List<byte[]>(MipLevelCount(width, height)) { rgba };
 		var source = rgba;
 		int w = width, h = height;

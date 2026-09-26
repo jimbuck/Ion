@@ -38,6 +38,54 @@ public static unsafe class ShaderCompiler
 	};
 
 	/// <summary>
+	/// Replaces every <c>#include "file"</c> line of <paramref name="source"/> with the contents of that file, resolved
+	/// relative to <paramref name="directory"/> (includes nest; each file is included once per shader). A <c>#line</c>
+	/// directive after each included file keeps the including file's line numbers in diagnostics. The included files are
+	/// added to <paramref name="included"/> (for incremental builds).
+	/// </summary>
+	/// <exception cref="ShaderCompilationException">An included file does not exist.</exception>
+	public static string ResolveIncludes(string source, string directory, ICollection<string>? included = null)
+	{
+		ArgumentNullException.ThrowIfNull(source);
+		var seen = new HashSet<string>(StringComparer.Ordinal);
+		return Resolve(source, directory);
+
+		string Resolve(string text, string dir)
+		{
+			if (!text.Contains("#include", StringComparison.Ordinal)) return text;
+			var lines = text.Split('\n');
+			var result = new StringBuilder(text.Length);
+			for (var i = 0; i < lines.Length; i++)
+			{
+				var line = lines[i];
+				var trimmed = line.TrimStart();
+				if (!trimmed.StartsWith("#include", StringComparison.Ordinal))
+				{
+					result.Append(line);
+					if (i < lines.Length - 1) result.Append('\n');
+					continue;
+				}
+
+				var open = trimmed.IndexOf('"');
+				var close = open < 0 ? -1 : trimmed.IndexOf('"', open + 1);
+				if (close < 0) throw new ShaderCompilationException($"{i + 1}: error: malformed #include (use #include \"file\").");
+				var path = Path.GetFullPath(Path.Combine(dir, trimmed[(open + 1)..close]));
+				if (!File.Exists(path)) throw new ShaderCompilationException($"{i + 1}: error: included file '{path}' not found.");
+				if (seen.Add(path))
+				{
+					included?.Add(path);
+					result.Append(Resolve(File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal), Path.GetDirectoryName(path)!)).Append('\n');
+				}
+
+				// The next line of the including file keeps its own number.
+				result.Append("#line ").Append(i + 2).Append('\n');
+			}
+
+			return result.ToString();
+		}
+	}
+
+	/// <summary>
 	/// Compiles GLSL source to SPIR-V (Vulkan 1.0 environment, so it runs on every Vulkan device).
 	/// </summary>
 	/// <exception cref="ShaderCompilationException">The source does not compile; the message has Shaderc's diagnostics.</exception>

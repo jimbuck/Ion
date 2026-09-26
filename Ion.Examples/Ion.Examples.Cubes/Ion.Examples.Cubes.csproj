@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Immediate-mode 3D without ECS: a grid of 1,000 cubes in two materials, instanced by mesh and material, a directional
+    light with shadows onto a ground plane, an orbiting camera and a 2D HUD drawn on top by the sprite batch.
+    Options: - -Cubes:Frames=N (exit after N frames), - -Cubes:Screenshot=cubes.png (with Frames: save the last frame),
+    - -Ion:Headless=true (no window; add - -Ion:Headless:Render=true to render offscreen).
+    Publishes with NativeAOT: dotnet publish -c Release -r linux-x64 -p:PublishAot=true
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <Platforms>AnyCPU</Platforms>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="appsettings.json" />
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <!-- The HUD font (SIL Open Font License), shared with the Breakout sample. -->
+    <Content Include="..\Ion.Examples.Breakout\Assets\Bungee-Regular.ttf" Link="Assets\Bungee-Regular.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+  </ItemGroup>
+</Project>

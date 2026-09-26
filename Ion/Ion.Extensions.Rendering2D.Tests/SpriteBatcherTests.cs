@@ -174,6 +174,36 @@ public class SpriteBatcherTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
+	public void DeferredSubmissionWaitsForSubmitDeferredAndIsDroppedByTheNextFrame()
+	{
+		var batch = NewBatch();
+		batch.DeferSubmission = true;
+		batch.Begin();
+		batch.Draw(_a, Vector2.Zero, Vector2.One);
+		batch.End();
+		Assert.True(batch.HasDeferredSubmission);
+		Assert.Equal(-1, batch.LastFrameStatistics.Frame);
+
+		batch.SubmitDeferred();
+		Assert.False(batch.HasDeferredSubmission);
+		Assert.Equal(0, batch.LastFrameStatistics.Frame);
+		batch.SubmitDeferred();
+		Assert.Equal(0, batch.LastFrameStatistics.Frame);
+
+		// A deferred frame nobody submits is dropped when the next one begins.
+		batch.Begin();
+		batch.End();
+		batch.Begin();
+		Assert.False(batch.HasDeferredSubmission);
+		batch.End();
+		batch.DeferSubmission = false;
+		batch.Begin();
+		batch.End();
+		Assert.False(batch.HasDeferredSubmission);
+		Assert.Equal(1, batch.LastFrameStatistics.Frame);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
 	public void RecordingAFrameAllocatesNothingAfterWarmUp()
 	{
 		var batch = NewBatch();

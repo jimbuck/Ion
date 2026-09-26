@@ -57,6 +57,7 @@ internal sealed unsafe class GlesQueue(GlesDevice device) : IQueue
 		var bpp = (uint)target.Format.BytesPerPixel();
 		if (target.Format.IsDepth()) throw new NotSupportedException("OpenGL ES cannot upload depth textures.");
 		if (target.IsRenderbuffer) throw new NotSupportedException("Multisampled textures cannot be written on the GLES backend.");
+		if (region.ArrayLayer >= target.Dimension.ArrayLayerCount()) throw new ArgumentOutOfRangeException(nameof(region), region.ArrayLayer, $"The texture has {target.Dimension.ArrayLayerCount()} array layer(s).");
 		if (bytesPerRow % bpp != 0) throw new ArgumentException($"bytesPerRow ({bytesPerRow}) must be a multiple of the texel size ({bpp}).", nameof(bytesPerRow));
 		if (region.Width == 0 || region.Height == 0) return;
 		var size = (ulong)bytesPerRow * (region.Height - 1) + region.Width * bpp;
@@ -88,17 +89,19 @@ internal sealed unsafe class GlesQueue(GlesDevice device) : IQueue
 			rowLength = (int)region.Width;
 		}
 
-		gl.BindTexture(GLEnum.Texture2D, target.Handle);
+		// A cube map face is its own 2D image target (+X, -X, +Y, -Y, +Z, -Z are consecutive enum values).
+		var image = target.Dimension == TextureDimension.Cube ? GLEnum.TextureCubeMapPositiveX + (int)region.ArrayLayer : GLEnum.Texture2D;
+		gl.BindTexture(target.Target, target.Handle);
 		gl.PixelStore(GLEnum.UnpackAlignment, 1);
 		gl.PixelStore(GLEnum.UnpackRowLength, rowLength);
 		fixed (byte* p = data)
 		{
-			gl.TexSubImage2D(GLEnum.Texture2D, (int)region.MipLevel, (int)region.X, (int)region.Y, region.Width, region.Height, format.Format, format.Type, p);
+			gl.TexSubImage2D(image, (int)region.MipLevel, (int)region.X, (int)region.Y, region.Width, region.Height, format.Format, format.Type, p);
 		}
 
 		gl.PixelStore(GLEnum.UnpackRowLength, 0);
 		gl.PixelStore(GLEnum.UnpackAlignment, 4);
-		gl.BindTexture(GLEnum.Texture2D, 0);
+		gl.BindTexture(target.Target, 0);
 		device.CheckErrors("WriteTexture");
 	}
 

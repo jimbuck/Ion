@@ -122,6 +122,7 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 		for (var i = 0; i < colors.Length; i++)
 		{
 			var view = (GlesTextureView)colors[i].View;
+			if (view.TextureImpl.Dimension == TextureDimension.Cube) throw new NotSupportedException("A cube map cannot be a render attachment.");
 			pass.Colors[i] = view;
 			pass.ColorLoad[i] = colors[i].LoadOp;
 			pass.ColorStore[i] = colors[i].StoreOp;
@@ -169,6 +170,7 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 		var bpp = (uint)texture.Format.BytesPerPixel();
 		if (bpp == 0 || bytesPerRow % bpp != 0) throw new ArgumentException($"bytesPerRow ({bytesPerRow}) must be a multiple of the texel size ({bpp}).", nameof(bytesPerRow));
 		if (texture.Format.IsDepth()) throw new NotSupportedException("OpenGL ES cannot read back depth textures.");
+		if (texture.Dimension == TextureDimension.Cube) throw new NotSupportedException("A cube map cannot be a copy source.");
 		if (texture.IsRenderbuffer) throw new NotSupportedException("Multisampled textures cannot be copied on the GLES backend.");
 		if (region.Width == 0 || region.Height == 0) return;
 		if (destinationOffset + (ulong)bytesPerRow * (region.Height - 1) + (ulong)region.Width * bpp > destination.Size) throw new ArgumentOutOfRangeException(nameof(destination), "The copy overflows the destination buffer.");

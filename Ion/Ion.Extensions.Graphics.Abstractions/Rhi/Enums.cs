@@ -2,7 +2,9 @@ namespace Ion.Extensions.Graphics.Rhi;
 
 /// <summary>
 /// A texel format. The set is the subset of WebGPU formats that Vulkan, Metal (through MoltenVK) and OpenGL ES 3.1 all
-/// support as sampled textures; the depth formats are render attachments only.
+/// support as sampled textures. The depth formats are render attachments that can also be sampled (with
+/// <see cref="TextureUsage.TextureBinding"/>), through a comparison sampler (<see cref="SamplerDescriptor.Compare"/>,
+/// shadow maps) or as plain values; <see cref="TextureFormat.Depth32Float"/> is the portable choice for both.
 /// </summary>
 public enum TextureFormat
 {
@@ -66,6 +68,28 @@ public static class TextureFormatExtensions
 /// <summary>
 /// How a buffer may be used. Combine the flags a buffer needs; a backend may place it in faster or slower memory accordingly.
 /// </summary>
+/// <summary>
+/// The dimension of a texture (WebGPU's view dimension, fixed per texture here): a 2D texture or a cube map.
+/// </summary>
+public enum TextureDimension
+{
+	/// <summary>A 2D texture (one layer).</summary>
+	D2,
+	/// <summary>
+	/// A cube map: six square 2D faces as array layers 0 to 5 in the order +X, -X, +Y, -Y, +Z, -Z (Vulkan, GL and WebGPU
+	/// order). Its views are cube views (<c>textureCube</c> in GLSL, <c>samplerCube</c> in GLSL ES). Sampled only: cube
+	/// maps cannot be render attachments or copy sources.
+	/// </summary>
+	Cube,
+}
+
+/// <summary>Extension methods for <see cref="TextureDimension"/>.</summary>
+public static class TextureDimensionExtensions
+{
+	/// <summary>The number of array layers of a texture of this dimension (1, or 6 for a cube map).</summary>
+	public static uint ArrayLayerCount(this TextureDimension dimension) => dimension == TextureDimension.Cube ? 6u : 1u;
+}
+
 [Flags]
 public enum BufferUsage
 {

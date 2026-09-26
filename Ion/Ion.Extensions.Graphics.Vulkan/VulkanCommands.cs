@@ -52,6 +52,7 @@ internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : IComman
 			var attachment = colors[i];
 			var view = (VulkanTextureView)attachment.View;
 			var texture = view.TextureImpl;
+			if (texture.Dimension == TextureDimension.Cube) throw new NotSupportedException("A cube map cannot be a render attachment.");
 			width = texture.Width;
 			height = texture.Height;
 			samples = VulkanFormats.ToVkSamples(texture.SampleCount);
@@ -141,6 +142,7 @@ internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : IComman
 	{
 		_ensureRecording();
 		var texture = (VulkanTexture)source;
+		if (texture.Dimension == TextureDimension.Cube) throw new NotSupportedException("A cube map cannot be a copy source.");
 		var bpp = (uint)texture.Format.BytesPerPixel();
 		if (bpp == 0 || bytesPerRow % bpp != 0) throw new ArgumentException($"bytesPerRow ({bytesPerRow}) must be a multiple of the texel size ({bpp}).", nameof(bytesPerRow));
 

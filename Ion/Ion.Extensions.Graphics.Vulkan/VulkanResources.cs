@@ -94,17 +94,29 @@ internal sealed unsafe class VulkanTexture : ITexture
 		Usage = descriptor.Usage;
 		MipLevelCount = Math.Max(1, descriptor.MipLevelCount);
 		SampleCount = Math.Max(1, descriptor.SampleCount);
+		Dimension = descriptor.Dimension;
+		ArrayLayerCount = Dimension.ArrayLayerCount();
+		if (Dimension == TextureDimension.Cube)
+		{
+			if (Width != Height) throw new ArgumentException("The faces of a cube map must be square.", nameof(descriptor));
+			if ((Usage & (TextureUsage.RenderAttachment | TextureUsage.CopySrc)) != 0 || SampleCount > 1)
+			{
+				throw new NotSupportedException("Cube maps are sampled textures only (no render attachment, copy source or multisampling).");
+			}
+		}
+
 		VkFormat = Format.IsDepth() ? device.PickDepthFormat(Format) : Format.ToVk();
 
 		var vk = device.Vk;
 		var info = new ImageCreateInfo
 		{
 			SType = StructureType.ImageCreateInfo,
+			Flags = Dimension == TextureDimension.Cube ? ImageCreateFlags.CreateCubeCompatibleBit : 0,
 			ImageType = ImageType.Type2D,
 			Format = VkFormat,
 			Extent = new Extent3D(Width, Height, 1),
 			MipLevels = MipLevelCount,
-			ArrayLayers = 1,
+			ArrayLayers = ArrayLayerCount,
 			Samples = VulkanFormats.ToVkSamples(SampleCount),
 			Tiling = ImageTiling.Optimal,
 			Usage = Usage.ToVk(Format),
@@ -129,6 +141,7 @@ internal sealed unsafe class VulkanTexture : ITexture
 		Usage = TextureUsage.RenderAttachment | TextureUsage.CopySrc | TextureUsage.CopyDst;
 		MipLevelCount = 1;
 		SampleCount = 1;
+		ArrayLayerCount = 1;
 		IsSwapchainImage = true;
 	}
 
@@ -141,6 +154,11 @@ internal sealed unsafe class VulkanTexture : ITexture
 
 	/// <summary>True for swapchain images, which end every pass in <c>PRESENT_SRC_KHR</c>.</summary>
 	public bool IsSwapchainImage { get; }
+
+	public TextureDimension Dimension { get; }
+
+	/// <summary>The number of array layers (6 for a cube map).</summary>
+	public uint ArrayLayerCount { get; }
 
 	public uint Width { get; }
 
@@ -198,10 +216,10 @@ internal sealed unsafe class VulkanTextureView : ITextureView
 		{
 			SType = StructureType.ImageViewCreateInfo,
 			Image = texture.Image,
-			ViewType = ImageViewType.Type2D,
+			ViewType = texture.Dimension == TextureDimension.Cube ? ImageViewType.TypeCube : ImageViewType.Type2D,
 			Format = texture.VkFormat,
 			Components = new ComponentMapping(ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity),
-			SubresourceRange = new ImageSubresourceRange(texture.Format.Aspect(), descriptor.BaseMipLevel, levels, 0, 1),
+			SubresourceRange = new ImageSubresourceRange(texture.Format.Aspect(), descriptor.BaseMipLevel, levels, 0, texture.ArrayLayerCount),
 		};
 		VulkanDevice.Check(device.Vk.CreateImageView(device.Handle, in info, null, out Handle), "vkCreateImageView");
 	}

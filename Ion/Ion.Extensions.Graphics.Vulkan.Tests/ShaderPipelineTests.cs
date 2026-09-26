@@ -64,6 +64,33 @@ public class ShaderPipelineTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
+	public void IncludesAreResolvedRelativeToTheShaderAndKeepLineNumbers()
+	{
+		var folder = Path.Combine(Path.GetTempPath(), $"ion-include-{Guid.NewGuid():N}");
+		Directory.CreateDirectory(Path.Combine(folder, "lib"));
+		try
+		{
+			File.WriteAllText(Path.Combine(folder, "lib", "color.glsl"), "#include \"white.glsl\"\nvec4 twice() { return white() * 2.0; }\n");
+			File.WriteAllText(Path.Combine(folder, "lib", "white.glsl"), "vec4 white() { return vec4(1.0); }\n");
+			const string source = "#version 450\n#include \"lib/color.glsl\"\n#include \"lib/white.glsl\"\nlayout(location = 0) out vec4 color;\nvoid main() { color = twice(); undefined_call(); }\n";
+			var included = new List<string>();
+			var resolved = ShaderCompiler.ResolveIncludes(source, folder, included);
+			Assert.Equal(2, included.Count);
+			Assert.Single(System.Text.RegularExpressions.Regex.Matches(resolved, "vec4 white\\(\\)"));
+
+			// The error on line 5 of the shader is still reported at line 5.
+			var ex = Assert.Throws<ShaderCompilationException>(() => ShaderCompiler.CompileToSpirV(resolved, ShaderKind.FragmentShader, "main.frag"));
+			Assert.Contains("main.frag:5", ex.Message);
+
+			Assert.Throws<ShaderCompilationException>(() => ShaderCompiler.ResolveIncludes("#include \"missing.glsl\"\n", folder));
+		}
+		finally
+		{
+			Directory.Delete(folder, recursive: true);
+		}
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
 	public void MissingShadersExplainHowToAddThem()
 	{
 		var ex = Assert.Throws<FileNotFoundException>(() => EmbeddedShaders.Load(QuadAssembly, "nope.vert", ShaderLanguage.SpirV));
