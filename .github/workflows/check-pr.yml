@@ -39,9 +39,16 @@ jobs:
     # Mesa lavapipe (a CPU Vulkan driver) runs the headless rendering and golden-image tests; Xvfb runs the windowed ones.
     # Without a driver those tests are skipped, not failed. With the Khronos validation layer (and synchronization
     # validation, VK_LAYER_ENABLES in env) the Vulkan tests fail on any validation error.
-    - name: Install lavapipe and Xvfb
+    # The GLFW and SDL natives load the X11, xkb, Wayland and GL client libraries at run time; without them neither
+    # platform is applicable and the windowed tests cannot open a window even under Xvfb.
+    - name: Install lavapipe, Xvfb and the X11 client libraries
       if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: sudo apt-get update -y -qq && sudo apt-get install -y -qq mesa-vulkan-drivers libvulkan1 vulkan-validationlayers xvfb
+      run: |
+        sudo apt-get update -y -qq
+        sudo apt-get install -y -qq mesa-vulkan-drivers libvulkan1 vulkan-validationlayers xvfb \
+          libx11-6 libx11-xcb1 libxcursor1 libxi6 libxinerama1 libxrandr2 libxrender1 libxext6 libxfixes3 libxss1 \
+          libxxf86vm1 libxkbcommon0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libdecor-0-0 \
+          libgl1 libglx-mesa0 libegl1 libegl-mesa0 libgl1-mesa-dri libgbm1 libdrm2
     - name: Unit Tests
       if: ${{ matrix.os != 'windows-latest' }}
       run: dotnet test --configuration Release --no-build --verbosity normal --filter "Category!=E2E" --collect:"XPlat Code Coverage" --results-directory ./coverage --settings coverage.runsettings
