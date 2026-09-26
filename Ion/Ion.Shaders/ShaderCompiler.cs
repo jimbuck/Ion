@@ -91,7 +91,7 @@ public static unsafe class ShaderCompiler
 	/// <exception cref="ShaderCompilationException">The source does not compile; the message has Shaderc's diagnostics.</exception>
 	public static byte[] CompileToSpirV(string source, ShaderKind kind, string fileName, bool optimize = true)
 	{
-		var shaderc = Shaderc.GetApi();
+		var shaderc = NativeLibraries.Shaderc;
 		var compiler = shaderc.CompilerInitialize();
 		var options = shaderc.CompileOptionsInitialize();
 		try
@@ -135,7 +135,7 @@ public static unsafe class ShaderCompiler
 	/// <exception cref="ShaderCompilationException">SPIRV-Cross cannot translate the module.</exception>
 	public static string TranslateToGlslEs(ReadOnlySpan<byte> spirv, uint version = 310)
 	{
-		var cross = Cross.GetApi();
+		var cross = NativeLibraries.Cross;
 		CrossContext* context = null;
 		Check(cross, null, cross.ContextCreate(&context));
 		try
