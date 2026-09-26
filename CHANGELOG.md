@@ -179,6 +179,7 @@ My Changelog
 * Generators pin Roslyn 4.4 so they load in every SDK from 8.0 onwards.
 * Publishing a sample with `-p:PublishAot=true` no longer fails with `NETSDK1207` (generator projects ignore `PublishAot`).
 * Veldrid's transitive `Newtonsoft.Json` 9.0.1 (GHSA-5crp-9r3c-p9vr) is lifted to 13.0.4.
+* Silk.NET finds the GLFW and SDL natives of a framework-dependent game on Ubuntu and other Linux distributions its own resolver does not map to `linux-x64`: `SilkNativeLibraries.EnsureResolver()` (called before the first platform registration) adds the app-local `runtimes/{rid}/native` folders to its search, so a window opens without the system `libglfw3`/`libsdl2` packages. The build-time shader tool loads Shaderc and SPIRV-Cross the same way.
 
 ### Other
 

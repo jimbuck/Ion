@@ -367,6 +367,10 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 		{
 			if (_registeredPlatform == platform) return;
 
+			// Before Silk.NET loads any native library: its own probing misses the NuGet runtimes/ folder on unlisted
+			// Linux distributions (Ubuntu among them), see SilkNativeLibraries.
+			SilkNativeLibraries.EnsureResolver();
+
 			// Silk.NET allows this only before its platform list is first used, so only on the first registration.
 			if (_registeredPlatform == WindowPlatform.Auto)
 			{
