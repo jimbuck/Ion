@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The UI module: an immediate-mode widget API (Ui) with flex-style layout, a theme, pointer/keyboard/gamepad input and
+    focus navigation, drawn through ISpriteBatch, and the inspectable tree (IUiTree) the remote protocol exposes.
+    Written against the abstractions only (Ion.Core.Abstractions, Ion.Extensions.Graphics.Abstractions), so it runs on
+    the headless backend and on every RHI backend.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.UI</RootNamespace>
+    <Description>Ion's UI module: AddUi()/UseUi(), an immediate-mode API (panels, rows, columns, scroll views, labels, buttons, toggles, sliders, text inputs, lists) with flex-style layout, UiTheme, nine-slices, clip rectangles, pointer/keyboard/gamepad focus navigation, and the IUiTree inspection and command surface, drawn through ISpriteBatch without per-frame allocation.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.UI.Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.UI.Abstractions\Ion.Extensions.UI.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

@@ -433,6 +433,51 @@ public sealed class Scene(IRenderer3D renderer, IAssetManager assets)
 The design (pipeline, graph API, bind group conventions for custom materials, what the ECS extraction does) is in
 [docs/design/ion-rendering3d.md](./docs/design/ion-rendering3d.md).
 
+### UI
+`Ion.Extensions.UI` is an immediate-mode UI on the 2D renderer: Update steps describe the UI every frame with the `Ui`
+context, and interactive widgets report what happened to them. The calls are laid out once per frame (flex-style) and
+kept as the hit-test tree and as an inspectable tree (`IUiTree`, in the dependency-free `Ion.Extensions.UI.Abstractions`)
+that tools and the remote protocol read and drive by path. Register it after `AddIon`:
+
+```csharp
+builder.Services.AddIon(builder.Configuration);
+builder.Services.AddUi();
+app.UseIon().UseUi();       // Update scope at StageOrder.UiFrame (-550), drawing at StageOrder.Ui (700)
+
+public sealed class Menu(Ui ui)
+{
+    bool _music = true; float _volume = 0.8f; string _name = "Player";
+
+    [Update] public void Build(GameTime dt)
+    {
+        using (ui.Panel("options", new UiStyle { Width = 480 }))
+        {
+            ui.Label("Options", scale: 1.6f);
+            ui.Toggle("Music", ref _music);
+            ui.Slider("Volume", ref _volume, 0, 1, step: 0.05f);
+            ui.TextInput("Name", ref _name);
+            if (ui.Button("Back") || ui.BackPressed) { /* change screen */ }
+        }
+    }
+}
+```
+
+  - **Widgets**: `Panel`, `Row`, `Column`, `ScrollView` (clipped with a scissor segment, wheel and focus scrolling),
+    `Label` (also from a `ReadOnlySpan<char>`, interned), `Button`, `Toggle`, `Slider`, `TextInput`, `List`, `Spacer`,
+    and `Disabled` scopes. Containers return a `UiScope` to dispose, or close with `ui.End()`. Identity comes from an
+    explicit key or the call site.
+  - **Layout** (`UiStyle`): row/column, fixed, min and max sizes, grow, padding, gap, justify, cross alignment, wrap.
+  - **Theme** (`UiTheme`): font, colors, metrics, nine-slice skins for panels and buttons, key repeat timing.
+  - **Input**: pointer (mouse; touch arrives as the mouse), keyboard and gamepad focus navigation (arrows, D-pad or stick
+    move the focus; Enter, Space or A activate; Escape or B go back), text editing, key repeat. The first widget takes
+    the focus automatically, so a gamepad-only handheld (the R36S) can drive every screen.
+  - **Tree**: `IUiTree` lists the nodes (path such as `options/Volume`, kind, text, rectangle, enabled, focused, value)
+    and queues `Click`, `SetValue`, `Focus`, `Type` and `Back`, applied at the start of the next frame's Update as the
+    equivalent input would be. `Ion.Examples.Menu.Tests` drives the menu sample end to end through it.
+  - Nothing is allocated per frame once every widget has been seen (tested); `UiBenchmarks` measures a 500-widget screen.
+
+The API, layout model, tree contract and theme are in [docs/design/ion-ui.md](./docs/design/ion-ui.md).
+
 ### Running headless
 `AddIon(config)` switches graphics and audio to the headless backends when `Ion:Headless` is `true` or `Ion:Graphics:Output` is `None`, and `UseIon()` adds the matching systems. Any game that depends only on the interfaces (`IWindow`, `IInputState`, `ISpriteBatch`, `IAudioManager`, `ITexture2D`, `IFontSet`, `ISoundEffect`) runs without a GPU, window or audio device:
 
@@ -615,6 +660,7 @@ Feel free to check out the samples and open any issues or pull requests. If you 
 ## Examples
 
 Check out the Breakout ECS example for a simple game using the Ion Engine (on the ECS module: built-in transforms and sprites, the sprite extraction, `Commands` and `[Query]` steps, with Aether physics as an adapter), and `Ion.Examples.Quad` for the smallest app on the Silk.NET stack (a textured quad through the RHI; `--Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png` renders offscreen and saves a PNG). `Ion.Examples.Sprites100k` is the sprite batch stress test (100,000 moving sprites across 16 textures, one draw call per texture; `--Sprites:Count=N`, `--Sprites:Frames=N`). Every sample renders headless with `--Ion:Headless=true --Ion:Headless:Render=true`, and the `Ion.Examples.*.Tests` projects compare their frames with golden images.
+UI: `Ion.Examples.Menu` is a main menu with an options screen (toggle, slider, list, text input) on the UI module, driven by mouse, keyboard or gamepad; its tests drive it through `IUiTree` only.
 3D, both on the ECS module and its 3D extraction: `Ion.Examples.Cubes` animates 1,000 instanced cube entities in two materials with a `[Query]` step (shadows, an orbiting camera entity, a HUD drawn on top; `--Cubes:Frames=N --Cubes:Screenshot=cubes.png`) and `Ion.Examples.Model` spawns a glTF 2.0 model (Microsoft's CC0 Avocado) as entities with PBR materials, point lights and a skybox (`--Model:Frames=N --Model:Screenshot=model.png`). The immediate-mode API they used before (`IRenderer3D.Submit`, `Draw`, `SetCamera`, `AddLight`) is shown in the 3D section above.
 
 ![Breakout ECS Screenshot](./breakout-physics-debug.png)

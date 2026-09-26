@@ -81,6 +81,14 @@ public static class StageOrder
 	/// <summary>Coroutines: stepping the shared runner (Update).</summary>
 	public const int Coroutines = -600;
 
+	/// <summary>
+	/// The UI frame scope (Update): <c>Ion.Extensions.UI</c> opens its frame here (tree commands applied, input read
+	/// against the previous frame's hit-test tree) and closes it at the end of Update (layout, hit-test tree and inspectable
+	/// tree rebuilt). In the setup band after <see cref="Coroutines"/> and before <see cref="Scenes"/>, so scene steps and
+	/// the game's own Update steps can both build UI.
+	/// </summary>
+	public const int UiFrame = -550;
+
 	/// <summary>Scenes: the active scene's schedule, in every stage.</summary>
 	public const int Scenes = -500;
 
@@ -101,6 +109,13 @@ public static class StageOrder
 
 	/// <summary>ECS sprite animation (Update): after the game's Update steps at <see cref="Default"/>.</summary>
 	public const int SpriteAnimation = 400;
+
+	/// <summary>
+	/// UI drawing (Render): <c>Ion.Extensions.UI</c> submits the frame's widgets to the sprite batch here, inside the sprite
+	/// batch scope (<see cref="SpriteBatch"/>), after the game's own Render steps at <see cref="Default"/>, and
+	/// before <see cref="MetricsOverlay"/> (so the overlay stays on top of the UI).
+	/// </summary>
+	public const int Ui = 700;
 
 	/// <summary>The metrics overlay (Render), inside the sprite batch scope and after the game's own drawing.</summary>
 	public const int MetricsOverlay = 800;

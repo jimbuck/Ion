@@ -26,6 +26,8 @@
     <ProjectReference Include="..\Ion.Extensions.Rendering2D\Ion.Extensions.Rendering2D.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Rendering3D\Ion.Extensions.Rendering3D.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Null\Ion.Extensions.Graphics.Null.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.UI\Ion.Extensions.UI.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Numerics" />
