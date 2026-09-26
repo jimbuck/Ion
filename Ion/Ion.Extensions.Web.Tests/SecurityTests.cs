@@ -130,7 +130,9 @@ public class SecurityTests
 	[Fact]
 	public async Task ClientsOverTheRateLimitGet429()
 	{
-		using var game = new WebGame(new Dictionary<string, string?> { ["Ion:Web:RateLimit"] = "2", ["Ion:Web:RateLimitBurst"] = "5" });
+		// A refill rate that is practically zero makes the outcome independent of how long the round trips take on a
+		// loaded machine: exactly the burst succeeds, every request after it is over the limit.
+		using var game = new WebGame(new Dictionary<string, string?> { ["Ion:Web:RateLimit"] = "0.0001", ["Ion:Web:RateLimitBurst"] = "5" });
 		var statuses = new List<HttpStatusCode>();
 		for (var i = 0; i < 10; i++)
 		{
@@ -140,7 +142,7 @@ public class SecurityTests
 		}
 
 		Assert.True(statuses.Take(5).All(static s => s == HttpStatusCode.OK), string.Join(",", statuses));
-		Assert.Contains(HttpStatusCode.TooManyRequests, statuses);
+		Assert.True(statuses.Skip(5).All(static s => s == HttpStatusCode.TooManyRequests), string.Join(",", statuses));
 	}
 
 	[Fact]
