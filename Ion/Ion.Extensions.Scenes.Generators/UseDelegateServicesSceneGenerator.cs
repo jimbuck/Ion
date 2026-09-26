@@ -2,7 +2,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
-using SourceGeneratorUtils;
+using Ion.Generators;
 
 namespace Ion.Extensions.Scenes.Generators;
 

@@ -480,3 +480,7 @@ $RECYCLE.BIN/
 /Diagnostics
 
 !Ion/Ion.Core/Debug
+# Claude Code agent worktrees
+.claude/worktrees/
+# Ion run directories (remote token files, game logs, summaries written by the ion tool)
+.ion/

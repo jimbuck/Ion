@@ -1,8 +1,6 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
-using Ion.Extensions.Debug;
-
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Ion.Core;
@@ -10,18 +8,109 @@ namespace Ion.Core;
 /// <summary>
 /// Top-level class representing the runnable game.
 /// </summary>
-public class GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener events, ITraceTimer<GameLoop> trace)
+/// <remarks>
+/// <para>
+/// Each frame (<see cref="Step()"/>) reads the frame start time from the injected <see cref="IClock"/>, clamps the frame
+/// duration to <see cref="GameConfig.MaxFrameTime"/>, adds it to an accumulator and runs <see cref="FixedUpdate"/> once
+/// per whole fixed step (<c>1 / </c><see cref="GameConfig.FixedUpdateRate"/> seconds) that fits, carrying the remainder
+/// to the next frame. <see cref="GameTime.Alpha"/> is that remainder divided by the fixed step. Then
+/// <see cref="Update"/>, <see cref="Render"/> and <see cref="Last"/> run once with the variable <see cref="GameTime"/>.
+/// </para>
+/// <para>
+/// Frame pacing only limits rendering: unless <see cref="GameConfig.VSync"/> is set or <see cref="GameConfig.MaxFPS"/>
+/// is below 1, the loop asks the clock to <see cref="IClock.Sleep"/> for what is left of <c>1 / MaxFPS</c> seconds.
+/// </para>
+/// <para>
+/// Before invoking each stage the loop sets <see cref="ILoopContext.Stage"/> on <see cref="Context"/> (and increments
+/// <see cref="ILoopContext.FixedStepCount"/> before each fixed step), so engine services can tell fixed-step consumers
+/// from per-frame ones. This is how an input edge or an event that happens on a frame without a fixed step still reaches
+/// the next fixed step exactly once.
+/// </para>
+/// </remarks>
+public class GameLoop
 {
-	private bool _shouldExit;
-	private readonly float _maxFrameTime = 0.1f; // 100ms
-	private readonly ITraceTimer _trace = trace;
+	// Tolerance for floating point drift when comparing the accumulator against the fixed step (well below the 100 ns
+	// resolution of TimeSpan, so it never produces an extra step for real frame times).
+	private const double AccumulatorEpsilon = 1e-9;
 
-	private float MaxFPS => gameConfig.CurrentValue.MaxFPS < 1 ? 120 : gameConfig.CurrentValue.MaxFPS;
+	private readonly IOptionsMonitor<GameConfig> _gameConfig;
+	private readonly EventBus _events;
+	private EventReader<ExitGameEvent> _exitRequests;
+	private readonly IClock _clock;
+	private readonly GameLoopContext _context;
+	private readonly FrameProfiler _profiler;
+	private readonly IFrameStatsSource[] _statsSources;
 
+	private volatile bool _shouldExit;
+	private TimeSpan _frameStart;
+	private double _accumulator;
+
+	/// <summary>
+	/// Creates a game loop. Normally created by <see cref="IonApplication.Build"/>.
+	/// </summary>
+	/// <param name="gameConfig">The game configuration (fixed-step rate, frame time clamp, pacing).</param>
+	/// <param name="events">The event bus: the loop marks the start of every fixed step on it and reads <see cref="ExitGameEvent"/>.</param>
+	/// <param name="clock">The time source for every frame.</param>
+	/// <param name="context">
+	/// The loop context to keep up to date (the application's singleton <see cref="GameLoopContext"/>). When omitted the loop
+	/// uses a private one, which only this loop's <see cref="Context"/> exposes.
+	/// </param>
+	/// <param name="profiler">
+	/// The frame profiler: the loop opens and closes a profile per frame (and for Init and Destroy), records a span per
+	/// stage and the idle time, and writes the frame's <see cref="FrameStats"/>. <see cref="FrameProfiler.Disabled"/> when omitted.
+	/// </param>
+	/// <param name="statsSources">The sources that add engine counters to every frame's stats (sprite batch, event bus, ECS).</param>
+	public GameLoop(IOptionsMonitor<GameConfig> gameConfig, EventBus events, IClock clock, GameLoopContext? context = null, FrameProfiler? profiler = null, IEnumerable<IFrameStatsSource>? statsSources = null)
+	{
+		_gameConfig = gameConfig;
+		_events = events;
+		_exitRequests = events.Reader<ExitGameEvent>();
+		_clock = clock;
+		_context = context ?? new GameLoopContext();
+		_context.Loop = this;
+		_profiler = profiler ?? FrameProfiler.Disabled;
+		_statsSources = statsSources is null ? [] : [.. statsSources];
+
+		_frameStart = clock.Elapsed;
+		FixedGameTime.Alpha = 1;
+		FixedGameTime.Delta = (float)GetFixedStepSeconds(gameConfig.CurrentValue);
+	}
+
+	/// <summary>
+	/// The clock that drives this loop.
+	/// </summary>
+	public IClock Clock => _clock;
+
+	/// <summary>
+	/// Where the loop is: the running stage, the frame and the number of fixed steps started. Set before each stage runs.
+	/// </summary>
+	public ILoopContext Context => _context;
+
+	/// <summary>
+	/// The frame profiler this loop writes to (<see cref="FrameProfiler.Disabled"/> when metrics are not installed).
+	/// </summary>
+	public FrameProfiler Profiler => _profiler;
+
+	/// <summary>
+	/// The variable-rate time passed to First, Update, Render and Last.
+	/// </summary>
 	public GameTime GameTime { get; } = new();
-	public GameTime FixedGameTime { get; private set; } = new();
 
+	/// <summary>
+	/// The fixed-rate time passed to FixedUpdate. <see cref="GameTime.Delta"/> is always the fixed step and
+	/// <see cref="GameTime.Elapsed"/> is the simulated time (the sum of all fixed steps run so far).
+	/// </summary>
+	public GameTime FixedGameTime { get; } = new();
+
+	/// <summary>
+	/// Whether <see cref="Run"/> or <see cref="RunFrames"/> is currently executing.
+	/// </summary>
 	public bool IsRunning { get; private set; } = false;
+
+	/// <summary>
+	/// The time carried over to the next frame by the fixed-step accumulator, in seconds.
+	/// </summary>
+	internal double Accumulator => _accumulator;
 
 	public GameLoopDelegate Init { get; set; } = (dt) => { };
 	public GameLoopDelegate First { get; set; } = (dt) => { };
@@ -33,110 +122,341 @@ public class GameLoop(IOptionsMonitor<GameConfig> gameConfig, IEventListener eve
 
 	public bool Rebuild { get; set; } = false;
 
-	public MiddlewarePipelineBuilder InitBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder FirstBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder UpdateBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder FixedUpdateBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder RenderBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder LastBuilder { get; set; } = default!;
-	public MiddlewarePipelineBuilder DestroyBuilder { get; set; } = default!;
+	/// <summary>
+	/// The schedule the stage delegates (<see cref="Init"/>, <see cref="Update"/>, ...) come from.
+	/// </summary>
+	public Schedule? Schedule { get; private set; }
 
+	/// <summary>
+	/// Rebuilds the schedule for <see cref="Build"/> (hot reload). Set by <see cref="IonApplication.Build"/>.
+	/// </summary>
+	public Func<Schedule>? ScheduleFactory { get; set; }
+
+	/// <summary>
+	/// Runs <paramref name="schedule"/>: sets <see cref="Schedule"/> and the stage delegates from it.
+	/// </summary>
+	public void UseSchedule(Schedule schedule)
+	{
+		ArgumentNullException.ThrowIfNull(schedule);
+
+		Schedule = schedule;
+		Init = schedule.Init;
+		First = schedule.First;
+		FixedUpdate = schedule.FixedUpdate;
+		Update = schedule.Update;
+		Render = schedule.Render;
+		Last = schedule.Last;
+		Destroy = schedule.Destroy;
+	}
+
+	/// <summary>
+	/// Rebuilds the schedule with <see cref="ScheduleFactory"/> and runs it (hot reload sets <see cref="Rebuild"/>, and the
+	/// loop calls this at the end of the frame).
+	/// </summary>
+	/// <exception cref="InvalidOperationException">No <see cref="ScheduleFactory"/> is set.</exception>
 	public void Build()
 	{
-		Init = InitBuilder.Build();
-		First = FirstBuilder.Build();
-		Update = UpdateBuilder.Build();
-		FixedUpdate = FixedUpdateBuilder.Build();
-		Render = RenderBuilder.Build();
-		Last = LastBuilder.Build();
-		Destroy = DestroyBuilder.Build();
+		if (ScheduleFactory is null) throw new InvalidOperationException("The game loop has no schedule factory; build it with IonApplication.Build().");
+		UseSchedule(ScheduleFactory());
 	}
 
-	public void Run()
-    {
+	/// <summary>
+	/// Runs Init, then frames until <see cref="Stop"/> is called, an <see cref="ExitGameEvent"/> is received or
+	/// <paramref name="cancellationToken"/> is cancelled, then Destroy.
+	/// </summary>
+	/// <param name="cancellationToken">Stops the loop (after the current frame) when cancelled.</param>
+	/// <exception cref="InvalidOperationException">The loop is already running.</exception>
+	[StackTraceHidden]
+	public void Run(CancellationToken cancellationToken = default)
+	{
+		RunCore(long.MaxValue, cancellationToken);
+	}
+
+	/// <summary>
+	/// Runs Init, then at most <paramref name="frames"/> frames (fewer if the loop is stopped or an
+	/// <see cref="ExitGameEvent"/> is received), then Destroy.
+	/// </summary>
+	/// <param name="frames">The number of frames to run. Must not be negative.</param>
+	/// <exception cref="InvalidOperationException">The loop is already running.</exception>
+	[StackTraceHidden]
+	public void RunFrames(int frames)
+	{
+		ArgumentOutOfRangeException.ThrowIfNegative(frames);
+		RunCore(frames, CancellationToken.None);
+	}
+
+	[StackTraceHidden]
+	private void RunCore(long maxFrames, CancellationToken cancellationToken)
+	{
+		if (IsRunning) throw new InvalidOperationException("The game loop is already running.");
+
 		IsRunning = true;
+		_shouldExit = false;
 
-		FixedGameTime = new()
+		try
 		{
-			Alpha = 1,
-			Delta = 1f / MaxFPS,
-		};
+			Initialize();
 
-		Init(GameTime);
+			using var timerResolution = _gameConfig.CurrentValue.VSync ? default : WindowsTimerResolution.Begin();
 
-        var stopwatch = Stopwatch.StartNew();
-
-		var targetFrameTime = (int)(1000 / MaxFPS);
-		var currentTime = stopwatch.Elapsed.TotalSeconds;
-		float accumulator = 0;
-
-		while (_shouldExit == false)
-        {
-			GameTime.Alpha = FixedGameTime.Alpha = 1;
-			GameTime.Elapsed = FixedGameTime.Elapsed = stopwatch.Elapsed;
-			var newTime = GameTime.Elapsed.TotalSeconds;
-			GameTime.Delta = (float)(newTime - currentTime);
-
-			if (GameTime.Delta > _maxFrameTime) GameTime.Delta = _maxFrameTime;
-			currentTime = newTime;
-
-			accumulator += GameTime.Delta;
-
-			First(GameTime);
-
-			while (accumulator >= FixedGameTime.Delta)
+			for (long frame = 0; frame < maxFrames && !_shouldExit && !cancellationToken.IsCancellationRequested; frame++)
 			{
-				FixedUpdate(FixedGameTime);
-				accumulator -= FixedGameTime.Delta;
+				Step();
 			}
 
-			GameTime.Alpha = accumulator / FixedGameTime.Delta;
+			Shutdown();
+		}
+		finally
+		{
+			_context.Stage = GameLoopStage.None;
+			IsRunning = false;
+		}
+	}
 
-			Update(GameTime);
-
-			Render(GameTime);
-
-			if (events.On<ExitGameEvent>()) _shouldExit = true;
-
-			Last(GameTime);
-
-			var delayTime = targetFrameTime - (int)((stopwatch.Elapsed.TotalSeconds - currentTime) * 1000);
-			if (delayTime > 0)
-			{
-				var timer = _trace.Start("Idle");
-				Thread.Sleep(delayTime);
-				timer.Stop();
-			}
-
-			GameTime.Frame = FixedGameTime.Frame = (GameTime.Frame + 1);
-
-			if (Rebuild)
-			{
-				Build();
-				Rebuild = false;
-			}
+	/// <summary>
+	/// Runs the Init stage and restarts frame timing, so that loading time does not count as the first frame. Called by
+	/// <see cref="Run"/> and <see cref="RunFrames"/>; call it directly only when driving the loop with <see cref="Step()"/>
+	/// (as test hosts do), once, before the first frame.
+	/// </summary>
+	[StackTraceHidden]
+	public void Initialize()
+	{
+		_shouldExit = false;
+		_context.Frame = GameTime.Frame;
+		_context.Stage = GameLoopStage.Init;
+		_profiler.BeginFrame(GameTime.Frame, FrameKind.Init);
+		var span = BeginSpan(SpanIds.Init);
+		try
+		{
+			Init(GameTime);
+		}
+		finally
+		{
+			_context.Stage = GameLoopStage.None;
+			EndSpan(SpanIds.Init, span);
+			EndFrameStats(0, 0);
 		}
 
-		Destroy(GameTime);
-		IsRunning = false;
+		_frameStart = _clock.Elapsed;
 	}
 
-    public void Step(GameTime time)
-    {
+	/// <summary>
+	/// Runs the Destroy stage. Called by <see cref="Run"/> and <see cref="RunFrames"/> after the last frame; call it
+	/// directly only when driving the loop with <see cref="Step()"/>, once, after the last frame.
+	/// </summary>
+	[StackTraceHidden]
+	public void Shutdown()
+	{
+		_context.Stage = GameLoopStage.Destroy;
+		_profiler.BeginFrame(GameTime.Frame, FrameKind.Destroy);
+		var span = BeginSpan(SpanIds.Destroy);
+		try
+		{
+			Destroy(GameTime);
+		}
+		finally
+		{
+			_context.Stage = GameLoopStage.None;
+			EndSpan(SpanIds.Destroy, span);
+			EndFrameStats(0, 0);
+		}
+	}
+
+	/// <summary>
+	/// Whether the loop has been asked to exit, by <see cref="Stop"/> or an <see cref="ExitGameEvent"/>. <see cref="Run"/>
+	/// and <see cref="RunFrames"/> return after the frame in which this becomes true; <see cref="Step()"/> ignores it.
+	/// </summary>
+	public bool IsExitRequested => _shouldExit;
+
+	/// <summary>
+	/// Runs one complete, timed frame: First, as many FixedUpdate steps as the accumulated time allows, Update, Render,
+	/// Last, then frame pacing. Does not run Init or Destroy. Time is measured from the previous frame (or from when the
+	/// loop was created or started) using <see cref="Clock"/>.
+	/// </summary>
+	[StackTraceHidden]
+	public void Step()
+	{
+		var config = _gameConfig.CurrentValue;
+		var fixedStep = GetFixedStepSeconds(config);
+		var maxFrameTime = config.MaxFrameTime > TimeSpan.Zero ? config.MaxFrameTime : GameConfig.DefaultMaxFrameTime;
+
+		var frameStart = _clock.NextFrame();
+		var delta = frameStart - _frameStart;
+		if (delta < TimeSpan.Zero) delta = TimeSpan.Zero;
+		if (delta > maxFrameTime) delta = maxFrameTime;
+		_frameStart = frameStart;
+
+		GameTime.Elapsed = frameStart;
+		GameTime.Delta = (float)delta.TotalSeconds;
+		GameTime.Alpha = 1;
+		FixedGameTime.Delta = (float)fixedStep;
+		FixedGameTime.Alpha = 1;
+
+		_accumulator += delta.TotalSeconds;
+
+		var context = _context;
+		context.Frame = GameTime.Frame;
+		_profiler.BeginFrame(GameTime.Frame);
+
+		context.Stage = GameLoopStage.First;
+		var span = BeginSpan(SpanIds.First);
+		First(GameTime);
+		EndSpan(SpanIds.First, span);
+
+		var fixedSteps = 0;
+		while (_accumulator + AccumulatorEpsilon >= fixedStep)
+		{
+			FixedGameTime.Elapsed += TimeSpan.FromSeconds(fixedStep);
+			context.FixedStepCount++;
+			_events.BeginFixedStep();
+			context.Stage = GameLoopStage.FixedUpdate;
+			span = BeginSpan(SpanIds.FixedUpdate);
+			FixedUpdate(FixedGameTime);
+			EndSpan(SpanIds.FixedUpdate, span);
+			_accumulator -= fixedStep;
+			fixedSteps++;
+		}
+
+		if (_accumulator < 0) _accumulator = 0;
+		GameTime.Alpha = (float)(_accumulator / fixedStep);
+
+		_events.EndFixedSteps();
+		context.Stage = GameLoopStage.Update;
+		span = BeginSpan(SpanIds.Update);
+		Update(GameTime);
+		EndSpan(SpanIds.Update, span);
+
+		context.Stage = GameLoopStage.Render;
+		span = BeginSpan(SpanIds.Render);
+		Render(GameTime);
+		EndSpan(SpanIds.Render, span);
+
+		if (_exitRequests.Read().Length > 0) _shouldExit = true;
+
+		context.Stage = GameLoopStage.Last;
+		span = BeginSpan(SpanIds.Last);
+		Last(GameTime);
+		EndSpan(SpanIds.Last, span);
+
+		context.Stage = GameLoopStage.None;
+
+		var idle = Pace(config, frameStart);
+		EndFrameStats(fixedSteps, idle);
+
+		GameTime.Frame = FixedGameTime.Frame = GameTime.Frame + 1;
+		context.Frame = GameTime.Frame;
+
+		if (Rebuild)
+		{
+			Build();
+			Rebuild = false;
+		}
+	}
+
+	/// <summary>
+	/// Runs one untimed pass of every per-frame stage with the given time: First, FixedUpdate (once), Update, Render
+	/// and Last. Render and Last are skipped once the loop has been asked to stop. No clock, accumulator or pacing is
+	/// involved, which makes it the cheapest way to drive systems from tests and benchmarks.
+	/// </summary>
+	/// <param name="time">The time passed to every stage.</param>
+	[StackTraceHidden]
+	public void Step(GameTime time)
+	{
+		var context = _context;
+		context.Frame = time.Frame;
+		_profiler.BeginFrame(time.Frame);
+
+		context.Stage = GameLoopStage.First;
+		var span = BeginSpan(SpanIds.First);
 		First(time);
+		EndSpan(SpanIds.First, span);
 
+		context.FixedStepCount++;
+		_events.BeginFixedStep();
+		context.Stage = GameLoopStage.FixedUpdate;
+		span = BeginSpan(SpanIds.FixedUpdate);
 		FixedUpdate(time);
+		EndSpan(SpanIds.FixedUpdate, span);
+
+		_events.EndFixedSteps();
+		context.Stage = GameLoopStage.Update;
+		span = BeginSpan(SpanIds.Update);
 		Update(time);
+		EndSpan(SpanIds.Update, span);
 
-		if (_shouldExit) return;
+		if (!_shouldExit)
+		{
+			context.Stage = GameLoopStage.Render;
+			span = BeginSpan(SpanIds.Render);
+			Render(time);
+			EndSpan(SpanIds.Render, span);
 
-		Render(time);
+			context.Stage = GameLoopStage.Last;
+			span = BeginSpan(SpanIds.Last);
+			Last(time);
+			EndSpan(SpanIds.Last, span);
+		}
 
-		Last(time);
-    }
+		context.Stage = GameLoopStage.None;
+		EndFrameStats(1, 0, time.Delta);
+	}
 
+	/// <summary>
+	/// Asks the loop to exit after the current frame.
+	/// </summary>
 	public void Stop()
 	{
 		_shouldExit = true;
+	}
+
+	/// <summary>Sleeps for what is left of the frame; returns the wall-clock milliseconds slept (0 when not profiling).</summary>
+	private double Pace(GameConfig config, TimeSpan frameStart)
+	{
+		if (config.VSync || config.MaxFPS < 1) return 0;
+
+		var targetFrameTime = TimeSpan.FromSeconds(1.0 / config.MaxFPS);
+		var remaining = targetFrameTime - (_clock.Elapsed - frameStart);
+		if (remaining <= TimeSpan.Zero) return 0;
+
+		var measure = _profiler.IsEnabled;
+		var start = measure ? Stopwatch.GetTimestamp() : 0;
+		var span = BeginSpan(SpanIds.Idle);
+		_clock.Sleep(remaining);
+		EndSpan(SpanIds.Idle, span);
+		return measure ? Stopwatch.GetElapsedTime(start).TotalMilliseconds : 0;
+	}
+
+	/// <summary>Writes the frame's stats (the loop's own counters and every source's) and closes the profile.</summary>
+	private void EndFrameStats(int fixedSteps, double idleMs, float? delta = null)
+	{
+		var profiler = _profiler;
+		if (!profiler.IsEnabled) return;
+
+		var stats = new FrameStats
+		{
+			DeltaMs = (delta ?? GameTime.Delta) * 1000.0,
+			IdleMs = idleMs,
+			FixedSteps = fixedSteps,
+		};
+
+		var sources = _statsSources;
+		for (var i = 0; i < sources.Length; i++) sources[i].Collect(ref stats);
+
+		profiler.EndFrame(ref stats);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private long BeginSpan(SpanId span) => FrameProfiler.IsProfilingEnabled ? _profiler.Begin(span) : 0;
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private void EndSpan(SpanId span, long start)
+	{
+		if (FrameProfiler.IsProfilingEnabled) _profiler.End(span, start);
+	}
+
+	private static double GetFixedStepSeconds(GameConfig config)
+	{
+		var rate = config.FixedUpdateRate > 0 && double.IsFinite(config.FixedUpdateRate) ? config.FixedUpdateRate : GameConfig.DefaultFixedUpdateRate;
+		return 1.0 / rate;
 	}
 }

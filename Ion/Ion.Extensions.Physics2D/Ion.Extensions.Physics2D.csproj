@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The 2D physics module on Box2D v3.1 (the C library, through Box2D.NET.Bindings.Release: generated P/Invoke bindings
+    and prebuilt natives for win, osx, linux, android and ios on x64 and arm64, with static libraries for NativeAOT).
+    Picked by the Stage 5b benchmark (docs/plans/benchmarks/2026-09-physics2d): a PhysicsWorld2D per scope, the ECS
+    adapter step in FixedUpdate, events on IEvents, queries and a debug drawing on the sprite batch.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Physics2D</RootNamespace>
+    <Description>Ion's 2D physics module on Box2D v3: AddPhysics2D()/UsePhysics2D(), a PhysicsWorld2D per scene scope, RigidBody2D/Collider2D/Joint2D synchronized with Transform2D in FixedUpdate, Collision2D/Trigger2D events, ray cast and overlap queries, deterministic fixed stepping and a debug drawing on the sprite batch.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Physics2D.Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Box2D.NET.Bindings.Release" Version="3.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations and summarizes its Use* helpers. -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Extensions.Physics2D.Abstractions\Ion.Extensions.Physics2D.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Scenes.Abstractions\Ion.Extensions.Scenes.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

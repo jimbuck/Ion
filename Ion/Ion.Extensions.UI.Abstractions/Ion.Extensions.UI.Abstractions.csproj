@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The UI module's inspection surface without the module: IUiTree (enumerate the widget tree, queue clicks, values, focus
+    and typed text) and its plain data types. No dependencies (no JSON, graphics or DI types), so the remote protocol and
+    tools can expose it as-is (ui.tree, ui.click).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.UI</RootNamespace>
+    <Description>Ion UI abstractions: IUiTree, the inspectable widget tree of Ion.Extensions.UI (paths, kinds, text, rectangles, enabled/focused state and values) with queued Click, SetValue, Focus, Type and Back commands applied at the start of the next frame's Update.</Description>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,5 @@
+<Project>
+  <!-- Building against sources: the packages' build targets (the remote protocol's feature switch, IonRemote). -->
+  <Import Project="$(IonSource)/Ion/Ion.Extensions.Remote/buildTransitive/Ion.Extensions.Remote.targets" Condition="'$(IonSource)' != '' and Exists('$(IonSource)/Ion/Ion.Extensions.Remote/buildTransitive/Ion.Extensions.Remote.targets')" />
+  <Import Project="$(IonSource)/build/Ion.Publish.targets" Condition="'$(IonSource)' != '' and Exists('$(IonSource)/build/Ion.Publish.targets')" />
+</Project>

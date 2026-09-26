@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Ion",
+  "classifications": [
+    "Game",
+    "Ion",
+    "2D"
+  ],
+  "identity": "Ion.Templates.2D",
+  "name": "Ion 2D game",
+  "description": "An Ion 2D game without ECS: a paddle and a ball drawn with the sprite batch, a remote-readable state, a headless test, a state snapshot test and a CLAUDE.md for coding agents.",
+  "shortName": "ion-2d",
+  "sourceName": "MyIonGame",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "IonSource": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "",
+      "replaces": "ION_SOURCE_PATH",
+      "description": "Path of an Ion source checkout to build against instead of the packages."
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/.ion/**",
+            "**/*.actual.*",
+            "**/*.diff.png"
+          ]
+        }
+      ]
+    }
+  ]
+}

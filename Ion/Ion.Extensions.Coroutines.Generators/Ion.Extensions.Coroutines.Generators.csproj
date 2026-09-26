@@ -1,31 +1,31 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot">
 
+  <!-- LangVersion, Nullable, ImplicitUsings and Deterministic come from Directory.Build.props. -->
   <PropertyGroup>
-	  <TargetFramework>netstandard2.0</TargetFramework>
-	  <IncludeBuildOutput>false</IncludeBuildOutput>
-	  <Nullable>enable</Nullable>
-	  <ImplicitUsings>true</ImplicitUsings>
-	  <LangVersion>Preview</LangVersion>
-	  <EnableNETAnalyzers>True</EnableNETAnalyzers>
-	  <IsRoslynComponent>True</IsRoslynComponent>
-	  <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-	  <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-	  <Configurations>Debug;Release;DebugGenerators</Configurations>
-	  <Platforms>AnyCPU</Platforms>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Analyzers never publish natively; ignore PublishAot passed on the command line (avoids NETSDK1207). -->
+    <PublishAot>false</PublishAot>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
-	<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.10.0" PrivateAssets="all" />
-	  <PackageReference Include="SourceGeneratorUtils.SourceGeneration" Version="0.0.2" PrivateAssets="all" />
+    <!-- Roslyn 4.4 is the oldest compiler shipped with a .NET 8 SDK; newer references break 8.0.1xx SDKs (CS9057). -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
   </ItemGroup>
 
-	<ItemGroup>
-		<None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-	</ItemGroup>
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
 
-	<ItemGroup>
-		<Compile Remove="bin\**" />
-		<EmbeddedResource Remove="bin\**" />
-		<None Remove="bin\**" />
-	</ItemGroup>
+  <ItemGroup>
+    <Compile Remove="bin\**" />
+    <EmbeddedResource Remove="bin\**" />
+    <None Remove="bin\**" />
+  </ItemGroup>
 </Project>

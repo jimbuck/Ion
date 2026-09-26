@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Graphics.GLES</RootNamespace>
+    <Description>OpenGL ES 3.1 backend of Ion's RHI on Silk.NET.OpenGLES (with ES 3.0 fallbacks): windowed through the Silk.NET window's GL context or headless through EGL (surfaceless or pbuffer), frames in flight on fence syncs, GLSL ES shaders translated at build time, PNG screenshots. The backend of the R36S handheld and the fallback wherever Vulkan is missing.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleToSuffix Include=".Tests" />
+    <InternalsVisibleTo Include="Ion.Extensions.Graphics.Headless" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Generated function-pointer bindings: AOT-clean themselves (see docs/plans/spikes/2026-silknet-spike.md). -->
+    <PackageReference Include="Silk.NET.OpenGLES" Version="2.23.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Silk.NET NativeAOT substitutions (shared with the windowing module), auto-imported by package consumers. -->
+    <None Include="..\Ion.Extensions.Windowing.SilkNet\buildTransitive\*.xml" Pack="true" PackagePath="buildTransitive\" Visible="false" />
+    <None Include="..\Ion.Extensions.Windowing.SilkNet\buildTransitive\Ion.Extensions.Windowing.SilkNet.targets" Pack="true" PackagePath="buildTransitive\Ion.Extensions.Graphics.GLES.targets" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

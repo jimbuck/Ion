@@ -1,7 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using SourceGeneratorUtils;
+using Ion.Generators;
 
 using System.Collections.Immutable;
 
@@ -25,8 +25,13 @@ public class UseDelegateServicesGenerator : IIncrementalGenerator
 #endif
 
 
-		// Add the marker attribute to the compilation
-		context.RegisterPostInitializationOutput(ctx => ctx.AddSource("UseDelegateServiceExtensions.g.cs", _getUseDelegateServiceExtensions()));
+		// Only Ion.Core.Abstractions gets the legacy IIonApplication overloads (the generator is also an analyzer of
+		// Ion.Extensions.Scenes.Abstractions, for the function step extensions).
+		var assemblyName = context.CompilationProvider.Select(static (compilation, _) => compilation.AssemblyName ?? "");
+		context.RegisterSourceOutput(assemblyName, static (spc, name) =>
+		{
+			if (name == "Ion.Core.Abstractions") spc.AddSource("UseDelegateServiceExtensions.g.cs", _getUseDelegateServiceExtensions());
+		});
 	}
 
 	private static SourceText _getUseDelegateServiceExtensions()

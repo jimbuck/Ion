@@ -1,31 +1,44 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 
 using Ion;
 using Ion.Extensions.Assets;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Audio;
 
+// Run with --Ion:Headless=true to use the headless graphics and audio backends (no GPU, window or audio device), and add
+// --Ion:Headless:Render=true to render offscreen with the Vulkan backend.
 var builder = IonApplication.CreateBuilder(args);
-
-builder.Services.AddIon(builder.Configuration, graphics =>
-{
-	graphics.Output = GraphicsOutput.Window;
-	graphics.ClearColor = new Color(0x333);
-});
-
-builder.Services.AddSingleton<BreakoutSystems>();
+BreakoutApp.Configure(builder);
 
 var game = builder.Build();
-game.UseIon()
-	.UseSystem<BreakoutSystems>();
-
-//Thread.Sleep(10 * 1000); // Delay to let diagnostics warm up.
+BreakoutApp.Use(game);
 
 game.Run();
 
-
-public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEventListener events, IAssetManager assets, IAudioManager audio)
+/// <summary>The game setup, shared with the tests (Ion.Examples.Breakout.Tests).</summary>
+public static class BreakoutApp
 {
+	/// <summary>Registers the engine (<c>AddIon</c>) and the game's system.</summary>
+	public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
+	{
+		builder.Services.AddIon(builder.Configuration, graphics =>
+		{
+			graphics.ClearColor = new Color(0x333);
+		});
+
+		builder.Services.AddSingleton<BreakoutSystems>();
+		return builder;
+	}
+
+	/// <summary>Adds the engine's systems (<c>UseIon</c>) and the game's system.</summary>
+	public static IIonApplication Use(IIonApplication game) => game.UseIon().UseSystem<BreakoutSystems>();
+}
+
+
+public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEvents events, IAssetManager assets, IAudioManager audio)
+{
+	private EventReader<WindowResizeEvent> _resizes = events.Reader<WindowResizeEvent>();
+
 	private const int ROWS = 10;
 	private const int COLS = 10;
 
@@ -51,26 +64,26 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 	private readonly Vector2 _paddleBounceMin = Vector2.Normalize(new Vector2(-1, -0.75f));
 	private readonly Vector2 _paddleBounceMax = Vector2.Normalize(new Vector2(+1, -0.75f));
 
-	private Texture2D _blockTexture = default!;
-	private Texture2D _ballTexture = default!;
-	private Texture2D _paddleTexture = default!;
+	private ITexture2D _blockTexture = default!;
+	private ITexture2D _ballTexture = default!;
+	private ITexture2D _paddleTexture = default!;
 
-	private SoundEffect _bonkSound = default!;
-	private SoundEffect _pingSound = default!;
+	private ISoundEffect _bonkSound = default!;
+	private ISoundEffect _pingSound = default!;
 
 	private int _score = 0;
-	private FontSet _scoreFontSet = default!;
-	private Font _scoreFont = default!;
+	private IFontSet _scoreFontSet = default!;
+	private IFont _scoreFont = default!;
 
 	[Init]
-	public void SetupBlocks(GameTime dt, GameLoopDelegate next)
+	public void SetupBlocks(GameTime dt)
 	{		
-		_blockTexture = assets.Load<Texture2D>("15-Breakout-Tiles.png");
-		_paddleTexture = assets.Load<Texture2D>("49-Breakout-Tiles.png");
-		_ballTexture = assets.Load<Texture2D>("58-Breakout-Tiles.png");
-		_bonkSound =  assets.Load<SoundEffect>("Bonk.wav");
-		_pingSound =  assets.Load<SoundEffect>("Ping.mp3");
-		_scoreFontSet = assets.Load<FontSet>("BungeeRegular", "Bungee-Regular.ttf");
+		_blockTexture = assets.Load<ITexture2D>("15-Breakout-Tiles.png");
+		_paddleTexture = assets.Load<ITexture2D>("49-Breakout-Tiles.png");
+		_ballTexture = assets.Load<ITexture2D>("58-Breakout-Tiles.png");
+		_bonkSound =  assets.Load<ISoundEffect>("bonk.wav");
+		_pingSound =  assets.Load<ISoundEffect>("ping.mp3");
+		_scoreFontSet = assets.Load<IFontSet>("Bungee-Regular.ttf");
 		_scoreFont = _scoreFontSet.CreateStyle(24);
 
 		// Setup blocks in rows and columns across the window each with different colors:
@@ -91,20 +104,16 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 		_paddleRect.Location = new Vector2(Math.Clamp(input.MousePosition.X - (_paddleRect.Height / 2f), 0, window.Width - _paddleRect.Width), window.Size.Y - (_blockSize.Y + _bottomGap));
 
 		_repositionBlocks();
-
-		next(dt);
 	}
 
 	[First]
-	public void HandleWindowResize(GameTime dt, GameLoopDelegate next)
+	public void HandleWindowResize(GameTime dt)
 	{
-		if (events.On<WindowResizeEvent>()) _repositionBlocks();
-
-		next(dt);
+		if (_resizes.Read().Length > 0) _repositionBlocks();
 	}
 
 	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		var isMouseGrabbed = window.IsMouseGrabbed;
 
@@ -225,12 +234,10 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 
 			Console.WriteLine("You Win!");
 		}
-
-		next(dt);
 	}
 
 	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
+	public void Render(GameTime dt)
 	{
 		for (var row = 0; row < ROWS; row++)
 		{
@@ -244,8 +251,6 @@ public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spr
 		spriteBatch.Draw(_paddleTexture, _paddleRect);//, color: Color.DarkBlue);
 		spriteBatch.Draw(_ballTexture, _ballRect);//, color: Color.DarkRed);
 		spriteBatch.DrawString(_scoreFont, $"Score:  {_score}", new Vector2(20f), Color.Red);
-
-		next(dt);
 	}
 
 	private void _repositionBlocks()

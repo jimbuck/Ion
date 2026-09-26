@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The UI sample: a main menu, an options screen (toggle, slider, list, text input) and a play screen, built with
+    Ion.Extensions.UI and driven by mouse, keyboard or gamepad (D-pad/stick to move, A to activate, B to go back; the R36S
+    controls). Run headless with - -Ion:Headless=true. Publishes with NativeAOT:
+      dotnet publish -c Release -r linux-x64 -p:PublishAot=true
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Keep NativeAOT stack traces readable. -->
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <!-- The font of the Breakout sample (SIL Open Font License), shared rather than copied. -->
+    <None Include="..\Ion.Examples.Breakout\Assets\Bungee-Regular.ttf" Link="Assets\Bungee-Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free) and summarizes its Use* helpers. -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.UI\Ion.Extensions.UI.csproj" />
+    <!-- ui.* on the remote protocol (only while the remote server runs; compiled out of Release builds without IonRemote=true). -->
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.UI.Remote\Ion.Extensions.UI.Remote.csproj" />
+  </ItemGroup>
+</Project>

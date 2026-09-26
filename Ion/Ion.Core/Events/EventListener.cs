@@ -1,145 +1,42 @@
-﻿using System.Runtime.CompilerServices;
-
 namespace Ion;
 
+/// <summary>
+/// Obsolete adapter: <see cref="IEventListener"/> over <see cref="IEvents"/>, with one <see cref="EventReader{T}"/> per
+/// event type (an <see cref="EventReaderSet"/>). Kept for one release.
+/// </summary>
+[Obsolete(EventAdapterMessages.Listener)]
 public class EventListener : IEventListener
 {
-    private readonly EventEmitter _eventEmitter;
+	private readonly EventReaderSet _readers;
 
-	private HashSet<ulong> _currFrameSeenEvents = new(8);
-    private HashSet<ulong> _prevFrameKnownEvents = new(8);
-
-    public EventListener(IEventEmitter eventEmitter)
-    {
-        _eventEmitter = (EventEmitter)eventEmitter;
-		_eventEmitter.AttachListener(this);
-    }
-
-    public bool On<T>() where T : unmanaged
+	/// <summary>Creates a listener that reads <paramref name="events"/>. The first read of a type starts at its oldest visible event.</summary>
+	public EventListener(IEvents events)
 	{
-		for (var i = 0; i < _eventEmitter.PreviousFrameEvents.Count; i++)
-		{
-			var e = _eventEmitter.PreviousFrameEvents[i];
-			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
-
-			_currFrameSeenEvents.Add(e.EventId);
-			return true;
-		}
-
-		for (var i = 0; i < _eventEmitter.CurrentFrameEvents.Count; i++)
-		{
-			var e = _eventEmitter.CurrentFrameEvents[i];
-			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
-
-			_currFrameSeenEvents.Add(e.EventId);
-			return true;
-		}
-
-		return false;
+		ArgumentNullException.ThrowIfNull(events);
+		_readers = new EventReaderSet(events);
 	}
 
-    public bool On<T>([NotNullWhen(true)]out IEvent<T>? @event) where T : unmanaged
-	{
-		for (var i = 0; i < _eventEmitter.PreviousFrameEvents.Count; i++)
-		{
-			var e = _eventEmitter.PreviousFrameEvents[i];
-			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
+	/// <summary>Creates a listener that reads the bus behind <paramref name="emitter"/>.</summary>
+	public EventListener(EventEmitter emitter) : this((emitter ?? throw new ArgumentNullException(nameof(emitter))).Events) { }
 
-			_currFrameSeenEvents.Add(e.EventId);
-			@event = (IEvent<T>)e;
-			return true;
-		}
+	/// <inheritdoc/>
+	public bool On<T>() where T : unmanaged => _readers.TryRead<T>(out _);
 
-		for (var i = 0; i < _eventEmitter.CurrentFrameEvents.Count; i++)
-		{
-			var e = _eventEmitter.CurrentFrameEvents[i];
-			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
+	/// <inheritdoc/>
+	public bool On<T>(out T data) where T : unmanaged => _readers.TryRead(out data);
 
-			_currFrameSeenEvents.Add(e.EventId);
-			@event = (IEvent<T>)e;
-			return true;
-		}
+	/// <inheritdoc/>
+	public bool OnLatest<T>() where T : unmanaged => _readers.TryReadLatest<T>(out _);
 
-		@event = default;
-		return false;
-	}
+	/// <inheritdoc/>
+	public bool OnLatest<T>(out T data) where T : unmanaged => _readers.TryReadLatest(out data);
 
-	public bool OnLatest<T>() where T : unmanaged
-	{
-		var found = false;
-		for (var i = 0; i < _eventEmitter.PreviousFrameEvents.Count; i++)
-		{
-			var e = _eventEmitter.PreviousFrameEvents[i];
-			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
+	/// <inheritdoc/>
+	public void Emit<T>() where T : unmanaged => _readers.Events.Emit(default(T));
 
-			_currFrameSeenEvents.Add(e.EventId);
-			found = true;
-		}
+	/// <inheritdoc/>
+	public void Emit<T>(T data) where T : unmanaged => _readers.Events.Emit(in data);
 
-		for (var i = 0; i < _eventEmitter.CurrentFrameEvents.Count; i++)
-		{
-			var e = _eventEmitter.CurrentFrameEvents[i];
-			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
-
-			_currFrameSeenEvents.Add(e.EventId);
-			found = true;
-		}
-
-		return found;
-	}
-
-	public bool OnLatest<T>([NotNullWhen(true)] out IEvent<T>? @event) where T : unmanaged
-	{
-		@event = default;
-		for (var i = 0; i < _eventEmitter.PreviousFrameEvents.Count; i++)
-		{
-			var e = _eventEmitter.PreviousFrameEvents[i];
-			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
-
-			_currFrameSeenEvents.Add(e.EventId);
-			@event = (IEvent<T>)e;
-		}
-
-		for (var i = 0; i < _eventEmitter.CurrentFrameEvents.Count; i++)
-		{
-			var e = _eventEmitter.CurrentFrameEvents[i];
-			if (e.Handled || e is not IEvent<T>) continue;
-			if (_prevFrameKnownEvents.Contains(e.EventId) || _currFrameSeenEvents.Contains(e.EventId)) continue;
-
-			_currFrameSeenEvents.Add(e.EventId);
-			@event = (IEvent<T>)e;
-		}
-
-		return @event != default;
-    }
-
-    public void UpdateKnownEvents()
-    {
-		(_currFrameSeenEvents, _prevFrameKnownEvents) = (_prevFrameKnownEvents, _currFrameSeenEvents);
-		_currFrameSeenEvents.Clear();
-	}
-
-    public void Dispose()
-    {
-        _eventEmitter.DetachListener(this);
-    }
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Emit<T>() where T : unmanaged
-	{
-		_eventEmitter.Emit<T>();
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Emit<T>(T data) where T : unmanaged
-	{
-		_eventEmitter.Emit(data);
-	}
+	/// <summary>Nothing to release: readers are not attached to the bus.</summary>
+	public void Dispose() => GC.SuppressFinalize(this);
 }

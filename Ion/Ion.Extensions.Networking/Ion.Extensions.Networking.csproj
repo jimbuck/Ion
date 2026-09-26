@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The networking module: replication of [Replicated] components through a per-tick snapshot ring with delta encoding
+    against each peer's acknowledged tick, typed [NetworkMessage] messages on the frame event bus, the handshake and
+    security checks, client-side prediction with reconciliation, interpolation, lag compensation, the interest policy
+    hook, and the deterministic LoopbackTransport. Transports over real sockets are separate packages
+    (Ion.Extensions.Networking.LiteNetLib).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Networking</RootNamespace>
+    <Description>Ion's multiplayer networking module: AddNetworking()/UseNetworking(), replicated components with delta-encoded snapshots, typed network messages, handshake with protocol and registry hashes and an optional join secret, per-message authority checks and rate limits, prediction and reconciliation, interpolation, lag compensation, interest management and a deterministic loopback transport with simulated latency, jitter, loss and reordering.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Networking.Tests" />
+    <InternalsVisibleTo Include="Ion.Extensions.Networking.LiteNetLib" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations and summarizes its Use* helpers. -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Extensions.Networking.Abstractions\Ion.Extensions.Networking.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Metrics.Abstractions\Ion.Extensions.Metrics.Abstractions.csproj" />
+    <!-- network.status remote method (IRemoteMethodProvider); no dependency on the remote server itself. -->
+    <ProjectReference Include="..\Ion.Extensions.Remote.Abstractions\Ion.Extensions.Remote.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

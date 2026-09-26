@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -19,10 +19,21 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
-    <ProjectReference Include="..\Ion.Extensions.Debug\Ion.Extensions.Debug.csproj" />
+    <ProjectReference Include="..\Ion.Benchmarks.GeneratedApp\Ion.Benchmarks.GeneratedApp.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Metrics\Ion.Extensions.Metrics.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Coroutines\Ion.Extensions.Coroutines.csproj" />
-    <ProjectReference Include="..\Ion.Extensions.Graphics.Veldrid\Ion.Extensions.Graphics.Veldrid.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Rendering2D\Ion.Extensions.Rendering2D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Rendering3D\Ion.Extensions.Rendering3D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Null\Ion.Extensions.Graphics.Null.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.UI\Ion.Extensions.UI.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics3D\Ion.Extensions.Physics3D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Web\Ion.Extensions.Web.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Networking\Ion.Extensions.Networking.csproj" />
+    <!-- The networking generator: serializers of the benchmarks' replicated components and messages. -->
+    <ProjectReference Include="..\Ion.Extensions.Networking.Generators\Ion.Extensions.Networking.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Numerics" />

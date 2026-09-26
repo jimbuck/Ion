@@ -1,7 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using SourceGeneratorUtils;
+using Ion.Generators;
 
 using System.Diagnostics;
 using System.Collections.Immutable;
@@ -92,47 +92,11 @@ public class {SCENE_ATTRIBUTE_NAME} : Attribute {{ }}
 
 	static void _execute(Compilation compilation, ImmutableArray<EnumDeclarationSyntax> enums, SourceProductionContext context)
 	{
-		if (enums.IsDefaultOrEmpty) return;
-
-		IEnumerable<EnumDeclarationSyntax> distinctEnums = enums.Distinct();
-
-		foreach(var enumDeclarationSyntax in distinctEnums)
-		{
-			SemanticModel semanticModel = compilation.GetSemanticModel(enumDeclarationSyntax.SyntaxTree);
-
-			var enumSymbol = semanticModel.GetDeclaredSymbol(enumDeclarationSyntax);
-
-			if (enumSymbol is null) continue;
-
-			var enumNamespace = enumSymbol.ContainingNamespace.ToDisplayString();
-			var enumName = enumSymbol.Name;
-
-			var sourceText = _createExtensionMethods(enumNamespace, enumName);
-			context.AddSource($"{enumSymbol.Name}SceneExtensions.g.cs", sourceText);
-		}
-	}
-
-	static SourceText _createExtensionMethods(string enumNamespace, string enumName)
-	{
-		var source = new SourceWriter();
-
-		source.WriteLine($"namespace Ion.Extensions.Scenes;");
-
-		source.WriteLine($"public static class {enumName}SceneExtensions");
-		source.OpenBlock();
-
-		#region UseScene Extension
-		source.WriteLine($"public static IIonApplication UseScene(this IIonApplication app, {enumNamespace}.{enumName} sceneId, Action<ISceneBuilder> configure) => app.UseScene((int)sceneId, configure);");
-		#endregion
-
-		source.WriteEmptyLines(1);
-
-		#region EmitChangeScene Extension
-		source.WriteLine($"public static void EmitChangeScene(this IEventEmitter eventEmitter, {enumNamespace}.{enumName} nextSceneId) => eventEmitter.EmitChangeScene((int)nextSceneId);");
-		#endregion
-
-		source.CloseBlock();
-
-		return source.ToSourceText();
+		// The enum overloads (UseScene(Scene, ...) and EmitChangeScene(Scene)) used to be generated here. They are now the
+		// generic UseScene<TScene> and EmitChangeScene<TScene> of Ion.Extensions.Scenes, so that other generators (the
+		// schedule generator, which cannot see this generator's output) bind scene registrations and their callbacks.
+		_ = compilation;
+		_ = enums;
+		_ = context;
 	}
 }

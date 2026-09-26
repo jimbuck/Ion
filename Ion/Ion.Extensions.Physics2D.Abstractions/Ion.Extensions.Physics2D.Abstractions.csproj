@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The 2D physics module's public surface without the engine: the ECS components (RigidBody2D, Collider2D, Joint2D), the
+    collision and trigger events, the query types, IPhysicsWorld2D and Physics2DConfig. A game library can depend on this
+    package only; the game adds Ion.Extensions.Physics2D (AddPhysics2D/UsePhysics2D, Box2D v3).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Physics2D</RootNamespace>
+    <Description>Ion 2D physics abstractions: RigidBody2D, Collider2D (box, circle, capsule, polygon) and Joint2D (distance, revolute, prismatic, weld) ECS components, Collision2D and Trigger2D events, ray cast and overlap query types, IPhysicsWorld2D and Physics2DConfig.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Physics2D" />
+    <InternalsVisibleTo Include="Ion.Extensions.Physics2D.Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Ecs.Abstractions\Ion.Extensions.Ecs.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

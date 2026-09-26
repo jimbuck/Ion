@@ -1,65 +1,40 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 
 namespace Ion;
 
+/// <summary>
+/// Obsolete adapter: <see cref="IEventEmitter"/> over <see cref="IEvents"/>. Kept for one release.
+/// </summary>
+[Obsolete(EventAdapterMessages.Emitter)]
 public class EventEmitter : IEventEmitter
 {
-	private RingBuffer<IEvent> _currFrame = new(64);
-	private RingBuffer<IEvent> _prevFrame = new(64);
+	/// <summary>Creates an emitter over a new <see cref="EventBus"/> that is not tied to a game loop.</summary>
+	public EventEmitter() : this(new EventBus()) { }
 
-	private readonly List<EventListener> _listeners = new();
-	private uint _nextId = 1;
-
-	public RingBuffer<IEvent> CurrentFrameEvents => _currFrame;
-	public RingBuffer<IEvent> PreviousFrameEvents => _prevFrame;
-
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Step()
-    {
-		(_currFrame, _prevFrame) = (_prevFrame, _currFrame);
-		_currFrame.Clear();
-
-        foreach (var listener in _listeners) listener.UpdateKnownEvents();
-    }
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Emit<T>() where T : unmanaged
+	/// <summary>Creates an emitter over <paramref name="events"/>.</summary>
+	public EventEmitter(IEvents events)
 	{
-		_currFrame.Add(new Event<T>(Interlocked.Increment(ref _nextId)));
+		ArgumentNullException.ThrowIfNull(events);
+		Events = events;
 	}
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Emit<T>(T data) where T : unmanaged
-	{
-		_currFrame.Add(new Event<T>(Interlocked.Increment(ref _nextId), data));
-	}
+	/// <summary>The bus this adapter emits to.</summary>
+	public IEvents Events { get; }
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void AttachListener(EventListener listener)
-	{
-		_listeners.Add(listener);
-	}
+	/// <summary>Ends the frame on the underlying <see cref="EventBus"/> (no-op for other <see cref="IEvents"/>).</summary>
+	public void Step() => (Events as EventBus)?.Step();
 
+	/// <inheritdoc/>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void DetachListener(EventListener listener)
-    {
-        _listeners.Remove(listener);
-    }
+	public void Emit<T>() where T : unmanaged => Events.Emit(default(T));
 
+	/// <inheritdoc/>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public IEnumerator<IEvent<T>> GetEvents<T>() where T : unmanaged
-	{
-		for (var i = 0; i < _prevFrame.Count; i++)
-		{
-			if (_prevFrame[i].Handled || _prevFrame[i] is not IEvent<T>) continue;
-			yield return (IEvent<T>)_prevFrame[i];
-		}
+	public void Emit<T>(T data) where T : unmanaged => Events.Emit(in data);
+}
 
-		for (var i = 0; i < _currFrame.Count; i++)
-		{
-			if (_currFrame[i].Handled || _currFrame[i] is not IEvent<T>) continue;
-			yield return (IEvent<T>)_currFrame[i];
-		}
-	}
+internal static class EventAdapterMessages
+{
+	public const string Emitter = "EventEmitter is an adapter over IEvents and will be removed in the next release. Inject IEvents and call Emit<T>(in T).";
+	public const string Listener = "EventListener is an adapter over IEvents and will be removed in the next release. Inject IEvents and keep an EventReader<T> from Reader<T>(), created once in the constructor, in a field that is not readonly.";
 }

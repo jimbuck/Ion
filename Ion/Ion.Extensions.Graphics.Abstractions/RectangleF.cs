@@ -318,10 +318,10 @@ public struct RectangleF : IEquatable<RectangleF>
 	/// <param name="verticalAmount">Value to adjust the top and bottom edges.</param>
 	public void Inflate(float horizontalAmount, float verticalAmount)
 	{
-		X -= (int)horizontalAmount;
-		Y -= (int)verticalAmount;
-		Width += (int)horizontalAmount * 2;
-		Height += (int)verticalAmount * 2;
+		X -= horizontalAmount;
+		Y -= verticalAmount;
+		Width += horizontalAmount * 2;
+		Height += verticalAmount * 2;
 	}
 
 	/// <summary>
@@ -403,8 +403,8 @@ public struct RectangleF : IEquatable<RectangleF>
 	/// <param name="offsetY">The y coordinate to add to this <see cref="RectangleF"/>.</param>
 	public void Offset(float offsetX, float offsetY)
 	{
-		X += (int)offsetX;
-		Y += (int)offsetY;
+		X += offsetX;
+		Y += offsetY;
 	}
 
 	/// <summary>
@@ -423,8 +423,8 @@ public struct RectangleF : IEquatable<RectangleF>
 	/// <param name="amount">The x and y components to add to this <see cref="RectangleF"/>.</param>
 	public void Offset(Vector2 amount)
 	{
-		X += (int)amount.X;
-		Y += (int)amount.Y;
+		X += amount.X;
+		Y += amount.Y;
 	}
 
 	/// <summary>
