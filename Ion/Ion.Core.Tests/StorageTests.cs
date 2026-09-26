@@ -102,6 +102,15 @@ public class StorageTests : IDisposable
 		Directory.CreateDirectory(Path.Combine(_root, "Assets"));
 		File.WriteAllText(Path.Combine(_root, "Assets", "bonk.wav"), "");
 
+		if (File.Exists(Path.Combine(_root, "Assets", "BONK.WAV")))
+		{
+			// A case-insensitive file system (macOS and Windows defaults) finds the file under either casing, so there is
+			// no miss to report; the casing hint is only observable on case-sensitive file systems.
+			using var stream = storage.Assets.Read("Bonk.wav");
+			Assert.NotNull(stream);
+			return;
+		}
+
 		var ex = Assert.Throws<FileNotFoundException>(() => storage.Assets.Read("Bonk.wav"));
 
 		Assert.Contains("'Bonk.wav'", ex.Message);

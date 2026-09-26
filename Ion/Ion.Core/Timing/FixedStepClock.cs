@@ -25,7 +25,7 @@ public sealed class FixedStepClock : IClock
 	public TimeSpan Step { get; }
 
 	/// <inheritdoc/>
-	public TimeSpan Elapsed => Step * _steps;
+	public TimeSpan Elapsed => TimeSpan.FromTicks(Step.Ticks * _steps);
 
 	/// <summary>
 	/// Advances the clock by exactly one <see cref="Step"/>.
