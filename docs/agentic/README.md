@@ -36,7 +36,9 @@ Install the tool from a checkout with `dotnet pack Ion/Ion.Tools -c Release -o o
    CI) and compare with a golden image using `ion diff`.
 6. **Inspect and poke**: `ion_run` with `live=true` (MCP) starts the game with the remote protocol and pauses after N
    frames. Then `ion_query`, `ion_get`, `ion_mutate`, `ion_spawn`, `ion_input`, `ion_step`, `ion_screenshot`,
-   `ion_metrics`, `ion_logs`, `ion_call` (any method; `rpc.discover` lists them). `ion_stop` ends it.
+   `ion_metrics`, `ion_logs`, `ion_call` (any method; `rpc.discover` lists them). `ion_stop` ends it. Games with the UI
+   module and `AddUiRemote()` are driven by path without screenshots: `ion_ui_tree` lists the widgets, `ion_ui_click`
+   clicks one, and `ion_call` reaches `ui.set_value`, `ui.type`, `ui.focus` and `ui.back`.
 7. **Lock it in**: add a headless test (`IonTestHost.Run<Game>(frames)`, assert on state and counters) and a snapshot
    (`JsonSnapshot.AssertMatches(run.WorldJson()!, RenderingEnvironment.GoldenPath("world.json"))`). Accept intended
    changes with `ION_UPDATE_GOLDEN=1 dotnet test` and review the diff.

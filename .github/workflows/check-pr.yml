@@ -101,7 +101,7 @@ jobs:
         path: bench/
         if-no-files-found: warn
 
-  # NativeAOT publish of the ECS sample, the Silk.NET quad sample and the UI menu sample. Fails on any trim/AOT warning whose subject is Ion's
+  # NativeAOT publish of the ECS sample, the Silk.NET quad sample, the UI menu sample and the web companion sample. Fails on any trim/AOT warning whose subject is Ion's
   # own code; warnings from third-party packages (Silk.NET.Core, DependencyModel) are reported only. The ECS sample is published with the
   # linux-x64 and r36s presets (Stage 7) by the size and startup measurement, which fails only when a desktop executable is over 30 MB.
   aot:
@@ -153,6 +153,12 @@ jobs:
         set -o pipefail
         dotnet publish Ion.Examples/Ion.Examples.Menu -p:IonTarget=linux-x64 \
           -p:TrimmerSingleWarn=false -o ./aot-menu 2>&1 | tee -a aot-publish.log
+    - name: Publish web companion sample with NativeAOT
+      shell: bash
+      run: |
+        set -o pipefail
+        dotnet publish Ion.Examples/Ion.Examples.Companion -p:IonTarget=linux-x64 \
+          -p:TrimmerSingleWarn=false -o ./aot-companion 2>&1 | tee -a aot-publish.log
     - name: Check for Ion AOT warnings
       shell: bash
       run: |

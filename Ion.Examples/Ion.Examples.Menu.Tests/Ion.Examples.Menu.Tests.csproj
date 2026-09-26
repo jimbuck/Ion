@@ -7,6 +7,8 @@
     <IsTestProject>true</IsTestProject>
     <Platforms>AnyCPU</Platforms>
     <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <!-- The remote module is compiled out of Release builds by default; the remote protocol test needs it. -->
+    <IonRemote>true</IonRemote>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\Ion\Ion.Core.Tests\TestConstants.cs" Link="TestConstants.cs" />

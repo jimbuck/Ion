@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 
 using Ion.Extensions.Graphics;
+using Ion.Extensions.Http;
 using Ion.Extensions.Metrics;
 
 namespace Ion.Extensions.Remote;
@@ -59,6 +60,8 @@ public static class RemoteBuilderExtensions
 		services.Configure<RemoteOptions>(config.GetSection("Ion:Remote"));
 		services.TryAddSingleton<RemoteServer>();
 		services.TryAddSingleton<RemoteSystem>();
+		// The protocol as an HTTP endpoint, which the web module (Ion.Extensions.Web) mounts at /rpc when it runs too.
+		services.AddSingleton<IHttpEndpoint>(static sp => sp.GetRequiredService<RemoteServer>().HttpEndpoint);
 		services.AddScriptedInput();
 
 		if (!services.Any(static d => d.ServiceType == typeof(RemoteLogBuffer)))

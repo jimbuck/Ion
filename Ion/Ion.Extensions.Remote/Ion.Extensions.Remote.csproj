@@ -19,6 +19,8 @@
     <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
     <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\Ion.Extensions.Remote.Abstractions\Ion.Extensions.Remote.Abstractions.csproj" />
+    <!-- The HTTP/1.1 and WebSocket server core shared with the web module. -->
+    <ProjectReference Include="..\Ion.Extensions.Http\Ion.Extensions.Http.csproj" />
     <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Metrics\Ion.Extensions.Metrics.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />

@@ -18,11 +18,15 @@ game.Run();
 /// <summary>The game setup, shared with the tests (Ion.Examples.Menu.Tests).</summary>
 public static class MenuApp
 {
-	/// <summary>Registers the engine (<c>AddIon</c>), the UI module and the menu.</summary>
+	/// <summary>
+	/// Registers the engine (<c>AddIon</c>), the UI module with its remote methods (<c>ui.tree</c>, <c>ui.click</c>, ... when
+	/// the game runs with <c>--remote</c>) and the menu.
+	/// </summary>
 	public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
 	{
 		builder.Services.AddIon(builder.Configuration, graphics => graphics.ClearColor = new Color(0x14, 0x17, 0x20, 0xFF));
 		builder.Services.AddUi();
+		builder.Services.AddUiRemote();
 		builder.Services.AddSingleton<MenuSettings>();
 		builder.Services.AddSingleton<MenuSystem>();
 		return builder;

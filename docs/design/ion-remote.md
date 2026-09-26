@@ -108,7 +108,8 @@ no listening socket unless configured, loopback by default, an explicit logged o
 
 ## 4. Messages
 
-One JSON-RPC 2.0 request per HTTP `POST /` (or `/rpc`) body, per WebSocket text message (`GET /ws` with the upgrade), or
+One JSON-RPC 2.0 request per HTTP `POST /` (or `/rpc`) body (also on the web module's port at `/rpc` when both
+modules run, see `docs/design/ion-web.md` section 7), per WebSocket text message (`GET /ws` with the upgrade), or
 per stdio line. Batches are not supported. `params` must be an object or absent.
 
 ```json
@@ -180,6 +181,22 @@ needed: registering a component for serialization is the opt-in, and it is the o
 | `world.remove_components` | mutate | `entity`, `components[]`, `world?` | `{entity, removed[]}` |
 | `world.spawn` | mutate | `components?`, `name?`, `world?` | the new entity (nothing is created if a component name is wrong) |
 | `world.despawn` | mutate | `entity`, `world?` | `{entity, despawned}` |
+| `ui.tree` (+watch) | read | `prefix?` | `{frame, version, focused, count, nodes[{path, kind, text, value, rect[x, y, w, h], enabled, focusable, focused, visible, depth}]}` (the last UI frame, pre-order) |
+| `ui.click` | mutate | `path` | `{queued, path, frame}`; -32004 naming why when the path is unknown, disabled or not clickable |
+| `ui.set_value` | mutate | `path`, `value` (string, number or boolean) | `{queued, path, frame}` (toggle, slider, text input, list) |
+| `ui.focus` | mutate | `path` | `{queued, path, frame}` |
+| `ui.type` | mutate | `path`, `text` | `{queued, path, frame}` (a text input takes focus and inserts at the caret) |
+| `ui.back` | mutate | | `{queued, frame}` (gamepad B / Escape) |
+| `physics2d.bodies` (+watch) | read | `name?` (exact or `prefix*`), `type?` (`static`, `kinematic`, `dynamic`), `limit?` | `{bodies[{entity, name, type, position, rotation, velocity, angularVelocity, shape, sensor, layer, simulated}], total, truncated, bodyCount, stepCount, gravity}` |
+| `physics2d.raycast` | read | `origin` `[x, y]`, `translation?` `[dx, dy]` or `to?` `[x, y]`, `mask?` | `{hit: false}` or `{hit, entity, name, point, normal, fraction}` (the closest hit) |
+
+The `ui.*` methods come from `Ion.Extensions.UI.Remote` (`services.AddUiRemote()`, over `IUiTree`; commands are queued
+and applied at the start of the next frame's Update, so their effect shows in the tree published at the end of that
+frame), the `physics2d.*` methods from `Ion.Extensions.Physics2D.Remote` (`services.AddPhysics2DRemote()`, on the root
+physics world, as of the last fixed step). Both are separate projects so neither module references the protocol, and
+both register nothing when the module is compiled out. `Ion.Examples.Menu` registers `AddUiRemote`, and its
+`MenuRemoteTests` drives every screen through them with only the token file. The MCP server adds `ion_ui_tree` and
+`ion_ui_click` on top.
 
 Built-in resources: `Ion.GameTime` (read: frame, elapsed seconds, delta, fixed steps, stage) and `Ion.Metrics.Profiling`
 (read and write: the span recording toggle). Games add theirs with `AddRemoteResource(name, description, jsonTypeInfo,
@@ -209,17 +226,14 @@ depends only on `Ion.Core.Abstractions`):
 ```csharp
 public interface IRemoteMethodProvider { void Register(RemoteMethodRegistry methods); }
 
-services.AddRemoteMethods(sp => new UiRemoteMethods(sp.GetRequiredService<IUiTree>()));
+services.AddRemoteMethods(static sp => new ScoreRemoteMethods(sp));
 
-sealed class UiRemoteMethods(IUiTree tree) : IRemoteMethodProvider
+sealed class ScoreRemoteMethods(IServiceProvider services) : IRemoteMethodProvider
 {
     public void Register(RemoteMethodRegistry methods) => methods
-        .Read("ui.tree", "The UI tree.", _ => tree.ToJson(), watchable: true)
-        .Mutate("ui.click", "Clicks a node by path.", r => { tree.Click(r.GetString("path")); return null; },
-            RemoteSchema.Object(("path", RemoteSchema.String("The node path."))))
-        .Mutate("ui.set_value", "Sets a widget's value.", r => { tree.SetValue(r.GetString("path"), r.Get("value")); return null; })
-        .Mutate("ui.focus", "Focuses a node.", r => { tree.Focus(r.GetString("path")); return null; })
-        .Mutate("ui.type", "Types text into the focused node.", r => { tree.Type(r.GetString("text")); return null; });
+        .Read("game.score", "The score.", _ => services.GetRequiredService<ScoreSystem>().Score, watchable: true)
+        .Mutate("game.add_score", "Adds points.", r => { services.GetRequiredService<ScoreSystem>().Score += r.GetInt32("points", 1); return null; },
+            RemoteSchema.Object(("points?", RemoteSchema.Integer("Points to add (default 1)."))));
 }
 ```
 
@@ -236,7 +250,11 @@ module registers its `world.*` methods this way (`EcsRemoteMethods`, from `AddEc
 - `Ion/Ion.Extensions.Remote`: `RemoteServer`, `RemoteSystem`, `HttpTransport` (HTTP/1.1 and RFC 6455 WebSocket),
   `StreamTransport` (stdio), `CoreRemoteMethods`, `RemoteLogBuffer`, `RemoteOptions`, `AddRemote`/`UseRemote`, and
   `buildTransitive/Ion.Extensions.Remote.targets`.
+- `Ion/Ion.Extensions.Http`: the HTTP/1.1 and WebSocket server core shared with the web module (listener, parser,
+  response writer, RFC 6455 framing, Host/Origin/token policy, rate limits, lock-free queue).
 - `Ion/Ion.Extensions.Ecs/Remote/EcsRemoteMethods.cs`: `world.*` and `registry.schema`.
+- `Ion/Ion.Extensions.UI.Remote` (`ui.*`) and `Ion/Ion.Extensions.Physics2D.Remote` (`physics2d.*`), tested over HTTP
+  in `Ion.Extensions.Remote.Tests` (`UiRemoteTests`, `Physics2DRemoteTests`).
 - `Ion/Ion.Extensions.Remote.Tests`: every method (`ProtocolTests`), the access control (`SecurityTests`: no token 401
   and -32001, the read token cannot call any mutate method, no mutate token without `AllowMutations`, non-loopback bind
   refused unless allowed, origin and Host checks, owner-only token file, replayed mutation ids apply once, mutations

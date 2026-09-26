@@ -29,7 +29,7 @@ public sealed class McpServerTests
 		using var server = new McpServer(TextReader.Null, TextWriter.Null);
 		var tools = Handle(server, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")["result"]!["tools"]!.AsArray();
 		var names = tools.Select(t => t!["name"]!.GetValue<string>()).ToList();
-		foreach (var name in (string[])["ion_run", "ion_connect", "ion_stop", "ion_call", "ion_query", "ion_get", "ion_mutate", "ion_spawn", "ion_despawn", "ion_screenshot", "ion_input", "ion_step", "ion_pause", "ion_resume", "ion_schedule", "ion_metrics", "ion_logs", "ion_events", "ion_diff"])
+		foreach (var name in (string[])["ion_run", "ion_connect", "ion_stop", "ion_call", "ion_query", "ion_get", "ion_mutate", "ion_spawn", "ion_despawn", "ion_screenshot", "ion_input", "ion_step", "ion_pause", "ion_resume", "ion_schedule", "ion_metrics", "ion_logs", "ion_events", "ion_diff", "ion_ui_tree", "ion_ui_click"])
 		{
 			Assert.Contains(name, names);
 		}

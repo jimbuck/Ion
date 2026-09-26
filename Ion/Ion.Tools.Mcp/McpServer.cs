@@ -135,6 +135,8 @@ public sealed class McpServer : IDisposable
 				"ion_metrics" => Text(Remote("metrics.get", null)),
 				"ion_logs" => Text(Remote("log.tail", Pick(args, "since", "level", "limit"))),
 				"ion_events" => Text(Remote("events.tail", Pick(args, "since", "limit"))),
+				"ion_ui_tree" => Text(Remote("ui.tree", Pick(args, "prefix"))),
+				"ion_ui_click" => Text(Remote("ui.click", Pick(args, "path"))),
 				"ion_diff" => Diff(args),
 				_ => throw new McpException(-32602, $"Unknown tool: {name}"),
 			};
@@ -432,6 +434,10 @@ public sealed class McpServer : IDisposable
 		Tool("ion_metrics", "The live game's last frame stats and game counters.", Schema()),
 		Tool("ion_logs", "The live game's recent log entries.", Schema(("since?", "integer", "Sequence number from the previous call's 'next'."), ("level?", "string", "Minimum level (default Information)."), ("limit?", "integer", "At most this many."))),
 		Tool("ion_events", "Event counts per type and recent payloads of remote-registered events.", Schema(("since?", "integer", "Sequence number from the previous call's 'next'."), ("limit?", "integer", "At most this many payloads."))),
+		Tool("ion_ui_tree", "The live game's UI tree (games with the UI module and AddUiRemote): every node's path, kind, text, value, rectangle, enabled/focused state, and the focused path. Use the paths with ion_ui_click, or ion_call with ui.set_value, ui.type, ui.focus and ui.back.",
+			Schema(("prefix?", "string", "Only nodes whose path starts with this (for example 'options/')."))),
+		Tool("ion_ui_click", "Clicks a UI node of the live game by path (from ion_ui_tree), as the pointer would, at the start of the next frame: a button reports it clicked, a toggle flips, a list item is selected.",
+			Schema(("path", "string", "The node's path, for example 'main/Options'."))),
 		Tool("ion_diff", "Compares a PNG with a golden PNG: a pixel mismatches when a channel differs by more than 'tolerance'; writes a diff image (mismatches in red).",
 			Schema(("actual", "string", "The PNG to check."), ("expected", "string", "The golden PNG."), ("tolerance?", "integer", "Per-channel tolerance (default 2)."), ("maxMismatchRatio?", "number", "Fraction of pixels allowed to mismatch (default 0)."), ("diff?", "string", "Where to write the diff image (default <actual>.diff.png)."))),
 	];

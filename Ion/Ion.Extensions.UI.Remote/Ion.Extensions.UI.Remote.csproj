@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The UI module on the remote protocol: ui.tree, ui.click, ui.set_value, ui.focus, ui.type and ui.back over IUiTree,
+    registered through IRemoteMethodProvider (AddUiRemote). Depends on the two abstractions only, so neither the UI
+    module nor the remote server references the other. Compiled out with the remote module (Ion.Remote.IsSupported).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.UI</RootNamespace>
+    <Description>Ion UI remote methods: ui.tree (watchable), ui.click, ui.set_value, ui.focus, ui.type and ui.back on the remote protocol, so agents and tools drive menus by path without screenshots.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Extensions.UI.Abstractions\Ion.Extensions.UI.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Remote.Abstractions\Ion.Extensions.Remote.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

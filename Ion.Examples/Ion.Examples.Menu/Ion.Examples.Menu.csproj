@@ -26,5 +26,7 @@
     <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
     <ProjectReference Include="..\..\Ion\Ion.Extensions.UI\Ion.Extensions.UI.csproj" />
+    <!-- ui.* on the remote protocol (only while the remote server runs; compiled out of Release builds without IonRemote=true). -->
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.UI.Remote\Ion.Extensions.UI.Remote.csproj" />
   </ItemGroup>
 </Project>

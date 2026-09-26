@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -9,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Ion.Extensions.Http;
 using Ion.Extensions.Scenes;
 
 namespace Ion.Extensions.Remote;
@@ -52,6 +52,9 @@ public sealed class RemoteServer : IDisposable
 	private bool _paused;
 	private int _stepRemaining;
 	private PendingRequest? _stepRequest;
+	private byte[]? _readTokenBytes;
+	private byte[]? _mutateTokenBytes;
+	private RemoteHttpEndpoint? _httpEndpoint;
 
 	/// <summary>Creates the server. It starts on <see cref="Start"/> (the remote system's Init step).</summary>
 	public RemoteServer(IServiceProvider services, IOptions<RemoteOptions> options, ILogger<RemoteServer> logger)
@@ -117,8 +120,10 @@ public sealed class RemoteServer : IDisposable
 			foreach (var source in _eventSources) source.Attach(events);
 		}
 
-		ReadToken = NewToken();
-		MutateToken = _options.AllowMutations ? NewToken() : null;
+		ReadToken = HttpSecurity.NewToken();
+		MutateToken = _options.AllowMutations ? HttpSecurity.NewToken() : null;
+		_readTokenBytes = Encoding.ASCII.GetBytes(ReadToken);
+		_mutateTokenBytes = MutateToken is null ? null : Encoding.ASCII.GetBytes(MutateToken);
 
 		var transport = _options.Transport;
 		if (transport is RemoteTransport.Http or RemoteTransport.Both)
@@ -234,14 +239,22 @@ public sealed class RemoteServer : IDisposable
 	internal RemoteAccess? Authenticate(string? authorization)
 	{
 		if (authorization is null || !authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return null;
-		var token = authorization["Bearer ".Length..].Trim();
-		if (MutateToken is { } mutate && FixedEquals(token, mutate)) return RemoteAccess.Mutate;
-		if (ReadToken is { } read && FixedEquals(token, read)) return RemoteAccess.Read;
+		return AuthenticateToken(Encoding.UTF8.GetBytes(authorization["Bearer ".Length..].Trim()));
+	}
+
+	/// <summary>The access the request's <c>Authorization: Bearer</c> token grants, or null.</summary>
+	internal RemoteAccess? Authenticate(HttpRequest request) =>
+		HttpSecurity.TryGetBearer(request, out var token) ? AuthenticateToken(token) : null;
+
+	private RemoteAccess? AuthenticateToken(ReadOnlySpan<byte> token)
+	{
+		if (_mutateTokenBytes is { } mutate && HttpSecurity.TokenEquals(token, mutate)) return RemoteAccess.Mutate;
+		if (_readTokenBytes is { } read && HttpSecurity.TokenEquals(token, read)) return RemoteAccess.Read;
 		return null;
 	}
 
-	/// <summary>Whether a request with this <c>Origin</c> header may call the server (no header: yes).</summary>
-	internal bool IsOriginAllowed(string? origin) => origin is null || _options.AllowedOrigins.Contains(origin, StringComparer.Ordinal);
+	/// <summary>The protocol as an HTTP endpoint: served by the HTTP transport, and mounted at <c>/rpc</c> by the web module.</summary>
+	internal RemoteHttpEndpoint HttpEndpoint => _httpEndpoint ??= new RemoteHttpEndpoint(this);
 
 	/// <summary>
 	/// Parses and validates one incoming JSON-RPC message on a transport thread: errors that need no game state (parse,
@@ -533,20 +546,11 @@ public sealed class RemoteServer : IDisposable
 		TokenFilePath = path;
 	}
 
-	internal static IPAddress ResolveBind(string bind)
-	{
-		if (string.IsNullOrWhiteSpace(bind) || bind.Equals("localhost", StringComparison.OrdinalIgnoreCase)) return IPAddress.Loopback;
-		if (bind is "*" or "+") return IPAddress.Any;
-		if (IPAddress.TryParse(bind, out var address)) return address;
-		throw new RemoteSecurityException($"Ion:Remote:Bind must be an IP address or 'localhost', not '{bind}'.");
-	}
+	internal static IPAddress ResolveBind(string bind) => HttpSecurity.TryResolveBind(bind, out var address)
+		? address
+		: throw new RemoteSecurityException($"Ion:Remote:Bind must be an IP address or 'localhost', not '{bind}'.");
 
-	internal static string FormatHost(IPAddress address) => address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? $"[{address}]" : address.ToString();
-
-	private static string NewToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
-	private static bool FixedEquals(string a, string b) =>
-		CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
+	internal static string FormatHost(IPAddress address) => HttpSecurity.FormatHost(address);
 
 	/// <summary>Stops the transports, releases a paused game thread and deletes the token file.</summary>
 	public void Dispose()

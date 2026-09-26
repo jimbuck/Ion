@@ -26,6 +26,11 @@
     <ProjectReference Include="..\Ion.Testing\Ion.Testing.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Remote\Ion.Extensions.Remote.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <!-- The UI and 2D physics remote integrations, driven over the protocol. -->
+    <ProjectReference Include="..\Ion.Extensions.UI\Ion.Extensions.UI.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.UI.Remote\Ion.Extensions.UI.Remote.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics2D.Remote\Ion.Extensions.Physics2D.Remote.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

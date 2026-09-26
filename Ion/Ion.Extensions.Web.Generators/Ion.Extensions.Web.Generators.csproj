@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot">
+  <!--
+    The web module's routing generator: turns the [Http] and [WebSocket] methods of an assembly into a static route table
+    (Ion.Extensions.Web.WebRouteTable) registered from a module initializer, with direct calls and typed binding (no
+    reflection, NativeAOT-clean), and reports ION4xx diagnostics for bad routes, duplicates and unsupported signatures.
+    LangVersion, Nullable, ImplicitUsings and Deterministic come from Directory.Build.props.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Analyzers never publish natively; ignore PublishAot passed on the command line (avoids NETSDK1207). -->
+    <PublishAot>false</PublishAot>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <Platforms>AnyCPU</Platforms>
+    <RootNamespace>Ion.Extensions.Web.Generators</RootNamespace>
+    <PackageId>Ion.Extensions.Web.Generators</PackageId>
+    <Description>Compile-time route tables for Ion's web module: [Http] and [WebSocket] methods on systems become direct, typed calls (no reflection).</Description>
+    <PackageTags>ion;game engine;analyzers;source generator;web</PackageTags>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Roslyn 4.4 is the oldest compiler shipped with a .NET 8 SDK; newer references break 8.0.1xx SDKs (CS9057). -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Web.Tests" />
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+</Project>

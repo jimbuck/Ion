@@ -148,6 +148,16 @@ public static class StageOrder
 	public const int Ecs = 950;
 
 	/// <summary>
+	/// The web server module (Last): the requests and WebSocket messages queued by <c>Ion.Extensions.Web</c>'s server
+	/// threads are handed to the game's <c>[Http]</c> and <c>[WebSocket]</c> methods on the game thread here, at the end of
+	/// the frame. After every gameplay, render and ECS command step (<see cref="Ecs"/>), so a handler sees the finished
+	/// frame and its changes are visible from the next frame's First stage on (input it injects through the scripted path
+	/// is applied then too); before the remote protocol (<see cref="Remote"/>), so a remote read in the same frame sees
+	/// them, and before the event stepping (<see cref="Events"/>), so events a handler emits are read in the next frame.
+	/// </summary>
+	public const int Web = 960;
+
+	/// <summary>
 	/// The remote inspection protocol (Last): requests queued by the transports are applied on the game thread here, at the
 	/// end of the frame. After every gameplay, render and ECS command step of the frame (so a read sees the finished frame,
 	/// a screenshot the rendered image, and a mutation is visible from the next frame's First stage on), and before the

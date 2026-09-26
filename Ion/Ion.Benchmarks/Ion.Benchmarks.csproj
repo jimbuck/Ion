@@ -30,6 +30,7 @@
     <ProjectReference Include="..\Ion.Extensions.UI\Ion.Extensions.UI.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Physics3D\Ion.Extensions.Physics3D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Web\Ion.Extensions.Web.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Numerics" />

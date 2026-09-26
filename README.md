@@ -484,10 +484,37 @@ public sealed class Menu(Ui ui)
     the focus automatically, so a gamepad-only handheld (the R36S) can drive every screen.
   - **Tree**: `IUiTree` lists the nodes (path such as `options/Volume`, kind, text, rectangle, enabled, focused, value)
     and queues `Click`, `SetValue`, `Focus`, `Type` and `Back`, applied at the start of the next frame's Update as the
-    equivalent input would be. `Ion.Examples.Menu.Tests` drives the menu sample end to end through it.
+    equivalent input would be. `Ion.Examples.Menu.Tests` drives the menu sample end to end through it, and through the
+    remote protocol: `services.AddUiRemote()` (`Ion.Extensions.UI.Remote`) adds `ui.tree`, `ui.click`, `ui.set_value`,
+    `ui.focus`, `ui.type` and `ui.back` (and `Ion.Extensions.Physics2D.Remote` adds `physics2d.bodies` and `physics2d.raycast`).
   - Nothing is allocated per frame once every widget has been seen (tested); `UiBenchmarks` measures a 500-widget screen.
 
 The API, layout model, tree contract and theme are in [docs/design/ion-ui.md](./docs/design/ion-ui.md).
+
+### Web server
+`Ion.Extensions.Web` embeds an HTTP/1.1 and WebSocket server for companion apps and integrations. Endpoints are
+ordinary methods on systems; the routing generator (`Ion.Extensions.Web.Generators`, referenced as an analyzer) turns
+them into a static route table, and the server calls them on the game thread at the end of a frame
+(`StageOrder.Web`), so they touch game state freely:
+
+```csharp
+builder.Services.AddWeb(builder.Configuration);        // --Ion:Web:Enabled=true (off by default, loopback only)
+app.UseIon().UseWeb().UseSystem<ScoreSystem>();
+
+[WebJson(typeof(GameJson))]
+public sealed class ScoreSystem
+{
+    [Http("GET", "/score")] public ScoreInfo Score() => new(_score, _lives);
+    [Http("POST", "/players/{id}/name")] public void Rename(int id, [FromBody] string name) { /* ... */ }
+    [WebSocket("/events")] public void Events(in WebSocketMessage message) { /* connected, text, binary, disconnected */ }
+}
+```
+
+Static files (`Ion:Web:StaticFiles`), push channels (`IWebServer.Channel(path).Broadcast(...)`), JSON through
+System.Text.Json source generation, and the remote protocol at `/rpc` when both modules run. A LAN bind is an explicit,
+logged opt-in that generates a token for mutating endpoints; browser origins other than the server's own are refused
+unless allowed. `Ion.Examples.Companion` is a paddle game driven from a phone. See
+[docs/design/ion-web.md](./docs/design/ion-web.md).
 
 ### Running headless
 `AddIon(config)` switches graphics and audio to the headless backends when `Ion:Headless` is `true` or `Ion:Graphics:Output` is `None`, and `UseIon()` adds the matching systems. Any game that depends only on the interfaces (`IWindow`, `IInputState`, `ISpriteBatch`, `IAudioManager`, `ITexture2D`, `IFontSet`, `ISoundEffect`) runs without a GPU, window or audio device:
@@ -696,6 +723,7 @@ Feel free to check out the samples and open any issues or pull requests. If you 
 ## Examples
 
 Check out the Breakout ECS example for a simple game using the Ion Engine (on the ECS module: built-in transforms and sprites, the sprite extraction, `Commands` and `[Query]` steps, and the 2D physics module), and `Ion.Examples.Quad` for the smallest app on the Silk.NET stack (a textured quad through the RHI; `--Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png` renders offscreen and saves a PNG). `Ion.Examples.Sprites100k` is the sprite batch stress test (100,000 moving sprites across 16 textures, one draw call per texture; `--Sprites:Count=N`, `--Sprites:Frames=N`). Every sample renders headless with `--Ion:Headless=true --Ion:Headless:Render=true`, and the `Ion.Examples.*.Tests` projects compare their frames with golden images.
+Web: `Ion.Examples.Companion` is a paddle game that serves a phone controller page; each phone becomes a virtual gamepad over a WebSocket endpoint (`dotnet run`, then open `http://127.0.0.1:15780/`).
 UI: `Ion.Examples.Menu` is a main menu with an options screen (toggle, slider, list, text input) on the UI module, driven by mouse, keyboard or gamepad; its tests drive it through `IUiTree` only.
 3D, both on the ECS module and its 3D extraction: `Ion.Examples.Cubes` animates 1,000 instanced cube entities in two materials with a `[Query]` step (shadows, an orbiting camera entity, a HUD drawn on top; `--Cubes:Frames=N --Cubes:Screenshot=cubes.png`) and `Ion.Examples.Model` spawns a glTF 2.0 model (Microsoft's CC0 Avocado) as entities with PBR materials, point lights and a skybox (`--Model:Frames=N --Model:Screenshot=model.png`). The immediate-mode API they used before (`IRenderer3D.Submit`, `Draw`, `SetCamera`, `AddLight`) is shown in the 3D section above.
 
