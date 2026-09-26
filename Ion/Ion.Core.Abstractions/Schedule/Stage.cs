@@ -69,6 +69,24 @@ public static class StageOrder
 	public const int Audio = -880;
 
 	/// <summary>
+	/// Networking (<c>Ion.Extensions.Networking</c>): starting the transport (Init); draining it, decoding packets into the
+	/// typed message channels and applying received snapshots to the world (First), before any game step reads them; the
+	/// tick scope around every fixed step (FixedUpdate: the tick is incremented when it opens, and when it closes, after
+	/// every other fixed step including the ECS command playback, the replicated components are captured into the snapshot
+	/// ring, in a <c>finally</c> so a throwing step never leaves a tick without a snapshot); and the interpolation of remote
+	/// entities (Render, inside the graphics frame scope and before the extraction). Prediction and reconciliation run at
+	/// <c>Network + 10</c> (FixedUpdate and First). The send step is <see cref="NetworkSend"/>.
+	/// </summary>
+	public const int Network = -870;
+
+	/// <summary>
+	/// Networking (Last and Destroy): delta-encoding the newest snapshot for each peer, packing the queued messages and
+	/// flushing the transport (Last), and disconnecting the peers (Destroy). In the teardown band, after the game's own
+	/// Last steps and before the ECS playback (<see cref="Ecs"/>) and event stepping (<see cref="Events"/>).
+	/// </summary>
+	public const int NetworkSend = 870;
+
+	/// <summary>
 	/// The 3D renderer: initialization (Init) and the frame scope (Render). Its scope opens before the sprite batch's and
 	/// closes after it, so when it closes every 3D and 2D submission of the frame is in and its render graph draws the
 	/// 3D passes and then the 2D overlay.

@@ -696,6 +696,17 @@ app.UseIon().UseEcs().UsePhysics2D();
 world.Create(new Transform2D(position), Collider2D.Circle(16) with { Restitution = 1 }, RigidBody2D.Dynamic(new Vector2(0, -100)));
 ```
 
+### Ion.Extensions.Networking
+Multiplayer networking (`docs/design/ion-networking.md`): server-authoritative replication of ECS components marked `[Replicated]` (or `[assembly: ReplicateComponent(typeof(T))]` for types declared elsewhere), typed `[NetworkMessage]` structs, and the handshake and security checks of anything that listens on a socket. The networking generator (`Ion.Extensions.Networking.Generators`) writes a full and a field-wise delta serializer per type and a registry whose hash both sides compare in the handshake (diagnostics ION201 to ION210); nothing is reflected. Every fixed step closes with a snapshot capture into a ring (a `FixedUpdate` End scope at `StageOrder.Network`), which the server delta-encodes against each client's acknowledged tick; clients apply the newest snapshot, interpolate `[Interpolated]` components of remote entities, predict `[Predicted]` components of their own entities from their inputs and reconcile against the server. `INetworkMessages`/`NetworkReader<T>` mirror `IEvents`/`EventReader<T>`. Transports: the deterministic `LoopbackTransport` (seeded latency, jitter, loss and reordering, for tests of a server and clients in one process) and the LiteNetLib UDP transport (`Ion.Extensions.Networking.LiteNetLib`). A dedicated server is the game run with `--Ion:Headless=true --Ion:Network:Mode=Server`.
+
+```csharp
+[Replicated, Interpolated] public record struct Position(Vector2 Value);
+[NetworkMessage(Direction = MessageDirection.ClientToServer)] public record struct Fire(float Angle);
+
+builder.Services.AddEcs().AddNetworking(builder.Configuration).AddLiteNetLibTransport();
+app.UseIon().UseEcs().UseNetworking();
+```
+
 ### Ion.Extensions.Scenes
 Adds support for scenes that each have their own scope for dependency injection and their own schedule, run by the `SceneSystem` step (see "Systems and the schedule").
 
@@ -703,7 +714,7 @@ Adds support for scenes that each have their own scope for dependency injection 
 
 ## Planned Modules
  - Web-based UI Framework
- - Low-level Networking
+ - WebSocket transport for the networking module (browser clients)
  - Multi-platform build support
 
 ## Built Using/Inspired By
@@ -724,6 +735,7 @@ Feel free to check out the samples and open any issues or pull requests. If you 
 
 Check out the Breakout ECS example for a simple game using the Ion Engine (on the ECS module: built-in transforms and sprites, the sprite extraction, `Commands` and `[Query]` steps, and the 2D physics module), and `Ion.Examples.Quad` for the smallest app on the Silk.NET stack (a textured quad through the RHI; `--Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png` renders offscreen and saves a PNG). `Ion.Examples.Sprites100k` is the sprite batch stress test (100,000 moving sprites across 16 textures, one draw call per texture; `--Sprites:Count=N`, `--Sprites:Frames=N`). Every sample renders headless with `--Ion:Headless=true --Ion:Headless:Render=true`, and the `Ion.Examples.*.Tests` projects compare their frames with golden images.
 Web: `Ion.Examples.Companion` is a paddle game that serves a phone controller page; each phone becomes a virtual gamepad over a WebSocket endpoint (`dotnet run`, then open `http://127.0.0.1:15780/`).
+Networking: `Ion.Examples.Breakout.Net` is Breakout with a server simulating balls, blocks and paddles on the physics module and clients drawing the replicated state and predicting their own paddle (a listen server by default; `--Ion:Headless=true --Ion:Network:Mode=Server` for a dedicated server, `--Ion:Network:Mode=Client` to join); its tests run a headless server and client in one process over the loopback transport and over UDP and check that the client converges.
 UI: `Ion.Examples.Menu` is a main menu with an options screen (toggle, slider, list, text input) on the UI module, driven by mouse, keyboard or gamepad; its tests drive it through `IUiTree` only.
 3D, both on the ECS module and its 3D extraction: `Ion.Examples.Cubes` animates 1,000 instanced cube entities in two materials with a `[Query]` step (shadows, an orbiting camera entity, a HUD drawn on top; `--Cubes:Frames=N --Cubes:Screenshot=cubes.png`) and `Ion.Examples.Model` spawns a glTF 2.0 model (Microsoft's CC0 Avocado) as entities with PBR materials, point lights and a skybox (`--Model:Frames=N --Model:Screenshot=model.png`). The immediate-mode API they used before (`IRenderer3D.Submit`, `Draw`, `SetCamera`, `AddLight`) is shown in the 3D section above.
 

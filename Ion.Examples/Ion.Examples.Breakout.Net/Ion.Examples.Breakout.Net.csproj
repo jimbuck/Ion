@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Breakout over the network: a server simulates the balls, blocks and paddles on the 2D physics module and replicates
+    them (Ion.Extensions.Networking); clients draw the replicated state, predict their own paddle and send inputs.
+    Dedicated server: Ion:Headless=true and Ion:Network:Mode=Server on the command line; a client: Ion:Network:Mode=Client.
+    Without a mode it is a listen server (a server that is also the first player). See Program.cs.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <!-- NativeAOT: link Box2D's static library into the executable instead of shipping libbox2d next to it. -->
+    <Box2DStaticLink>true</Box2DStaticLink>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="appsettings.json" CopyToOutputDirectory="Always" />
+    <!-- The Breakout ECS sample's art and sounds. -->
+    <Content Include="..\Ion.Examples.Breakout.ECS\Assets\15-Breakout-Tiles.png" Link="Assets\15-Breakout-Tiles.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Ion.Examples.Breakout.ECS\Assets\49-Breakout-Tiles.png" Link="Assets\49-Breakout-Tiles.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Ion.Examples.Breakout.ECS\Assets\58-Breakout-Tiles.png" Link="Assets\58-Breakout-Tiles.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Ion.Examples.Breakout.ECS\Assets\Bungee-Regular.ttf" Link="Assets\Bungee-Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Ion.Examples.Breakout.ECS\Assets\ping.wav" Link="Assets\ping.wav" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator and the networking generator (serializers of the replicated types and messages). -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Networking.Generators\Ion.Extensions.Networking.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Networking\Ion.Extensions.Networking.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Networking.LiteNetLib\Ion.Extensions.Networking.LiteNetLib.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="System.Numerics" />
+  </ItemGroup>
+</Project>

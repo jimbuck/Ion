@@ -31,6 +31,9 @@
     <ProjectReference Include="..\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Physics3D\Ion.Extensions.Physics3D.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Web\Ion.Extensions.Web.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Networking\Ion.Extensions.Networking.csproj" />
+    <!-- The networking generator: serializers of the benchmarks' replicated components and messages. -->
+    <ProjectReference Include="..\Ion.Extensions.Networking.Generators\Ion.Extensions.Networking.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Numerics" />
