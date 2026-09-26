@@ -86,18 +86,27 @@ public sealed class HttpSocketListener : IDisposable
 			try
 			{
 				socket = _listener.AcceptSocket();
+				socket.NoDelay = true;
 			}
 			catch (SocketException)
 			{
 				if (_disposed) return;
 				continue;
 			}
-			catch (ObjectDisposedException)
+			catch (Exception ex) when (ex is ObjectDisposedException or InvalidOperationException)
 			{
+				// After Stop() the listener throws ObjectDisposedException on Linux and Windows and, on macOS,
+				// InvalidOperationException ("Not listening"). Either way this thread is done; an unhandled exception here
+				// would take the whole process down.
 				return;
 			}
+			catch (Exception ex)
+			{
+				if (_disposed) return;
+				_logger?.LogWarning(ex, "{Name}: accept failed.", _settings.Name);
+				continue;
+			}
 
-			socket.NoDelay = true;
 			var connection = new HttpConnection(socket, _settings.MaxHeadBytes);
 			bool accepted;
 			lock (_connections)
