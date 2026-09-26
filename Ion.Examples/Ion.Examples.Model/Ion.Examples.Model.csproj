@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     A glTF 2.0 model (Microsoft's CC0 "Avocado" from the Khronos sample assets) lit with the PBR material, a row of
-    metallic-roughness spheres, a sun with shadows, two point lights and a skybox that also lights the scene.
+    metallic-roughness spheres, a sun with shadows, two point lights and a skybox that also lights the scene, all as
+    entities of the ECS module (the model spawned as one entity per glTF node) submitted by the 3D extraction.
     Options: - -Model:Frames=N (exit after N frames), - -Model:Screenshot=model.png (with Frames: save the last frame),
     - -Ion:Headless=true (no window; add - -Ion:Headless:Render=true to render offscreen).
   -->
@@ -30,5 +31,7 @@
     <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
     <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
   </ItemGroup>
 </Project>

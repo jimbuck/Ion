@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Immediate-mode 3D without ECS: a grid of 1,000 cubes in two materials, instanced by mesh and material, a directional
-    light with shadows onto a ground plane, an orbiting camera and a 2D HUD drawn on top by the sprite batch.
+    3D on the ECS module: a grid of 1,000 cube entities in two materials, instanced by mesh and material, a directional
+    light entity with shadows onto a ground plane, an orbiting camera entity and a 2D HUD drawn on top by the sprite batch.
     Options: - -Cubes:Frames=N (exit after N frames), - -Cubes:Screenshot=cubes.png (with Frames: save the last frame),
     - -Ion:Headless=true (no window; add - -Ion:Headless:Render=true to render offscreen).
     Publishes with NativeAOT: dotnet publish -c Release -r linux-x64 -p:PublishAot=true
@@ -27,8 +27,10 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <!-- The Ion schedule generator: intercepts this project's registrations and expands its [Query] steps (reflection-free). -->
     <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
   </ItemGroup>
 </Project>

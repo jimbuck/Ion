@@ -10,7 +10,7 @@
     <Configurations>Debug;Release;DebugGenerators</Configurations>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RootNamespace>Ion.Extensions.Ecs</RootNamespace>
-    <Description>Ion ECS abstractions on Arch 2.1: [Query] attributes (expanded by Ion.Generators into chunk loops, bound by reflection otherwise), the Commands buffer, and the built-in components (Transform2D/Transform, GlobalTransform2D/GlobalTransform, Parent/Children, Sprite, SpriteAnimation, Aabb2D, Visible/Hidden/MainCamera, EntityName).</Description>
+    <Description>Ion ECS abstractions on Arch 2.1: [Query] attributes (expanded by Ion.Generators into chunk loops, bound by reflection otherwise), the Commands buffer, and the built-in components (Transform2D/Transform, GlobalTransform2D/GlobalTransform, Parent/Children, Sprite, SpriteAnimation, Aabb2D, Visible/Hidden/MainCamera, EntityName), the 3D scene helpers (the SceneEnvironment singleton, SetHidden) and IModel spawning (SpawnModel on World and Commands).</Description>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Ion.Extensions.Ecs" />

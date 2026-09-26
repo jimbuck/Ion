@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     ECS render extraction: the world's sprites and main camera copied into the renderer every frame (Bevy's extraction
-    model), so entities never reach the renderer and the renderer stays usable from non-ECS code. 2D today; the 3D
-    extraction (MeshRenderer, lights, cameras) joins here on Rendering3D.
+    model), so entities never reach the renderer and the renderer stays usable from non-ECS code. 2D (sprites, main
+    camera) into ISpriteBatch, and 3D (mesh renderers, cameras, lights, the world's environment) into IMeshBatch.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -10,7 +10,7 @@
     <Configurations>Debug;Release;DebugGenerators</Configurations>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RootNamespace>Ion.Extensions.Ecs.Rendering</RootNamespace>
-    <Description>Ion ECS render extraction: SpriteExtractionSystem copies Sprite + GlobalTransform2D entities (minus Hidden, culled against the MainCamera's view) into ISpriteBatch in Render at StageOrder.Extract, sorted by depth.</Description>
+    <Description>Ion ECS render extraction: SpriteExtractionSystem copies Sprite + GlobalTransform2D entities (minus Hidden, culled against the MainCamera's view) into ISpriteBatch in Render at StageOrder.Extract, sorted by depth; Scene3DExtractionSystem submits MeshRenderer + GlobalTransform entities, adds Camera and light entities and passes the world's SceneEnvironment to IMeshBatch (IRenderer3D) at the same order.</Description>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Ion.Extensions.Ecs.Tests" />

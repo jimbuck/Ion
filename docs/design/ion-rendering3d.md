@@ -262,6 +262,18 @@ so the material conventions do not change.
 
 ## 8. What the ECS extraction wave must do
 
+**Status: done** (Stage 5, ECS 3D wave, September 2026). `Scene3DExtractionSystem` in `Ion.Extensions.Ecs.Rendering`
+(`AddEcsRendering3D()`/`UseEcsRendering3D()`) follows the points below as written: `Transform` is
+`Ion.Extensions.Graphics.Transform`, `GlobalTransform.Matrix` is `local.ToMatrix() * parent`, propagated at
+`StageOrder.TransformPropagation` in Last and again in Render; the extraction runs at `StageOrder.Extract` (-300) and
+calls `Submit`, `AddCamera` and `AddLight` for every entity without `Hidden` (`RequireVisible` also needs `Visible` on
+mesh renderers), and `SetEnvironment` when the world's `SceneEnvironment` singleton changes (`World.SetEnvironment`).
+Models spawn with `World.SpawnModel`/`Commands.SpawnModel` as in point 5 (a root entity with the placement above the
+model's root nodes). Mesh renderers are a hand-written chunk loop (the query depends on an option); cameras and lights
+are `[Query]` steps. 10,000 mesh entities extract in 82 us against 64 us for the same submissions from arrays, with
+no allocation (`Scene3DExtractionBenchmarks`). The renderer needed no change. `Hidden` is not inherited: hide a subtree
+with `World.SetHidden(entity, true)`.
+
 The ECS module (`Ion.Extensions.Ecs.Rendering`, section 4.9 of the roadmap) needs no renderer changes. Its extraction
 systems call `IRenderer3D` (or `IMeshBatch`) from Render steps at the roadmap's order (-300), which is inside the 3D
 renderer's scope:

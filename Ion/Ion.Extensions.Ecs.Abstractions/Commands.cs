@@ -20,6 +20,7 @@ public sealed class Commands
 	private readonly List<Entity> _unparents = [];
 	private readonly List<Entity> _destroyTrees = [];
 	private readonly QueryDescription _pending = new QueryDescription().WithAll<PendingParent>();
+	private readonly QueryDescription _pendingModels = new QueryDescription().WithAll<PendingModel>();
 	private readonly List<Entity> _scratch = [];
 	private int _count;
 
@@ -147,7 +148,8 @@ public sealed class Commands
 
 	/// <summary>
 	/// Applies every recorded command to <see cref="World"/>, in order: Arch's buffer (creates, sets, adds, removes,
-	/// destroys), then the hierarchy commands, then <see cref="DestroyRecursive"/>. Called by the ECS module at the end of
+	/// destroys), then the parents of created entities, the models recorded with <c>SpawnModel</c>, the other hierarchy
+	/// commands, then <see cref="DestroyRecursive"/>. Called by the ECS module at the end of
 	/// every stage; call it yourself outside a query to apply commands early.
 	/// </summary>
 	public void Flush()
@@ -172,6 +174,25 @@ public sealed class Commands
 				var parent = World.Get<PendingParent>(entity).Value;
 				World.Remove<PendingParent>(entity);
 				if (World.IsAlive(parent)) World.SetParent(entity, parent);
+			}
+
+			_scratch.Clear();
+		}
+
+		if (World.CountEntities(in _pendingModels) > 0)
+		{
+			_scratch.Clear();
+			foreach (ref var chunk in World.Query(in _pendingModels))
+			{
+				var entities = chunk.Entities;
+				for (var i = 0; i < chunk.Count; i++) _scratch.Add(entities[i]);
+			}
+
+			foreach (var entity in _scratch)
+			{
+				var pending = World.Get<PendingModel>(entity);
+				World.Remove<PendingModel>(entity);
+				ModelSpawnExtensions.Instantiate(World, entity, pending.Model, pending.Options);
 			}
 
 			_scratch.Clear();

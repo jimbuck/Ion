@@ -1,4 +1,9 @@
+using System.Numerics;
+
+using Arch.Core;
+
 using Ion.Examples.Tests;
+using Ion.Extensions.Ecs;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Rendering3D;
 using Ion.Testing;
@@ -33,6 +38,15 @@ public class ModelTests
 		Assert.Equal(7, stats.Submitted);
 		Assert.Equal(7, stats.Visible);
 		Assert.Equal(3, stats.Lights);
+
+		// The model is spawned as entities: a root (with the scale) and one entity per glTF node under it.
+		var world = host.Get<World>();
+		var root = host.Get<ModelSystem>().ModelEntity;
+		Assert.Equal(new Vector3(40f), world.Get<Transform>(root).Scale);
+		Assert.Equal(model.RootNodes.Count, world.GetChildren(root).Length);
+		Assert.Equal(model.Nodes[model.RootNodes[0]].Name, world.Get<EntityName>(world.GetChildren(root)[0]).Value);
+		Assert.Equal(7, world.CountEntities(new QueryDescription().WithAll<MeshRenderer>()));
+		Assert.Equal(2, world.CountEntities(new QueryDescription().WithAll<PointLight>()));
 	}
 
 	[VulkanFact, Trait(CATEGORY, E2E)]

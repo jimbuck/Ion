@@ -52,6 +52,13 @@ public static class EcsComponents
 		Register<MainCamera>();
 		Register<Camera2D>();
 		Register<EntityName>();
+		Register<MeshRenderer>();
+		Register<Camera>();
+		Register<DirectionalLight>();
+		Register<PointLight>();
+		Register<SpotLight>();
+		Register<SceneEnvironment>();
+		Register<PendingModel>();
 		_builtIns = true;
 	}
 

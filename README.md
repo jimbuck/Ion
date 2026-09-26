@@ -156,7 +156,7 @@ Methods that emit or read an event type for their caller (such as `EmitChangeSce
 
 ## ECS
 
-`Ion.Extensions.Ecs` integrates [Arch](https://github.com/genaray/Arch) 2.1 (picked by measurement against Friflo, roadmap section 5.7). Games keep Arch's own `World`, `Entity` and `QueryDescription`; the module adds a world per scope, a command buffer played back at the end of every stage, generated query loops, built-in components and systems, and the 2D render extraction (`Ion.Extensions.Ecs.Rendering`). A game library can depend on `Ion.Extensions.Ecs.Abstractions` only (the attributes, `Commands` and the components).
+`Ion.Extensions.Ecs` integrates [Arch](https://github.com/genaray/Arch) 2.1 (picked by measurement against Friflo, roadmap section 5.7). Games keep Arch's own `World`, `Entity` and `QueryDescription`; the module adds a world per scope, a command buffer played back at the end of every stage, generated query loops, built-in components and systems, and the 2D and 3D render extraction (`Ion.Extensions.Ecs.Rendering`). A game library can depend on `Ion.Extensions.Ecs.Abstractions` only (the attributes, `Commands` and the components).
 
 ```csharp
 builder.Services.AddIon(builder.Configuration).AddEcs().AddEcsRendering();
@@ -187,6 +187,22 @@ public sealed partial class MoveSystem(World world)
 - **Structural changes.** `Commands` (Arch's `CommandBuffer`, plus `SetParent`, `RemoveParent`, `DestroyRecursive`) records creations, destructions and component adds/removes; `EcsCommandsSystem` plays them back at `StageOrder.Ecs` (950) at the end of every stage. A query that changes the world directly throws `StructuralChangeException` naming the step and the entity (checked after every entity; `[Query(Unchecked = true)]` drops the check).
 - **Built-in components.** `Transform2D` (position, rotation, scale) and, for 3D, the graphics abstractions' `Transform` (position, quaternion, scale); `GlobalTransform2D`/`GlobalTransform` (world matrices, plus the 2D decomposition); `Parent`/`Children` (maintain them with `world.SetParent`); `Sprite` (texture, source rectangle, size, color, origin, depth, flip); `SpriteAnimation` (frames, rate, looping); `Aabb2D`; the tags `Visible`, `Hidden` and `MainCamera` (on an entity with a `Camera2D`); `EntityName` with `NameRegistry`.
 - **Built-in systems.** `TransformPropagationSystem` (Last and Render at `StageOrder.TransformPropagation` = -400: a dirty-tree walk that recomputes only what changed, roots in query order and children in attach order; the Render pass makes a frame draw what its Update did and updates `Aabb2D`), `SpriteAnimationSystem` (Update at `StageOrder.SpriteAnimation` = 400), and `SpriteExtractionSystem` (Render at `StageOrder.Extract` = -300, inside the sprite batch scope and before the game's own Render steps): sprites without `Hidden`, culled against the main camera's view, sorted by depth, drawn with the camera's transform.
+- **3D.** `AddEcsRendering3D()`/`UseEcsRendering3D()` add `Scene3DExtractionSystem` (Render at `StageOrder.Extract`, inside the 3D renderer's scope, next to the 2D extraction): every frame it submits each `MeshRenderer` + `GlobalTransform` entity without `Hidden` to the 3D renderer, adds `Camera` entities (looking down their -Z) and `DirectionalLight` (shining along -Z), `PointLight` and `SpotLight` entities, and passes the world's `SceneEnvironment` (`world.SetEnvironment(...)`) when it changes. `world.SpawnModel(model, transform)` (or `commands.SpawnModel`) turns a loaded `IModel` into entities: a root, one entity per glTF node with its transform, parent and name, and a `MeshRenderer` per primitive; `world.SetHidden(root, true)` hides it and `world.DestroyRecursive(root)` removes it. 10,000 mesh entities extract in about 80 us with no allocation.
+
+```csharp
+builder.Services.AddRendering3D(builder.Configuration);
+builder.Services.AddEcs().AddEcsRendering3D();
+app.UseIon().UseRendering3D().UseEcs().UseEcsRendering3D();
+
+[Init] public void Spawn(GameTime dt)   // in a system with World world, IRenderer3D renderer, IAssetManager assets
+{
+    world.SetEnvironment(new SceneEnvironment { Skybox = assets.Load<ICubemap>("Skybox").Handle });
+    world.Create(Transform.LookAt(new Vector3(0, 3, 8), Vector3.Zero), new Camera { Clear = CameraClear.Skybox });
+    world.Create(new Transform(Vector3.Zero, Transform.LookRotation(new Vector3(-0.5f, -1f, -0.3f), Vector3.UnitY)), new DirectionalLight(Color.White, 3f));
+    world.Create(new Transform(new Vector3(2, 0.5f, 0)), new MeshRenderer(renderer.CreateMesh(MeshPrimitives.Cube()), renderer.CreateMaterial(new PbrMaterial(Color.Red))));
+    world.SpawnModel(assets.Load<IModel>("Avocado/Avocado.gltf"), new Transform(Vector3.Zero, Quaternion.Identity, new Vector3(40)));
+}
+```
 - **Serialization.** `JsonWorldSerializer` and `BinaryWorldSerializer` (`IWorldSerializer`) save the registered components of every entity and remap entity references (`Parent`, `Children`) on load; register them with `AddEcsSerialization(registry => registry.Add<T>(...))` and a source-generated `JsonTypeInfo<T>` (NativeAOT-safe; opt-in, so games that do not save worlds keep System.Text.Json's serializer out of their image). `Arch.Persistence` is not used: its 2.0.0 package does not load against Arch 2.1.
 - **NativeAOT.** Arch allocates component arrays through `ArrayRegistry`; the generator registers the components of every `[Query]` (a module initializer), the module its built-ins, and `EcsComponents.Register<T>()` the rest.
 
@@ -360,7 +376,7 @@ why they are harmless are listed in [docs/plans/spikes/2026-silknet-spike.md](./
 `Ion.Extensions.Rendering3D` is the 3D renderer, written once against the RHI (Vulkan and OpenGL ES render the same
 pixels). It is immediate mode: every frame, Render steps submit cameras, lights and mesh renderers, and the renderer
 culls, sorts, batches and draws them when the Render stage closes, with the sprite batch drawn on top as the last pass.
-The ECS extraction will call the same API. Register it after `AddIon`:
+The ECS extraction (`AddEcsRendering3D()`, see [ECS](#ecs)) calls the same API for entities. Register it after `AddIon`:
 
 ```csharp
 builder.Services.AddIon(builder.Configuration);
@@ -599,7 +615,7 @@ Feel free to check out the samples and open any issues or pull requests. If you 
 ## Examples
 
 Check out the Breakout ECS example for a simple game using the Ion Engine (on the ECS module: built-in transforms and sprites, the sprite extraction, `Commands` and `[Query]` steps, with Aether physics as an adapter), and `Ion.Examples.Quad` for the smallest app on the Silk.NET stack (a textured quad through the RHI; `--Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png` renders offscreen and saves a PNG). `Ion.Examples.Sprites100k` is the sprite batch stress test (100,000 moving sprites across 16 textures, one draw call per texture; `--Sprites:Count=N`, `--Sprites:Frames=N`). Every sample renders headless with `--Ion:Headless=true --Ion:Headless:Render=true`, and the `Ion.Examples.*.Tests` projects compare their frames with golden images.
-3D: `Ion.Examples.Cubes` is immediate-mode 3D (1,000 instanced cubes in two materials, shadows, an orbiting camera, a HUD drawn on top; `--Cubes:Frames=N --Cubes:Screenshot=cubes.png`) and `Ion.Examples.Model` loads a glTF 2.0 model (Microsoft's CC0 Avocado) with PBR materials, point lights and a skybox (`--Model:Frames=N --Model:Screenshot=model.png`).
+3D, both on the ECS module and its 3D extraction: `Ion.Examples.Cubes` animates 1,000 instanced cube entities in two materials with a `[Query]` step (shadows, an orbiting camera entity, a HUD drawn on top; `--Cubes:Frames=N --Cubes:Screenshot=cubes.png`) and `Ion.Examples.Model` spawns a glTF 2.0 model (Microsoft's CC0 Avocado) as entities with PBR materials, point lights and a skybox (`--Model:Frames=N --Model:Screenshot=model.png`). The immediate-mode API they used before (`IRenderer3D.Submit`, `Draw`, `SetCamera`, `AddLight`) is shown in the 3D section above.
 
 ![Breakout ECS Screenshot](./breakout-physics-debug.png)
 

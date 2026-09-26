@@ -1,4 +1,7 @@
+using Arch.Core;
+
 using Ion.Examples.Tests;
+using Ion.Extensions.Ecs;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Rendering3D;
 using Ion.Testing;
@@ -33,6 +36,15 @@ public class CubesTests
 		// Opaque: ground plus one instanced batch per cube material; shadow: one batch per mesh.
 		Assert.Equal(5, stats.Batches);
 		Assert.Equal(1001, stats.ShadowCasters);
+		Assert.Equal(1, stats.Lights);
+
+		// The scene is entities, submitted by the ECS extraction: 1,000 cubes and the ground, a camera, a sun.
+		var world = host.Get<World>();
+		Assert.Equal(1001, world.CountEntities(new QueryDescription().WithAll<MeshRenderer, GlobalTransform>()));
+		Assert.Equal(1, world.CountEntities(new QueryDescription().WithAll<Camera>()));
+		Assert.Equal(1, world.CountEntities(new QueryDescription().WithAll<DirectionalLight>()));
+		Assert.True(world.TryGetEnvironment(out var environment));
+		Assert.Equal(environment.AmbientIntensity, renderer.Environment.AmbientIntensity);
 	}
 
 	[VulkanFact, Trait(CATEGORY, E2E)]
