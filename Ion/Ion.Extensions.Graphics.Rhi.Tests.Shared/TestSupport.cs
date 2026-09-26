@@ -32,6 +32,36 @@ public static class TestEnvironment
 	/// <summary>EGL with an OpenGL ES 3 driver for headless contexts (llvmpipe on CI).</summary>
 	public static bool HasHeadlessGles => Gles.Value;
 
+	private static readonly Lazy<bool> WindowedGl = new(ProbeWindowedGl);
+
+	/// <summary>
+	/// An OpenGL driver for windows. Always true off Windows (Mesa under Xvfb on Linux, the system OpenGL on macOS); on
+	/// Windows a hidden GLFW window is created once, which fails on machines without a GPU driver (the CI runners: "WGL:
+	/// The driver does not appear to support OpenGL").
+	/// </summary>
+	public static bool HasWindowedGl => WindowedGl.Value;
+
+	private static unsafe bool ProbeWindowedGl()
+	{
+		if (!OperatingSystem.IsWindows()) return true;
+		try
+		{
+			var glfw = Silk.NET.GLFW.Glfw.GetApi();
+			if (!glfw.Init()) return false;
+			glfw.DefaultWindowHints();
+			glfw.WindowHint(Silk.NET.GLFW.WindowHintBool.Visible, false);
+			glfw.WindowHint(Silk.NET.GLFW.WindowHintClientApi.ClientApi, Silk.NET.GLFW.ClientApi.OpenGL);
+			var window = glfw.CreateWindow(64, 64, "Ion GL probe", null, null);
+			if (window is null) return false;
+			glfw.DestroyWindow(window);
+			return true;
+		}
+		catch (Exception)
+		{
+			return false;
+		}
+	}
+
 	/// <summary>A display to open windows on (X11/Wayland on Linux, always on Windows and macOS).</summary>
 	public static bool HasDisplay => !OperatingSystem.IsLinux()
 		|| !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"))
@@ -46,6 +76,7 @@ public static class TestEnvironment
 			GraphicsBackend.Vulkan when !HasVulkan => "No Vulkan driver (on Linux install Mesa lavapipe: mesa-vulkan-drivers).",
 			// Windowed GLES needs only the window's context; headless needs EGL.
 			GraphicsBackend.OpenGLES when !windowed && !HasHeadlessGles => "No EGL OpenGL ES 3 driver (on Linux install Mesa: libegl1 libegl-mesa0).",
+			GraphicsBackend.OpenGLES when windowed && !HasWindowedGl => "No OpenGL driver for windows (WGL on a machine without a GPU driver).",
 			_ => null,
 		};
 	}

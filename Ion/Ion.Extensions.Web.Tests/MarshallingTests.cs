@@ -67,9 +67,21 @@ public class MarshallingTests
 		using var game = new WebGame(new Dictionary<string, string?> { ["Ion:Web:MaxRequestsPerFrame"] = "1" }, background: false);
 		var server = game.Server;
 		// Three clients queue a request each while no frame runs.
-		var clients = Enumerable.Range(0, 3).Select(i => Task.Run(() => game.Raw($"POST /order?n={i} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))).ToArray();
+		// Dedicated threads: the thread pool can be starved by other tests' blocked clients, which delayed the third
+		// request past the wait below on the Windows CI runner.
+		var clients = Enumerable.Range(0, 3).Select(i =>
+		{
+			var completion = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+			new Thread(() =>
+			{
+				try { completion.SetResult(game.Raw($"POST /order?n={i} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")); }
+				catch (Exception ex) { completion.SetException(ex); }
+			}) { IsBackground = true }.Start();
+			return completion.Task;
+		}).ToArray();
 		var deadline = DateTime.UtcNow.AddSeconds(10);
 		while (server.RequestCount < 3 && DateTime.UtcNow < deadline) Thread.Sleep(5);
+		Assert.Equal(3, server.RequestCount);
 		Thread.Sleep(50);
 
 		game.Host.Step();

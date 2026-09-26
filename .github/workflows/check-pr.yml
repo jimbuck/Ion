@@ -114,7 +114,7 @@ jobs:
         dotnet-version: 10.0.x
     - name: Install NativeAOT prerequisites
       # clang and lld cross-link linux-arm64 (docs/platforms/r36s.md); qemu-user-static runs the r36s build for its startup time.
-      run: sudo apt-get update -y -qq && sudo apt-get install -y -qq clang lld zlib1g-dev qemu-user-static
+      run: sudo apt-get update -y -qq && sudo apt-get install -y -qq clang lld llvm zlib1g-dev qemu-user-static
     - name: Build the arm64 glibc 2.27 sysroot
       run: python3 build/arm64-sysroot.py "$RUNNER_TEMP/sysroot-bionic-arm64"
     - name: Publish sizes and startup (Breakout ECS, linux-x64 and r36s)

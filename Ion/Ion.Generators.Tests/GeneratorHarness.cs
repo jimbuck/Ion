@@ -34,7 +34,9 @@ internal static class GeneratorHarness
 
 	public static CSharpCompilation Compile(string source, string assemblyName = "TestApp", OutputKind kind = OutputKind.DynamicallyLinkedLibrary, IEnumerable<MetadataReference>? extraReferences = null)
 	{
-		var tree = CSharpSyntaxTree.ParseText(source, ParseOptions, path: "Program.cs");
+		// The source literals come from test files that a Windows checkout may hold with CRLF; the interceptor location
+		// data hashes the source text, so the goldens are only stable when the text is normalized first.
+		var tree = CSharpSyntaxTree.ParseText(source.Replace("\r\n", "\n"), ParseOptions, path: "Program.cs");
 		return CSharpCompilation.Create(
 			assemblyName,
 			[tree],

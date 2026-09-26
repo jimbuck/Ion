@@ -68,7 +68,7 @@ public sealed class McpServerTests
 	{
 		var dir = Repo.TempDirectory("connect");
 		using var server = new McpServer(TextReader.Null, TextWriter.Null, dir);
-		var missing = Handle(server, $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"ion_connect\",\"arguments\":{{\"runDirectory\":\"{dir}\"}}}}}}")["result"]!;
+		var missing = Handle(server, $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"ion_connect\",\"arguments\":{{\"runDirectory\":{System.Text.Json.JsonSerializer.Serialize(dir)}}}}}}}")["result"]!;
 		Assert.True(missing["isError"]!.GetValue<bool>());
 		Assert.Contains("remote.json", missing["content"]![0]!["text"]!.GetValue<string>(), StringComparison.Ordinal);
 		Directory.Delete(dir, recursive: true);
