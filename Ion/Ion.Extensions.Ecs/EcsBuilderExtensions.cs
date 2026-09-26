@@ -3,6 +3,7 @@ using Arch.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using Ion.Extensions.Remote;
 using Ion.Extensions.Scenes;
 
 namespace Ion.Extensions.Ecs;
@@ -35,6 +36,13 @@ public static class EcsBuilderExtensions
 		services.TryAddTransient(static _ => new SpriteAnimationSystem());
 
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IFrameStatsSource, EcsStatsSource>(static sp => new EcsStatsSource(sp.GetRequiredService<EcsWorlds>())));
+
+		// The remote protocol's world.* and registry.schema methods (only used when the remote server runs; removed from
+		// builds that compile the remote module out, see RemoteFeature).
+		if (RemoteFeature.IsSupported)
+		{
+			services.TryAddEnumerable(ServiceDescriptor.Singleton<IRemoteMethodProvider, EcsRemoteMethods>(static sp => new EcsRemoteMethods(sp)));
+		}
 
 		return services;
 	}

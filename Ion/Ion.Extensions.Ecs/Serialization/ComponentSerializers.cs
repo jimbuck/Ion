@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 
 using Arch.Core;
@@ -18,22 +19,83 @@ public delegate T BinaryComponentReader<T>(BinaryReader reader, EntityReadMap en
 public sealed class EntityWriteMap
 {
 	private readonly Dictionary<Entity, int> _indexes = [];
+	private readonly bool _ids;
+
+	internal EntityWriteMap()
+	{
+	}
+
+	private EntityWriteMap(bool ids) => _ids = ids;
+
+	/// <summary>A map that writes entity references as entity ids (the remote protocol's addressing), not saved positions.</summary>
+	internal static EntityWriteMap Ids { get; } = new(ids: true);
 
 	internal void Add(Entity entity) => _indexes[entity] = _indexes.Count;
 
 	/// <summary>The saved position of <paramref name="entity"/>, or -1 when it is not saved (null, dead, or in another world).</summary>
-	public int IndexOf(Entity entity) => _indexes.TryGetValue(entity, out var index) ? index : -1;
+	public int IndexOf(Entity entity) => _ids ? (entity == Entity.Null ? -1 : entity.Id) : _indexes.TryGetValue(entity, out var index) ? index : -1;
 }
 
 /// <summary>Maps saved entity positions to the entities created by a load.</summary>
 public sealed class EntityReadMap
 {
+	private readonly World? _world;
+
 	internal EntityReadMap(Entity[] entities) => Entities = entities;
+
+	/// <summary>A map that reads entity references as entity ids of <paramref name="world"/> (the remote protocol's addressing).</summary>
+	internal EntityReadMap(World world)
+	{
+		_world = world;
+		Entities = [];
+	}
 
 	internal Entity[] Entities { get; }
 
 	/// <summary>The entity created for saved position <paramref name="index"/>, or <see cref="Entity.Null"/> for -1 or an unknown position.</summary>
-	public Entity EntityAt(int index) => (uint)index < (uint)Entities.Length ? Entities[index] : Entity.Null;
+	public Entity EntityAt(int index)
+	{
+		if (_world is { } world) return EcsEntities.FindById(world, index);
+		return (uint)index < (uint)Entities.Length ? Entities[index] : Entity.Null;
+	}
+}
+
+/// <summary>Entity lookups by id (the remote protocol addresses entities by id or by name).</summary>
+internal static class EcsEntities
+{
+	private static readonly QueryDescription Everything = new();
+	private static readonly QueryDescription Named = new QueryDescription().WithAll<EntityName>();
+
+	/// <summary>The live entity of <paramref name="world"/> with id <paramref name="id"/>, or <see cref="Entity.Null"/>.</summary>
+	public static Entity FindById(World world, int id)
+	{
+		if (id < 0) return Entity.Null;
+		foreach (ref var chunk in world.Query(in Everything))
+		{
+			for (var i = 0; i < chunk.Count; i++)
+			{
+				var entity = chunk.Entity(i);
+				if (entity.Id == id) return entity;
+			}
+		}
+
+		return Entity.Null;
+	}
+
+	/// <summary>The first entity of <paramref name="world"/> named <paramref name="name"/>, or <see cref="Entity.Null"/>.</summary>
+	public static Entity FindByName(World world, string name)
+	{
+		foreach (ref var chunk in world.Query(in Named))
+		{
+			var names = chunk.GetArray<EntityName>();
+			for (var i = 0; i < chunk.Count; i++)
+			{
+				if (names[i].Value == name) return chunk.Entity(i);
+			}
+		}
+
+		return Entity.Null;
+	}
 }
 
 /// <summary>
@@ -176,6 +238,8 @@ public sealed class ComponentSerializerRegistry
 	}
 
 	internal ComponentSerializer? Find(string name) => _byName.GetValueOrDefault(name);
+
+	internal ComponentSerializer? Find(ComponentType type) => _byType.GetValueOrDefault(type.Type);
 }
 
 /// <summary>Reads and writes one component type for the world serializers.</summary>
@@ -192,11 +256,43 @@ internal abstract class ComponentSerializer(string name, ComponentType component
 	public abstract void WriteBinary(BinaryWriter writer, ref Chunk chunk, int index, EntityWriteMap entities);
 
 	public abstract void ReadBinary(BinaryReader reader, World world, Entity entity, EntityReadMap entities);
+
+	/// <summary>Whether <paramref name="entity"/> has this component.</summary>
+	public bool Has(World world, Entity entity) => world.Has(entity, ComponentType);
+
+	/// <summary>Writes the component of one entity (the remote protocol's reads).</summary>
+	public abstract void WriteJson(Utf8JsonWriter writer, World world, Entity entity);
+
+	/// <summary>Adds the component to <paramref name="entity"/> from JSON, or replaces it when present (the remote protocol's writes).</summary>
+	public abstract void Insert(JsonElement element, World world, Entity entity);
+
+	/// <summary>Removes the component from <paramref name="entity"/> (nothing when absent).</summary>
+	public void Remove(World world, Entity entity)
+	{
+		if (world.Has(entity, ComponentType)) world.Remove(entity, ComponentType);
+	}
+
+	/// <summary>The JSON Schema of the component's JSON form.</summary>
+	public abstract JsonNode Schema();
+
+	/// <summary>Whether the component is a tag (no data).</summary>
+	public virtual bool IsTag => false;
 }
 
 internal sealed class ComponentSerializer<T>(string name, JsonTypeInfo<T> json, BinaryComponentWriter<T> write, BinaryComponentReader<T> read)
 	: ComponentSerializer(name, Component<T>.ComponentType)
 {
+	public override void WriteJson(Utf8JsonWriter writer, World world, Entity entity) => JsonSerializer.Serialize(writer, world.Get<T>(entity), json);
+
+	public override void Insert(JsonElement element, World world, Entity entity)
+	{
+		var value = element.Deserialize(json)!;
+		if (world.Has<T>(entity)) world.Set(entity, value);
+		else world.Add(entity, value);
+	}
+
+	public override JsonNode Schema() => System.Text.Json.Schema.JsonSchemaExporter.GetJsonSchemaAsNode(json);
+
 	public override void WriteJson(Utf8JsonWriter writer, ref Chunk chunk, int index, JsonSerializerOptions options) =>
 		JsonSerializer.Serialize(writer, chunk.GetArray<T>()[index], json);
 
@@ -213,6 +309,21 @@ internal sealed class ComponentSerializer<T>(string name, JsonTypeInfo<T> json, 
 
 internal sealed class TagSerializer<T>(string name) : ComponentSerializer(name, Component<T>.ComponentType) where T : struct
 {
+	public override bool IsTag => true;
+
+	public override void WriteJson(Utf8JsonWriter writer, World world, Entity entity)
+	{
+		writer.WriteStartObject();
+		writer.WriteEndObject();
+	}
+
+	public override void Insert(JsonElement element, World world, Entity entity)
+	{
+		if (!world.Has<T>(entity)) world.Add<T>(entity);
+	}
+
+	public override JsonNode Schema() => new JsonObject { ["type"] = "object", ["description"] = "A tag (no data)." };
+
 	public override void WriteJson(Utf8JsonWriter writer, ref Chunk chunk, int index, JsonSerializerOptions options)
 	{
 		writer.WriteStartObject();

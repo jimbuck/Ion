@@ -1,6 +1,8 @@
 <Project>
   <!-- NativeAOT: stub out Silk.NET code paths Ion never runs (packaged as buildTransitive for NuGet consumers). -->
   <Import Project="Ion\Ion.Extensions.Windowing.SilkNet\buildTransitive\Ion.Extensions.Windowing.SilkNet.targets" />
+  <!-- The remote protocol's feature switch: compiled out of Release builds unless IonRemote=true (packaged as buildTransitive too). -->
+  <Import Project="Ion\Ion.Extensions.Remote\buildTransitive\Ion.Extensions.Remote.targets" />
 
   <Target Name="AddInternalsVisibleTo" BeforeTargets="BeforeCompile">
     <!-- Add default suffix if there is no InternalsVisibleTo or InternalsVisibleToSuffix defined -->

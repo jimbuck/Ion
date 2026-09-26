@@ -14,4 +14,13 @@ public sealed class GameLoopContext : ILoopContext
 
 	/// <inheritdoc/>
 	public long FixedStepCount { get; internal set; }
+
+	/// <summary>
+	/// The game loop that writes this context (the last one created over it), or null before one is built. Tools such as
+	/// the remote protocol use it to read the running schedule and to stop the loop.
+	/// </summary>
+	public Core.GameLoop? Loop { get; internal set; }
+
+	/// <summary>The schedule the loop runs (<see cref="Core.GameLoop.Schedule"/>), or null before one is set.</summary>
+	public Schedule? Schedule => Loop?.Schedule;
 }

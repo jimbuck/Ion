@@ -53,4 +53,21 @@ public static class InputServiceCollectionExtensions
 		services.AddSingleton<IInputTrackerHook>(static sp => sp.GetRequiredService<InputPlayer>());
 		return services.AddInputTracker();
 	}
+
+	/// <summary>
+	/// Registers the application's <see cref="ScriptedInput"/> (once) and attaches it to the <see cref="InputTracker"/>:
+	/// events queued on it from any thread are applied at the start of the next frame, alongside device input. The remote
+	/// protocol's <c>input.send</c> uses it.
+	/// </summary>
+	public static IServiceCollection AddScriptedInput(this IServiceCollection services)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+		if (!services.Any(static d => d.ServiceType == typeof(ScriptedInput)))
+		{
+			services.AddSingleton(new ScriptedInput());
+			services.AddSingleton<IInputTrackerHook>(static sp => sp.GetRequiredService<ScriptedInput>());
+		}
+
+		return services.AddInputTracker();
+	}
 }

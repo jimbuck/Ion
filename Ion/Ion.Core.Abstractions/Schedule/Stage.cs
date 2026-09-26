@@ -147,6 +147,14 @@ public static class StageOrder
 	/// </summary>
 	public const int Ecs = 950;
 
+	/// <summary>
+	/// The remote inspection protocol (Last): requests queued by the transports are applied on the game thread here, at the
+	/// end of the frame. After every gameplay, render and ECS command step of the frame (so a read sees the finished frame,
+	/// a screenshot the rendered image, and a mutation is visible from the next frame's First stage on), and before the
+	/// event stepping (<see cref="Events"/>), so <c>events.tail</c> still sees the frame's events.
+	/// </summary>
+	public const int Remote = 970;
+
 	/// <summary>Events: stepping the frame buffers after every other Last step.</summary>
 	public const int Events = 1000;
 }

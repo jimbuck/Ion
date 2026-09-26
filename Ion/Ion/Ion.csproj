@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Ion.Extensions.Rendering3D\Ion.Extensions.Rendering3D.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" PackAsAnalyzer="true" />
     <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Remote\Ion.Extensions.Remote.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />

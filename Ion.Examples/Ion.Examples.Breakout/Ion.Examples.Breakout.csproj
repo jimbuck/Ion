@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <Configurations>Debug;Release;DebugGenerators</Configurations>
     <Platforms>AnyCPU</Platforms>
+    <!-- Keep the remote inspection protocol in Release builds too, so agents and the ion tool's end-to-end tests can
+         drive the sample with remote enabled. It still only runs when asked (Ion:Remote:Enabled). -->
+    <IonRemote>true</IonRemote>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="appsettings.json" />

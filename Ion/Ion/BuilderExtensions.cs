@@ -9,6 +9,9 @@ using Ion.Extensions.Rendering2D;
 using Ion.Extensions.Scenes;
 using Ion.Extensions.Coroutines;
 using Ion.Extensions.Windowing;
+using Ion.Extensions.Remote;
+
+using Microsoft.Extensions.Logging;
 
 namespace Ion;
 
@@ -74,9 +77,21 @@ public static class BuilderExtensions
 				.AddAudio(config);
 		}
 
+		// Agent and CI runs (ion run): a deterministic clock for headless fixed-length runs, and the screenshot and summary.
+		if (IonRun.UsesFixedStep(config, headless)) services.AddSingleton<IClock>(new FixedStepClock(IonRun.FrameTime));
+		if (IonRun.WantsReport(config))
+		{
+			var logs = new RunLogCollector();
+			services.AddSingleton<ILoggerProvider>(logs);
+			services.AddSingleton(sp => new RunReportSystem(sp, config, logs));
+		}
+
 		return services
 			.AddScenes()
-			.AddCoroutines();
+			.AddCoroutines()
+			// The remote inspection protocol: registers nothing unless Ion:Remote:Enabled (--remote), and compiled out of
+			// Release builds unless IonRemote=true.
+			.AddRemote(config);
 	}
 
 	/// <summary>
@@ -109,7 +124,11 @@ public static class BuilderExtensions
 				.UseAudio();
 		}
 
-		return app.UseCoroutines();
+		if (app.Services.GetService<RunReportSystem>() is not null) app.UseSystem<RunReportSystem>();
+
+		return app
+			.UseCoroutines()
+			.UseRemote();
 	}
 
 	/// <summary>

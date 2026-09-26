@@ -67,6 +67,7 @@ public class GameLoop
 		_exitRequests = events.Reader<ExitGameEvent>();
 		_clock = clock;
 		_context = context ?? new GameLoopContext();
+		_context.Loop = this;
 		_profiler = profiler ?? FrameProfiler.Disabled;
 		_statsSources = statsSources is null ? [] : [.. statsSources];
 

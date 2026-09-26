@@ -47,6 +47,15 @@ public sealed class SceneSystem(
 	/// <summary>The active scene, or null when none is loaded.</summary>
 	public SceneInstance? ActiveScene => _activeScene;
 
+	/// <summary>
+	/// Whether a scene change is under way: a scene is being unloaded or loaded right now, a change was requested and will
+	/// be applied at the start of the next frame, or a <see cref="ChangeSceneEvent"/> is waiting to be handled. The remote
+	/// protocol rejects mutations while this is true, because the world they address is about to be replaced.
+	/// </summary>
+	public bool IsLoading => _loading || _nextSceneId != CurrentSceneId || _changeScene.Any();
+
+	private bool _loading;
+
 	internal void Register(int sceneId, SceneBuilderFactory sceneBuilderFactory)
 	{
 		_scenesBuilders[sceneId] = sceneBuilderFactory;
@@ -57,6 +66,20 @@ public sealed class SceneSystem(
 	{
 		if (_nextSceneId == CurrentSceneId) return;
 
+		_loading = true;
+		try
+		{
+			_loadScene(dt);
+		}
+		finally
+		{
+			_loading = false;
+		}
+	}
+
+	[StackTraceHidden]
+	private void _loadScene(GameTime dt)
+	{
 		if (_activeScene != null)
 		{
 			_logger.LogInformation("Unloading {CurrentSceneId} Scene.", CurrentSceneId);

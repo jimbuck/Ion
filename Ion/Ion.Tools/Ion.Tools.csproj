@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The ion command line tool (dotnet tool install -g Ion.Tools): new, run, schedule, bench, trace, diff, remote and mcp.
+    The game templates under templates/ are embedded, so ion new works offline.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <RootNamespace>Ion.Tools</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>ion</ToolCommandName>
+    <PackageId>Ion.Tools</PackageId>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Description>The Ion engine's command line: ion new 2d|3d|ecs, ion run (headless, frames, seed, screenshot, summary, remote), ion schedule, ion bench, ion trace, ion diff, ion remote and ion mcp (an MCP server for coding agents).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Tools.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Tools.Mcp\Ion.Tools.Mcp.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\templates\**\*"
+                      Exclude="..\..\templates\*.*;..\..\templates\**\bin\**;..\..\templates\**\obj\**;..\..\templates\**\.ion\**;..\..\templates\**\*.actual.*;..\..\templates\**\*.diff.png"
+                      LogicalName="templates/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

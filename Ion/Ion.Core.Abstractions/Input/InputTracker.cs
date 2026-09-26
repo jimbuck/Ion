@@ -135,6 +135,12 @@ public sealed class InputTracker : IInputEventSink
 	public IInputPlayback? Playback { get; set; }
 
 	/// <summary>
+	/// Injected input (see <see cref="ScriptedInput"/>): applied at <see cref="BeginFrame"/> after <see cref="Playback"/>,
+	/// in addition to device events, and recorded like device events. Ignored while a playback supplies the input.
+	/// </summary>
+	public IInputScript? Script { get; set; }
+
+	/// <summary>
 	/// The number of the current input frame: <see cref="ILoopContext.Frame"/> when there is a loop context, otherwise the
 	/// number of <see cref="BeginFrame"/> calls before the current one.
 	/// </summary>
@@ -246,6 +252,8 @@ public sealed class InputTracker : IInputEventSink
 				_replaying = false;
 			}
 		}
+
+		Script?.Apply(Frame, this);
 	}
 
 	/// <summary>

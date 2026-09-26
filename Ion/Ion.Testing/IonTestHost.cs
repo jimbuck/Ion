@@ -238,6 +238,34 @@ public sealed class IonTestHost : IDisposable
 	}
 
 	/// <summary>
+	/// Builds <typeparamref name="TGame"/> headless (its <see cref="IIonGame.Configure"/> and <see cref="IIonGame.Use"/>, with
+	/// the deterministic clock), runs <paramref name="frames"/> frames and returns the outcome: state (the still running
+	/// host and its services), counters, the last frame's stats and, with rendering, the image. Dispose the result.
+	/// </summary>
+	/// <param name="frames">The number of frames to run.</param>
+	/// <param name="configure">
+	/// Configures the host before it starts: <c>host =&gt; host.WithRendering()</c> for an image,
+	/// <c>WithConfiguration("Ion:Seed", "42")</c>, <c>ConfigureApp</c> to add systems.
+	/// </param>
+	/// <param name="frameTime">The frame time (<see cref="DefaultFrameTime"/> when omitted).</param>
+	public static IonRunResult Run<TGame>(int frames, Action<IonTestHost>? configure = null, TimeSpan? frameTime = null) where TGame : IIonGame
+	{
+		ArgumentOutOfRangeException.ThrowIfNegative(frames);
+		var host = new IonTestHost(frameTime).UseGame(TGame.Configure, TGame.Use);
+		try
+		{
+			configure?.Invoke(host);
+			var run = host.Step(frames);
+			return new IonRunResult(host, run);
+		}
+		catch
+		{
+			host.Dispose();
+			throw;
+		}
+	}
+
+	/// <summary>
 	/// Runs <paramref name="frames"/> frames (fewer if the game asks to exit). Returns the number of frames run.
 	/// </summary>
 	public int Step(int frames = 1)

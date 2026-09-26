@@ -25,5 +25,7 @@
     <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\Ion.Extensions.Ecs.Abstractions\Ion.Extensions.Ecs.Abstractions.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Scenes.Abstractions\Ion.Extensions.Scenes.Abstractions.csproj" />
+    <!-- world.* remote methods (IRemoteMethodProvider); no dependency on the remote server itself. -->
+    <ProjectReference Include="..\Ion.Extensions.Remote.Abstractions\Ion.Extensions.Remote.Abstractions.csproj" />
   </ItemGroup>
 </Project>

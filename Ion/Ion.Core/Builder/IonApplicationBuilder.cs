@@ -18,7 +18,7 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 
 	internal IonApplicationBuilder(string[] args)
 	{
-		_hostBuilder = Host.CreateApplicationBuilder(args);
+		_hostBuilder = Host.CreateApplicationBuilder(IonCommandLine.Normalize(args));
 
 		Services.AddLogging(config =>
 		{

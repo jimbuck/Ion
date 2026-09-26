@@ -1,0 +1,18 @@
+<Project>
+  <!-- Shared settings for the game and its tests. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- The Ion packages this game uses. -->
+    <IonVersion>0.3.0</IonVersion>
+    <!-- An Ion source checkout to build against instead of the packages (set by "ion new" with its ion-source
+         option, or the IonSource parameter of dotnet new); empty uses the packages. -->
+    <IonSource>ION_SOURCE_PATH</IonSource>
+    <!-- The Ion schedule generator emits C# interceptors in this namespace. -->
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Ion.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+  <!-- Building against sources: the packages' build props (metrics feature switch). -->
+  <Import Project="$(IonSource)/Ion/Ion/buildTransitive/Ion.props" Condition="'$(IonSource)' != ''" />
+</Project>

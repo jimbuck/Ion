@@ -487,6 +487,22 @@ dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS -- --Ion:Headless=tr
 
 In tests, resolve `NullInputState` to script input and `NullSpriteBatch` / `NullAudioManager` to assert on what was drawn and played, or use `IonTestHost` (below). Add `--Ion:Headless:Render=true` to render for real into an offscreen target (Vulkan on lavapipe, or OpenGL ES through EGL with `--Ion:Graphics:PreferredBackend=OpenGLES`): `ISpriteBatch` becomes the 2D renderer's sprite batch, textures and fonts are loaded to the GPU, and frames can be captured (`IonTestHost.WithRendering()`, `Screenshot()`, `GoldenImage`).
 
+### Tools for agents and CI
+The `ion` tool (`Ion/Ion.Tools`, a dotnet tool) and the remote protocol make a game drivable without a human:
+
+```sh
+ion new ecs Arena                                  # also 2d, 3d; each with CLAUDE.md, a headless test and a snapshot test
+ion run --headless --frames 600 --seed 1 --screenshot out/frame.png --summary out/run.json   # exit code reflects exceptions
+ion diff out/frame.png Golden/frame.png            # golden-image comparison with a diff PNG
+ion schedule                                       # the schedule, stage by stage
+ion trace --frames 300 --out trace.json            # Chrome trace (Perfetto)
+ion bench <filter>                                 # the benchmarks, in Release
+ion mcp                                            # MCP server for coding agents: claude mcp add ion -- ion mcp
+dotnet run -- --remote-allow-mutations             # JSON-RPC inspection (world.query, world.mutate_components, screenshot, input.send, ...)
+```
+
+Every game understands the run settings without the tool (`--headless`, `--Ion:Run:Frames=600`, `--Ion:Run:Screenshot=...`, `--Ion:Run:Summary=...`, `--Ion:Seed=1`). The remote protocol is off unless asked for, listens on loopback only, requires a per-run token from an owner-only file, grants writes only with `--remote-allow-mutations`, and is compiled out of Release builds unless `IonRemote=true`. See [docs/agentic/README.md](./docs/agentic/README.md) and [docs/design/ion-remote.md](./docs/design/ion-remote.md).
+
 ### Input
 `IInputState` is captured once per frame at the start of `First` and is read-only for the rest of the frame. Both backends keep it in one shared `InputTracker` (in `Ion.Core.Abstractions`) with fixed-size storage and no per-frame allocation: `ulong` bitsets indexed by `Key` for held, pressed and released keys, a 32-bit mask for mouse buttons, mouse position and delta, the wheel, the frame's text input and eight gamepad slots.
 

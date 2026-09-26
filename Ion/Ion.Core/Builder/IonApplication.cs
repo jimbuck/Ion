@@ -114,8 +114,23 @@ public class IonApplication : IIonApplication, IDisposable
 	[StackTraceHidden]
 	public void Run(CancellationToken cancellationToken)
 	{
-		BuildForRun().Run(cancellationToken);
+		var loop = BuildForRun();
+		if (int.TryParse(Configuration[RunFramesKey], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var frames) && frames >= 0)
+		{
+			loop.RunFrames(frames);
+		}
+		else
+		{
+			loop.Run(cancellationToken);
+		}
 	}
+
+	/// <summary>
+	/// The configuration key that makes <see cref="Run()"/> stop after a number of frames, as <see cref="RunFrames"/>:
+	/// <c>Ion:Run:Frames = 600</c>, or <c>--Ion:Run:Frames=600</c> on the command line (what <c>ion run --frames</c>
+	/// passes). The game still exits earlier if it asks to.
+	/// </summary>
+	public const string RunFramesKey = "Ion:Run:Frames";
 
 	/// <inheritdoc/>
 	[StackTraceHidden]
