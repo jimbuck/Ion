@@ -1,0 +1,76 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Breakout ECS on Android phones and tablets: the desktop sample's game code (linked from ../Ion.Examples.Breakout.ECS)
+    in an Android app, on the SDL windowing platform (Silk.NET's SilkActivity, a full-screen view), with the Vulkan backend
+    and the OpenGL ES fallback (GraphicsBackend.Auto), NativeAOT, and touch driving the paddle.
+
+      dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS.Android -c Release -p:IonMobileHeads=true   (an .apk)
+
+    Needs the android workload (dotnet workload install android), a JDK and the Android SDK. Without -p:IonMobileHeads=true
+    (the default, and in Ion.sln builds) this project builds as a net10.0 library of the shared game code only; see
+    build/Ion.Mobile.props.
+  -->
+  <PropertyGroup>
+    <IonMobileHeadKind>android</IonMobileHeadKind>
+  </PropertyGroup>
+  <Import Project="..\..\build\Ion.Mobile.props" />
+
+  <PropertyGroup Condition="'$(IonBuildMobileHead)' == 'true'">
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <ApplicationId>dev.ion.examples.breakout.ecs</ApplicationId>
+    <ApplicationTitle>Ion Breakout</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.3</ApplicationDisplayVersion>
+    <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidManifest>Platform\AndroidManifest.xml</AndroidManifest>
+    <!-- NativeAOT on Android (.NET 10); the Mono runtime is used for Debug builds. -->
+    <PublishAot Condition="'$(Configuration)' == 'Release'">true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+    <EventSourceSupport>false</EventSourceSupport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IonBuildMobileHead)' != 'true'">
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <IsPublishable>false</IsPublishable>
+    <IonPublishable>false</IonPublishable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <RootNamespace>Ion.Examples.Breakout.ECS.Android</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The game: the same sources as the desktop sample (its Program.cs is the desktop entry point). -->
+    <Compile Include="..\Ion.Examples.Breakout.ECS\BreakoutGame.cs;..\Ion.Examples.Breakout.ECS\BreakoutSystems.cs;..\Ion.Examples.Breakout.ECS\BreakoutMobile.cs" Link="Game\%(Filename)%(Extension)" />
+    <Compile Include="..\Ion.Examples.Breakout.ECS\Common\**\*.cs" Link="Game\Common\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- The Android entry point compiles only into the real head. -->
+    <Compile Remove="Platform\**" Condition="'$(IonBuildMobileHead)' != 'true'" />
+    <Using Include="System.Numerics" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(IonBuildMobileHead)' == 'true'">
+    <!-- The game's assets go into the APK's assets; MainActivity unpacks them into the app's files folder on start. -->
+    <AndroidAsset Include="..\Ion.Examples.Breakout.ECS\Assets\*" Exclude="..\Ion.Examples.Breakout.ECS\Assets\favicon.ico" Link="Assets\%(Filename)%(Extension)" />
+    <!-- SilkActivity (SDL's Java activity, libSDL2.so and libmain.so for every ABI). -->
+    <PackageReference Include="Silk.NET.Windowing.Sdl" Version="2.23.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" OutputItemType="Analyzer" />
+    <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
+  </ItemGroup>
+</Project>

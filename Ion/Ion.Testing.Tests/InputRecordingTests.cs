@@ -142,6 +142,9 @@ public class InputRecordingTests : IDisposable
 			tracker.OnGamepadAxis(3, GamepadAxis.RightY, -0.75f);
 			tracker.OnGamepadConnected(3, false);
 			tracker.ReleaseAll();
+			tracker.OnTouch(4, TouchPhase.Began, new Vector2(10.5f, 20.25f));
+			tracker.OnTouch(4, TouchPhase.Moved, new Vector2(11f, 21f));
+			tracker.OnTouch(4, TouchPhase.Ended, new Vector2(12f, 22f));
 			tracker.BeginFrame();
 		}
 
@@ -161,6 +164,9 @@ public class InputRecordingTests : IDisposable
 			(2u, InputEvent.ForGamepadAxis(3, GamepadAxis.RightY, -0.75f)),
 			(2u, InputEvent.ForGamepadConnection(3, false)),
 			(2u, InputEvent.ForReleaseAll()),
+			(2u, InputEvent.ForTouch(4, TouchPhase.Began, new Vector2(10.5f, 20.25f))),
+			(2u, InputEvent.ForTouch(4, TouchPhase.Moved, new Vector2(11f, 21f))),
+			(2u, InputEvent.ForTouch(4, TouchPhase.Ended, new Vector2(12f, 22f))),
 		], player.Events.ToList());
 	}
 

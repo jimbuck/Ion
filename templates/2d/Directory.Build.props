@@ -15,4 +15,6 @@
   </PropertyGroup>
   <!-- Building against sources: the packages' build props (metrics feature switch). -->
   <Import Project="$(IonSource)/Ion/Ion/buildTransitive/Ion.props" Condition="'$(IonSource)' != ''" />
+  <!-- Building against sources: the publishing presets (dotnet publish -p:IonTarget=linux-x64|r36s|..., or ion publish). -->
+  <Import Project="$(IonSource)/build/Ion.Publish.props" Condition="'$(IonSource)' != '' and Exists('$(IonSource)/build/Ion.Publish.props')" />
 </Project>

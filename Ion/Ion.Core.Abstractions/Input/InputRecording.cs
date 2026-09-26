@@ -18,7 +18,9 @@ namespace Ion;
 /// 2 repeat) and the modifiers byte; <c>MouseButton</c> the button and down bytes; <c>MouseMove</c> two floats (x, y);
 /// <c>Wheel</c> a float; <c>Text</c> the UTF-16 code unit (ushort); <c>GamepadConnection</c> the slot and connected bytes;
 /// <c>GamepadButton</c> the slot, button and down bytes; <c>GamepadAxis</c> the slot and axis bytes and a float;
-/// <c>ReleaseAll</c> nothing.
+/// <c>ReleaseAll</c> nothing; <c>Touch</c> the touch id (7-bit int), the <see cref="TouchPhase"/> byte and two floats (x, y).
+/// <c>Touch</c> was added after version 1 shipped, without a version change: a recording without touch events is
+/// byte-identical, and older readers reject only recordings that contain touches.
 /// </para>
 /// </remarks>
 public static class InputRecordingFormat
@@ -69,6 +71,12 @@ public static class InputRecordingFormat
 				break;
 			case InputEventKind.ReleaseAll:
 				break;
+			case InputEventKind.Touch:
+				writer.Write7BitEncodedInt(e.Index);
+				writer.Write((byte)e.Code);
+				writer.Write(e.Value.X);
+				writer.Write(e.Value.Y);
+				break;
 			default:
 				throw new ArgumentOutOfRangeException(nameof(e), e.Kind, "Unknown input event kind.");
 		}
@@ -103,6 +111,10 @@ public static class InputRecordingFormat
 				return new InputEvent(kind, axis, axisPad, Value: new Vector2(reader.ReadSingle(), 0));
 			case InputEventKind.ReleaseAll:
 				return new InputEvent(kind);
+			case InputEventKind.Touch:
+				var touchId = reader.Read7BitEncodedInt();
+				var phase = reader.ReadByte();
+				return new InputEvent(kind, phase, touchId, Value: new Vector2(reader.ReadSingle(), reader.ReadSingle()));
 			default:
 				throw new InvalidDataException($"Unknown input event kind {(byte)kind} in the input recording.");
 		}
@@ -183,6 +195,9 @@ public sealed class InputRecorder : IInputRecorder, IInputTrackerHook, IDisposab
 
 	/// <inheritdoc/>
 	public void ReleaseAll() => _add(InputEvent.ForReleaseAll());
+
+	/// <inheritdoc/>
+	public void OnTouch(int id, TouchPhase phase, Vector2 position) => _add(InputEvent.ForTouch(id, phase, position));
 
 	/// <summary>
 	/// Writes the events of the current frame so far and flushes the stream.

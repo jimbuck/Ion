@@ -5,7 +5,7 @@ namespace Ion;
 
 /// <summary>
 /// The backend-independent input state behind every <see cref="IInputState"/>: keyboard, mouse buttons, wheel, mouse
-/// motion, text input and gamepads, in fixed-size storage. A backend calls <see cref="BeginFrame"/> once at the start of
+/// motion, text input, gamepads and touches, in fixed-size storage. A backend calls <see cref="BeginFrame"/> once at the start of
 /// every frame (the First stage), then feeds the frame's device events in order through the <see cref="IInputEventSink"/>
 /// methods; the state is then read-only for the rest of the frame.
 /// </summary>
@@ -55,6 +55,9 @@ public sealed class InputTracker : IInputEventSink
 	/// <summary>The number of characters of text input kept per frame (and per fixed step); more are dropped.</summary>
 	public const int TextCapacity = 256;
 
+	/// <summary>The number of touches tracked at the same time; touches that begin while this many are down are dropped.</summary>
+	public const int MaxTouches = 10;
+
 	private const int KeyCount = (int)Key.LastKey + 1;
 	private const int ButtonCount = (int)MouseButton.LastButton + 1;
 	private const int GamepadButtonCount = (int)GamepadButton.LastButton;
@@ -94,6 +97,10 @@ public sealed class InputTracker : IInputEventSink
 	private readonly GamepadState[] _gamepads = new GamepadState[MaxGamepads];
 	private readonly List<IGamepadState> _connected = new(MaxGamepads);
 	private readonly GamepadState _invalidGamepad;
+
+	// Touches of the frame, in the order they began: the ones down, then (until the next BeginFrame) the ones released.
+	private readonly TouchPoint[] _touches = new TouchPoint[MaxTouches];
+	private int _touchCount;
 
 	private uint _frameCounter;
 	private bool _replaying;
@@ -191,6 +198,35 @@ public sealed class InputTracker : IInputEventSink
 	public IReadOnlyList<IGamepadState> Gamepads => _connected;
 
 	/// <summary>
+	/// The touches of this frame, in the order they began: every touch that is down, plus those released this frame. A
+	/// per-frame view (the same from FixedUpdate).
+	/// </summary>
+	public ReadOnlySpan<TouchPoint> Touches => _touches.AsSpan(0, _touchCount);
+
+	/// <summary>
+	/// Finds the touch with <paramref name="id"/> in <see cref="Touches"/>, preferring one that is down over one released
+	/// this frame (an id can be reused within a frame).
+	/// </summary>
+	public bool TryGetTouch(int id, out TouchPoint touch)
+	{
+		var i = _findTouch(id);
+		if (i < 0)
+		{
+			for (var j = 0; j < _touchCount; j++)
+			{
+				if (_touches[j].Id == id)
+				{
+					i = j;
+					break;
+				}
+			}
+		}
+
+		touch = i >= 0 ? _touches[i] : default;
+		return i >= 0;
+	}
+
+	/// <summary>
 	/// The gamepad in slot <paramref name="index"/>. Every slot (and any out-of-range index) returns a state; a
 	/// disconnected one reports nothing held.
 	/// </summary>
@@ -234,6 +270,8 @@ public sealed class InputTracker : IInputEventSink
 		}
 
 		for (var i = 0; i < MaxGamepads; i++) _gamepads[i].BeginFrame(clearFixed);
+
+		_beginTouchFrame();
 
 		Frame = _loop?.Frame ?? _frameCounter;
 		_frameCounter++;
@@ -427,7 +465,8 @@ public sealed class InputTracker : IInputEventSink
 
 	/// <summary>
 	/// Releases every held key and mouse button without reporting a <c>Released</c> edge, for example when the window
-	/// loses focus and will not receive the matching key up events. Gamepads are not affected.
+	/// loses focus and will not receive the matching key up events, and cancels every touch that is down
+	/// (<see cref="TouchPhase.Canceled"/>). Gamepads are not affected.
 	/// </summary>
 	public void ReleaseAll()
 	{
@@ -436,7 +475,63 @@ public sealed class InputTracker : IInputEventSink
 		_keysDown.Reset();
 		_buttonsDown = 0;
 
+		for (var i = 0; i < _touchCount; i++)
+		{
+			ref var touch = ref _touches[i];
+			if (touch.IsDown) touch = touch with { Phase = TouchPhase.Canceled };
+		}
+
 		Recorder?.ReleaseAll();
+	}
+
+	/// <summary>
+	/// Applies one touch event. A touch that begins while <see cref="MaxTouches"/> are down is dropped (with its later
+	/// events); a move for an unknown id starts a touch; an end for an unknown id is ignored. A touch that begins and moves
+	/// within one frame stays <see cref="TouchPhase.Began"/>; one that begins and ends within one frame is reported once,
+	/// ended and <see cref="TouchPoint.Pressed"/>.
+	/// </summary>
+	/// <param name="id">The touch's id, unique among the touches down at the same time.</param>
+	/// <param name="phase"><see cref="TouchPhase.Began"/>, <see cref="TouchPhase.Moved"/>, <see cref="TouchPhase.Stationary"/>, <see cref="TouchPhase.Ended"/> or <see cref="TouchPhase.Canceled"/>.</param>
+	/// <param name="position">The position in window coordinates.</param>
+	public void OnTouch(int id, TouchPhase phase, Vector2 position)
+	{
+		if (_ignored) return;
+
+		var i = _findTouch(id);
+		switch (phase)
+		{
+			case TouchPhase.Began:
+			case TouchPhase.Moved:
+			case TouchPhase.Stationary:
+				if (i < 0)
+				{
+					if (_touchCount == MaxTouches && !_dropReleasedTouch()) return;
+					_touches[_touchCount++] = new TouchPoint(id, position, Vector2.Zero, position, TouchPhase.Began, Pressed: true);
+					phase = TouchPhase.Began;
+				}
+				else
+				{
+					ref var touch = ref _touches[i];
+					var moved = position != touch.Position;
+					touch = touch with
+					{
+						Position = position,
+						Delta = touch.Delta + (position - touch.Position),
+						Phase = touch.Pressed ? TouchPhase.Began : moved || touch.Phase == TouchPhase.Moved ? TouchPhase.Moved : TouchPhase.Stationary,
+					};
+				}
+				break;
+			case TouchPhase.Ended:
+			case TouchPhase.Canceled:
+				if (i < 0) return;
+				ref var ended = ref _touches[i];
+				ended = ended with { Position = position, Delta = ended.Delta + (position - ended.Position), Phase = phase };
+				break;
+			default:
+				return;
+		}
+
+		Recorder?.OnTouch(id, phase, position);
 	}
 
 	/// <summary>True while <paramref name="key"/> is held.</summary>
@@ -468,6 +563,46 @@ public sealed class InputTracker : IInputEventSink
 
 	/// <summary>True when <paramref name="button"/> went up this frame (from FixedUpdate: since the previous fixed step).</summary>
 	public bool Released(MouseButton button) => _mask(_buttonsReleased, _fixedButtonsReleased, (int)button, ButtonCount);
+
+	/// <summary>The index of the touch with <paramref name="id"/> that is down, or -1.</summary>
+	private int _findTouch(int id)
+	{
+		for (var i = 0; i < _touchCount; i++)
+		{
+			if (_touches[i].Id == id && _touches[i].IsDown) return i;
+		}
+
+		return -1;
+	}
+
+	/// <summary>Makes room for a new touch by dropping the oldest one released this frame; false when every touch is down.</summary>
+	private bool _dropReleasedTouch()
+	{
+		for (var i = 0; i < _touchCount; i++)
+		{
+			if (_touches[i].IsDown) continue;
+			Array.Copy(_touches, i + 1, _touches, i, _touchCount - i - 1);
+			_touchCount--;
+			return true;
+		}
+
+		return false;
+	}
+
+	/// <summary>Drops the touches released last frame and makes the others stationary, with no movement and no press.</summary>
+	private void _beginTouchFrame()
+	{
+		var kept = 0;
+		for (var i = 0; i < _touchCount; i++)
+		{
+			var touch = _touches[i];
+			if (!touch.IsDown) continue;
+			_touches[kept++] = touch with { Delta = Vector2.Zero, Phase = TouchPhase.Stationary, Pressed = false };
+		}
+
+		Array.Clear(_touches, kept, _touchCount - kept);
+		_touchCount = kept;
+	}
 
 	// Device events are dropped while a playback supplies the input.
 	private bool _ignored => !_replaying && Playback is { IsPlaying: true };

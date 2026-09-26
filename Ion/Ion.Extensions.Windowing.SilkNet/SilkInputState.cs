@@ -29,6 +29,10 @@ namespace Ion.Extensions.Windowing;
 /// <para>
 /// Silk.NET does not flag key repeats, so a key down for a key that is already down is reported as a repeat.
 /// </para>
+/// <para>
+/// Touch: on the SDL platform, SDL's finger events are mapped to <see cref="IInputState.Touches"/> (see
+/// <see cref="SdlTouchSource"/>); GLFW has no touch input.
+/// </para>
 /// </remarks>
 public sealed class SilkInputState : TrackedInputState, IDisposable
 {
@@ -40,6 +44,11 @@ public sealed class SilkInputState : TrackedInputState, IDisposable
 	private readonly HashSet<IGamepad> _hooked = [];
 	private EventReader<WindowFocusLostEvent> _focusLost;
 	private IInputContext? _input;
+
+	// Touch events come from SDL's event watch, possibly on another thread (Android), so they have their own locked queue.
+	private readonly Lock _touchLock = new();
+	private readonly List<InputEvent> _touchQueue = new(32);
+	private SdlTouchSource? _touch;
 
 	/// <summary>Creates the input state; it attaches to the window when the window is created.</summary>
 	public SilkInputState(SilkWindow window, IEvents events, InputTracker tracker) : base(tracker)
@@ -67,6 +76,12 @@ public sealed class SilkInputState : TrackedInputState, IDisposable
 		foreach (var gamepad in _input.Gamepads) _hookGamepad(gamepad);
 		_input.ConnectionChanged += _onConnectionChanged;
 		_applyCursor();
+
+		// Touch screens: SDL only (GLFW has no touch events).
+		if (_window.Platform == WindowPlatform.Sdl)
+		{
+			_touch = new SdlTouchSource(Silk.NET.SDL.SdlProvider.SDL.Value, () => _window.Size, EnqueueTouch);
+		}
 	}
 
 	/// <summary>
@@ -80,6 +95,12 @@ public sealed class SilkInputState : TrackedInputState, IDisposable
 
 		for (var i = 0; i < _queue.Count; i++) _queue[i].ApplyTo(tracker);
 		_queue.Clear();
+
+		lock (_touchLock)
+		{
+			for (var i = 0; i < _touchQueue.Count; i++) _touchQueue[i].ApplyTo(tracker);
+			_touchQueue.Clear();
+		}
 
 		// Key up events that happen while another window has focus never reach us, so forget held keys.
 		if (_focusLost.Read().Length > 0)
@@ -101,12 +122,20 @@ public sealed class SilkInputState : TrackedInputState, IDisposable
 	{
 		_window.Created -= Attach;
 		_window.CursorStateChanged -= _applyCursor;
+		_touch?.Dispose();
+		_touch = null;
 		_input?.Dispose();
 		_input = null;
 	}
 
 	/// <summary>Queues an event as if it came from a device (for tests and tools).</summary>
 	internal void Enqueue(in InputEvent e) => _queue.Add(e);
+
+	/// <summary>Queues a touch event; thread-safe (SDL may deliver touches on another thread).</summary>
+	internal void EnqueueTouch(InputEvent e)
+	{
+		lock (_touchLock) _touchQueue.Add(e);
+	}
 
 	private void _applyCursor()
 	{

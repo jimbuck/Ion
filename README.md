@@ -9,7 +9,18 @@ A small, positively-charged, schedule-based game engine for C#.
 
 ## Requirements
 
-Ion targets `net10.0` and builds with the .NET 10 SDK (pinned in `global.json`, `rollForward: latestFeature`). The source generators target `netstandard2.0` on Roslyn 4.4, so they load in any compiler from the .NET 8 SDK onwards; the schedule generator's interceptors need the .NET SDK 9.0.200 or later (see [Compile-time schedule](#compile-time-schedule-source-generator)). Games can be published with NativeAOT (`dotnet publish -r <rid> -p:PublishAot=true`).
+Ion targets `net10.0` and builds with the .NET 10 SDK (pinned in `global.json`, `rollForward: latestFeature`). The source generators target `netstandard2.0` on Roslyn 4.4, so they load in any compiler from the .NET 8 SDK onwards; the schedule generator's interceptors need the .NET SDK 9.0.200 or later (see [Compile-time schedule](#compile-time-schedule-source-generator)). Games are published with NativeAOT (see below).
+
+## Building and publishing
+
+```sh
+dotnet build Ion.sln -c Release                   # zero warnings expected
+xvfb-run -a dotnet test Ion.sln -c Release --no-build
+dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -p:IonTarget=linux-x64      # a NativeAOT executable
+ion publish Ion.Examples/Ion.Examples.Breakout.ECS --target r36s --sysroot <arm64 sysroot>   # the R36S handheld, with the ArkOS layout
+```
+
+`IonTarget` picks a publishing preset: `win-x64`, `win-arm64`, `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64` or `r36s` (NativeAOT, self-contained, trimmed, invariant globalization, stripped symbols; the handheld preset adds OpenGL ES, SDL, fullscreen 640x480 and an SD card folder with a launcher). Breakout ECS is a 12.6 MB executable on linux-x64 and reaches the end of its first headless frame in about 50 ms. Windows and macOS presets publish on their own OS. The Android and iOS heads of Breakout ECS build with `-p:IonMobileHeads=true` on a machine with the workload. Presets, sizes, startup times and the mobile status are in [docs/platforms/publishing.md](./docs/platforms/publishing.md), the handheld in [docs/platforms/r36s.md](./docs/platforms/r36s.md).
 
 ## Systems and the schedule
 

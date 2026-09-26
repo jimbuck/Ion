@@ -168,6 +168,33 @@ public sealed class NullInputState : TrackedInputState
 	}
 
 	/// <summary>
+	/// Queues a finger going down at <paramref name="position"/> (window coordinates) for the next frame.
+	/// </summary>
+	/// <param name="id">The touch id, unique among the scripted touches that are down.</param>
+	/// <param name="position">Where the finger goes down.</param>
+	public void TouchDown(int id, Vector2 position) => _queue(InputEvent.ForTouch(id, TouchPhase.Began, position));
+
+	/// <summary>
+	/// Queues moving the finger <paramref name="id"/> to <paramref name="position"/> for the next frame.
+	/// </summary>
+	public void TouchMove(int id, Vector2 position) => _queue(InputEvent.ForTouch(id, TouchPhase.Moved, position));
+
+	/// <summary>
+	/// Queues lifting the finger <paramref name="id"/> at <paramref name="position"/> for the next frame.
+	/// </summary>
+	public void TouchUp(int id, Vector2 position) => _queue(InputEvent.ForTouch(id, TouchPhase.Ended, position));
+
+	/// <summary>
+	/// Queues a quick tap at <paramref name="position"/>: the finger goes down and up within the next frame, which reports
+	/// one touch that is both <see cref="TouchPoint.Pressed"/> and <see cref="TouchPoint.Released"/>.
+	/// </summary>
+	public void TouchTap(int id, Vector2 position)
+	{
+		TouchDown(id, position);
+		TouchUp(id, position);
+	}
+
+	/// <summary>
 	/// Moves the mouse at the start of the next frame, like a windowed backend warping the cursor. The movement counts
 	/// towards <see cref="TrackedInputState.MouseDelta"/>.
 	/// </summary>

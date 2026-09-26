@@ -30,6 +30,9 @@ namespace Ion;
 /// <see cref="ILoopContext"/>; when no game loop is running every query uses the per-frame view.
 /// </para>
 /// <para>
+/// Touch screens: <see cref="Touches"/> lists the fingers of the frame (the Silk.NET module maps SDL touch events into it).
+/// </para>
+/// <para>
 /// Both backends keep their state in one shared <see cref="InputTracker"/> (bitsets, no per-frame allocation); see it for
 /// the modifier and focus-loss rules. Gamepads: the Silk.NET windowing module feeds real ones (GLFW or SDL) and the headless
 /// backend's <c>NullInputState</c> can script them. Input can be recorded and replayed with <c>AddInputRecording</c> and <c>AddInputPlayback</c>.
@@ -90,6 +93,37 @@ public interface IInputState
 	bool Up(Key key);
 	/// <summary>True while <paramref name="btn"/> is not held.</summary>
 	bool Up(MouseButton btn);
+
+	/// <summary>
+	/// The touch points of this frame, in the order they began: every finger that is down, plus those that were lifted or
+	/// cancelled this frame (<see cref="TouchPoint.Released"/>). Empty without a touch screen. Only valid until the next
+	/// frame starts.
+	/// </summary>
+	/// <remarks>
+	/// Touches have a per-frame view only: from FixedUpdate this is the same list as from Update, so a touch that begins
+	/// on a frame that runs no fixed step is not seen as <see cref="TouchPoint.Pressed"/> by any fixed step. Read touches
+	/// from First, Update or Render. The default implementation (for input states without touch support) is empty.
+	/// </remarks>
+	ReadOnlySpan<TouchPoint> Touches => [];
+
+	/// <summary>
+	/// Finds the touch with <paramref name="id"/> in <see cref="Touches"/>.
+	/// </summary>
+	/// <returns>True when a touch with that id is down or ended this frame.</returns>
+	bool TryGetTouch(int id, out TouchPoint touch)
+	{
+		foreach (var t in Touches)
+		{
+			if (t.Id == id)
+			{
+				touch = t;
+				return true;
+			}
+		}
+
+		touch = default;
+		return false;
+	}
 
 	/// <summary>Moves the mouse cursor.</summary>
 	void SetMousePosition(Vector2 position);

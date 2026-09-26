@@ -100,6 +100,44 @@ public class BreakoutHeadlessTests(ITestOutputHelper output)
 	}
 
 	[Fact, Trait(CATEGORY, INTEGRATION)]
+	public void TouchMovesThePaddleAndLiftingTheFingerLaunchesABall()
+	{
+		// The first frames, before the autopilot grabs the mouse (frame 5): only the scripted touches drive the paddle.
+		using var host = CreateHost(seed: null);
+		var world = host.Get<World>();
+		var launches = host.Collect<LaunchBallCommand>();
+		var paddleQuery = new QueryDescription().WithAll<Paddle, Transform2D>();
+		float PaddleX()
+		{
+			var x = float.NaN;
+			world.Query(in paddleQuery, (ref Transform2D transform) => x = transform.Position.X);
+			return x;
+		}
+
+		host.Step();
+		var start = PaddleX();
+
+		host.Input.TouchDown(0, new System.Numerics.Vector2(300, 500));
+		host.Step();
+		Assert.Equal(300, PaddleX());
+		Assert.Empty(launches);
+
+		host.Input.TouchMove(0, new System.Numerics.Vector2(700, 480));
+		host.Step();
+		Assert.Equal(700, PaddleX());
+		Assert.Empty(launches);
+
+		host.Input.TouchUp(0, new System.Numerics.Vector2(700, 480));
+		host.Step();
+		Assert.Single(launches);
+		Assert.NotEqual(start, PaddleX());
+
+		// No finger, no movement.
+		host.Step();
+		Assert.Equal(700, PaddleX());
+	}
+
+	[Fact, Trait(CATEGORY, INTEGRATION)]
 	public void TwoRunsWithTheSameSeedAreIdentical()
 	{
 		var first = Play(seed: 42);

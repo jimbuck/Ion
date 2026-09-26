@@ -31,6 +31,10 @@ namespace Ion.Tools
 			      Compares two PNGs (exit code 0 when they match, 1 otherwise) and writes a diff image.
 			  ion remote <method> [params-json] [--project <dir> | --token-file <file>]
 			      Calls a remote protocol method of a game running with --remote (ion remote rpc.discover lists them).
+			  ion publish [project] --target <preset> [-c Release] [--output <dir>] [--sysroot <dir>] [-- msbuild args]
+			      Publishes the game with a NativeAOT preset: win-x64, win-arm64, osx-arm64, osx-x64, linux-x64, linux-arm64
+			      or r36s (the R36S handheld: linux-arm64, OpenGL ES, SDL, fullscreen 640x480, plus the ArkOS ports layout
+			      in <output>-arkos). Same as dotnet publish -p:IonTarget=<preset>; --sysroot sets IonArm64SysRoot.
 			  ion mcp
 			      Serves the Model Context Protocol on stdio for coding agents (claude mcp add ion -- ion mcp).
 			""";
@@ -61,6 +65,7 @@ namespace Ion.Tools
 					"trace" => Trace(new Arguments(rest)),
 					"diff" => Diff(new Arguments(rest)),
 					"remote" => Remote(new Arguments(rest)),
+					"publish" => Publish(new Arguments(rest)),
 					"mcp" => Mcp(),
 					_ => Fail($"Unknown command '{args[0]}'.\n\n{Usage}"),
 				};
@@ -212,6 +217,35 @@ namespace Ion.Tools
 			var result = client.Call(method, parameters);
 			Console.Out.WriteLine(result?.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) ?? "null");
 			return 0;
+		}
+
+		/// <summary>The publishing presets of <c>build/Ion.Publish.props</c> (the IonTarget values).</summary>
+		public static readonly string[] PublishTargets = ["win-x64", "win-arm64", "osx-arm64", "osx-x64", "linux-x64", "linux-arm64", "r36s"];
+
+		private static int Publish(Arguments a)
+		{
+			var target = a.Option("--target") ?? throw new ArgumentException($"ion publish needs --target <preset>: {string.Join(", ", PublishTargets)}.");
+			if (Array.IndexOf(PublishTargets, target) < 0) throw new ArgumentException($"Unknown publish target '{target}'. The presets are {string.Join(", ", PublishTargets)}.");
+			var project = GameRunner.ResolveProject(a.Positional(0));
+			var arguments = PublishArguments(project, target, a.Option("-c") ?? a.Option("--configuration"), a.Option("--output") ?? a.Option("-o"), a.Option("--sysroot"), a.Rest);
+			a.ThrowOnUnknown();
+			var start = new System.Diagnostics.ProcessStartInfo("dotnet") { UseShellExecute = false };
+			foreach (var arg in arguments) start.ArgumentList.Add(arg);
+			using var process = System.Diagnostics.Process.Start(start)!;
+			process.WaitForExit();
+			return process.ExitCode;
+		}
+
+		/// <summary>The <c>dotnet</c> arguments of <c>ion publish</c>: a <c>dotnet publish</c> with the IonTarget preset.</summary>
+		/// <exception cref="ArgumentException">An unknown preset.</exception>
+		public static List<string> PublishArguments(string project, string target, string? configuration, string? output, string? sysroot, IReadOnlyList<string> extra)
+		{
+			if (Array.IndexOf(PublishTargets, target) < 0) throw new ArgumentException($"Unknown publish target '{target}'. The presets are {string.Join(", ", PublishTargets)}.");
+			List<string> arguments = ["publish", project, "-c", configuration ?? "Release", $"-p:IonTarget={target}"];
+			if (output is not null) arguments.AddRange(["-o", Path.GetFullPath(output)]);
+			if (sysroot is not null) arguments.Add($"-p:IonArm64SysRoot={Path.GetFullPath(sysroot)}");
+			arguments.AddRange(extra);
+			return arguments;
 		}
 
 		private static int Mcp()

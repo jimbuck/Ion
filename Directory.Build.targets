@@ -3,6 +3,8 @@
   <Import Project="Ion\Ion.Extensions.Windowing.SilkNet\buildTransitive\Ion.Extensions.Windowing.SilkNet.targets" />
   <!-- The remote protocol's feature switch: compiled out of Release builds unless IonRemote=true (packaged as buildTransitive too). -->
   <Import Project="Ion\Ion.Extensions.Remote\buildTransitive\Ion.Extensions.Remote.targets" />
+  <!-- Publishing presets (IonTarget): checks, the handheld default configuration and the ArkOS SD card layout. -->
+  <Import Project="build\Ion.Publish.targets" />
 
   <Target Name="AddInternalsVisibleTo" BeforeTargets="BeforeCompile">
     <!-- Add default suffix if there is no InternalsVisibleTo or InternalsVisibleToSuffix defined -->

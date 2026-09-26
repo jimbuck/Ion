@@ -75,6 +75,12 @@ public abstract class TrackedInputState : IInputState
 	public bool Up(MouseButton btn) => !Tracker.Down(btn);
 
 	/// <inheritdoc/>
+	public ReadOnlySpan<TouchPoint> Touches => Tracker.Touches;
+
+	/// <inheritdoc/>
+	public bool TryGetTouch(int id, out TouchPoint touch) => Tracker.TryGetTouch(id, out touch);
+
+	/// <inheritdoc/>
 	public abstract void SetMousePosition(Vector2 position);
 
 	/// <inheritdoc/>

@@ -35,6 +35,17 @@ public interface IInputEventSink
 
 	/// <summary>Every held key and mouse button was released without an edge (the window lost focus).</summary>
 	void ReleaseAll();
+
+	/// <summary>
+	/// A touch began, moved, ended or was cancelled at <paramref name="position"/> (window coordinates). The default
+	/// implementation ignores it, for sinks written before touch input existed.
+	/// </summary>
+	/// <param name="id">The touch's id, unique among the touches down at the same time.</param>
+	/// <param name="phase"><see cref="TouchPhase.Began"/>, <see cref="TouchPhase.Moved"/>, <see cref="TouchPhase.Ended"/> or <see cref="TouchPhase.Canceled"/>.</param>
+	/// <param name="position">The position in window coordinates.</param>
+	void OnTouch(int id, TouchPhase phase, Vector2 position)
+	{
+	}
 }
 
 /// <summary>
@@ -96,18 +107,20 @@ public enum InputEventKind : byte
 	GamepadAxis,
 	/// <summary><see cref="IInputEventSink.ReleaseAll"/>.</summary>
 	ReleaseAll,
+	/// <summary><see cref="IInputEventSink.OnTouch"/>.</summary>
+	Touch,
 }
 
 /// <summary>
 /// One raw input event as a value: what <see cref="IInputEventSink"/> receives, for queues and recordings.
 /// </summary>
 /// <param name="Kind">The kind of event.</param>
-/// <param name="Code">The <see cref="Key"/>, <see cref="MouseButton"/>, <see cref="GamepadButton"/>, <see cref="GamepadAxis"/> or text character.</param>
-/// <param name="Index">The gamepad slot, for gamepad events.</param>
+/// <param name="Code">The <see cref="Key"/>, <see cref="MouseButton"/>, <see cref="GamepadButton"/>, <see cref="GamepadAxis"/>, <see cref="TouchPhase"/> or text character.</param>
+/// <param name="Index">The gamepad slot, for gamepad events, or the touch id, for touch events.</param>
 /// <param name="Down">Down (or connected) versus up (or disconnected).</param>
 /// <param name="Repeat">Whether a key down is an auto-repeat.</param>
 /// <param name="Modifiers">The modifiers held with a key event.</param>
-/// <param name="Value">The mouse position, the wheel delta (in X) or the axis value (in X).</param>
+/// <param name="Value">The mouse or touch position, the wheel delta (in X) or the axis value (in X).</param>
 public readonly record struct InputEvent(
 	InputEventKind Kind,
 	int Code = 0,
@@ -144,6 +157,9 @@ public readonly record struct InputEvent(
 	/// <summary>A release-all (focus loss) event.</summary>
 	public static InputEvent ForReleaseAll() => new(InputEventKind.ReleaseAll);
 
+	/// <summary>A touch event.</summary>
+	public static InputEvent ForTouch(int id, TouchPhase phase, Vector2 position) => new(InputEventKind.Touch, (int)phase, id, Value: position);
+
 	/// <summary>Delivers this event to <paramref name="sink"/>.</summary>
 	public void ApplyTo(IInputEventSink sink)
 	{
@@ -158,6 +174,7 @@ public readonly record struct InputEvent(
 			case InputEventKind.GamepadButton: sink.OnGamepadButton(Index, (GamepadButton)Code, Down); break;
 			case InputEventKind.GamepadAxis: sink.OnGamepadAxis(Index, (GamepadAxis)Code, Value.X); break;
 			case InputEventKind.ReleaseAll: sink.ReleaseAll(); break;
+			case InputEventKind.Touch: sink.OnTouch(Index, (TouchPhase)Code, Value); break;
 		}
 	}
 }

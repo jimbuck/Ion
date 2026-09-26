@@ -31,6 +31,33 @@ public class NullInputStateTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
+	public void ScriptedTouches_AreAppliedAtTheNextFrame()
+	{
+		_input.TouchDown(0, new System.Numerics.Vector2(10, 10));
+		Assert.True(_input.Touches.IsEmpty);
+
+		_input.Step();
+		var touch = Assert.Single(_input.Touches.ToArray());
+		Assert.True(touch.Pressed);
+		Assert.Equal(TouchPhase.Began, touch.Phase);
+
+		_input.TouchMove(0, new System.Numerics.Vector2(20, 10));
+		_input.Step();
+		Assert.Equal(new System.Numerics.Vector2(10, 0), Assert.Single(_input.Touches.ToArray()).Delta);
+
+		_input.TouchUp(0, new System.Numerics.Vector2(20, 10));
+		_input.TouchTap(1, new System.Numerics.Vector2(5, 5));
+		_input.Step();
+		var touches = _input.Touches.ToArray();
+		Assert.Equal(2, touches.Length);
+		Assert.All(touches, t => Assert.True(t.Released));
+		Assert.True(touches[1].Pressed);
+
+		_input.Step();
+		Assert.True(_input.Touches.IsEmpty);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
 	public void Tap_PressesAndReleasesWithinOneFrame()
 	{
 		_input.Tap(Key.Enter);

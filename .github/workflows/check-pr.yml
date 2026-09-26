@@ -102,7 +102,8 @@ jobs:
         if-no-files-found: warn
 
   # NativeAOT publish of the ECS sample, the Silk.NET quad sample and the UI menu sample. Fails on any trim/AOT warning whose subject is Ion's
-  # own code; warnings from third-party packages (Silk.NET.Core, DependencyModel) are reported only.
+  # own code; warnings from third-party packages (Silk.NET.Core, DependencyModel) are reported only. The ECS sample is published with the
+  # linux-x64 and r36s presets (Stage 7) by the size and startup measurement, which fails only when a desktop executable is over 30 MB.
   aot:
     runs-on: ubuntu-latest
     steps:
@@ -112,26 +113,46 @@ jobs:
       with:
         dotnet-version: 10.0.x
     - name: Install NativeAOT prerequisites
-      run: sudo apt-get update -y -qq && sudo apt-get install -y -qq clang zlib1g-dev
-    - name: Publish ECS sample with NativeAOT
+      # clang and lld cross-link linux-arm64 (docs/platforms/r36s.md); qemu-user-static runs the r36s build for its startup time.
+      run: sudo apt-get update -y -qq && sudo apt-get install -y -qq clang lld zlib1g-dev qemu-user-static
+    - name: Build the arm64 glibc 2.27 sysroot
+      run: python3 build/arm64-sysroot.py "$RUNNER_TEMP/sysroot-bionic-arm64"
+    - name: Publish sizes and startup (Breakout ECS, linux-x64 and r36s)
       shell: bash
+      env:
+        IonArm64SysRoot: ${{ runner.temp }}/sysroot-bionic-arm64
+        TARGETS: linux-x64 r36s
+        RUNS: 10
       run: |
         set -o pipefail
-        # TrimmerSingleWarn=false reports every warning instead of one summary line per assembly.
-        dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -c Release -r linux-x64 \
-          -p:PublishAot=true -p:TrimmerSingleWarn=false -o ./aot 2>&1 | tee aot-publish.log
+        status=0
+        bash docs/plans/benchmarks/2026-09-stage7-publish/measure.sh ./stage7-publish || status=$?
+        cat ./stage7-publish/*-publish.log > aot-publish.log
+        cat ./stage7-publish/results.md >> "$GITHUB_STEP_SUMMARY"
+        exit $status
+    - uses: actions/upload-artifact@v5
+      name: Upload publish sizes and startup
+      if: ${{ always() }}
+      with:
+        name: Stage7PublishResults
+        path: |
+          stage7-publish/results.md
+          stage7-publish/results.json
+          stage7-publish/*-startup.txt
+          stage7-publish/*-run.log
+          stage7-publish/r36s-arkos/
     - name: Publish Silk.NET quad sample with NativeAOT
       shell: bash
       run: |
         set -o pipefail
-        dotnet publish Ion.Examples/Ion.Examples.Quad -c Release -r linux-x64 \
-          -p:PublishAot=true -p:TrimmerSingleWarn=false -o ./aot-quad 2>&1 | tee -a aot-publish.log
+        dotnet publish Ion.Examples/Ion.Examples.Quad -p:IonTarget=linux-x64 \
+          -p:TrimmerSingleWarn=false -o ./aot-quad 2>&1 | tee -a aot-publish.log
     - name: Publish UI menu sample with NativeAOT
       shell: bash
       run: |
         set -o pipefail
-        dotnet publish Ion.Examples/Ion.Examples.Menu -c Release -r linux-x64 \
-          -p:PublishAot=true -p:TrimmerSingleWarn=false -o ./aot-menu 2>&1 | tee -a aot-publish.log
+        dotnet publish Ion.Examples/Ion.Examples.Menu -p:IonTarget=linux-x64 \
+          -p:TrimmerSingleWarn=false -o ./aot-menu 2>&1 | tee -a aot-publish.log
     - name: Check for Ion AOT warnings
       shell: bash
       run: |
@@ -148,3 +169,74 @@ jobs:
       with:
         name: AotPublishLog
         path: aot-publish.log
+
+  # Desktop presets on their own operating systems (NativeAOT does not cross-compile between operating systems). Off unless the
+  # repository variable ION_PUBLISH_CI is 'true'.
+  publish-desktop:
+    if: ${{ vars.ION_PUBLISH_CI == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: win-x64, exe: Ion.Examples.Breakout.ECS.exe }
+          - { os: macos-latest, target: osx-arm64, exe: Ion.Examples.Breakout.ECS }
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v5
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+    - name: Publish Breakout ECS with the ${{ matrix.target }} preset
+      shell: bash
+      run: |
+        dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -p:IonTarget=${{ matrix.target }} -o ./publish/${{ matrix.target }}
+        size=$(wc -c < "./publish/${{ matrix.target }}/${{ matrix.exe }}")
+        echo "${{ matrix.target }}: $((size / 1048576)) MB ($size bytes)" | tee -a "$GITHUB_STEP_SUMMARY"
+        if [ "$size" -gt $((30 * 1048576)) ]; then echo "::error::over the 30 MB desktop limit"; exit 1; fi
+    - uses: actions/upload-artifact@v5
+      with:
+        name: BreakoutECS-${{ matrix.target }}
+        path: publish/${{ matrix.target }}
+
+  # Mobile heads (Stage 7): skeletons, off unless the repository variable ION_MOBILE_CI is 'true'. -p:IonMobileHeads=true builds the real
+  # net10.0-android and net10.0-ios heads (build/Ion.Mobile.props); without it they build as libraries of the shared game code.
+  mobile-android:
+    if: ${{ vars.ION_MOBILE_CI == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 17
+    - name: Install the android workload
+      run: dotnet workload install android
+    - name: Publish the Android head (NativeAOT, android-arm64 APK)
+      # The hosted runner has the Android SDK in ANDROID_HOME.
+      run: >
+        dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS.Android -c Release -p:IonMobileHeads=true
+        -p:RuntimeIdentifier=android-arm64 -p:AndroidSdkDirectory="$ANDROID_HOME" -o ./publish/android
+    - uses: actions/upload-artifact@v5
+      with:
+        name: BreakoutECS-android
+        path: publish/android/*.apk
+
+  mobile-ios:
+    if: ${{ vars.ION_MOBILE_CI == 'true' }}
+    runs-on: macos-15
+    steps:
+    - uses: actions/checkout@v5
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+    - name: Install the ios workload
+      run: dotnet workload install ios
+    - name: Build the iOS head for the simulator (no signing)
+      # A device build (ios-arm64, NativeAOT) needs a signing identity and provisioning profile: add them as secrets and publish.
+      run: dotnet build Ion.Examples/Ion.Examples.Breakout.ECS.iOS -c Release -p:IonMobileHeads=true -p:RuntimeIdentifier=iossimulator-arm64

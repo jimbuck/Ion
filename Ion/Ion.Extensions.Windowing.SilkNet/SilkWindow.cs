@@ -38,6 +38,10 @@ namespace Ion.Extensions.Windowing;
 /// The platform (<see cref="WindowConfig.Platform"/>) is registered explicitly with Silk.NET's first-party discovery
 /// turned off, so no reflection runs and the window works under NativeAOT.
 /// </para>
+/// <para>
+/// Android and iOS: SDL is view-only there (<see cref="IsViewOnly"/>), so a Silk.NET view is created in place of a window.
+/// The view fills the screen; the window-only members (title, position, size and state setters, borders) do nothing.
+/// </para>
 /// </remarks>
 public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 {
@@ -50,6 +54,8 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 	private readonly IEvents _events;
 	private readonly ILogger _logger;
 
+	// The view is the window on desktop, and the only object on view-only platforms (Android, iOS), where _window is null.
+	private IView? _view;
 	private ISilkWindow? _window;
 	private string _title;
 	private bool _isMouseGrabbed;
@@ -68,45 +74,48 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 		_cursorVisible = windowConfig.CurrentValue.ShowCursor;
 	}
 
-	/// <summary>The Silk.NET window, or null before <see cref="Initialize"/>.</summary>
-	public ISilkWindow? View => _window;
+	/// <summary>The Silk.NET view (the window on desktop), or null before <see cref="Initialize"/>.</summary>
+	public IView? View => _view;
+
+	/// <summary>True when the platform has views only (SDL on Android and iOS): the view fills the screen.</summary>
+	public bool IsViewOnly => _view is not null && _window is null;
 
 	/// <summary>The platform the window was created with (<see cref="WindowPlatform.Glfw"/> or <see cref="WindowPlatform.Sdl"/>).</summary>
 	public WindowPlatform Platform { get; private set; }
 
 	/// <summary>Raised on the main thread after the native window has been created, before the initial resize event.</summary>
-	public event Action<ISilkWindow>? Created;
+	public event Action<IView>? Created;
 
 	/// <inheritdoc/>
-	public bool IsCreated => _window is not null;
+	public bool IsCreated => _view is not null;
 
 	/// <inheritdoc/>
-	public object? PlatformWindow => _window;
+	public object? PlatformWindow => _view;
 
 	/// <inheritdoc/>
-	public Vector2 FramebufferSize => _window is null ? Vector2.Zero : new Vector2(_window.FramebufferSize.X, _window.FramebufferSize.Y);
+	public Vector2 FramebufferSize => _view is null ? Vector2.Zero : new Vector2(_view.FramebufferSize.X, _view.FramebufferSize.Y);
 
 	/// <inheritdoc/>
-	public NativeWindowHandles NativeHandles => _window?.Native is { } native ? ToHandles(native) : default;
+	public NativeWindowHandles NativeHandles => _view?.Native is { } native ? ToHandles(native) : default;
 
 	/// <inheritdoc/>
 	public uint Width
 	{
-		get => (uint)Math.Max(0, _window?.Size.X ?? 0);
+		get => (uint)Math.Max(0, _view?.Size.X ?? 0);
 		set { if (_window is not null) _window.Size = new Vector2D<int>((int)value, _window.Size.Y); }
 	}
 
 	/// <inheritdoc/>
 	public uint Height
 	{
-		get => (uint)Math.Max(0, _window?.Size.Y ?? 0);
+		get => (uint)Math.Max(0, _view?.Size.Y ?? 0);
 		set { if (_window is not null) _window.Size = new Vector2D<int>(_window.Size.X, (int)value); }
 	}
 
 	/// <inheritdoc/>
 	public Vector2 Size
 	{
-		get => _window is null ? Vector2.Zero : new Vector2(_window.Size.X, _window.Size.Y);
+		get => _view is null ? Vector2.Zero : new Vector2(_view.Size.X, _view.Size.Y);
 		set { if (_window is not null) _window.Size = new Vector2D<int>((int)value.X, (int)value.Y); }
 	}
 
@@ -122,7 +131,7 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 	/// <inheritdoc/>
 	public bool IsVisible
 	{
-		get => _window?.IsVisible ?? false;
+		get => _window?.IsVisible ?? _view is not null;
 		set { if (_window is not null) _window.IsVisible = value; }
 	}
 
@@ -143,7 +152,7 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 	/// <inheritdoc/>
 	public bool IsFullscreen
 	{
-		get => _window?.WindowState == SilkWindowState.Fullscreen;
+		get => _window is null ? _view is not null : _window.WindowState == SilkWindowState.Fullscreen;
 		set { if (_window is not null) _window.WindowState = value ? SilkWindowState.Fullscreen : SilkWindowState.Normal; }
 	}
 
@@ -217,30 +226,33 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 		var requested = config.Platform;
 		var platform = ResolvePlatform(requested);
 
+		IView view;
 		try
 		{
-			_window = Create(platform, config);
+			view = Create(platform, config);
 		}
 		catch (Exception ex) when (requested == WindowPlatform.Auto && platform == WindowPlatform.Glfw)
 		{
 			_logger.LogWarning(ex, "GLFW window creation failed; falling back to SDL.");
 			platform = WindowPlatform.Sdl;
-			_window = Create(platform, config);
+			view = Create(platform, config);
 		}
 
 		Platform = platform;
-		_window.Closing += _onClosing;
-		_window.FocusChanged += _onFocusChanged;
-		_window.Resize += _onResize;
+		_view = view;
+		_window = view as ISilkWindow;
+		view.Closing += _onClosing;
+		view.FocusChanged += _onFocusChanged;
+		view.Resize += _onResize;
 		IsActive = true;
 
-		if (config.WindowState == IonWindowState.BorderlessFullScreen) _makeBorderlessFullscreen(_window);
+		if (_window is not null && config.WindowState == IonWindowState.BorderlessFullScreen) _makeBorderlessFullscreen(_window);
 
-		_lastSize = _window.Size;
-		_logger.LogInformation("Window created with {Platform}: {Width}x{Height} (framebuffer {FbWidth}x{FbHeight}, {Native}).",
-			platform, _window.Size.X, _window.Size.Y, _window.FramebufferSize.X, _window.FramebufferSize.Y, _window.Native?.Kind);
+		_lastSize = view.Size;
+		_logger.LogInformation("{Kind} created with {Platform}: {Width}x{Height} (framebuffer {FbWidth}x{FbHeight}, {Native}).",
+			_window is null ? "View" : "Window", platform, view.Size.X, view.Size.Y, view.FramebufferSize.X, view.FramebufferSize.Y, view.Native?.Kind);
 
-		Created?.Invoke(_window);
+		Created?.Invoke(view);
 		_events.Emit(new WindowResizeEvent(Width, Height));
 	}
 
@@ -250,15 +262,16 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 	/// </summary>
 	public void Step()
 	{
-		if (_window is null || IsClosed) return;
-		_window.DoEvents();
+		if (_view is null || IsClosed) return;
+		_view.DoEvents();
 	}
 
 	/// <summary>Destroys the native window.</summary>
 	public void Dispose()
 	{
-		if (_window is null) return;
-		var window = _window;
+		if (_view is null) return;
+		var window = _view;
+		_view = null;
 		_window = null;
 		IsClosed = true;
 		window.Closing -= _onClosing;
@@ -277,7 +290,7 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 	/// <summary>Marks the window closed after the exit request (the native window lives until disposal).</summary>
 	internal void MarkClosed() => IsClosed = true;
 
-	private ISilkWindow Create(WindowPlatform platform, WindowConfig config)
+	private IView Create(WindowPlatform platform, WindowConfig config)
 	{
 		RegisterPlatform(platform);
 
@@ -309,7 +322,9 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 			ShouldSwapAutomatically = false,
 		};
 
-		var window = Window.Create(options);
+		// SDL on Android and iOS is view-only: the view is the whole screen (size, position and state do not apply).
+		var viewOnly = Window.IsViewOnly;
+		IView window = viewOnly ? Window.GetView(new ViewOptions(options)) : Window.Create(options);
 		try
 		{
 			window.Initialize();
@@ -319,7 +334,8 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 			// No OpenGL ES 3.1 context: fall back to 3.0 (the GLES backend has ES 3.0 paths).
 			_logger.LogWarning(ex, "No OpenGL ES 3.1 context; retrying with OpenGL ES 3.0.");
 			window.Dispose();
-			window = Window.Create(options with { API = GlesApi(3, 0) });
+			var fallback = options with { API = GlesApi(3, 0) };
+			window = viewOnly ? Window.GetView(new ViewOptions(fallback)) : Window.Create(fallback);
 			window.Initialize();
 		}
 

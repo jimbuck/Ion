@@ -26,6 +26,17 @@ public sealed class CliTests
 	}
 
 	[Fact]
+	public void PublishForwardsThePresetToDotnetPublish()
+	{
+		var args = Cli.PublishArguments("/g/Game.csproj", "r36s", null, "out/r36s", "sysroot", ["-v", "m"]);
+		Assert.Equal(["publish", "/g/Game.csproj", "-c", "Release", "-p:IonTarget=r36s", "-o", Path.GetFullPath("out/r36s"), $"-p:IonArm64SysRoot={Path.GetFullPath("sysroot")}", "-v", "m"], args);
+
+		Assert.Equal(["publish", "/g/Game.csproj", "-c", "Debug", "-p:IonTarget=linux-x64"], Cli.PublishArguments("/g/Game.csproj", "linux-x64", "Debug", null, null, []));
+		Assert.Throws<ArgumentException>(() => Cli.PublishArguments("/g/Game.csproj", "r35s", null, null, null, []));
+		Assert.Equal(2, Cli.Execute(["publish", "--target", "nope"]));
+	}
+
+	[Fact]
 	public void RunOptionsBecomeEngineConfiguration()
 	{
 		var args = GameRunner.GameArguments(new GameRunOptions
