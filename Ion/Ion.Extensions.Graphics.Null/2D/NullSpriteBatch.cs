@@ -1,5 +1,7 @@
 using System.Numerics;
 
+using Ion.Extensions.Graphics.Rhi;
+
 namespace Ion.Extensions.Graphics;
 
 /// <summary>
@@ -156,23 +158,55 @@ public sealed class NullSpriteBatch : ISpriteBatch, ISpriteBatchStatistics
 		}
 	}
 
+	private int _depth;
+
+	/// <summary>The options of the innermost open segment (<c>default</c> outside a segment).</summary>
+	public SpriteBatchOptions CurrentOptions { get; private set; }
+
+	/// <summary>The render target set with <see cref="SetRenderTarget"/>, or null for the frame.</summary>
+	public ITexture? CurrentRenderTarget { get; private set; }
+
+	private readonly Stack<SpriteBatchOptions> _options = new();
+
 	/// <summary>
-	/// Starts recording a new frame, discarding anything drawn since the last <see cref="End"/>.
+	/// Starts recording a new frame, discarding anything drawn since the last <see cref="End"/>. Same as
+	/// <see cref="Begin(SpriteBatchOptions)"/> with default options.
 	/// </summary>
-	public void Begin()
+	public void Begin() => Begin(default);
+
+	/// <summary>
+	/// Opens a segment. The outermost one (the sprite batch system's) starts recording a new frame, discarding anything
+	/// drawn since the last <see cref="End"/>; nested ones only change <see cref="CurrentOptions"/>.
+	/// </summary>
+	public void Begin(SpriteBatchOptions options)
 	{
-		_current = new FrameStats(FramesCompleted);
+		if (_depth == 0) _current = new FrameStats(FramesCompleted);
+		_options.Push(CurrentOptions);
+		CurrentOptions = options;
+		_depth++;
 	}
 
 	/// <summary>
-	/// Completes the frame: it becomes <see cref="LastFrame"/> and a new one starts.
+	/// Closes a segment. Closing the outermost one completes the frame: it becomes <see cref="LastFrame"/> and a new one
+	/// starts. Without an open segment it completes the frame too.
 	/// </summary>
 	public void End()
 	{
+		if (_depth > 0)
+		{
+			_depth--;
+			CurrentOptions = _options.Pop();
+			if (_depth > 0) return;
+		}
+
+		CurrentRenderTarget = null;
 		_last = _current;
 		FramesCompleted++;
 		_current = new FrameStats(FramesCompleted);
 	}
+
+	/// <summary>Records the target (nothing is rendered).</summary>
+	public void SetRenderTarget(ITexture? target, Color? clearColor = null) => CurrentRenderTarget = target;
 
 	public void Draw(ITexture2D texture, RectangleF destinationRectangle, RectangleF sourceRectangle = default, Color color = default, Vector2 origin = default, float rotation = 0, float depth = 0, SpriteEffect options = SpriteEffect.None)
 	{

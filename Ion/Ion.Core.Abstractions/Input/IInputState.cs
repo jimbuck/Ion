@@ -31,9 +31,8 @@ namespace Ion;
 /// </para>
 /// <para>
 /// Both backends keep their state in one shared <see cref="InputTracker"/> (bitsets, no per-frame allocation); see it for
-/// the modifier and focus-loss rules. Gamepads: the Veldrid backend reports no gamepads (its SDL2 input snapshot has no
-/// controller events), the headless backend's <c>NullInputState</c> can script them, and the Silk.NET backend (Stage 4)
-/// will feed real ones. Input can be recorded and replayed with <c>AddInputRecording</c> and <c>AddInputPlayback</c>.
+/// the modifier and focus-loss rules. Gamepads: the Silk.NET windowing module feeds real ones (GLFW or SDL) and the headless
+/// backend's <c>NullInputState</c> can script them. Input can be recorded and replayed with <c>AddInputRecording</c> and <c>AddInputPlayback</c>.
 /// </para>
 /// </remarks>
 public interface IInputState

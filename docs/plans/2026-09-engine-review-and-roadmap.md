@@ -48,7 +48,7 @@ Decisions confirmed by the owner after the first draft (they replace the open qu
 | `dotnet restore` + `dotnet build -c Release` with SDK 8.0.131 | Engine and both Breakout samples build. `Ion.Examples.Scenes` fails: 7x `CS1593` because the `UseUpdate<TService...>` overloads come from `Ion.Core.InternalGenerators`, which references Roslyn 4.10 and is rejected by the 4.8 compiler (`CS9057`). |
 | Same with SDK 10.0.112 | Everything builds, 4 warnings (`SceneSystem._activeTransition` never assigned, `TraceManager._nextId` unused, unread primary-constructor parameters). |
 | `dotnet test --filter Category!=E2E` | 8 tests: 7 pass, 1 skipped (`SceneGeneratorTests` is `Skip="WIP"`). ~1.7 s. |
-| `Ion.Examples.Breakout.ECS` under Xvfb + Mesa lavapipe (Vulkan) | Runs (window, device, shaders, sprite buffer, resize). Reaching Vulkan required requesting `Direct3D12` in config because of the enum bug, and a `libdl.so` symlink because Veldrid's `vk` package loads `libdl` rather than `libdl.so.2`. |
+| `Ion.Examples.Breakout.ECS` under Xvfb + Mesa lavapipe (Vulkan) | Runs (window, device, shaders, sprite buffer, resize). Reaching Vulkan required requesting `Direct3D12` in config because of the enum bug (the Veldrid backend has since been removed). |
 | Same with OpenGL (the backend the samples actually get) | `Unable to create OpenGL Context` under Xvfb (Veldrid requests a D32_S8 GL visual). |
 | `Ion.Examples.Breakout` (non-ECS) | Crashes at init: `Could not find file .../Assets/Bonk.wav` (file is `bonk.wav`). |
 | `Ion.Examples.Scenes` | Crashes at init: asks for Vulkan in code, gets OpenGL, cannot create a GL context. |
@@ -392,6 +392,13 @@ Three layers, all allocation-free on the hot path:
 - Tests: the Vulkan suite became backend-agnostic contracts in `Ion.Extensions.Graphics.Rhi.Tests.Shared`, run by the Vulkan tests (62) and the GLES tests (81: the contract at ES 3.0, 3.1 and 3.2, windowed, and GLES-specific binding, std140, sampler, fence and readback tests). Both backends match one set of golden PNGs pixel for pixel on Mesa, windowed and headless.
 - NativeAOT: the quad sample publishes for linux-x64 and cross-publishes for linux-arm64 (clang/lld against a glibc 2.27 sysroot) with no `Ion.*` warnings; the arm64 build runs under qemu-aarch64 on arm64 Mesa 20 (ES 3.1) and renders the golden. Not verified: R36S hardware, Panfrost, SDL KMSDRM, gamepad and frame times on the device.
 
+**As implemented (Stage 4, third wave: 2D renderer, sample migration, Veldrid removed, September 2026).**
+
+- `Ion.Extensions.Rendering2D` on the RHI only (runs on Vulkan and OpenGL ES unchanged): `SpriteBatch` records a 40-byte instance per sprite (origin corner and two edge vectors with scale and rotation folded in, so the vertex shader has no trigonometry; unorm16 UV rectangle; packed RGBA8 color; depth) into one CPU array per frame, sorts each `Begin`/`End` segment (`Deferred`, `Texture` by counting sort, `FrontToBack`/`BackToFront` by a stable radix sort), uploads everything once with `IQueue.WriteBuffer` into the frame slot's instance buffer (ring of `FramesInFlight`, no waits) and draws ranges bound by vertex buffer offset (so GLES 3.1 needs no base instance), one draw per run of equal textures. Blend presets (`AlphaBlend` premultiplied, `Additive`, `Opaque`, `NonPremultiplied`), sampler presets, a `Camera2D` transform and a scissor per segment (a uniform slot per segment), `SetRenderTarget` and `RenderTarget2D`, debug shapes through a 1x1 white texture, FontStashSharp text with a renderer-owned glyph atlas and per-font cached layouts, `MeasureString`. Loaders: ImageSharp textures premultiplied with CPU mips and in-place hot reload, font sets, `TextureFactory`.
+- `AddIon`/`UseIon` use `AddGraphics`/`UseGraphics` (Silk.NET window, `AddRhiGraphics`, the 2D renderer); `Ion:Headless:Render` swaps the recording batch for the real one. Veldrid, its tests and its dependencies are deleted; `GraphicsBackend` keeps `Vulkan`, `OpenGLES`, `Auto` and the reserved `Direct3D12`, `Metal`, `WebGPU`.
+- Samples: Breakout, Breakout ECS and Scenes run unchanged apart from setup moved into static classes for tests; golden-image tests at the game's own window size on both backends, windowed E2E runs on both backends under Xvfb with validation. `Ion.Examples.Sprites100k` is the stress sample.
+- Measured (Xeon 2.1 GHz VM): `SpriteBatchBenchmarks` 5.7 ns per sprite with 1 texture and 6.9 ns with 16 against 12.4 and 14.6 ns for the old batcher's per-sprite work on the same machine (0.46x, 0.47x), 0 B per frame; 100k sprites on lavapipe 103 ms per frame headless and 117 ms windowed (CPU rasterization of 25 million blended pixels; 2.3 ms of it is recording), 136 ms on llvmpipe GLES. NativeAOT publish of the ECS sample: no `Ion.*`, Veldrid, Vortice, NativeLibraryLoader or DependencyModel warnings; what remains is `nkast.Aether` (9: XML serialization) and the Silk.NET.Core resolver lambda (2).
+
 ### 4.8 The 3D SDK (Stage 5)
 
 The minimal set that Bevy, Stride, Unity Entities Graphics and Godot's RenderingServer all converge on:
@@ -569,6 +576,15 @@ The enabled rows are two `Stopwatch.GetTimestamp()` reads at 40 ns each on this 
 
 Zero allocations; grouping by texture is free at this scale. 27 ns per sprite for the CPU write is acceptable but the 80-byte instance (16 B color, 16 B unused scissor) is what limits the GPU upload; the scissor transform adds 4 to 10 percent on the CPU and a per-pixel `discard` on the GPU. Renderer v2 targets 10 ns and 40 bytes per sprite.
 
+After Stage 4 (`docs/plans/benchmarks/2026-09-25-stage4-rendering2d`, a different and noisier VM, so compare within the table): a whole frame of the new `SpriteBatch` (`Begin`, 10,000 `Draw`, `End` with sorting and draw ranges) against a verbatim copy of the old per-sprite work.
+
+| Textures | Old batcher (80 B instance) | New `SpriteBatch`, `Deferred` (40 B) | with the upload copy | `Texture` sort | `BackToFront` sort |
+|---|---|---|---|---|---|
+| 1 | 124 us (12.4 ns/sprite) | 57 us (5.7 ns, 0.46x) | 67 us | 103 us | 179 us |
+| 16 | 146 us (14.6 ns/sprite) | 69 us (6.9 ns, 0.47x) | 81 us | 101 us | 190 us |
+
+0 B per frame in every row. The per-sprite CPU cost is halved (the target) and the instance is half the size.
+
 ### 5.6 Coroutines (`CoroutineBenchmarks`)
 
 100 coroutines yielding `Wait.For` every frame: 2.5 us and 2.34 KB per frame (24 B per coroutine per frame from boxing the `WaitFor` record struct into `IWait`).
@@ -646,6 +662,7 @@ Each stage is sized so a single agent session (or a small PR series) can deliver
 - Acceptance: all samples run on all three desktops, on the R36S at a steady 60 fps, and headless in CI with golden-image tests on both backends; `SpriteBatchBenchmarks` per-sprite CPU cost halved (no scissor transform, packed color); a 100k-sprite stress sample holds 60 fps on an integrated desktop GPU and 10k sprites hold 60 fps on the R36S, one draw call per texture; zero AOT warnings from `Ion.*`.
 - Status (first wave, see "As implemented (Stage 4, first wave)" in 4.7): spike done on Linux (GLFW and SDL under Xvfb, lavapipe; macOS/MoltenVK, Windows, Wayland, HiDPI and the R36S/GLES half not verified). RHI, Silk.NET windowing/input, Vulkan backend, headless backend with PNG readback, build-time shaders with SPIRV-Cross translation, and the quad sample are in; the headless textured quad is checked by pixel asserts and golden PNGs in CI (lavapipe), the windowed quad by E2E tests under Xvfb, all under Vulkan validation. Zero AOT warnings from `Ion.*` for the quad sample (met for this sample). Next wave: `Rendering2D` on the RHI, `Graphics.GLES`, sample migration, then deleting Veldrid once the samples' snapshot tests match.
 - Status (second wave, GLES, see "As implemented (Stage 4, second wave)" in 4.7): `Graphics.GLES` is in, with headless GLES through EGL, backend selection (`Auto`, OpenGL ES first on linux-arm64), and the contract tests and goldens shared with Vulkan (both backends pixel-identical on Mesa, windowed and headless). The quad sample cross-publishes for linux-arm64 with NativeAOT and runs under QEMU on arm64 Mesa at the ES 3.1 level. The R36S half of the spike (the device itself, Panfrost, SDL KMSDRM, 60 fps, startup on the handheld) is still open and needs hardware or a Mali/Panfrost board on CI.
+- Status (third wave, see "As implemented (Stage 4, third wave)" in 4.7): `Rendering2D` is in and the three samples run on it windowed (Vulkan and OpenGL ES under Xvfb, validation clean) and headless with golden images on both backends; Veldrid is deleted. `SpriteBatchBenchmarks` per-sprite CPU cost halved (met: 0.46x to 0.47x, 0 B). One draw call per texture for the stress sample (met: 16 draw calls for 100k sprites and 16 textures). Zero AOT warnings from `Ion.*` for the ECS sample (met). Not verified: 60 fps for 100k sprites on an integrated desktop GPU and 10k on the R36S (only CPU rasterizers here), the three desktops beyond Linux.
 
 ### Stage 5: Built-in ECS and the 3D SDK (6-8 weeks)
 

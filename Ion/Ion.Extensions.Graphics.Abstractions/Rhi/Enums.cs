@@ -202,6 +202,10 @@ public enum VertexFormat
 	Uint32,
 	/// <summary>One signed 32-bit integer.</summary>
 	Sint32,
+	/// <summary>Two normalized unsigned 16-bit integers (a vec2 in [0, 1]; GLES: <c>GL_UNSIGNED_SHORT</c>, normalized).</summary>
+	Unorm16x2,
+	/// <summary>Four normalized unsigned 16-bit integers (a vec4 in [0, 1]; the sprite batch's UV rectangle).</summary>
+	Unorm16x4,
 }
 
 /// <summary>
@@ -212,8 +216,8 @@ public static class VertexFormatExtensions
 	/// <summary>The size of the attribute in bytes.</summary>
 	public static uint Size(this VertexFormat format) => format switch
 	{
-		VertexFormat.Float32 or VertexFormat.Unorm8x4 or VertexFormat.Uint8x4 or VertexFormat.Uint32 or VertexFormat.Sint32 => 4,
-		VertexFormat.Float32x2 => 8,
+		VertexFormat.Float32 or VertexFormat.Unorm8x4 or VertexFormat.Uint8x4 or VertexFormat.Uint32 or VertexFormat.Sint32 or VertexFormat.Unorm16x2 => 4,
+		VertexFormat.Float32x2 or VertexFormat.Unorm16x4 => 8,
 		VertexFormat.Float32x3 => 12,
 		VertexFormat.Float32x4 => 16,
 		_ => 0,

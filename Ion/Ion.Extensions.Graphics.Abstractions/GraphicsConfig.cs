@@ -1,4 +1,4 @@
-﻿
+
 
 
 namespace Ion.Extensions.Graphics;
@@ -8,13 +8,14 @@ namespace Ion.Extensions.Graphics;
 public class GraphicsConfig
 {
 	/// <summary>
-	/// The graphics API to use (<c>Ion:Graphics:PreferredBackend</c>). With the Silk.NET stack, <see cref="GraphicsBackend.Vulkan"/>
-	/// and <see cref="GraphicsBackend.OpenGLES"/> force that backend, and <see cref="GraphicsBackend.Auto"/> takes the first
-	/// available one in platform order (<see cref="GraphicsBackendSelector.AutoOrder()"/>: Vulkan then OpenGL ES on desktop,
-	/// OpenGL ES first on Linux arm64) where the backend-selecting registration (<c>AddRhiGraphics</c>, headless rendering)
-	/// is used. The Veldrid backend maps <see cref="GraphicsBackend.Auto"/> to its own platform default.
+	/// The graphics API to use (<c>Ion:Graphics:PreferredBackend</c>). <see cref="GraphicsBackend.Auto"/> (the default) takes
+	/// the first available backend in platform order (<see cref="GraphicsBackendSelector.AutoOrder()"/>: Vulkan then OpenGL ES
+	/// on desktop, OpenGL ES first on Linux arm64); <see cref="GraphicsBackend.Vulkan"/> and
+	/// <see cref="GraphicsBackend.OpenGLES"/> force one. <see cref="GraphicsBackend.Direct3D12"/>,
+	/// <see cref="GraphicsBackend.Metal"/> and <see cref="GraphicsBackend.WebGPU"/> are reserved: <c>AddIon</c> throws
+	/// <see cref="NotSupportedException"/> for them.
 	/// </summary>
-	public GraphicsBackend PreferredBackend { get; set; } = GraphicsBackend.Vulkan;
+	public GraphicsBackend PreferredBackend { get; set; } = GraphicsBackend.Auto;
 
 	/// <summary>Wait for vertical blank when presenting (FIFO). Off: mailbox where supported, else immediate.</summary>
 	public bool VSync { get; set; }
@@ -110,41 +111,28 @@ public enum GraphicsOutput : byte
 	Window,
 }
 
+/// <summary>
+/// The graphics API of the RHI backends. Values are bound by name from configuration.
+/// </summary>
 public enum GraphicsBackend : byte
 {
-	/// <summary>
-	/// Direct3D 11.
-	/// </summary>
-	Direct3D11,
-	/// <summary>
-	/// Direct3D 12.
-	/// </summary>
-	Direct3D12,
-	/// <summary>
-	/// Vulkan.
-	/// </summary>
+	/// <summary>Vulkan: the desktop and mobile reference backend (MoltenVK on Apple platforms).</summary>
 	Vulkan,
-	/// <summary>
-	/// OpenGL.
-	/// </summary>
-	OpenGL,
-	/// <summary>
-	/// Metal.
-	/// </summary>
-	Metal,
-	/// <summary>
-	/// OpenGL ES.
-	/// </summary>
+
+	/// <summary>OpenGL ES 3.1: handhelds such as the R36S, and the fallback where Vulkan is unavailable.</summary>
 	OpenGLES,
 
-	/// <summary>
-	/// WebGPU
-	/// </summary>
+	/// <summary>Reserved: no Direct3D 12 backend exists; choosing it throws <see cref="NotSupportedException"/>.</summary>
+	Direct3D12,
+
+	/// <summary>Reserved: no Metal backend exists (Apple platforms use Vulkan over MoltenVK); choosing it throws <see cref="NotSupportedException"/>.</summary>
+	Metal,
+
+	/// <summary>Reserved for a browser build; choosing it throws <see cref="NotSupportedException"/>.</summary>
 	WebGPU,
 
 	/// <summary>
-	/// The platform default: for the Silk.NET stack, the first available of Vulkan then OpenGL ES (OpenGL ES first on Linux
-	/// arm64, the R36S); for the Veldrid backend, its own platform default.
+	/// The platform default: the first available of Vulkan then OpenGL ES (OpenGL ES first on Linux arm64, the R36S).
 	/// </summary>
 	Auto,
 }

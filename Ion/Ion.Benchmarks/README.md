@@ -10,7 +10,7 @@ BenchmarkDotNet micro-benchmarks that measure the engine's own per-frame overhea
 | `FullFrameBenchmarks` | One headless `GameLoop.Step` with events only, with 8 systems (runtime and generated schedule), with the metrics module, with a frame profiler (stats only, and profiling every step), and inside a scene scope |
 | `EventBenchmarks` | Emit/read cost and allocations of Events v2: the runtime `EventBus` (direct and through `IEvents`), the generated bus of `Ion.Benchmarks.GeneratedApp`, the obsolete `IEventEmitter`/`IEventListener` adapters, and the typed-channel prototype it was designed from |
 | `MetricsBenchmarks` | Metrics v2 hot paths: `MetricsScope` and the generated `Begin`/`End` bracket with profiling off and on, a game counter increment, the once-per-frame stats write, and the obsolete `ITraceTimer` adapter |
-| `SpriteBatchBenchmarks` | CPU cost of batching 10k sprites across 1/16 textures, with and without the per-sprite scissor transform |
+| `SpriteBatchBenchmarks` | CPU cost of a 10k-sprite frame across 1/16 textures: the 2D renderer's `SpriteBatch` (Deferred, with the upload copy, Texture and BackToFront sorts) against a copy of the removed Veldrid batcher's per-sprite work (with and without its scissor transform); `--min-of-n sprites` runs them interleaved for noisy machines |
 | `CoroutineBenchmarks` | Stepping 100 coroutines that yield `Wait.For` every frame, as `IEnumerator<Wait>` (unboxed) and as plain `IEnumerator` |
 | `ArchQueryBenchmarks` | Arch 2.1 delegate query vs inline struct query vs chunk spans over 10k entities |
 | `EcsComparisonBenchmarks` | Arch 2.1 vs Friflo.Engine.ECS 3.6: iteration styles, entity creation and structural churn on 10k entities |

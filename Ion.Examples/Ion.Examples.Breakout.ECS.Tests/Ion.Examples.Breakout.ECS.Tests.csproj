@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\Ion\Ion.Core.Tests\TestConstants.cs" Link="TestConstants.cs" />
+    <Compile Include="..\Shared\SampleRenderingTest.cs" Link="SampleRenderingTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
@@ -28,5 +29,8 @@
     <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\..\Ion\Ion.Testing\Ion.Testing.csproj" />
     <ProjectReference Include="..\Ion.Examples.Breakout.ECS\Ion.Examples.Breakout.ECS.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Golden\*.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

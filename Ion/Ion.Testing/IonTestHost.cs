@@ -97,7 +97,7 @@ public sealed class IonTestHost : IDisposable
 	/// <summary>The headless window. Starts the host.</summary>
 	public NullWindow Window => Get<NullWindow>();
 
-	/// <summary>The headless sprite batch: <see cref="NullSpriteBatch.LastFrame"/> has the last frame's draw counts. Starts the host.</summary>
+	/// <summary>The headless recording sprite batch: <see cref="NullSpriteBatch.LastFrame"/> has the last frame's draw counts (empty with <see cref="WithRendering"/>, where the 2D renderer draws). Starts the host.</summary>
 	public NullSpriteBatch SpriteBatch => Get<NullSpriteBatch>();
 
 	/// <summary>The headless audio manager: <see cref="NullAudioManager.Plays"/> has every sound played. Starts the host.</summary>
@@ -279,10 +279,10 @@ public sealed class IonTestHost : IDisposable
 	/// <summary>
 	/// Turns on headless rendering (<c>Ion:Headless:Render = true</c>): an RHI backend renders every frame into an offscreen
 	/// target sized from <c>Ion:Window</c> (960x540 by default), systems can render through <see cref="IGraphicsFrame"/>, and
-	/// <see cref="Screenshot"/> captures frames. The backend follows <c>Ion:Graphics:PreferredBackend</c>: Vulkan by default
-	/// (on Linux CI, Mesa lavapipe), <c>OpenGLES</c> through EGL (Mesa llvmpipe, no display needed), or <c>Auto</c> for the
-	/// first available. Sprites drawn with <see cref="ISpriteBatch"/> are still only recorded until the 2D renderer is ported
-	/// to the RHI.
+	/// <see cref="Screenshot"/> captures frames. The backend follows <c>Ion:Graphics:PreferredBackend</c>: <c>Auto</c> (the
+	/// default) takes the first available (Vulkan on Mesa lavapipe, else OpenGL ES through EGL on Mesa llvmpipe, no display
+	/// needed), or <c>Vulkan</c>/<c>OpenGLES</c> forces one. <see cref="ISpriteBatch"/> is then the 2D renderer's sprite batch,
+	/// so sprites are rasterized; <see cref="SpriteBatch"/> (the recording null batch) no longer receives the game's draws.
 	/// </summary>
 	public IonTestHost WithRendering(uint? width = null, uint? height = null)
 	{

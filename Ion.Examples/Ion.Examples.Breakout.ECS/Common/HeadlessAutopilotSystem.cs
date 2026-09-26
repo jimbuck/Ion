@@ -13,9 +13,9 @@ namespace Ion.Examples.Breakout.ECS.Common;
 /// <summary>
 /// Plays the game when it runs headless (<c>--Ion:Headless=true</c>): scripts mouse input through
 /// <see cref="NullInputState"/> to grab the mouse, launch balls and keep the paddle under the lowest ball, and logs what
-/// the headless backends recorded about once a second.
+/// was drawn and played about once a second.
 /// </summary>
-public class HeadlessAutopilotSystem(NullInputState input, NullSpriteBatch spriteBatch, NullAudioManager audio, IWindow window, World world, ILogger<HeadlessAutopilotSystem> logger)
+public class HeadlessAutopilotSystem(NullInputState input, ISpriteBatch spriteBatch, NullAudioManager audio, IWindow window, World world, ILogger<HeadlessAutopilotSystem> logger)
 {
 	private const int GrabFrame = 5;
 	private const int FirstLaunchFrame = 10;
@@ -67,9 +67,10 @@ public class HeadlessAutopilotSystem(NullInputState input, NullSpriteBatch sprit
 	{
 		if (_frame % ReportInterval != 0) return;
 
-		var drawn = spriteBatch.LastFrame;
+		// The recording batch (headless) or the 2D renderer (headless rendering): both report statistics.
+		var drawn = (spriteBatch as ISpriteBatchStatistics)?.LastFrameStatistics ?? default;
 		logger.LogInformation(
-			"Frame {Frame}: {Balls} balls, {Blocks} blocks left, last frame drew {Sprites} sprites and {Strings} strings in {DrawCalls} draw calls, {Sounds} sounds played so far, {Mixed} audio frames mixed ({Voices} voices playing).",
-			_frame, world.CountEntities(in _ballQuery), world.CountEntities(in _blockQuery), drawn.Sprites, drawn.Strings, drawn.DrawCalls, audio.Plays.Count, audio.Mixer.FramesRendered, audio.Mixer.ActiveVoices);
+			"Frame {Frame}: {Balls} balls, {Blocks} blocks left, last frame drew {Sprites} quads in {DrawCalls} draw calls, {Sounds} sounds played so far, {Mixed} audio frames mixed ({Voices} voices playing).",
+			_frame, world.CountEntities(in _ballQuery), world.CountEntities(in _blockQuery), drawn.Sprites, drawn.DrawCalls, audio.Plays.Count, audio.Mixer.FramesRendered, audio.Mixer.ActiveVoices);
 	}
 }

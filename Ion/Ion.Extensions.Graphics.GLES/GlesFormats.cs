@@ -57,6 +57,8 @@ internal static class GlesFormats
 		VertexFormat.Uint8x4 => new(4, GLEnum.UnsignedByte, false, true),
 		VertexFormat.Uint32 => new(1, GLEnum.UnsignedInt, false, true),
 		VertexFormat.Sint32 => new(1, GLEnum.Int, false, true),
+		VertexFormat.Unorm16x2 => new(2, GLEnum.UnsignedShort, true, false),
+		VertexFormat.Unorm16x4 => new(4, GLEnum.UnsignedShort, true, false),
 		_ => throw new NotSupportedException($"Vertex format {format} is not supported by the GLES backend."),
 	};
 

@@ -1,27 +1,38 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 
 using Ion;
 using Ion.Extensions.Assets;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Audio;
 
+// Run with --Ion:Headless=true to use the headless graphics and audio backends (no GPU, window or audio device), and add
+// --Ion:Headless:Render=true to render offscreen with the Vulkan backend.
 var builder = IonApplication.CreateBuilder(args);
-
-// Run with --Ion:Headless=true to use the headless graphics and audio backends (no GPU, window or audio device).
-builder.Services.AddIon(builder.Configuration, graphics =>
-{
-	graphics.ClearColor = new Color(0x333);
-});
-
-builder.Services.AddSingleton<BreakoutSystems>();
+BreakoutApp.Configure(builder);
 
 var game = builder.Build();
-game.UseIon()
-	.UseSystem<BreakoutSystems>();
-
-//Thread.Sleep(10 * 1000); // Delay to let diagnostics warm up.
+BreakoutApp.Use(game);
 
 game.Run();
+
+/// <summary>The game setup, shared with the tests (Ion.Examples.Breakout.Tests).</summary>
+public static class BreakoutApp
+{
+	/// <summary>Registers the engine (<c>AddIon</c>) and the game's system.</summary>
+	public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
+	{
+		builder.Services.AddIon(builder.Configuration, graphics =>
+		{
+			graphics.ClearColor = new Color(0x333);
+		});
+
+		builder.Services.AddSingleton<BreakoutSystems>();
+		return builder;
+	}
+
+	/// <summary>Adds the engine's systems (<c>UseIon</c>) and the game's system.</summary>
+	public static IIonApplication Use(IIonApplication game) => game.UseIon().UseSystem<BreakoutSystems>();
+}
 
 
 public class BreakoutSystems(IWindow window, IInputState input, ISpriteBatch spriteBatch, IEvents events, IAssetManager assets, IAudioManager audio)

@@ -201,7 +201,7 @@ internal sealed unsafe class VulkanSurface : ISurface
 		var formats = new SurfaceFormatKHR[count];
 		fixed (SurfaceFormatKHR* p = formats) khr.GetPhysicalDeviceSurfaceFormats(_device.Physical, _surface, ref count, p);
 
-		// Non-sRGB 8-bit formats first: colors are written as given, like the Veldrid backend.
+		// Non-sRGB 8-bit formats first: colors are written as given (no implicit sRGB encoding).
 		ReadOnlySpan<Format> preferred = requested != TextureFormat.Undefined
 			? [requested.ToVk(), Silk.NET.Vulkan.Format.B8G8R8A8Unorm, Silk.NET.Vulkan.Format.R8G8B8A8Unorm]
 			: [Silk.NET.Vulkan.Format.B8G8R8A8Unorm, Silk.NET.Vulkan.Format.R8G8B8A8Unorm];

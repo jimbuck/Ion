@@ -6,7 +6,7 @@ using Ion.Extensions.Assets;
 namespace Ion.Extensions.Graphics;
 
 /// <summary>
-/// Registration of the headless graphics backend: no GPU, no window, no SDL. It provides everything the Veldrid backend
+/// Registration of the headless graphics backend: no GPU, no window, no SDL. It provides everything the windowed stack
 /// does (<see cref="IWindow"/>, <see cref="IInputState"/>, <see cref="ISpriteBatch"/>, and loaders for
 /// <see cref="ITexture2D"/> and <see cref="IFontSet"/>) so a game that depends only on those interfaces runs unchanged.
 /// The concrete <see cref="NullWindow"/>, <see cref="NullInputState"/> and <see cref="NullSpriteBatch"/> are registered

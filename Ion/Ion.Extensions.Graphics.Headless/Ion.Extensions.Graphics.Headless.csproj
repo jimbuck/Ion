@@ -4,13 +4,14 @@
     <Platforms>AnyCPU</Platforms>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RootNamespace>Ion.Extensions.Graphics</RootNamespace>
-    <Description>Headless rendering for Ion and RHI backend selection: the Vulkan or OpenGL ES RHI backend (from Ion:Graphics:PreferredBackend, Auto picks the first available) without a window, rendering into an offscreen target (sized from Ion:Window) with RGBA8 capture and PNG screenshots. Runs on Mesa lavapipe (Vulkan) or llvmpipe through EGL (OpenGL ES) on CI. Also registers the same selection for a window (AddRhiGraphics).</Description>
+    <Description>Headless rendering for Ion and RHI backend selection: the Vulkan or OpenGL ES RHI backend (from Ion:Graphics:PreferredBackend, Auto picks the first available) without a window, rendering into an offscreen target (sized from Ion:Window) with the 2D renderer, RGBA8 capture and PNG screenshots. Runs on Mesa lavapipe (Vulkan) or llvmpipe through EGL (OpenGL ES) on CI. Also registers the same selection for a window (AddRhiGraphics).</Description>
   </PropertyGroup>
   <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free) and summarizes its Use* helpers. -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Null\Ion.Extensions.Graphics.Null.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.Vulkan\Ion.Extensions.Graphics.Vulkan.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Graphics.GLES\Ion.Extensions.Graphics.GLES.csproj" />
-    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
-    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Extensions.Rendering2D\Ion.Extensions.Rendering2D.csproj" />
   </ItemGroup>
 </Project>

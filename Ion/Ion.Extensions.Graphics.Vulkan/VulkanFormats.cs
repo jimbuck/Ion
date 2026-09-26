@@ -130,6 +130,8 @@ internal static class VulkanFormats
 		VertexFormat.Uint8x4 => Format.R8G8B8A8Uint,
 		VertexFormat.Uint32 => Format.R32Uint,
 		VertexFormat.Sint32 => Format.R32Sint,
+		VertexFormat.Unorm16x2 => Format.R16G16Unorm,
+		VertexFormat.Unorm16x4 => Format.R16G16B16A16Unorm,
 		_ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
 	};
 

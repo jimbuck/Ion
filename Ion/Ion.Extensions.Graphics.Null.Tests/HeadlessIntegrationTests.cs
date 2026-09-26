@@ -96,7 +96,7 @@ public class HeadlessIntegrationTests
 		Assert.Equal(headless, config.IsHeadless());
 		Assert.Equal(headless, services.Any(d => d.ServiceType == typeof(NullWindow)));
 		Assert.Equal(headless, services.Any(d => d.ServiceType == typeof(NullAudioManager)));
-		Assert.Equal(!headless, services.Any(d => d.ServiceType == typeof(IGraphicsContext)));
+		Assert.Equal(!headless, services.Any(d => d.ServiceType == typeof(IWindowSurface)));
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]

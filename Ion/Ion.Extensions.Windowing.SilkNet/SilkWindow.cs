@@ -286,7 +286,6 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 		{
 			// The GLES backend renders into offscreen targets and blits to the default framebuffer: no depth or stencil.
 			GraphicsBackend.OpenGLES => WindowOptions.Default with { API = GlesApi(3, 1), PreferredDepthBufferBits = 0, PreferredStencilBufferBits = 0 },
-			GraphicsBackend.OpenGL => WindowOptions.Default,
 			_ => WindowOptions.DefaultVulkan,
 		};
 		options = options with

@@ -19,9 +19,10 @@ public sealed record BreakoutSettings(int Seed)
 {
 	/// <summary>
 	/// Creates a random number generator for one consumer. Each consumer passes its own <paramref name="stream"/> so the
-	/// sequences do not depend on the order systems run or draw numbers in.
+	/// sequences do not depend on the order systems run or draw numbers in. The seed is combined without <see cref="HashCode"/>
+	/// (randomized per process), so a seed gives the same game in every run (golden-image tests rely on it).
 	/// </summary>
-	public Random CreateRandom(int stream) => new(HashCode.Combine(Seed, stream));
+	public Random CreateRandom(int stream) => new(unchecked(Seed * 7919 + stream * 104729));
 }
 
 /// <summary>

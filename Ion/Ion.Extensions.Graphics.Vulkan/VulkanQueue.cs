@@ -72,6 +72,16 @@ internal sealed unsafe class VulkanQueue(VulkanDevice device) : IQueue
 		var cmd = _ensureUpload();
 		var range = new ImageSubresourceRange(target.Format.Aspect(), region.MipLevel, 1, 0, 1);
 		var final = (target.Usage & TextureUsage.TextureBinding) != 0 ? ImageLayout.ShaderReadOnlyOptimal : ImageLayout.TransferDstOptimal;
+
+		// Layouts are tracked per image: before the first write to a mipmapped image, bring every level to the final
+		// layout, so a write to one level leaves the others in the tracked layout too.
+		if (target.Layout == ImageLayout.Undefined && target.MipLevelCount > 1)
+		{
+			var all = new ImageSubresourceRange(target.Format.Aspect(), 0, target.MipLevelCount, 0, 1);
+			VulkanCommandEncoder.Transition(device.Vk, cmd, target.Image, ImageLayout.Undefined, final, all);
+			target.Layout = final;
+		}
+
 		VulkanCommandEncoder.Transition(device.Vk, cmd, target.Image, target.Layout, ImageLayout.TransferDstOptimal, range);
 		var copy = new BufferImageCopy
 		{

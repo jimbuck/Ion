@@ -168,7 +168,7 @@ public sealed class NullInputState : TrackedInputState
 	}
 
 	/// <summary>
-	/// Moves the mouse at the start of the next frame, like the Veldrid backend warping the cursor. The movement counts
+	/// Moves the mouse at the start of the next frame, like a windowed backend warping the cursor. The movement counts
 	/// towards <see cref="TrackedInputState.MouseDelta"/>.
 	/// </summary>
 	public override void SetMousePosition(Vector2 position) => _queue(InputEvent.ForMouseMove(position));

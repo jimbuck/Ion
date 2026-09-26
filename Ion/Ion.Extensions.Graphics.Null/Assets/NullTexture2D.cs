@@ -28,7 +28,7 @@ public sealed class NullTexture2D : ITexture2D
 	public uint Height { get; private set; }
 
 	/// <summary>
-	/// The mip level count the Veldrid backend would generate for this size (a full chain down to 1x1).
+	/// The mip level count the 2D renderer's texture loader generates for this size (a full chain down to 1x1).
 	/// </summary>
 	public uint MipLevels { get; private set; }
 

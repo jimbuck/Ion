@@ -1,6 +1,6 @@
 # Spike: Silk.NET windowing and Vulkan under Ion's loop (Stage 4)
 
-Date: 2026-09-25. Time box: one session. Code: [`silknet-spike/`](silknet-spike/) (a standalone console app, not in `Ion.sln`).
+Date: 2026-09-25. Time box: one session. The spike's standalone console app was removed once `Ion.Examples/Ion.Examples.Quad` covered the same checks on the real stack.
 
 Question: can `Silk.NET.Windowing` be created, pumped and torn down by hand (never `IWindow.Run`), with the platform registered
 explicitly (no reflection-based discovery), give a Vulkan surface on `Silk.NET.Vulkan`, and does all of it publish with
@@ -39,7 +39,7 @@ Packages referenced: `Silk.NET.Windowing.Common`, `Silk.NET.Windowing.Glfw`, `Si
    `TransferSrc`, so the presented image can be read back before present.
 4. **Readback.** A clear to (255, 128, 0) reads back as BGRA `0,128,255,255` on an Unorm target and `0,188,255,255` on the
    Srgb swapchain format (the expected sRGB encoding of 128/255). Ion picks `B8G8R8A8Unorm` for the swapchain so colors
-   match the Veldrid backend (no implicit sRGB conversion); the offscreen target is `R8G8B8A8Unorm` so readback is RGBA as is.
+   are written as given (no implicit sRGB conversion); the offscreen target is `R8G8B8A8Unorm` so readback is RGBA as is.
 5. **Headless.** With no window the same code creates an instance without surface extensions, renders into an offscreen
    `VkImage` and reads it back. This is the CI path; it needs only a Vulkan ICD (lavapipe) and no X server.
 6. **Shaders.** `Silk.NET.Shaderc` compiles GLSL 4.5 to SPIR-V (1036 bytes for the quad vertex shader, first call about

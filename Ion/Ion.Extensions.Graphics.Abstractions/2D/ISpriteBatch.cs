@@ -1,9 +1,48 @@
 ﻿using System.Numerics;
 
+using Ion.Extensions.Graphics.Rhi;
+
 namespace Ion.Extensions.Graphics;
 
+/// <summary>
+/// Draws sprites, rectangles, lines, points and text in 2D.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The sprite batch system opens a segment with <c>default</c> <see cref="SpriteBatchOptions"/> around every Render stage,
+/// so a game can call the <c>Draw*</c> methods from any Render step without <see cref="Begin"/>. For other render state
+/// (sort mode, blend, sampler, camera, scissor) wrap draws in <see cref="Begin"/> and <see cref="End"/>: segments nest,
+/// and <see cref="End"/> returns to the enclosing segment's options. Segments are drawn in order at the end of the frame.
+/// </para>
+/// <para>
+/// Depth is a sort key (see <see cref="SpriteSortMode"/>), not a depth test: in <see cref="SpriteSortMode.Deferred"/> (the
+/// default) sprites are drawn in submission order.
+/// </para>
+/// </remarks>
 public interface ISpriteBatch
 {
+	/// <summary>
+	/// Starts a segment with <paramref name="options"/>, ending the current one. Pair every call with <see cref="End"/>.
+	/// </summary>
+	void Begin(SpriteBatchOptions options = default);
+
+	/// <summary>
+	/// Ends the segment started by the matching <see cref="Begin"/>; drawing continues with the enclosing segment's options.
+	/// Ending the outermost segment submits the frame's sprites.
+	/// </summary>
+	/// <exception cref="InvalidOperationException">No segment is open.</exception>
+	void End();
+
+	/// <summary>
+	/// Renders the following draws into <paramref name="target"/> (a texture created with
+	/// <see cref="TextureUsage.RenderAttachment"/> and <see cref="TextureUsage.TextureBinding"/>), or back into the frame
+	/// when null. Segments drawn into a target use its pixel space. The target stays set until changed or until the
+	/// outermost <see cref="End"/>.
+	/// </summary>
+	/// <param name="target">The target texture, or null for the frame.</param>
+	/// <param name="clearColor">Clears the target to this color before the first draw into it; null keeps its contents.</param>
+	void SetRenderTarget(ITexture? target, Color? clearColor = null);
+
 	void DrawRect(Color color, RectangleF destinationRectangle, Vector2 origin = default, float rotation = 0, float depth = 0);
 	void DrawRect(Color color, Vector2 position, Vector2 size, Vector2 origin = default, float rotation = 0, float depth = 0);
 

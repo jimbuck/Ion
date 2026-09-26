@@ -4,7 +4,7 @@ namespace Ion.Extensions.Graphics;
 
 /// <summary>
 /// Initializes the <see cref="NullWindow"/> (emitting the initial <see cref="WindowResizeEvent"/>) and turns
-/// <see cref="WindowClosedEvent"/> into <see cref="ExitGameEvent"/>, like the Veldrid window system.
+/// <see cref="WindowClosedEvent"/> into <see cref="ExitGameEvent"/>, like the Silk.NET window system.
 /// </summary>
 internal sealed class NullWindowSystem(NullWindow window, IEvents events, ILogger<NullWindowSystem> logger)
 {

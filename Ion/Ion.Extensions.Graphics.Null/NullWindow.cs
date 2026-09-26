@@ -12,7 +12,7 @@ namespace Ion.Extensions.Graphics;
 /// <remarks>
 /// The window system emits one <see cref="WindowResizeEvent"/> with the initial size at Init, and one more whenever the
 /// size changes afterwards. <see cref="Close"/> emits <see cref="WindowClosedEvent"/>, which the window system turns into
-/// <see cref="ExitGameEvent"/> at the end of that frame's Render stage, exactly like the Veldrid window.
+/// <see cref="ExitGameEvent"/> at the end of that frame's Render stage, exactly like the Silk.NET window.
 /// </remarks>
 public sealed class NullWindow : IWindow
 {
