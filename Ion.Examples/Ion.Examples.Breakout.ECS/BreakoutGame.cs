@@ -1,13 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-using Arch.Core;
-
+using Ion.Extensions.Ecs;
+using Ion.Extensions.Ecs.Rendering;
 using Ion.Extensions.Graphics;
 using Ion.Examples.Breakout.ECS.Common;
 using Ion.Examples.Breakout.ECS.Physics;
-
-using World = Arch.Core.World;
 
 namespace Ion.Examples.Breakout.ECS;
 
@@ -37,9 +35,6 @@ public static class BreakoutGame
 	/// <summary>The seed used when <see cref="SeedKey"/> is not configured.</summary>
 	public const int DefaultSeed = 6014;
 
-	private static readonly Lock RegistrationLock = new();
-	private static bool _componentsRegistered;
-
 	/// <summary>
 	/// Registers the game's services with <paramref name="builder"/>, including <c>AddIon</c>. When the configuration asks
 	/// for headless mode (<c>Ion:Headless=true</c>) the <see cref="HeadlessAutopilotSystem"/> is registered too.
@@ -57,10 +52,13 @@ public static class BreakoutGame
 			graphics.ClearColor = new Color(0x333);
 		});
 
+		// The ECS module: the root World (resolved by every system below), Commands played back at the end of every stage,
+		// transform propagation, FrameStats.Entities, and the sprite extraction into the sprite batch.
+		builder.Services.AddEcs()
+						.AddEcsRendering();
+
 		builder.Services.AddSingleton(new BreakoutSettings(seed))
 						.AddSingleton<MouseCaptureSystem>()
-						.AddSingleton<SpriteRendererSystem>()
-						.AddSingleton(services => World.Create())
 						.AddSingleton<ScoreSystem>()
 						.AddSingleton<SoundEffectsSystem>()
 						.AddSingleton<PaddleSystem>()
@@ -68,9 +66,7 @@ public static class BreakoutGame
 						.AddSingleton<BlockSystem>()
 						.AddSingleton<PhysicsManager>()
 						.AddSingleton<PhysicsSystem>()
-						.AddSingleton<LevelSystem>()
-						// The ECS hook of the frame stats: FrameStats.Entities (frame log, overlay, dotnet-counters).
-						.AddSingleton<IFrameStatsSource, EntityStatsSource>();
+						.AddSingleton<LevelSystem>();
 
 		// The game runs in the root schedule (no scenes), so its systems are singletons: a scoped system there is error ION006.
 		if (builder.Configuration.IsHeadless()) builder.Services.AddSingleton<HeadlessAutopilotSystem>();
@@ -93,13 +89,14 @@ public static class BreakoutGame
 
 		app.UseSystem<MouseCaptureSystem>()
 			.UseIon()
+			.UseEcs()
+			.UseEcsRendering()
 			.UseSystem<PhysicsSystem>()
 			.UseSystem<LevelSystem>()
 			.UseSystem<SoundEffectsSystem>()
 			.UseSystem<PaddleSystem>()
 			.UseSystem<BallSystem>()
 			.UseSystem<BlockSystem>()
-			.UseSystem<SpriteRendererSystem>()
 			.UseSystem<ScoreSystem>();
 
 		if (app.Configuration.IsHeadless()) app.UseSystem<HeadlessAutopilotSystem>();
@@ -108,32 +105,18 @@ public static class BreakoutGame
 	}
 
 	/// <summary>
-	/// Registers every component array type with Arch. Arch creates component arrays with <c>Array.CreateInstance</c>
-	/// unless the array type is registered up front, which NativeAOT cannot do for types it has not seen, so this lets the
-	/// sample run under PublishAot. Safe to call more than once.
+	/// Registers the game's own component types with Arch. Arch creates component arrays with <c>Array.CreateInstance</c>
+	/// unless the array type is registered up front, which NativeAOT cannot do for types it has not seen. The ECS module
+	/// registers its built-in components (Transform2D, Sprite, ...) and the generator those of every [Query] method; this
+	/// covers the components the game only creates. Safe to call more than once.
 	/// </summary>
 	public static void RegisterComponents()
 	{
-		lock (RegistrationLock)
-		{
-			if (_componentsRegistered) return;
-
-			ArrayRegistry.Add<Block>();
-			ArrayRegistry.Add<Paddle>();
-			ArrayRegistry.Add<Ball>();
-			ArrayRegistry.Add<Transform2D>();
-			ArrayRegistry.Add<Sprite>();
-			ArrayRegistry.Add<DynamicRigidBody>();
-			ArrayRegistry.Add<KinematicRigidBody>();
-			ArrayRegistry.Add<StaticBody>();
-
-			_componentsRegistered = true;
-		}
+		EcsComponents.Register<Block>();
+		EcsComponents.Register<Paddle>();
+		EcsComponents.Register<Ball>();
+		EcsComponents.Register<DynamicRigidBody>();
+		EcsComponents.Register<KinematicRigidBody>();
+		EcsComponents.Register<StaticBody>();
 	}
-}
-
-/// <summary>Writes the number of live Arch entities into every frame's <see cref="FrameStats.Entities"/>.</summary>
-internal sealed class EntityStatsSource(World world) : IFrameStatsSource
-{
-	public void Collect(ref FrameStats stats) => stats.Entities = world.Size;
 }

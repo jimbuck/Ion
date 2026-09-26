@@ -84,11 +84,36 @@ public static class StageOrder
 	/// <summary>Scenes: the active scene's schedule, in every stage.</summary>
 	public const int Scenes = -500;
 
+	/// <summary>
+	/// ECS transform propagation (<c>Transform2D</c>/<c>Transform</c> and <c>Parent</c> to the global transforms): in Last,
+	/// after the frame's gameplay, and again in Render before <see cref="Extract"/> so a frame draws what its Update did.
+	/// At the start of the user band: after the scene's steps (<see cref="Scenes"/>), before the game's own steps at
+	/// <see cref="Default"/>.
+	/// </summary>
+	public const int TransformPropagation = -400;
+
+	/// <summary>
+	/// ECS render extraction (Render): sprites and cameras copied from the world into the renderer. At -300, the plan's
+	/// "user band minus 300": inside the sprite batch scope (<see cref="SpriteBatch"/>), after <see cref="TransformPropagation"/>,
+	/// and before the game's own Render steps at <see cref="Default"/> (which therefore draw over the extracted sprites).
+	/// </summary>
+	public const int Extract = -300;
+
+	/// <summary>ECS sprite animation (Update): after the game's Update steps at <see cref="Default"/>.</summary>
+	public const int SpriteAnimation = 400;
+
 	/// <summary>The metrics overlay (Render), inside the sprite batch scope and after the game's own drawing.</summary>
 	public const int MetricsOverlay = 800;
 
 	/// <summary>The window close check that turns a closed window into an exit request (Render).</summary>
 	public const int WindowClose = 900;
+
+	/// <summary>
+	/// ECS: the command buffer (<c>Commands</c>) is played back at the end of every stage, after every other step of the
+	/// stage but the event stepping (<see cref="Events"/>), so structural changes recorded during a stage are visible to
+	/// the next one and never invalidate a running query.
+	/// </summary>
+	public const int Ecs = 950;
 
 	/// <summary>Events: stepping the frame buffers after every other Last step.</summary>
 	public const int Events = 1000;

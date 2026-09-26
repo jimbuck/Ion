@@ -73,7 +73,7 @@ public class DiagnosticTests
 	}
 
 	/// <summary>The Roslyn SDK test, with the engine assemblies referenced and interceptors enabled.</summary>
-	private sealed class GeneratorTest : CSharpSourceGeneratorTest<ScheduleGenerator, DefaultVerifier>
+	internal sealed class GeneratorTest : CSharpSourceGeneratorTest<ScheduleGenerator, DefaultVerifier>
 	{
 		public GeneratorTest()
 		{

@@ -35,6 +35,7 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 			.CreateSyntaxProvider(
 				static (node, _) => node is InvocationExpressionSyntax invocation && RegistrationAnalyzer.IsCandidateName(invocation)
 					|| EventAnalyzer.IsCandidate(node)
+					|| node is AttributeSyntax { Name: var attributeName } && QueryEmitter.IsQueryName(attributeName.ToString())
 					|| node is ParameterSyntax { Type: { } type } && type.ToString() is var name && (name.EndsWith("IIonApplication", StringComparison.Ordinal) || name.EndsWith("ISceneBuilder", StringComparison.Ordinal) || name.EndsWith("IScheduleBuilder", StringComparison.Ordinal) || name.EndsWith("IonApplication", StringComparison.Ordinal)),
 				static (_, _) => true)
 			.Collect()
@@ -67,8 +68,26 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 		var namespaceEnabled = InterceptableLocations.IsNamespaceEnabled(compilation);
 		var canIntercept = InterceptableLocations.IsSupported && namespaceEnabled;
 
+		if (known.HasQueries) ExecuteQueries(known, context);
 		ExecuteSchedule(known, context, Report, canIntercept, namespaceEnabled, profiling);
 		if (known.HasEvents) ExecuteEvents(known, context, Report, canIntercept);
+	}
+
+	/// <summary>[Query] methods: their diagnostics (ION301 to ION307) and their expansions (<c>IonQueries.g.cs</c>).</summary>
+	private static void ExecuteQueries(KnownSymbols known, SourceProductionContext context)
+	{
+		var queries = new QueryAnalyzer(known);
+		var emitter = new QueryEmitter(known, queries);
+		var methods = emitter.FindQueries(context.CancellationToken);
+		if (methods.Count == 0) return;
+
+		foreach (var method in methods)
+		{
+			foreach (var diagnostic in queries.Diagnostics(method, context.CancellationToken)) context.ReportDiagnostic(diagnostic);
+		}
+
+		var source = emitter.Emit(methods, context.CancellationToken);
+		if (source is not null) context.AddSource("IonQueries.g.cs", source);
 	}
 
 	private static void ExecuteEvents(KnownSymbols known, SourceProductionContext context, Action<DiagnosticDescriptor, Location?, string> Report, bool canIntercept)
@@ -85,7 +104,8 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 	{
 		var compilation = known.Compilation;
 
-		var systems = new SystemAnalyzer(known);
+		var queries = new QueryAnalyzer(known);
+		var systems = new SystemAnalyzer(known, queries);
 		var analyzer = new RegistrationAnalyzer(known, systems, canIntercept);
 		analyzer.FindCalls(context.CancellationToken);
 

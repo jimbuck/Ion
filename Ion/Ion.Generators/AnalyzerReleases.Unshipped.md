@@ -25,3 +25,10 @@ ION103 | Ion.Events | Warning | Event reader created in a stage method
 ION104 | Ion.Events | Error | Event payload is not unmanaged
 ION105 | Ion.Events | Info | Event read in an earlier stage than it is emitted
 ION106 | Ion.Events | Warning | Event reader in a readonly field or a property
+ION301 | Ion.Ecs | Error | Query on a class that is not partial
+ION302 | Ion.Ecs | Error | Query component parameter passed by value
+ION303 | Ion.Ecs | Error | Query component is not a struct
+ION304 | Ion.Ecs | Error | Query component both required and excluded
+ION305 | Ion.Ecs | Error | Structural change inside a query without Commands
+ION306 | Ion.Ecs | Error | Unsupported query method
+ION307 | Ion.Ecs | Warning | Query without a stage

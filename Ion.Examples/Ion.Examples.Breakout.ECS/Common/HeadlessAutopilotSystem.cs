@@ -4,6 +4,7 @@ using Arch.Core.Extensions;
 using Microsoft.Extensions.Logging;
 
 using Ion.Extensions.Audio;
+using Ion.Extensions.Ecs;
 using Ion.Extensions.Graphics;
 
 using World = Arch.Core.World;
@@ -13,9 +14,9 @@ namespace Ion.Examples.Breakout.ECS.Common;
 /// <summary>
 /// Plays the game when it runs headless (<c>--Ion:Headless=true</c>): scripts mouse input through
 /// <see cref="NullInputState"/> to grab the mouse, launch balls and keep the paddle under the lowest ball, and logs what
-/// was drawn and played about once a second.
+/// was drawn and played about once a second. The ball the paddle follows is found by a [Query] step.
 /// </summary>
-public class HeadlessAutopilotSystem(NullInputState input, ISpriteBatch spriteBatch, NullAudioManager audio, IWindow window, World world, ILogger<HeadlessAutopilotSystem> logger)
+public partial class HeadlessAutopilotSystem(NullInputState input, ISpriteBatch spriteBatch, NullAudioManager audio, IWindow window, World world, ILogger<HeadlessAutopilotSystem> logger)
 {
 	private const int GrabFrame = 5;
 	private const int FirstLaunchFrame = 10;
@@ -28,6 +29,8 @@ public class HeadlessAutopilotSystem(NullInputState input, ISpriteBatch spriteBa
 
 	private long _frame;
 	private int _launches;
+	private float _lowest;
+	private float _target;
 
 	[Init]
 	public void Init(GameTime dt)
@@ -48,19 +51,23 @@ public class HeadlessAutopilotSystem(NullInputState input, ISpriteBatch spriteBa
 			_launches++;
 		}
 
-		// Follow the lowest ball with the paddle.
-		var target = window.Width / 2f;
-		var lowest = float.MinValue;
-		world.Query(in _ballQuery, (ref Transform2D transform) =>
-		{
-			if (transform.Position.Y > lowest)
-			{
-				lowest = transform.Position.Y;
-				target = transform.Position.X;
-			}
-		});
-		input.SetMousePosition(new Vector2(target, window.Height / 2f));
+		// Follow the lowest ball with the paddle (found by TrackLowestBall, then applied by Steer).
+		_target = window.Width / 2f;
+		_lowest = float.MinValue;
 	}
+
+	[First(Order = 1), Query, All<Ball>]
+	private void TrackLowestBall(in Transform2D transform)
+	{
+		if (transform.Position.Y > _lowest)
+		{
+			_lowest = transform.Position.Y;
+			_target = transform.Position.X;
+		}
+	}
+
+	[First(Order = 2)]
+	public void Steer(GameTime dt) => input.SetMousePosition(new Vector2(_target, window.Height / 2f));
 
 	[Last]
 	public void Last(GameTime dt)

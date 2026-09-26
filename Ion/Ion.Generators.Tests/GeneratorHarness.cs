@@ -56,6 +56,7 @@ internal static class GeneratorHarness
 		return new GeneratorResult(compilation, (CSharpCompilation)output, Tree("IonSchedule.g.cs"), [.. run.Diagnostics.Concat(generatorDiagnostics).Distinct()])
 		{
 			GeneratedEvents = Tree("IonEvents.g.cs"),
+			GeneratedQueries = Tree("IonQueries.g.cs"),
 		};
 	}
 
@@ -110,6 +111,9 @@ internal sealed record GeneratorResult(CSharpCompilation Input, CSharpCompilatio
 {
 	/// <summary>The generated <c>IonEvents.g.cs</c> (event summary and generated bus), or empty.</summary>
 	public string GeneratedEvents { get; init; } = "";
+
+	/// <summary>The generated <c>IonQueries.g.cs</c> (the expansions of [Query] methods), or empty.</summary>
+	public string GeneratedQueries { get; init; } = "";
 
 	/// <summary>The errors of the compilation with the generated code (there should be none).</summary>
 	public IEnumerable<Diagnostic> CompilationErrors => Output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);

@@ -178,7 +178,7 @@ public class SpriteBatchBenchmarks
 		public void Dispose() { }
 	}
 
-	private sealed class NoGpuFrame : IGraphicsFrame
+	internal sealed class NoGpuFrame : IGraphicsFrame
 	{
 		public IGraphicsDevice Device => throw new InvalidOperationException("No GPU in this benchmark.");
 		public bool IsRendering => false;

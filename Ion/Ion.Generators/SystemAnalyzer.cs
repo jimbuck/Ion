@@ -15,6 +15,8 @@ internal enum SignatureKind
 	Injected,
 	LegacyVoidNext,
 	LegacyFactory,
+	/// <summary>A [Query] method of a source type: the step runs its generated expansion (see <see cref="QueryEmitter"/>).</summary>
+	Query,
 }
 
 internal enum ItemKind
@@ -38,6 +40,12 @@ internal sealed class SystemStep
 	public int DeclarationIndex { get; init; }
 	public List<ITypeSymbol> After { get; init; } = [];
 	public List<ITypeSymbol> Before { get; init; } = [];
+
+	/// <summary>The printed method name: the method's own, or for an expanded [Query] step the query method's.</summary>
+	public string Name { get; init; } = "";
+
+	/// <summary>For a [Query] method of a source type: the query (the step calls <see cref="QueryInfo.CompanionName"/>).</summary>
+	public QueryInfo? Query { get; init; }
 
 	public string KindCode => Kind switch
 	{
@@ -72,7 +80,7 @@ internal sealed class SystemInfo
 /// Ports <c>SchedulePlanner.DiscoverSystem</c> and <c>StepSignature</c> to Roslyn symbols, keeping every rule and message
 /// identical so that a system described at compile time plans exactly like one discovered by reflection.
 /// </summary>
-internal sealed class SystemAnalyzer(KnownSymbols known)
+internal sealed class SystemAnalyzer(KnownSymbols known, QueryAnalyzer queries)
 {
 	private readonly Dictionary<(INamedTypeSymbol, INamedTypeSymbol), SystemInfo> _cache = new(new PairComparer());
 
@@ -103,7 +111,15 @@ internal sealed class SystemAnalyzer(KnownSymbols known)
 			}
 		}
 
-		var methods = GetMethodsInDeclarationOrder(type);
+		var methods = GetMethodsInDeclarationOrder(type, IsBound);
+
+		// Methods a generator expanded in a referenced assembly (a [Query] method's generated loop): run in their place.
+		var expanded = new HashSet<string>(StringComparer.Ordinal);
+		foreach (var (method, _) in methods)
+		{
+			if (ExpandedName(method) is { } original) expanded.Add(original);
+		}
+
 		var scopeKeys = new List<(int Stage, string? Name)>();
 		var scopes = new Dictionary<(int Stage, string? Name), (List<ScopeMethod> Begins, List<ScopeMethod> Ends)>();
 		var count = 0;
@@ -147,8 +163,52 @@ internal sealed class SystemAnalyzer(KnownSymbols known)
 
 			if (stageAttributes.Count == 0 && scopeAttributes.Count == 0) continue;
 
-			var name = info.Name + "." + method.Name;
 			var location = SourceLocation(method);
+			var stepName = ExpandedName(method) ?? method.Name;
+			var name = info.Name + "." + stepName;
+
+			if (IsBound(method))
+			{
+				if (!queries.IsQuery(method))
+				{
+					info.NotDescribable ??= $"'{name}' is bound by an attribute the generator does not know";
+					continue;
+				}
+
+				// The original of an expansion that is visible in metadata: the expansion is the step.
+				if (expanded.Contains(method.Name)) continue;
+
+				if (!method.Locations.Any(l => l.IsInSource))
+				{
+					info.NotDescribable ??= $"the [Query] method '{name}' of a referenced assembly was not expanded (it was compiled without Ion.Generators)";
+					continue;
+				}
+
+				// Reported by the query diagnostics (ION301 to ION307); the build fails, nothing to describe.
+				if (queries.Analyze(method) is not { } query || scopeAttributes.Count > 0) continue;
+
+				var queryConstraints = classConstraints.Concat(methodConstraints).ToList();
+				foreach (var (stage, order) in stageAttributes)
+				{
+					if (!CheckStage(info, stage, name, location)) continue;
+					info.Steps.Add(new SystemStep
+					{
+						Stage = stage,
+						Kind = ItemKind.Step,
+						Order = order,
+						Method = method,
+						Signature = SignatureKind.Query,
+						Name = method.Name,
+						Query = query,
+						DeclarationIndex = index,
+						After = Targets(queryConstraints, before: false),
+						Before = Targets(queryConstraints, before: true),
+					});
+					count++;
+				}
+
+				continue;
+			}
 
 			if (method.DeclaredAccessibility != Accessibility.Public)
 			{
@@ -180,12 +240,12 @@ internal sealed class SystemAnalyzer(KnownSymbols known)
 					case SignatureKind.LegacyFactory:
 						Warning(info, "ION010",
 							$"'{name}' in {stageName} uses the legacy middleware form (GameLoopDelegate next). Rewrite it as a leaf step, [{stageName}] public void {method.Name}(GameTime dt), without next(dt); move code that ran after next(dt) into a later step (a higher Order or [After<T>]) or a [Begin]/[End] scope.", location);
-						info.Steps.Add(new SystemStep { Stage = stage, Kind = ItemKind.Middleware, Order = order, Method = method, Signature = signature, DeclarationIndex = index, After = after, Before = before });
+						info.Steps.Add(new SystemStep { Stage = stage, Kind = ItemKind.Middleware, Order = order, Method = method, Signature = signature, Name = stepName, DeclarationIndex = index, After = after, Before = before });
 						count++;
 						continue;
 
 					default:
-						info.Steps.Add(new SystemStep { Stage = stage, Kind = ItemKind.Step, Order = order, Method = method, Signature = signature, DeclarationIndex = index, After = after, Before = before });
+						info.Steps.Add(new SystemStep { Stage = stage, Kind = ItemKind.Step, Order = order, Method = method, Signature = signature, Name = stepName, DeclarationIndex = index, After = after, Before = before });
 						count++;
 						continue;
 				}
@@ -265,6 +325,7 @@ internal sealed class SystemAnalyzer(KnownSymbols known)
 				Order = begin.Attribute.Order,
 				Method = begin.Method,
 				Signature = begin.Signature,
+				Name = begin.Method.Name,
 				EndMethod = end.Method,
 				EndSignature = end.Signature,
 				ScopeName = scopeName,
@@ -423,6 +484,54 @@ internal sealed class SystemAnalyzer(KnownSymbols known)
 	/// protected ordinary methods are numbered (the ones every compilation can see, in source and in metadata), which keeps
 	/// the relative order of steps; other methods are visited (so an attributed non-public method is reported) but numbered -1.
 	/// </summary>
+	/// <summary>Whether <paramref name="method"/> has a step binder attribute (<c>[Query]</c>).</summary>
+	private bool IsBound(IMethodSymbol method) =>
+		known.StepBinderAttribute is { } binder && method.GetAttributes().Any(a => a.AttributeClass is { } c && (KnownSymbols.Is(c, binder) || InheritsFrom(c, binder)));
+
+	/// <summary>The method an <c>[ExpandedStep]</c> method replaces, or null.</summary>
+	private string? ExpandedName(IMethodSymbol method)
+	{
+		if (known.ExpandedStepAttribute is not { } expanded) return null;
+		foreach (var attribute in method.GetAttributes())
+		{
+			if (KnownSymbols.Is(attribute.AttributeClass, expanded) && attribute.ConstructorArguments.Length == 1 && attribute.ConstructorArguments[0].Value is string name) return name;
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// The methods in declaration order (see the overload), where the methods for which <paramref name="isBound"/> is true
+	/// (<c>[Query]</c> methods) are numbered as their generated expansions are: after the other numbered methods of their
+	/// declaring type, in declaration order (the expansion is emitted in a later partial part, so it comes last in
+	/// metadata and reflection order). In metadata, where the expansions exist, the originals are left unnumbered.
+	/// </summary>
+	private static List<(IMethodSymbol Method, int Index)> GetMethodsInDeclarationOrder(INamedTypeSymbol type, Func<IMethodSymbol, bool> isBound)
+	{
+		var all = GetMethodsInDeclarationOrder(type);
+		var result = new List<(IMethodSymbol, int)>(all.Count);
+		var index = 0;
+		foreach (var group in all.GroupBy(m => m.Method.ContainingType, SymbolEqualityComparer.Default))
+		{
+			var pending = new List<IMethodSymbol>();
+			foreach (var (method, original) in group)
+			{
+				if (isBound(method))
+				{
+					if (method.Locations.Any(l => l.IsInSource)) pending.Add(method);
+					else result.Add((method, -1));
+					continue;
+				}
+
+				result.Add((method, original < 0 ? -1 : index++));
+			}
+
+			foreach (var method in pending) result.Add((method, index++));
+		}
+
+		return result;
+	}
+
 	private static List<(IMethodSymbol Method, int Index)> GetMethodsInDeclarationOrder(INamedTypeSymbol type)
 	{
 		var chain = new List<INamedTypeSymbol>();

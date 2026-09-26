@@ -61,7 +61,7 @@ internal sealed class CandidateItem
 
 	public bool Wraps => KindCode is "B" or "M" or "D";
 
-	public string Key => Entry.ToString(CultureInfo.InvariantCulture) + "|" + KindCode + "|" + (Step?.Method.Name ?? "") + "|" + Declaration.ToString(CultureInfo.InvariantCulture);
+	public string Key => Entry.ToString(CultureInfo.InvariantCulture) + "|" + KindCode + "|" + (Step?.Name ?? "") + "|" + Declaration.ToString(CultureInfo.InvariantCulture);
 }
 
 /// <summary>
@@ -123,7 +123,7 @@ internal sealed class CandidatePlanner(SystemAnalyzer systems, Action<Diagnostic
 							Declaration = step.DeclarationIndex,
 							After = step.After,
 							Before = step.Before,
-							Name = system.Name + "." + step.Method.Name,
+							Name = system.Name + "." + step.Name,
 						});
 					}
 

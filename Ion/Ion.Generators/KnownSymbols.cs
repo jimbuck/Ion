@@ -41,6 +41,23 @@ internal sealed class KnownSymbols
 	public INamedTypeSymbol? ServiceProvider { get; private set; }
 	public INamedTypeSymbol? AsyncStateMachineAttribute { get; private set; }
 
+	// ECS: [Query] steps expanded into chunk loops (see QueryAnalyzer).
+	public INamedTypeSymbol? StepBinderAttribute { get; private set; }
+	public INamedTypeSymbol? ExpandedStepAttribute { get; private set; }
+	public INamedTypeSymbol? QueryAttribute { get; private set; }
+	public INamedTypeSymbol? QueryFilterAttribute { get; private set; }
+	public INamedTypeSymbol? DataAttribute { get; private set; }
+	public INamedTypeSymbol? Commands { get; private set; }
+	public INamedTypeSymbol? EcsComponents { get; private set; }
+	public INamedTypeSymbol? HierarchyExtensions { get; private set; }
+	public INamedTypeSymbol? ArchWorld { get; private set; }
+	public INamedTypeSymbol? ArchEntity { get; private set; }
+	public INamedTypeSymbol? ArchEntityExtensions { get; private set; }
+	public INamedTypeSymbol? ArchCommandBuffer { get; private set; }
+
+	/// <summary>Whether the compilation references the ECS module's [Query] (and Arch).</summary>
+	public bool HasQueries => QueryAttribute is not null && QueryFilterAttribute is not null && DataAttribute is not null && Commands is not null && ArchWorld is not null && ArchEntity is not null;
+
 	// Metrics v2: the frame profiler the generated stage methods record spans into.
 	public INamedTypeSymbol? FrameProfiler { get; private set; }
 
@@ -114,6 +131,18 @@ internal sealed class KnownSymbols
 		known.ReadsEventAttribute = Get("Ion.ReadsEventAttribute");
 		known.EventUsageAttribute = Get("Ion.EventUsageAttribute");
 		known.IonApplicationBuilder = Get("Ion.IonApplicationBuilder");
+		known.StepBinderAttribute = Get("Ion.StepBinderAttribute");
+		known.ExpandedStepAttribute = Get("Ion.ExpandedStepAttribute");
+		known.QueryAttribute = Get("Ion.Extensions.Ecs.QueryAttribute");
+		known.QueryFilterAttribute = Get("Ion.Extensions.Ecs.QueryFilterAttribute");
+		known.DataAttribute = Get("Ion.Extensions.Ecs.DataAttribute");
+		known.Commands = Get("Ion.Extensions.Ecs.Commands");
+		known.EcsComponents = Get("Ion.Extensions.Ecs.EcsComponents");
+		known.HierarchyExtensions = Get("Ion.Extensions.Ecs.HierarchyExtensions");
+		known.ArchWorld = Get("Arch.Core.World");
+		known.ArchEntity = Get("Arch.Core.Entity");
+		known.ArchEntityExtensions = Get("Arch.Core.Extensions.EntityExtensions");
+		known.ArchCommandBuffer = Get("Arch.Buffer.CommandBuffer");
 
 		for (var i = 0; i < StageNames.Length; i++)
 		{

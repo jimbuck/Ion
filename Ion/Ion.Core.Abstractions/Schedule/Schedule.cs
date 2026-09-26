@@ -171,6 +171,7 @@ public sealed class Schedule
 		{
 			if (step.Function is { } function) return function.Bind(services);
 			if (step.Generated is { } generated) return generated.Bind!(generated.IsStatic ? null : Instance(step), services);
+			if (step.Binder is { } binder) return binder.Bind(step.Method!.IsStatic ? null : Instance(step), step.Method, services, step.Name);
 			return Bind(Instance(step), step.Method!);
 		}
 

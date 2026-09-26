@@ -228,6 +228,7 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 		w.OpenBlock();
 
 		var adapters = new List<(string Name, SystemInfo System, IMethodSymbol Method)>();
+		var queryAdapters = new List<(string Name, SystemInfo System, QueryInfo Query)>();
 
 		for (var s = 0; s < _systems.Count; s++)
 		{
@@ -252,7 +253,7 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 				{
 					var step = system.Steps[i];
 					var kind = step.Kind switch { ItemKind.Scope => "Scope", ItemKind.Middleware => "Middleware", _ => "Step" };
-					w.WriteLine($"new global::Ion.GeneratedStep(global::Ion.Stage.{KnownSymbols.StageName(step.Stage)}, global::Ion.GeneratedStepKind.{kind}, {step.Order.ToString(CultureInfo.InvariantCulture)}, {Literal(step.Method.Name)}, {step.DeclarationIndex.ToString(CultureInfo.InvariantCulture)})");
+					w.WriteLine($"new global::Ion.GeneratedStep(global::Ion.Stage.{KnownSymbols.StageName(step.Stage)}, global::Ion.GeneratedStepKind.{kind}, {step.Order.ToString(CultureInfo.InvariantCulture)}, {Literal(step.Name)}, {step.DeclarationIndex.ToString(CultureInfo.InvariantCulture)})");
 					w.OpenBlock();
 					if (step.Method.IsStatic) w.WriteLine("IsStatic = true,");
 					if (step.After.Count > 0) w.WriteLine($"After = {TypeArray(step.After)},");
@@ -261,6 +262,11 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 					if (step.Kind == ItemKind.Middleware)
 					{
 						w.WriteLine($"BindMiddleware = {BindMiddleware(system, step.Method, step.Signature)},");
+					}
+					else if (step.Query is { } query)
+					{
+						w.WriteLine($"Services = {TypeArray(QueryServices(query))},");
+						w.WriteLine($"Bind = {BindQuery(system, s, query, queryAdapters)},");
 					}
 					else
 					{
@@ -310,6 +316,12 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 			WriteAdapter(w, name, system, method);
 		}
 
+		foreach (var (name, system, query) in queryAdapters)
+		{
+			w.WriteEmptyLines(1);
+			WriteQueryAdapter(w, name, system, query);
+		}
+
 		w.CloseBlock();
 	}
 
@@ -332,6 +344,42 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 					? $"static (instance, services) => new {name}(services).Invoke"
 					: $"static (instance, services) => new {name}(({Type(system.Implementation)})instance!, services).Invoke";
 		}
+	}
+
+	private List<ITypeSymbol> QueryServices(QueryInfo query) => query.UsesCommands ? [known.ArchWorld!, known.Commands!] : [known.ArchWorld!];
+
+	private string BindQuery(SystemInfo system, int index, QueryInfo query, List<(string, SystemInfo, QueryInfo)> adapters)
+	{
+		var name = $"S{index.ToString(CultureInfo.InvariantCulture)}_{query.Method.Name}_Query{adapters.Count.ToString(CultureInfo.InvariantCulture)}";
+		adapters.Add((name, system, query));
+		return query.Method.IsStatic
+			? $"static (instance, services) => new {name}(services).Invoke"
+			: $"static (instance, services) => new {name}(({Type(system.Implementation)})instance!, services).Invoke";
+	}
+
+	/// <summary>Binds a [Query] step: its expansion with the scope's world (and commands) resolved once.</summary>
+	private void WriteQueryAdapter(SourceWriter w, string name, SystemInfo system, QueryInfo query)
+	{
+		var isStatic = query.Method.IsStatic;
+		WriteTypeAttributes(w);
+		w.WriteLine($"private sealed class {name}");
+		w.OpenBlock();
+		if (!isStatic) w.WriteLine($"private readonly {Type(system.Implementation)} _system;");
+		w.WriteLine($"private readonly {Type(known.ArchWorld!)} _world;");
+		if (query.UsesCommands) w.WriteLine($"private readonly {Type(known.Commands!)} _commands;");
+		w.WriteEmptyLines(1);
+		w.WriteLine(isStatic
+			? $"public {name}(global::System.IServiceProvider services)"
+			: $"public {name}({Type(system.Implementation)} system, global::System.IServiceProvider services)");
+		w.OpenBlock();
+		if (!isStatic) w.WriteLine("_system = system;");
+		w.WriteLine($"_world = {Resolve(known.ArchWorld!, "services")};");
+		if (query.UsesCommands) w.WriteLine($"_commands = {Resolve(known.Commands!, "services")};");
+		w.CloseBlock();
+		w.WriteEmptyLines(1);
+		w.WriteLine("[global::System.Diagnostics.StackTraceHidden]");
+		w.WriteLine($"public void Invoke(global::Ion.GameTime dt) => {(isStatic ? Type(query.Method.ContainingType) : "_system")}.{query.CompanionName}(dt, _world{(query.UsesCommands ? ", _commands" : "")});");
+		w.CloseBlock();
 	}
 
 	private string BindMiddleware(SystemInfo system, IMethodSymbol method, SignatureKind signature)
@@ -730,11 +778,29 @@ internal sealed class Emitter(KnownSymbols known, RegistrationAnalyzer registrat
 		}
 
 		var method = item.Step!.Method;
+		if (item.Step.Query is { } query && item.System is { } querySystem && registrations.IsAccessible(querySystem.Implementation))
+		{
+			var world = $"_p{n}_0";
+			state.Fields.Add($"private readonly {Type(known.ArchWorld!)} {world};");
+			state.Init.Add($"{world} = context.Service<{Type(known.ArchWorld!)}>({entry});");
+			var queryArguments = "dt, " + world;
+			if (query.UsesCommands)
+			{
+				var commands = $"_p{n}_1";
+				state.Fields.Add($"private readonly {Type(known.Commands!)} {commands};");
+				state.Init.Add($"{commands} = context.Service<{Type(known.Commands!)}>({entry});");
+				queryArguments += ", " + commands;
+			}
+
+			var queryTarget = query.Method.IsStatic ? Type(query.Method.ContainingType) : Instance(state, item);
+			return $"{queryTarget}.{query.CompanionName}({queryArguments})";
+		}
+
 		if (IsDirect(item, method)) return DirectCall(state, item, method, "p");
 
 		var bound = "_d" + n;
 		state.Fields.Add($"private readonly global::Ion.GameLoopDelegate {bound};");
-		state.Init.Add($"{bound} = context.Step({entry}, global::Ion.Stage.{KnownSymbols.StageName(item.Stage)}, {Literal(method.Name)}, {item.Declaration.ToString(CultureInfo.InvariantCulture)});");
+		state.Init.Add($"{bound} = context.Step({entry}, global::Ion.Stage.{KnownSymbols.StageName(item.Stage)}, {Literal(item.Step.Name)}, {item.Declaration.ToString(CultureInfo.InvariantCulture)});");
 		return $"{bound}(dt)";
 	}
 

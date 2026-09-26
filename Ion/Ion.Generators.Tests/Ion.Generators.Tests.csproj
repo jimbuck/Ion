@@ -29,6 +29,7 @@
     <!-- Referenced so the test compilations can reference the engine assemblies. -->
     <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Scenes\Ion.Extensions.Scenes.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Golden\**\*.cs" />

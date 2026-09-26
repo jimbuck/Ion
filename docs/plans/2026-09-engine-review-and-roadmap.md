@@ -464,6 +464,17 @@ public sealed partial class SpriteExtractSystem(World world, ISpriteBatch sprite
 - `Ion.Extensions.Ecs.Rendering` contains the extraction systems for 2D and 3D described in 4.8. Entities are never touched by the renderer; extraction copies into flat arrays every frame (Bevy's model), which also makes the renderer usable from non-ECS code.
 - Physics is a P1 module (section 4.12) with adapter systems, following the Breakout ECS sample.
 
+**As implemented (Stage 5, ECS half, September 2026).** Arch 2.1, as measured in 5.7. Packages `Ion.Extensions.Ecs.Abstractions` (attributes, `Commands`, components), `Ion.Extensions.Ecs` and `Ion.Extensions.Ecs.Rendering`; users keep Arch's `World`, `Entity` and queries. Decisions and deviations:
+
+- *World per scope.* `World`, `Commands` and `NameRegistry` are transients whose factory returns the scope's instance (`EcsWorlds`): the root provider gets the root world, each scene scope its own, disposed with it. A scoped `World` would fail DI scope validation (and ION006) in the root schedule, which needs a world too. The built-in systems are transients for the same reason, so `app.UseEcs()` and `scene.UseEcs()` each get instances bound to their world.
+- *`[Query]`.* The generator emits, into the partial system, a public hidden `__IonQuery_{Method}(GameTime, World[, Commands])` that loops over the chunks with `GetFirst`/`Unsafe.Add` in Arch's order (last to first within a chunk, as `World.Query`) and checks after each entity that neither the chunk's count nor the world's size changed (`StructuralChangeException` naming the step and the entity; `[Query(Unchecked = true)]` drops the check). It copies the method's stage and ordering attributes and carries `[ExpandedStep]`, so both the generated schedule and the reflection planner run it under the method's name; the generated schedule calls it directly, also for systems of referenced assemblies (through their metadata). Tie-break: expansions number after the type's other public methods, so at equal `Order` a query step runs after the system's other steps. Without the generator, `QueryAttribute` (a `StepBinderAttribute`, the new core hook) binds the method by reflection with boxed components (about 28x slower). Diagnostics ION301 to ION307. A module initializer registers the query components with Arch (`EcsComponents`), which NativeAOT needs; `Arch.AOT.SourceGenerator` 1.0.1 was not used: it targets Arch 1.x (`Arch.Core.Utils.ComponentType`) and brings Roslyn Workspaces as a runtime dependency.
+- *Commands.* Arch's `CommandBuffer` plus hierarchy commands, played back by `EcsCommandsSystem` at `StageOrder.Ecs` (950) at the end of every stage.
+- *Transform propagation* runs at `StageOrder.TransformPropagation` (-400, the start of the user band) in Last and again in Render before the extraction: Last alone would draw every frame one frame late (Render runs before Last in Ion's loop) and draw new entities at the origin. The second pass is the dirty check only when nothing moved since Last. Dirty tracking needs no change flags: the global component keeps the local transform and parent version it was computed from.
+- *2D extraction* at `StageOrder.Extract` (-300: inside the sprite batch scope, after the propagation, before the game's Render steps at 0). It draws straight from the chunks when depths are already in order and sorts integer keys (depth bits, query position) otherwise. The main camera is the engine's `Camera2D` class used as a component with the `MainCamera` tag.
+- *3D.* The 3D local transform is `Ion.Extensions.Graphics.Transform` (the 3D SDK's); `GlobalTransform.Matrix = local.ToMatrix() * parent`, the contract of `docs/design/ion-rendering3d.md` section 8. 3D extraction (`MeshRenderer`, cameras, lights) is the next wave.
+- *Serialization* is Ion's own (JSON with source-generated System.Text.Json metadata, and a binary format), opt-in with `AddEcsSerialization()`. `Arch.Persistence` 2.0.0 does not load against Arch 2.1 (`TypeLoadException` on `Arch.Core.Utils.ComponentType`), pins a MessagePack prerelease with a known vulnerability (NU1902) and uses Utf8Json (IL emission, no NativeAOT).
+- *Results:* see 5.9. The Breakout ECS sample runs on the module (golden images unchanged: at most 156 pixels differ by 2/255 from rotated sprites placed from their origin), and publishes with NativeAOT for linux-x64 and linux-arm64 with no Ion, Arch or Collections.Pooled warnings.
+
 ### 4.10 Agentic development (Stage 6)
 
 Concrete capabilities, in priority order, each with the engine feature that delivers it:
@@ -613,6 +624,26 @@ The benchmark project targets Arch 2.1.0 (the version the engine would adopt; th
 
 Iteration is a wash: both libraries hit about 8 ns per entity for the chunk-span loop, which is the form the generator will emit, and Arch 2.1 is 2.6x faster than the 1.2.8 delegate query the sample uses today (215 us in the first baseline run versus 87 us). Arch creates entities 1.7x faster with 2.7x less garbage, and its bulk structural API is far faster than per-entity command-buffer churn (the Friflo row is not the same algorithm, Friflo has no bulk tag add on a query; it is what a game would write). On the numbers, **Arch 2.1 is the pick**, with two conditions carried into Stage 5: NativeAOT must be made warning-free with `Arch.AOT.SourceGenerator` on linux-x64 and linux-arm64, and structural changes in user code go through the engine's `Commands` (which maps to Arch's `CommandBuffer` and to the bulk operations when a whole query is affected). Friflo stays the documented fallback: same integration surface, and it wins if the AOT condition cannot be met or once its 4.0 functor API ships and the numbers change.
 
+### 5.9 ECS module (`EcsQueryBenchmarks`, `TransformPropagationBenchmarks`, `SpriteExtractionBenchmarks`, 10,000 entities)
+
+Same VM as 5.7 (noisy: repeated runs of one row vary by about 5 percent). The query work writes the rotated corner of 5.7 into a third component.
+
+| Row | Mean | Ratio | Allocated |
+|---|---|---|---|
+| Query: `ChunkSpans` (hand-written, baseline) | 73.9 us | 1.00 | 0 B |
+| Query: `World.Query` delegate | 69.5 us | 0.94 | 0 B |
+| Query: generated `[Query]` (checked) | 78.4 us | 1.06 (0.99 in an earlier run) | 0 B |
+| Query: generated `[Query(Unchecked = true)]` | 64.1 us | 0.87 | 0 B |
+| Query: the generated loop by hand, without the check | 66.7 us | 0.90 | 0 B |
+| Query: reflection binder (no generator) | 2,121 us | 28.7 | 1.76 MB |
+| Propagation, 3-level tree, all dirty | 232 us (23 ns per entity) | | 0 B |
+| Propagation, nothing changed | 152 us (15 ns per entity) | | 0 B |
+| Extraction into the 2D batch, depths in order | 154 us (vs 80 us of direct draws) | 1.94 | 0 B |
+| Extraction alone, depths in order | 77 us | | 0 B |
+| Extraction alone, 8 interleaved depths (sorted) | 733 us | | 0 B |
+
+The generated loop is at the chunk-span baseline's cost within noise (0.99 and 1.06 in two runs); the structural-change check costs about 1.2 ns per entity on this trivial body (0.87 unchecked). Propagation is dominated by the per-child entity lookup (one lookup of the chunk and index per child).
+
 ### 5.8 Startup (`PipelineBuildBenchmarks`)
 
 Building the host, binding by reflection and building the seven pipelines: 1.28 ms and 296 KB for 8 systems, 2.0 ms and 451 KB for 32 (dominated by `Host.CreateApplicationBuilder`). Not a problem for startup, but it is the cost paid on every hot reload and every scene switch (each scene rebuilds its pipelines the same way). Note that every `IonApplication` that is built and not disposed leaks a `FileSystemWatcher` (the host's `appsettings.json` reload watcher); the benchmark hit the Linux inotify limit of 128 instances until it disposed the application. Tests that build many apps must dispose them.
@@ -683,6 +714,7 @@ Each stage is sized so a single agent session (or a small PR series) can deliver
 - Acceptance: 10k `MeshRenderer` entities with 3 materials render in under 2 ms CPU on the extraction+queue path (benchmark added); glTF sample matches reference screenshots on all backends; ECS query benchmark on the built-in `[Query]` path matches `ChunkSpans` numbers.
 
 - Status (3D half, see "As implemented (Stage 5, 3D half)" in 4.8): `Rendering3D` is in with mesh/material/camera/light types, bounds, frustum culling, extract/prepare/queue/sort, a render graph with shadow, depth prepass, opaque, skybox, transparent and 2D overlay passes (no built-in post pass), unlit and PBR materials in GLSL (not WGSL; custom materials use the same bind group conventions), glTF import and instancing. `Ion.Examples.Cubes` (immediate mode, no ECS) and `Ion.Examples.Model` (glTF, PBR, lights, skybox; the small CC0 Avocado model instead of Sponza, which is too large to commit) render one golden per sample on Vulkan and OpenGL ES and run windowed under validation; both publish with NativeAOT with no `Ion.*` warnings. The extraction+queue path takes 1.20 ms CPU for 10k mesh renderers with 3 materials (met, benchmark added; measured with the immediate-mode API, the ECS extraction adds its query). Open: transform propagation and the ECS extraction systems (the ECS wave, contract in `docs/design/ion-rendering3d.md` section 8), Breakout ECS on the built-in components, Sponza, and the arm64/R36S frame times.
+- Status (ECS half, see "As implemented (Stage 5, ECS half)" in 4.9 and 5.9): `World` per scope, `[Query]` generation, `Commands` per stage, 2D and 3D transform hierarchy, `EntityName`/`NameRegistry`, serialization, 2D extraction (sprites, camera, animation) and the Breakout ECS sample on the built-in components are in. ECS query benchmark on the built-in `[Query]` path matches `ChunkSpans` (met within noise: 0.99 to 1.06). NativeAOT publish of the ECS sample: no warnings from Ion, Arch or its dependencies on linux-x64 and linux-arm64 (met; what remains is nkast.Aether and Silk.NET.Core). Not done: tilemaps, 3D extraction (next wave, against `docs/design/ion-rendering3d.md` section 8), parallel queries.
 
 ### Stage 5b: UI and physics modules (P1, 4-6 weeks, parallel with Stage 6)
 

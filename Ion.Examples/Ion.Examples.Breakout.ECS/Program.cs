@@ -5,6 +5,7 @@ using Arch.Core.Extensions;
 
 using Ion;
 using Ion.Extensions.Assets;
+using Ion.Extensions.Ecs;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Audio;
 using Ion.Extensions.Metrics;
@@ -267,7 +268,12 @@ public class PaddleSystem(IWindow window, World world, IInputState input, IEvent
 	}
 }
 
-public unsafe class BallSystem(IWindow window, World world, IEvents events, IAssetManager assets, PhysicsManager physics)
+/// <summary>
+/// Launches balls from the paddle and handles lost balls. Launching creates the entity directly (outside any query, so
+/// the score counts it this frame); the per-ball checks are [Query] steps that record their structural changes with
+/// <see cref="Commands"/>, played back at the end of Update.
+/// </summary>
+public unsafe partial class BallSystem(IWindow window, World world, IEvents events, IAssetManager assets, PhysicsManager physics)
 {
 	private EventReader<LaunchBallCommand> _launches = events.Reader<LaunchBallCommand>();
 	private EventReader<BlocksClearedEvent> _cleared = events.Reader<BlocksClearedEvent>();
@@ -279,6 +285,9 @@ public unsafe class BallSystem(IWindow window, World world, IEvents events, IAss
 	private readonly QueryDescription _paddleQuery = new QueryDescription().WithAll<Paddle>();
 
 	private readonly Vector2 _paddleBallOffset = new(0f, -(BreakoutConstants.BALL_SIZE.Y + 20));
+
+	// Whether the blocks were cleared this frame (read in PositionUpdate, used by the ClearBall query).
+	private bool _clearing;
 
 	// The paddle entity exists once PaddleSystem's Init step has run.
 	[Init, After<PaddleSystem>]
@@ -311,35 +320,35 @@ public unsafe class BallSystem(IWindow window, World world, IEvents events, IAss
 			ballBody.LinearVelocity = new AetherVector2(0, -100f / physics.PhysicsScale);
 		}
 
-		world.Query(in _ballQuery, (Entity entity) =>
-		{
-			ref var ballTransform = ref entity.Get<Transform2D>();
-			ref var paddle = ref _paddle.Get<Paddle>();
+		_clearing = _cleared.Read().Length > 0;
+	}
 
-			if (ballTransform.Position.Y > window.Height && entity.Has<DynamicRigidBody>())
-			{
-				ref var rigidBody = ref entity.Get<DynamicRigidBody>();
-				physics.Remove(rigidBody.Body);
-				entity.Remove<DynamicRigidBody>();
-				paddle.HasBall = true;
-				events.Emit(new BallLostEvent());
-			}
-		});
+	/// <summary>A ball that fell below the window loses its body (the paddle gets a ball back).</summary>
+	[Update(Order = 1), Query, All<Ball>]
+	private void CheckLost(Entity entity, in Transform2D transform, in DynamicRigidBody body, Commands commands)
+	{
+		if (transform.Position.Y <= window.Height) return;
 
-		if (_cleared.Read().Length > 0)
-		{
-			world.Query(in _ballQuery, (Entity entity, ref DynamicRigidBody body) =>
-			{
-				physics.Remove(body.Body);
-				world.Destroy(entity);
-			});
-		}
+		physics.Remove(body.Body);
+		commands.Remove<DynamicRigidBody>(entity);
+		_paddle.Get<Paddle>().HasBall = true;
+		events.Emit(new BallLostEvent());
+	}
 
+	/// <summary>When every block is gone, the balls in play are removed.</summary>
+	[Update(Order = 2), Query, All<Ball>]
+	private void ClearBall(Entity entity, in DynamicRigidBody body, Commands commands)
+	{
+		if (!_clearing) return;
+
+		physics.Remove(body.Body);
+		commands.Destroy(entity);
 	}
 
 	private Entity _createBall(Vector2 position)
 	{
-		return world.Create(new Ball(), new Transform2D(position), new Sprite(_ballTexture, BreakoutConstants.BALL_SIZE));		
+		// In front of the blocks and the paddle (depth 0).
+		return world.Create(new Ball(), new Transform2D(position), new Sprite(_ballTexture, BreakoutConstants.BALL_SIZE, depth: 1));
 	}
 }
 

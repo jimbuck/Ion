@@ -48,6 +48,20 @@ internal static class Diagnostics
 	public static readonly DiagnosticDescriptor ReadBeforeEmit = Event("ION105", "Event read in an earlier stage than it is emitted", DiagnosticSeverity.Info);
 	public static readonly DiagnosticDescriptor ReadonlyReader = Event("ION106", "Event reader in a readonly field or a property", DiagnosticSeverity.Warning);
 
+	// ECS queries (ION3xx): [Query] methods the generator expands into chunk loops.
+	private const string QueryCategory = "Ion.Ecs";
+	private const string QueryHelpLink = "https://github.com/jimbuck/Ion/blob/main/docs/plans/2026-09-engine-review-and-roadmap.md#49-ecs-integration-stage-5-arch-or-friflo-decided-by-measurement";
+
+	public static readonly DiagnosticDescriptor QueryNotPartial = Query("ION301", "Query on a class that is not partial", DiagnosticSeverity.Error);
+	public static readonly DiagnosticDescriptor QueryParameterNotByRef = Query("ION302", "Query component parameter passed by value", DiagnosticSeverity.Error);
+	public static readonly DiagnosticDescriptor QueryComponentNotStruct = Query("ION303", "Query component is not a struct", DiagnosticSeverity.Error);
+	public static readonly DiagnosticDescriptor QueryOverlap = Query("ION304", "Query component both required and excluded", DiagnosticSeverity.Error);
+	public static readonly DiagnosticDescriptor QueryStructuralChange = Query("ION305", "Structural change inside a query without Commands", DiagnosticSeverity.Error);
+	public static readonly DiagnosticDescriptor QueryUnsupported = Query("ION306", "Unsupported query method", DiagnosticSeverity.Error);
+	public static readonly DiagnosticDescriptor QueryWithoutStage = Query("ION307", "Query without a stage", DiagnosticSeverity.Warning);
+
+	private static DiagnosticDescriptor Query(string id, string title, DiagnosticSeverity severity) => new(id, title, "{0}", QueryCategory, severity, isEnabledByDefault: true, helpLinkUri: QueryHelpLink);
+
 	public static DiagnosticDescriptor ForCode(string code) => code switch
 	{
 		"ION001" => UnknownStage,

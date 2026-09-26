@@ -1,6 +1,7 @@
 using Arch.Core;
 
 using Ion.Examples.Breakout.ECS.Common;
+using Ion.Extensions.Ecs;
 using Ion.Testing;
 
 using Xunit;

@@ -196,6 +196,9 @@ public sealed class StepPlan
 	/// <summary>The compile-time description of the step, for systems registered by generated code.</summary>
 	public GeneratedStep? Generated { get; internal init; }
 
+	/// <summary>The attribute that binds the step (a <see cref="StepBinderAttribute"/>, such as the ECS module's <c>[Query]</c> on its runtime path), or null.</summary>
+	public StepBinderAttribute? Binder { get; internal init; }
+
 	/// <summary>Whether running the item needs the system instance (a non-static step, begin or end method).</summary>
 	public bool NeedsInstance { get; internal init; }
 

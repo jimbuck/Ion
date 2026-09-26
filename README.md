@@ -46,10 +46,13 @@ app.Render(Hud.Draw, order: 50);                                         // a st
 ```text
   Render
       -850  NullSpriteBatchSystem.Begin {
-         0    SpriteRendererSystem.Render
+      -400    TransformPropagationSystem.PropagateBeforeRender
+      -300    SpriteExtractionSystem.Extract
          0    ScoreSystem.RenderScore
         10    PhysicsSystem.Render
+       800    MetricsOverlaySystem.Draw
        900    NullWindowSystem.CheckClosed
+       950    EcsCommandsSystem.FlushRender
       -850  } NullSpriteBatchSystem.End
 ```
 
@@ -76,6 +79,7 @@ Interceptors need the .NET SDK 9.0.200 or later (Roslyn 4.12); with an older com
 - **A generated schedule** for each application (the registrations made on it before `Build()`/`Run()` in the same method) and each scene (its configure callback): one method per stage that calls every step directly, in plan order, with a `try/finally` per scope; systems and injected services are resolved once in its constructor. It is sorted by the same code as the runtime planner (`ScheduleSorter`, shared), so `PrintSchedule()` is identical either way.
 - **Registration summaries.** For every method that takes an application or scene builder (`UseIon()`, `UseNullGraphics()`, your own `UseMyGame(app)`), an assembly attribute lists what it registers, so an application compiled later sees through helpers in other assemblies. Registrations under an `if` are included and guarded.
 - **Diagnostics.** `ION001` to `ION013` become compiler errors and warnings with the runtime's messages, at the offending method (or the registration call).
+- **ECS queries.** Every `[Query]` method of a `partial` system becomes a chunk loop the schedule calls directly (see [ECS](#ecs)), with diagnostics `ION301` to `ION307`.
 
 ```csharp
 // Generated for the Render stage of a small game (abridged):
@@ -87,7 +91,7 @@ public override void Render(global::Ion.GameTime dt)
         _b1(dt);                                // -850 NullSpriteBatchSystem.Begin (internal: bound delegate)
         try
         {
-            _s7.Render(dt);                     // 0 SpriteRendererSystem.Render
+            _d7(dt);                            // -300 SpriteExtractionSystem.Extract
             _s9.RenderScore(dt);                // 0 ScoreSystem.RenderScore
             if (_g3) _d4(dt);                   // 900 NullWindowSystem.CheckClosed (registered under an if)
         }
@@ -149,6 +153,42 @@ public class BlockSystem(IEvents events)
 Methods that emit or read an event type for their caller (such as `EmitChangeScene`, `Wait.For<T>()` or `IonTestHost.Collect<T>()`) are marked `[EmitsEvent]`/`[ReadsEvent]` so the generator counts their call sites; libraries compiled with the generator publish an `[assembly: EventUsage(...)]` summary of their event types.
 
 `IEventEmitter`, `IEventListener`, `IEventListenerFactory`, `EventEmitter` and `EventListener` still work as obsolete adapters over `IEvents` for one release.
+
+## ECS
+
+`Ion.Extensions.Ecs` integrates [Arch](https://github.com/genaray/Arch) 2.1 (picked by measurement against Friflo, roadmap section 5.7). Games keep Arch's own `World`, `Entity` and `QueryDescription`; the module adds a world per scope, a command buffer played back at the end of every stage, generated query loops, built-in components and systems, and the 2D render extraction (`Ion.Extensions.Ecs.Rendering`). A game library can depend on `Ion.Extensions.Ecs.Abstractions` only (the attributes, `Commands` and the components).
+
+```csharp
+builder.Services.AddIon(builder.Configuration).AddEcs().AddEcsRendering();
+builder.Services.AddSingleton<MoveSystem>();
+app.UseIon().UseEcs().UseEcsRendering().UseSystem<MoveSystem>();
+
+public record struct Velocity(Vector2 Value);
+public record struct Frozen;
+
+public sealed partial class MoveSystem(World world)
+{
+    [Init]
+    public void Spawn(GameTime dt, IAssetManager assets) =>
+        world.Create(new Transform2D(new Vector2(100, 100)), new Velocity(new Vector2(60, 0)), new Sprite(assets.Load<ITexture2D>("ball.png")));
+
+    // Expanded by the generator into a loop over Arch's chunks (no delegate, no boxing), called directly by the schedule.
+    [Update, Query, None<Frozen>]
+    private void Move(Entity entity, ref Transform2D transform, in Velocity velocity, [Data] in float dt, Commands commands)
+    {
+        transform.Position += velocity.Value * dt;
+        if (transform.Position.X > 2000) commands.Destroy(entity);      // structural changes go through Commands
+    }
+}
+```
+
+- **Worlds.** `AddEcs()` resolves `World`, `Commands` and `NameRegistry` per scope: the root provider (root systems) gets the root world, each scene scope its own world, disposed with the scene (`scene.UseEcs()` adds the ECS systems to a scene's schedule). `EcsWorlds` lists the live worlds; `FrameStats.Entities` counts their entities.
+- **`[Query]`.** Parameters: components `ref T` (or `in T` to read), `Entity`, `[Data] in float` (the delta time), `GameTime`, `Commands`, `World`; filters `All<...>`, `Any<...>`, `None<...>`. The method may be private; the class must be `partial` (`ION301`). The generator emits a public hidden `__IonQuery_{Method}(GameTime, World[, Commands])` that loops over the chunks with `GetFirst`/`Unsafe.Add` in Arch's order and carries the method's stage and ordering attributes, so the schedule prints and orders it as `System.Method`. Without the generator a reflection binder runs the same method (correct, but it boxes every component: 28x slower in `EcsQueryBenchmarks`). Diagnostics: `ION302` component passed by value, `ION303` component not a struct, `ION304` a component both required and excluded, `ION305` a structural change (`world.Create`, `Destroy`, `Add`, `Remove`, `SetParent`, ...) inside the query without `Commands`, `ION306` unsupported method or parameter, `ION307` no stage attribute.
+- **Structural changes.** `Commands` (Arch's `CommandBuffer`, plus `SetParent`, `RemoveParent`, `DestroyRecursive`) records creations, destructions and component adds/removes; `EcsCommandsSystem` plays them back at `StageOrder.Ecs` (950) at the end of every stage. A query that changes the world directly throws `StructuralChangeException` naming the step and the entity (checked after every entity; `[Query(Unchecked = true)]` drops the check).
+- **Built-in components.** `Transform2D` (position, rotation, scale) and, for 3D, the graphics abstractions' `Transform` (position, quaternion, scale); `GlobalTransform2D`/`GlobalTransform` (world matrices, plus the 2D decomposition); `Parent`/`Children` (maintain them with `world.SetParent`); `Sprite` (texture, source rectangle, size, color, origin, depth, flip); `SpriteAnimation` (frames, rate, looping); `Aabb2D`; the tags `Visible`, `Hidden` and `MainCamera` (on an entity with a `Camera2D`); `EntityName` with `NameRegistry`.
+- **Built-in systems.** `TransformPropagationSystem` (Last and Render at `StageOrder.TransformPropagation` = -400: a dirty-tree walk that recomputes only what changed, roots in query order and children in attach order; the Render pass makes a frame draw what its Update did and updates `Aabb2D`), `SpriteAnimationSystem` (Update at `StageOrder.SpriteAnimation` = 400), and `SpriteExtractionSystem` (Render at `StageOrder.Extract` = -300, inside the sprite batch scope and before the game's own Render steps): sprites without `Hidden`, culled against the main camera's view, sorted by depth, drawn with the camera's transform.
+- **Serialization.** `JsonWorldSerializer` and `BinaryWorldSerializer` (`IWorldSerializer`) save the registered components of every entity and remap entity references (`Parent`, `Children`) on load; register them with `AddEcsSerialization(registry => registry.Add<T>(...))` and a source-generated `JsonTypeInfo<T>` (NativeAOT-safe; opt-in, so games that do not save worlds keep System.Text.Json's serializer out of their image). `Arch.Persistence` is not used: its 2.0.0 package does not load against Arch 2.1.
+- **NativeAOT.** Arch allocates component arrays through `ArrayRegistry`; the generator registers the components of every `[Query]` (a module initializer), the module its built-ins, and `EcsComponents.Register<T>()` the rest.
 
 ## Modules
 
@@ -468,8 +508,8 @@ public sealed class PhysicsSystem(IMetrics metrics)
 ```
 
 `metrics.Histogram("name")` records values per frame (count, sum, min and max in the frame log). Engine counters come from
-`IFrameStatsSource` services (the sprite batch through `ISpriteBatchStatistics`, the event bus, and the ECS hook for
-`entities`, which the Breakout ECS sample implements for its Arch world). In tests, `IonTestHost.LastFrame` has the last
+`IFrameStatsSource` services (the sprite batch through `ISpriteBatchStatistics`, the event bus, and `entities` from the
+ECS module's worlds, registered by `AddEcs()`). In tests, `IonTestHost.LastFrame` has the last
 frame's stats and `IonTestHost.Metrics` the rest:
 
 ```csharp
@@ -558,7 +598,7 @@ Feel free to check out the samples and open any issues or pull requests. If you 
 
 ## Examples
 
-Check out the Breakout ECS example for a simple game using the Ion Engine, and `Ion.Examples.Quad` for the smallest app on the Silk.NET stack (a textured quad through the RHI; `--Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png` renders offscreen and saves a PNG). `Ion.Examples.Sprites100k` is the sprite batch stress test (100,000 moving sprites across 16 textures, one draw call per texture; `--Sprites:Count=N`, `--Sprites:Frames=N`). Every sample renders headless with `--Ion:Headless=true --Ion:Headless:Render=true`, and the `Ion.Examples.*.Tests` projects compare their frames with golden images.
+Check out the Breakout ECS example for a simple game using the Ion Engine (on the ECS module: built-in transforms and sprites, the sprite extraction, `Commands` and `[Query]` steps, with Aether physics as an adapter), and `Ion.Examples.Quad` for the smallest app on the Silk.NET stack (a textured quad through the RHI; `--Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png` renders offscreen and saves a PNG). `Ion.Examples.Sprites100k` is the sprite batch stress test (100,000 moving sprites across 16 textures, one draw call per texture; `--Sprites:Count=N`, `--Sprites:Frames=N`). Every sample renders headless with `--Ion:Headless=true --Ion:Headless:Render=true`, and the `Ion.Examples.*.Tests` projects compare their frames with golden images.
 3D: `Ion.Examples.Cubes` is immediate-mode 3D (1,000 instanced cubes in two materials, shadows, an orbiting camera, a HUD drawn on top; `--Cubes:Frames=N --Cubes:Screenshot=cubes.png`) and `Ion.Examples.Model` loads a glTF 2.0 model (Microsoft's CC0 Avocado) with PBR materials, point lights and a skybox (`--Model:Frames=N --Model:Screenshot=model.png`).
 
 ![Breakout ECS Screenshot](./breakout-physics-debug.png)

@@ -97,6 +97,13 @@ internal static class SchedulePlanner
 		var scopes = new Dictionary<(Stage Stage, string? Name), (List<(MethodInfo Method, ScopeAttribute Attribute, int Index)> Begins, List<(MethodInfo Method, ScopeAttribute Attribute, int Index)> Ends)>();
 		var count = 0;
 
+		// Methods a source generator expanded (a [Query] method and its generated loop): the expansion runs in their place.
+		var expanded = new HashSet<string>(StringComparer.Ordinal);
+		foreach (var method in methods)
+		{
+			if (method.GetCustomAttribute<ExpandedStepAttribute>(false) is { } expansion) expanded.Add(expansion.Method);
+		}
+
 		for (var index = 0; index < methods.Count; index++)
 		{
 			var method = methods[index];
@@ -104,9 +111,13 @@ internal static class SchedulePlanner
 			var scopeAttributes = method.GetCustomAttributes<ScopeAttribute>(true).ToArray();
 			if (stageAttributes.Length == 0 && scopeAttributes.Length == 0) continue;
 
-			var name = type.Name + "." + method.Name;
+			var binder = method.GetCustomAttribute<StepBinderAttribute>(true);
+			var methodName = method.GetCustomAttribute<ExpandedStepAttribute>(false)?.Method ?? method.Name;
+			if (binder is not null && methodName == method.Name && expanded.Contains(method.Name)) continue;
 
-			if (!method.IsPublic)
+			var name = type.Name + "." + methodName;
+
+			if (!method.IsPublic && binder is null)
 			{
 				context.Error(ScheduleDiagnosticCodes.UnreachableStep, $"'{name}' has a stage or scope attribute but is not public, so it can never run. Make it public.");
 				continue;
@@ -115,6 +126,40 @@ internal static class SchedulePlanner
 			var constraints = classConstraints.Concat(method.GetCustomAttributes<OrderingAttribute>(true)).ToArray();
 			var after = Targets(constraints, before: false);
 			var before = Targets(constraints, before: true);
+
+			if (binder is not null)
+			{
+				// A step the attribute binds (the runtime path of [Query]): a leaf step whatever its parameters.
+				var binderReason = scopeAttributes.Length > 0 ? "a step bound by an attribute cannot be a [Begin]/[End] scope" : binder.Validate(method);
+				foreach (var attribute in stageAttributes)
+				{
+					if (!context.CheckStage(attribute.Stage, name)) continue;
+					if (binderReason is not null)
+					{
+						context.Error(ScheduleDiagnosticCodes.InvalidSignature, $"'{name}' in {attribute.Stage} has an unsupported signature: {binderReason}.");
+						continue;
+					}
+
+					items.Add(new StepPlan(attribute.Stage, StepKind.Step, attribute.Order, name)
+					{
+						System = system,
+						Method = method,
+						MethodName = methodName,
+						Binder = binder,
+						NeedsInstance = !method.IsStatic,
+						Services = [.. binder.GetServices(method)],
+						After = after,
+						Before = before,
+						RegistrationIndex = system.Index,
+						DeclarationIndex = index,
+					});
+					count++;
+				}
+
+				if (stageAttributes.Length == 0) context.Error(ScheduleDiagnosticCodes.InvalidSignature, $"'{name}' has an unsupported signature: {binderReason ?? "a step bound by an attribute needs a stage attribute"}.");
+				continue;
+			}
+
 			var signature = StepSignature.Classify(method, out var reason);
 
 			foreach (var attribute in stageAttributes)
@@ -139,7 +184,7 @@ internal static class SchedulePlanner
 						{
 							System = system,
 							Method = method,
-							MethodName = method.Name,
+							MethodName = methodName,
 							NeedsInstance = !method.IsStatic,
 							After = after,
 							Before = before,
@@ -154,7 +199,7 @@ internal static class SchedulePlanner
 						{
 							System = system,
 							Method = method,
-							MethodName = method.Name,
+							MethodName = methodName,
 							NeedsInstance = !method.IsStatic,
 							Services = [.. StepSignature.ServiceParameters(method)],
 							After = after,

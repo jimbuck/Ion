@@ -1,18 +1,17 @@
-﻿using Arch.Core;
+﻿using Ion.Extensions.Ecs;
 
-using World = Arch.Core.World;
 using Vector2 = System.Numerics.Vector2;
 using AetherVector2 = nkast.Aether.Physics2D.Common.Vector2;
 
-using Ion.Examples.Breakout.ECS.Common;
-
 namespace Ion.Examples.Breakout.ECS.Physics;
 
-public class PhysicsSystem(World world, PhysicsManager physics)
+/// <summary>
+/// The adapter between Aether and the ECS: in each fixed step, kinematic bodies follow their <see cref="Transform2D"/>, the
+/// physics world steps, and dynamic bodies write their position back. All three run before the game's fixed steps
+/// (order 0), like the single step they replace. Physics stays a sample adapter until the physics module (Stage 5b).
+/// </summary>
+public partial class PhysicsSystem(PhysicsManager physics)
 {
-	private readonly QueryDescription _kinematicQuery = new QueryDescription().WithAll<KinematicRigidBody, Transform2D>();
-	private readonly QueryDescription _dynamicQuery = new QueryDescription().WithAll<DynamicRigidBody, Transform2D>();
-
 	public bool IsDebugRenderEnabled { get; set; } = true;
 
 	[Init]
@@ -28,31 +27,36 @@ public class PhysicsSystem(World world, PhysicsManager physics)
 		if (IsDebugRenderEnabled) physics.DebugRender(dt, physics.PhysicsScale);
 	}
 
-	[FixedUpdate]
-	public void Update(GameTime dt)
+	/// <summary>Moves kinematic bodies (the paddle) towards their transform.</summary>
+	[FixedUpdate(Order = -3), Query]
+	private void SyncKinematic(in KinematicRigidBody kinematic, in Transform2D transform)
 	{
-		world.Query(in _kinematicQuery, (ref KinematicRigidBody kineticComponent, ref Transform2D transform, ref Sprite sprite) =>
+		var body = kinematic.Body;
+		var physTransform = body.GetTransform();
+
+		var targetPos = new AetherVector2(transform.Position.X / physics.PhysicsScale, transform.Position.Y / physics.PhysicsScale);
+
+		body.LinearVelocity = (targetPos - physTransform.p) * physics.KineticVelocityFactor;
+		if (body.LinearVelocity.LengthSquared() >= physics.MaxKineticVelocitySquared)
 		{
-			var physTransform = kineticComponent.Body.GetTransform();
+			var rotation = MathF.Acos(physTransform.q.R);
 
-			var targetPos = new AetherVector2(transform.Position.X / physics.PhysicsScale, transform.Position.Y / physics.PhysicsScale);
+			body.LinearVelocity = AetherVector2.Zero;
+			body.SetTransform(targetPos, rotation);
+		}
+	}
 
-			kineticComponent.Body.LinearVelocity = (targetPos - physTransform.p) * physics.KineticVelocityFactor;
-			if (kineticComponent.Body.LinearVelocity.LengthSquared() >= physics.MaxKineticVelocitySquared)
-			{
-				var rotation = MathF.Acos(physTransform.q.R);
-
-				kineticComponent.Body.LinearVelocity = AetherVector2.Zero;
-				kineticComponent.Body.SetTransform(targetPos, rotation);
-			}
-		});
-
+	[FixedUpdate(Order = -2)]
+	public void Step(GameTime dt)
+	{
 		physics.Step(dt);
+	}
 
-		world.Query(in _dynamicQuery, (ref DynamicRigidBody rigidBody, ref Transform2D transform, ref Sprite sprite) =>
-		{
-			var position2d = rigidBody.Body.Position;
-			transform.Position = new Vector2(position2d.X * physics.PhysicsScale, position2d.Y * physics.PhysicsScale);
-		});
+	/// <summary>Writes dynamic bodies (the balls) back into their transform.</summary>
+	[FixedUpdate(Order = -1), Query]
+	private void SyncDynamic(in DynamicRigidBody rigidBody, ref Transform2D transform)
+	{
+		var position2d = rigidBody.Body.Position;
+		transform.Position = new Vector2(position2d.X * physics.PhysicsScale, position2d.Y * physics.PhysicsScale);
 	}
 }
