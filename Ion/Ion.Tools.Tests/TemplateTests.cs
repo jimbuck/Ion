@@ -73,11 +73,13 @@ public sealed class TemplateTests : IDisposable
 				}
 			}
 			""");
-		var gameFile = Path.Combine(game, "Game.cs");
-		var source = File.ReadAllText(gameFile)
-			.Replace("builder.Services.AddSingleton<DrawSystem>();", "builder.Services.AddSingleton<DrawSystem>();\n\t\tbuilder.Services.AddSingleton<GravitySystem>();", StringComparison.Ordinal)
-			.Replace(".UseSystem<DrawSystem>();", ".UseSystem<DrawSystem>()\n\t\t\t.UseSystem<GravitySystem>();", StringComparison.Ordinal);
-		File.WriteAllText(gameFile, source);
+		var programFile = Path.Combine(game, "Program.cs");
+		var program = File.ReadAllText(programFile);
+		var source = program
+			.Replace(".AddSystem<DrawSystem>();", ".AddSystem<DrawSystem>()\n\t.AddSystem<GravitySystem>();", StringComparison.Ordinal)
+			.Replace(".UseSystem<DrawSystem>();", ".UseSystem<DrawSystem>()\n\t.UseSystem<GravitySystem>();", StringComparison.Ordinal);
+		Assert.Equal(program.Length + "\n\t.AddSystem<GravitySystem>()\n\t.UseSystem<GravitySystem>()".Length, source.Length);
+		File.WriteAllText(programFile, source);
 
 		// 3. Run 600 headless frames with a screenshot and a summary.
 		var screenshot = Repo.CanRender ? new[] { "--screenshot", "out/frame600.png" } : [];

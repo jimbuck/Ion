@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 
 using Ion.Extensions.Ecs;
 using Ion.Extensions.Graphics;
+using Ion.Extensions.Rendering3D;
 using Ion.Extensions.Scenes;
 
 namespace Ion.Extensions.Physics3D;
@@ -20,13 +21,17 @@ public static class Physics3DBuilderExtensions
 	/// Registers the 3D physics module: <see cref="Physics3DWorlds"/>, and <see cref="PhysicsWorld3D"/> (also as
 	/// <see cref="IPhysicsWorld3D"/>) resolved per scope like the ECS <see cref="World"/> it simulates, the systems
 	/// (transients), and <see cref="Physics3DConfig"/> bound from <c>Ion:Physics3D</c> in <paramref name="config"/> and then
-	/// <paramref name="configure"/>. Needs the ECS module (<c>AddEcs</c>). Add the systems with
+	/// <paramref name="configure"/>. Registers the ECS module (<c>AddEcs</c>) and the 3D renderer (<c>AddRendering3D</c>, for the debug drawing) too. Add the systems with
 	/// <see cref="UsePhysics3D(IIonApplication)"/> (and <see cref="UsePhysics3D(ISceneBuilder)"/> in scenes).
 	/// </summary>
 	public static IServiceCollection AddPhysics3D(this IServiceCollection services, IConfiguration? config = null, Action<Physics3DConfig>? configure = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
 		Physics3DComponents.Register();
+
+		// The ECS world it simulates and the 3D renderer its debug drawing submits to (both registered once).
+		services.AddEcs();
+		services.AddRendering3D(config);
 
 		services.AddOptions<Physics3DConfig>();
 		if (config is not null) services.Configure<Physics3DConfig>(config.GetSection(Physics3DConfig.Section));
@@ -43,22 +48,40 @@ public static class Physics3DBuilderExtensions
 	}
 
 	/// <summary>
+	/// Registers the 3D physics module (see <see cref="AddPhysics3D(IServiceCollection, IConfiguration, Action{Physics3DConfig})"/>,
+	/// with the application's configuration) and what it needs: the ECS module (<c>AddEcs</c>) and the 3D renderer
+	/// (<c>AddRendering3D</c>, with the engine core), which the debug drawing uses. Add the systems with
+	/// <see cref="UsePhysics3D(IIonApplication)"/>.
+	/// </summary>
+	public static IonApplicationBuilder AddPhysics3D(this IonApplicationBuilder builder, Action<Physics3DConfig>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.AddRendering3D().AddEcs();
+		builder.Services.AddPhysics3D(builder.Configuration, configure);
+		return builder;
+	}
+
+	/// <summary>
 	/// Adds the 3D physics systems to the root schedule: the physics step in FixedUpdate at <see cref="StageOrder.Physics"/>
-	/// and the debug drawing in Render at <see cref="StageOrder.PhysicsDebugDraw"/> (while <see cref="IPhysicsWorld3D.DebugDraw"/> is on).
+	/// and the debug drawing in Render at <see cref="StageOrder.PhysicsDebugDraw"/> (while <see cref="IPhysicsWorld3D.DebugDraw"/> is on),
+	/// with the systems they need: the 3D renderer's (<c>UseRendering3D</c>, with the engine's) and the ECS module's (<c>UseEcs</c>).
 	/// </summary>
 	public static IIonApplication UsePhysics3D(this IIonApplication app)
 	{
 		ArgumentNullException.ThrowIfNull(app);
 		return app
+			.UseRendering3D()
+			.UseEcs()
 			.UseSystem<Physics3DSystem>()
 			.UseSystem<Physics3DDebugDrawSystem>();
 	}
 
-	/// <summary>Adds the 3D physics systems to a scene's schedule (for the scene's own world).</summary>
+	/// <summary>Adds the 3D physics systems to a scene's schedule (for the scene's own world), with the scene's ECS systems.</summary>
 	public static ISceneBuilder UsePhysics3D(this ISceneBuilder scene)
 	{
 		ArgumentNullException.ThrowIfNull(scene);
 		return scene
+			.UseEcs()
 			.UseSystem<Physics3DSystem>()
 			.UseSystem<Physics3DDebugDrawSystem>();
 	}

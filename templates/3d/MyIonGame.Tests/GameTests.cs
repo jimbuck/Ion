@@ -14,7 +14,7 @@ public sealed class GameTests
 	[Fact]
 	public void CubesSpinAndAreSubmitted()
 	{
-		using var run = IonTestHost.Run<Game>(60);
+		using var run = IonTestHost.RunEntryPoint<Program>(60);
 		var spin = run.Get<SpinState>();
 		Assert.Equal(60, spin.Steps);
 		Assert.InRange(spin.Angle, 1.1f, 1.3f); // one second at 1.2 rad/s
@@ -35,7 +35,7 @@ public sealed class SnapshotTests
 	[Fact]
 	public void StateAfter120FramesMatchesTheSnapshot()
 	{
-		using var run = IonTestHost.Run<Game>(120);
+		using var run = IonTestHost.RunEntryPoint<Program>(120);
 		var state = JsonSerializer.SerializeToNode(run.Get<SpinState>(), GameJson.Default.SpinState)!.AsObject();
 		var stats = run.Get<IRenderer3D>().LastFrameStatistics;
 		state["Submitted"] = stats.Submitted;

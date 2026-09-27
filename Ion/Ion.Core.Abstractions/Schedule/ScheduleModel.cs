@@ -55,11 +55,16 @@ public sealed class ScheduleModel
 	/// and every <see cref="BeginAttribute"/>/<see cref="EndAttribute"/> pair a scope. The instance is resolved as
 	/// <paramref name="serviceType"/> when the schedule is built.
 	/// </summary>
+	/// <remarks>
+	/// Adding a system that is already in the model (the same service and implementation types) does nothing and returns
+	/// the existing entry: modules add the systems of the modules they depend on (<c>UseEcsRendering3D</c> adds the ECS
+	/// and 3D renderer systems), so a system may be added more than once. It keeps its first registration index.
+	/// </remarks>
 	public SystemEntry AddSystem(Type serviceType, [DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type implementationType)
 	{
 		ArgumentNullException.ThrowIfNull(serviceType);
 		ArgumentNullException.ThrowIfNull(implementationType);
-		return Add(new SystemEntry(serviceType, implementationType));
+		return FindSystem(serviceType, implementationType) ?? Add(new SystemEntry(serviceType, implementationType));
 	}
 
 	/// <summary>
@@ -72,7 +77,23 @@ public sealed class ScheduleModel
 	public SystemEntry AddSystem(GeneratedSystem system, string? site = null)
 	{
 		ArgumentNullException.ThrowIfNull(system);
-		return Add(new SystemEntry(system), site);
+		return FindSystem(system.ServiceType, system.ImplementationType) ?? Add(new SystemEntry(system), site);
+	}
+
+	/// <summary>The entry of the system resolved as <paramref name="serviceType"/> with the steps of <paramref name="implementationType"/>, if it was added.</summary>
+	private SystemEntry? FindSystem(Type serviceType, Type implementationType)
+	{
+		foreach (var entry in _entries)
+		{
+			if (entry is SystemEntry system && system.ServiceType == serviceType && system.ImplementationType == implementationType)
+			{
+				// A frozen model rejects registrations, repeated ones included (ION004).
+				EnsureNotFrozen(system.ToString());
+				return system;
+			}
+		}
+
+		return null;
 	}
 
 	/// <summary>

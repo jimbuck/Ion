@@ -18,47 +18,31 @@ using Ion.Extensions.Windowing;
 //   --Quad:Screenshot=<file>               save the last frame as PNG on exit (headless, or windowed with Ion:Graphics:RetainLastFrame=true)
 //   --Quad:Spin=false                      keep the quad still (deterministic screenshots)
 //   --Ion:Window:Platform=Sdl              use SDL instead of GLFW (the R36S: see docs/platforms/r36s.md)
+// The window (unless headless) and the backend-selecting RHI graphics, without the rest of the engine (no AddIon).
 var builder = IonApplication.CreateBuilder(args);
-QuadApp.Configure(builder.Services, builder.Configuration);
+var headless = bool.TryParse(builder.Configuration["Ion:Headless"], out var configured) && configured;
+if (headless)
+{
+	builder.Services.AddInputTracker();
+	builder.Services.AddRhiGraphics(builder.Configuration, offscreen: true);
+}
+else
+{
+	builder.Services.AddSilkWindowing(builder.Configuration);
+	builder.Services.AddRhiGraphics(builder.Configuration);
+}
+
+builder.AddSystem<QuadSystem>();
 
 using var app = builder.Build();
-QuadApp.Use(app);
+app.UseEvents();
+if (!headless) app.UseSilkWindowing();
+app.UseRhiGraphics();
+app.UseSystem<QuadSystem>();
 app.Run();
 
 namespace Ion.Examples.Quad
 {
-	/// <summary>The app setup, shared with the tests.</summary>
-	public static class QuadApp
-	{
-		/// <summary>Registers the window (unless headless), the backend-selecting RHI graphics and the quad system.</summary>
-		public static void Configure(IServiceCollection services, IConfiguration config)
-		{
-			if (IsHeadless(config))
-			{
-				services.AddInputTracker();
-				services.AddRhiGraphics(config, offscreen: true);
-			}
-			else
-			{
-				services.AddSilkWindowing(config);
-				services.AddRhiGraphics(config);
-			}
-
-			services.AddSingleton<QuadSystem>();
-		}
-
-		/// <summary>Adds the systems.</summary>
-		public static void Use(IIonApplication app)
-		{
-			app.UseEvents();
-			if (!IsHeadless(app.Configuration)) app.UseSilkWindowing();
-			app.UseRhiGraphics();
-			app.UseSystem<QuadSystem>();
-		}
-
-		private static bool IsHeadless(IConfiguration config) => bool.TryParse(config["Ion:Headless"], out var headless) && headless;
-	}
-
 	/// <summary>
 	/// Creates the quad after the device exists (Init, default order, after <see cref="StageOrder.Graphics"/>), spins it in
 	/// Update, draws it in Render, and handles <c>Quad:Frames</c> and <c>Quad:Screenshot</c>.

@@ -5,9 +5,14 @@ on it without reading the engine's source.
 
 ## Layout
 
-- `MyIonGame/Program.cs`: the entry point. Keep its four calls (`CreateBuilder`, `Game.Configure`, `Build`, `Game.Use`,
-  `Run`) as they are: the Ion schedule generator reads them and compiles the schedule into direct calls.
-- `MyIonGame/Game.cs`: services and schedule (`Game : IIonGame`), settings, components and their JSON registration.
+- `MyIonGame/Program.cs`: the entry point and the game's setup: the modules and systems registered on `builder`
+  (`builder.AddIon()`, `builder.AddSystem<T>()`, `builder.Services...`) and added to the schedule on `game`
+  (`game.UseIon()`, `game.UseSystem<T>()`). Keep the registrations in this file (or in methods it calls), between
+  `CreateBuilder` and `game.Run()`: the Ion schedule generator reads them and compiles the schedule into direct calls, and
+  the tests run this file as it is. A module's `AddX`/`UseX` also registers and adds the modules it needs, so listing one
+  twice is harmless.
+- `MyIonGame/Game.cs`: settings, components and their JSON metadata (`GameJson`); `Program.cs` registers the components
+  for serialization.
 - `MyIonGame/Systems.cs`: the systems. Add new ones here or in new files.
 - `MyIonGame/appsettings.json`: configuration (`Ion:*` for the engine, `Game:*` for the game).
 - `MyIonGame.Tests/`: a headless test (`GameTests`) and a world snapshot test (`SnapshotTests`, snapshots in `Golden/`).
@@ -28,10 +33,10 @@ Constructor parameters are injected (`World`, `IInputState`, `ISpriteBatch`, `IW
   destroy, add or remove components) inside a query go through an injected `Commands` (played back at the end of the stage).
 - Built-in components: `Transform2D`, `GlobalTransform2D`, `Parent`/`Children`, `EntityName`, `Sprite`, `Hidden`.
 - New component: a `record struct`, added to `GameJson` (`[JsonSerializable(typeof(MyComponent))]`) and registered in
-  `Game.Configure` (`components.AddUnmanaged("MyComponent", GameJson.Default.MyComponent)`, or `.AddTag<T>(name)` for a
+  `Program.cs` (`components.AddUnmanaged("MyComponent", GameJson.Default.MyComponent)`, or `.AddTag<T>(name)` for a
   tag). Registered components appear in world snapshots and over the remote protocol.
-- New system: write the class, register it (`builder.Services.AddSingleton<MySystem>()` in `Configure`) and add it to the
-  schedule (`.UseSystem<MySystem>()` in `Use`).
+- New system: write the class, register it (`builder.AddSystem<MySystem>()` in `Program.cs`) and add it to the
+  schedule (`game.UseSystem<MySystem>()`).
 - No `async`/`Task` in steps (the build reports ION005). Long work goes to engine jobs; the frame never waits.
 - Randomness: seed from `GameSettings.Seed` (`Ion:Seed`), never `Random.Shared`, so runs are reproducible.
 
@@ -71,7 +76,8 @@ From a shell, in `MyIonGame/`: `dotnet run -- --headless-render --remote-allow-m
 
 ## Tests
 
-- `IonTestHost.Run<Game>(frames, host => ...)` builds the game headless with a fixed clock, runs the frames and returns
+- `IonTestHost.RunEntryPoint<Program>(frames, host => ...)` runs `Program.cs` headless with a fixed clock (the host's
+  configuration, such as `host.WithConfiguration("Ion:Seed", "7")`, is in place while it registers), runs the frames and returns
   state (`run.Get<T>()`, `run.Host`), `run.Counters`, `run.LastFrame` and, with `host.WithRendering()`, `run.Image`.
 - `JsonSnapshot.AssertMatches(run.WorldJson()!, RenderingEnvironment.GoldenPath("name.json"))` compares with `Golden/`.
   Update snapshots on purpose with `ION_UPDATE_GOLDEN=1 dotnet test`, then review the diff.

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using Ion.Core;
+using Ion.Testing;
 using Ion.Extensions.Scenes;
 
 using Xunit;
@@ -23,7 +24,7 @@ public class GeneratedScheduleTests(ITestOutputHelper output)
 	private static IonApplication CreateGame()
 	{
 		var app = CreateBuilder().Build();
-		BreakoutGame.Use(app);
+		app.UseBreakout();
 		return app;
 	}
 
@@ -31,16 +32,28 @@ public class GeneratedScheduleTests(ITestOutputHelper output)
 	{
 		var builder = IonApplication.CreateBuilder(HeadlessArgs);
 		builder.Services.AddLogging(logging => logging.ClearProviders());
-		return BreakoutGame.Configure(builder);
+		return builder.AddBreakout();
+	}
+
+	[Fact, Trait(CATEGORY, INTEGRATION)]
+	public void TheProgramRunsItsGeneratedSchedule()
+	{
+		// Program.cs itself, run by the test host: its game.Run() call installed the schedule the generator compiled for it,
+		// through UseBreakout and the modules it pulls in (UseEcsRendering and UsePhysics2D add UseIon and UseEcs again).
+		using var host = new IonTestHost().UseEntryPoint<Program>();
+		host.Step(60);
+
+		Assert.True(host.Loop.Schedule!.IsGenerated);
+		Assert.Equal(host.Application.Schedule.Entries.Count, host.Application.Schedule.Entries.OfType<SystemEntry>().Select(e => e.ImplementationType).Distinct().Count());
 	}
 
 	[Fact, Trait(CATEGORY, INTEGRATION)]
 	public void TheSampleRunsTheGeneratedSchedule()
 	{
 		// The same setup as Program.cs. Build() is intercepted here: the generator saw every registration made on app before
-		// it (BreakoutGame.Use, and through the ScheduleRegistrations summaries, UseIon and the engine helpers it calls).
+		// it (UseBreakout, and through the ScheduleRegistrations summaries, UseIon and the engine helpers it calls).
 		using var app = CreateBuilder().Build();
-		BreakoutGame.Use(app);
+		app.UseBreakout();
 		var loop = app.Build();
 
 		Assert.NotNull(loop.Schedule);

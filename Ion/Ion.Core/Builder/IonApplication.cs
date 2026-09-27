@@ -10,6 +10,8 @@ namespace Ion;
 public class IonApplication : IIonApplication, IDisposable
 {
 	private readonly IHost _host;
+	private readonly IonApplicationHook? _hook;
+	private bool _disposed;
 
 	/// <summary>
 	/// The configuration key that prints the schedule (<see cref="PrintSchedule"/>) to standard output when the game loop
@@ -32,14 +34,28 @@ public class IonApplication : IIonApplication, IDisposable
 	/// </summary>
 	public IConfiguration Configuration => _host.Services.GetRequiredService<IConfiguration>();
 
-	internal IonApplication(IHost host)
+	internal IonApplication(IHost host, IonApplicationHook? hook = null)
 	{
 		_host = host;
+		_hook = hook;
 	}
 
+	/// <summary>
+	/// Creates the application builder: the configuration from the command line (<paramref name="args"/>, with the short
+	/// switches of <see cref="IonCommandLine"/>), <c>appsettings.json</c> and the environment, and the core services.
+	/// </summary>
 	public static IonApplicationBuilder CreateBuilder(string[] args)
 	{
-		return new IonApplicationBuilder(args);
+		var builder = new IonApplicationBuilder(args);
+
+		// A test host running this program's entry point (see IonApplicationHook) configures the first builder.
+		if (IonApplicationHook.Claim() is { } hook)
+		{
+			builder.Hook = hook;
+			hook.OnBuilderCreated(builder);
+		}
+
+		return builder;
 	}
 
 	public static IonApplicationBuilder CreateBuilder()
@@ -114,6 +130,12 @@ public class IonApplication : IIonApplication, IDisposable
 	[StackTraceHidden]
 	public void Run(CancellationToken cancellationToken)
 	{
+		if (_hook is { } hook)
+		{
+			hook.OnRun(this);
+			return;
+		}
+
 		var loop = BuildForRun();
 		if (int.TryParse(Configuration[RunFramesKey], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var frames) && frames >= 0)
 		{
@@ -137,6 +159,12 @@ public class IonApplication : IIonApplication, IDisposable
 	public void RunFrames(int frames)
 	{
 		ArgumentOutOfRangeException.ThrowIfNegative(frames);
+		if (_hook is { } hook)
+		{
+			hook.OnRun(this);
+			return;
+		}
+
 		BuildForRun().RunFrames(frames);
 	}
 
@@ -151,8 +179,11 @@ public class IonApplication : IIonApplication, IDisposable
 		return gameLoop;
 	}
 
+	/// <summary>Disposes the application's services. Calling it again does nothing.</summary>
 	public void Dispose()
 	{
+		if (_disposed) return;
+		_disposed = true;
 		_host.Dispose();
 	}
 }

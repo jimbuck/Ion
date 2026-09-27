@@ -44,7 +44,7 @@ public sealed partial class GravitySystem(IMetrics metrics)
 }
 ```
 
-In `Game.cs`: `builder.Services.AddSingleton<GravitySystem>();` in `Configure` and `.UseSystem<GravitySystem>()` in `Use`.
+In `Program.cs`: `.AddSystem<GravitySystem>()` on the builder and `.UseSystem<GravitySystem>()` on the game.
 
 ## 3. Run 600 headless frames with a screenshot
 

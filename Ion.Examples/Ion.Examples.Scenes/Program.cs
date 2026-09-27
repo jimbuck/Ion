@@ -13,144 +13,126 @@ using Ion.Examples.Scenes;
 
 // Run with --Ion:Headless=true to use the headless graphics backend (no GPU or window), --Ion:Headless:Render=true on top
 // to render offscreen, and --Ion:PrintSchedule=true to print every stage's steps (including each scene's) at startup.
+// Unlike the other samples, this one composes the engine from its parts (metrics, graphics, scenes, coroutines) instead of
+// AddIon/UseIon, with the IServiceCollection registrations.
 var builder = IonApplication.CreateBuilder(args);
-ScenesApp.Configure(builder);
+var headless = builder.Configuration.IsHeadless();
 
-var game = builder.Build();
-ScenesApp.Use(game);
+builder.Services.AddMetrics(builder.Configuration);
+if (headless)
+{
+	builder.Services.AddNullGraphics(builder.Configuration, graphics => graphics.ClearColor = Color.CornflowerBlue);
+	if (builder.Configuration.IsHeadlessRender()) builder.Services.AddHeadlessRendering(builder.Configuration);
+}
+else
+{
+	builder.Services.AddGraphics(builder.Configuration, graphics => graphics.ClearColor = Color.CornflowerBlue);
+}
+
+builder.Services.AddScenes();
+builder.Services.AddCoroutines();
+builder.AddSystem<TestMiddleware>();
+
+using var game = builder.Build();
+
+// Function steps: services in the parameter list are resolved once when the schedule is built. They run at the default
+// order (0), after the engine's setup steps and the active scene, whatever the registration order.
+game.Init((GameTime dt, IEvents events, IWindow window) =>
+{
+	window.IsResizable = true;
+	events.Emit(42);
+});
+
+game.First((GameTime dt, IInputState input, ICoroutineRunner coroutine) =>
+{
+	if (input.Pressed(Key.Enter)) coroutine.Start(CountDown(5));
+});
+
+var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
+{
+	//Console.WriteLine($"Frame: {dt.Frame}!");
+});
+
+// F5 starts profiling, F6 stops it and writes the kept frames (Ion:Metrics:TraceOutput). F9 captures the next 120 frames.
+game.First((GameTime dt, IInputState input, IMetrics metrics) =>
+{
+	if (input.Pressed(Key.F5)) metrics.IsProfiling = true;
+	if (input.Pressed(Key.F6))
+	{
+		metrics.IsProfiling = false;
+		metrics.WriteTrace();
+	}
+
+	logFrameNumber(dt);
+});
+
+var gameplay = false;
+// A reader is created once, outside the step, so it remembers what it has read (ION103).
+var intEvents = game.Services.GetRequiredService<IEvents>().Reader<int>();
+
+game.Update((GameTime dt, IEvents events, IInputState input) =>
+{
+	while (intEvents.TryRead(out var e)) Console.WriteLine($"Int event! {e}");
+
+	// Tab switches between the two scenes.
+	if (input.Pressed(Key.Tab))
+	{
+		gameplay = !gameplay;
+		events.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu);
+	}
+});
+
+game.Render((GameTime dt, IEvents events, IInputState input) =>
+{
+	if (input.Down(Key.Escape))
+	{
+		Console.WriteLine("Escape Pressed!");
+		events.Emit<ExitGameEvent>();
+	}
+});
+
+game.UseScene(Scene.MainMenu, scene =>
+{
+	scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90)));
+	scene.UseSystem<TestMiddleware>();
+});
+
+game.UseScene(Scene.Gameplay, scene =>
+{
+	scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90)));
+});
+
+// The engine systems can be added after the game's own steps: engine steps use the reserved order bands.
+game.UseMetrics();
+game.UseEvents();
+if (headless)
+{
+	game.UseNullGraphics();
+	if (game.Configuration.IsHeadlessRender()) game.UseHeadlessRendering();
+}
+else
+{
+	game.UseGraphics();
+}
+
+// Steps the shared ICoroutineRunner once per frame in the Update stage.
+game.UseCoroutines();
 
 game.Run();
 
-namespace Ion.Examples.Scenes
+static IEnumerator CountDown(int from)
 {
-	/// <summary>The sample's setup, shared with the tests (Ion.Examples.Scenes.Tests).</summary>
-	public static class ScenesApp
+	while (from > 0)
 	{
-		/// <summary>Registers metrics, graphics (windowed, or the headless backends), scenes and coroutines.</summary>
-		public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
-		{
-			var headless = builder.Configuration.IsHeadless();
-
-			builder.Services.AddMetrics(builder.Configuration);
-			if (headless)
-			{
-				builder.Services.AddNullGraphics(builder.Configuration, graphics => graphics.ClearColor = Color.CornflowerBlue);
-				if (builder.Configuration.IsHeadlessRender()) builder.Services.AddHeadlessRendering(builder.Configuration);
-			}
-			else
-			{
-				builder.Services.AddGraphics(builder.Configuration, graphics => graphics.ClearColor = Color.CornflowerBlue);
-			}
-
-			builder.Services.AddScenes();
-			builder.Services.AddCoroutines();
-
-			builder.Services.AddSingleton<TestMiddleware>();
-			return builder;
-		}
-
-		/// <summary>Adds the function steps, the two scenes and the engine systems.</summary>
-		public static IonApplication Use(IonApplication game)
-		{
-			var headless = game.Configuration.IsHeadless();
-
-			// Function steps: services in the parameter list are resolved once when the schedule is built. They run at the default
-			// order (0), after the engine's setup steps and the active scene, whatever the registration order.
-			game.Init((GameTime dt, IEvents events, IWindow window) =>
-			{
-				window.IsResizable = true;
-				events.Emit(42);
-			});
-
-			game.First((GameTime dt, IInputState input, ICoroutineRunner coroutine) =>
-			{
-				if (input.Pressed(Key.Enter)) coroutine.Start(CountDown(5));
-			});
-
-			var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
-			{
-				//Console.WriteLine($"Frame: {dt.Frame}!");
-			});
-
-			// F5 starts profiling, F6 stops it and writes the kept frames (Ion:Metrics:TraceOutput). F9 captures the next 120 frames.
-			game.First((GameTime dt, IInputState input, IMetrics metrics) =>
-			{
-				if (input.Pressed(Key.F5)) metrics.IsProfiling = true;
-				if (input.Pressed(Key.F6))
-				{
-					metrics.IsProfiling = false;
-					metrics.WriteTrace();
-				}
-
-				logFrameNumber(dt);
-			});
-
-			var gameplay = false;
-			// A reader is created once, outside the step, so it remembers what it has read (ION103).
-			var intEvents = game.Services.GetRequiredService<IEvents>().Reader<int>();
-
-			game.Update((GameTime dt, IEvents events, IInputState input) =>
-			{
-				while (intEvents.TryRead(out var e)) Console.WriteLine($"Int event! {e}");
-
-				// Tab switches between the two scenes.
-				if (input.Pressed(Key.Tab))
-				{
-					gameplay = !gameplay;
-					events.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu);
-				}
-			});
-
-			game.Render((GameTime dt, IEvents events, IInputState input) =>
-			{
-				if (input.Down(Key.Escape))
-				{
-					Console.WriteLine("Escape Pressed!");
-					events.Emit<ExitGameEvent>();
-				}
-			});
-
-			game.UseScene(Scene.MainMenu, scene =>
-			{
-				scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90)));
-				scene.UseSystem<TestMiddleware>();
-			});
-
-			game.UseScene(Scene.Gameplay, scene =>
-			{
-				scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90)));
-			});
-
-			// The engine systems can be added after the game's own steps: engine steps use the reserved order bands.
-			game.UseMetrics();
-			game.UseEvents();
-			if (headless)
-			{
-				game.UseNullGraphics();
-				if (game.Configuration.IsHeadlessRender()) game.UseHeadlessRendering();
-			}
-			else
-			{
-				game.UseGraphics();
-			}
-
-			// Steps the shared ICoroutineRunner once per frame in the Update stage.
-			game.UseCoroutines();
-			return game;
-		}
-
-		private static IEnumerator CountDown(int from)
-		{
-			while (from > 0)
-			{
-				Console.WriteLine("Countdown: " + from--);
-				yield return Wait.For(TimeSpan.FromSeconds(1));
-			}
-
-			Console.WriteLine("Countdown done!");
-		}
+		Console.WriteLine("Countdown: " + from--);
+		yield return Wait.For(TimeSpan.FromSeconds(1));
 	}
 
+	Console.WriteLine("Countdown done!");
+}
+
+namespace Ion.Examples.Scenes
+{
 	public enum Scene
 	{
 		MainMenu = 1,

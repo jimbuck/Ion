@@ -16,7 +16,7 @@ public sealed class GameTests
 	[Fact]
 	public void BallsMoveAndStayInsideTheWindow()
 	{
-		using var run = IonTestHost.Run<Game>(600);
+		using var run = IonTestHost.RunEntryPoint<Program>(600);
 
 		Assert.Equal(600, run.Frames);
 		var world = run.Get<EcsWorlds>().Root;
@@ -39,7 +39,7 @@ public sealed class GameTests
 	{
 		string Run()
 		{
-			using var run = IonTestHost.Run<Game>(120, host => host.WithConfiguration("Ion:Seed", "7"));
+			using var run = IonTestHost.RunEntryPoint<Program>(120, host => host.WithConfiguration("Ion:Seed", "7"));
 			return run.WorldJson()!;
 		}
 
@@ -57,7 +57,7 @@ public sealed class SnapshotTests
 	[Fact]
 	public void WorldAfter120FramesMatchesTheSnapshot()
 	{
-		using var run = IonTestHost.Run<Game>(120, host => host.WithConfiguration("Ion:Seed", "1"));
+		using var run = IonTestHost.RunEntryPoint<Program>(120, host => host.WithConfiguration("Ion:Seed", "1"));
 		JsonSnapshot.AssertMatches(run.WorldJson()!, RenderingEnvironment.GoldenPath("world-120.json"));
 	}
 }

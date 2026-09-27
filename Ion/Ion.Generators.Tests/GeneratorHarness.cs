@@ -45,9 +45,9 @@ internal static class GeneratorHarness
 	}
 
 	/// <summary>Runs the generator on <paramref name="source"/>, with optional MSBuild properties (<c>build_property.*</c>).</summary>
-	public static GeneratorResult Run(string source, string assemblyName = "TestApp", IEnumerable<MetadataReference>? extraReferences = null, IReadOnlyDictionary<string, string>? buildProperties = null)
+	public static GeneratorResult Run(string source, string assemblyName = "TestApp", IEnumerable<MetadataReference>? extraReferences = null, IReadOnlyDictionary<string, string>? buildProperties = null, OutputKind kind = OutputKind.DynamicallyLinkedLibrary)
 	{
-		var compilation = Compile(source, assemblyName, extraReferences: extraReferences);
+		var compilation = Compile(source, assemblyName, kind, extraReferences);
 		GeneratorDriver driver = CSharpGeneratorDriver.Create(
 			[new ScheduleGenerator().AsSourceGenerator()],
 			parseOptions: ParseOptions,
@@ -59,6 +59,7 @@ internal static class GeneratorHarness
 		{
 			GeneratedEvents = Tree("IonEvents.g.cs"),
 			GeneratedQueries = Tree("IonQueries.g.cs"),
+			GeneratedProgram = Tree(PublicProgram.HintName),
 		};
 	}
 
@@ -113,6 +114,9 @@ internal sealed record GeneratorResult(CSharpCompilation Input, CSharpCompilatio
 {
 	/// <summary>The generated <c>IonEvents.g.cs</c> (event summary and generated bus), or empty.</summary>
 	public string GeneratedEvents { get; init; } = "";
+
+	/// <summary>The generated <c>IonProgram.g.cs</c> (the public Program of top-level statements), or empty.</summary>
+	public string GeneratedProgram { get; init; } = "";
 
 	/// <summary>The generated <c>IonQueries.g.cs</c> (the expansions of [Query] methods), or empty.</summary>
 	public string GeneratedQueries { get; init; } = "";

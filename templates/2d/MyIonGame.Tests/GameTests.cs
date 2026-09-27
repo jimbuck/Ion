@@ -14,7 +14,7 @@ public sealed class GameTests
 	[Fact]
 	public void HoldingRightMovesThePaddleRight()
 	{
-		using var run = IonTestHost.Run<Game>(1);
+		using var run = IonTestHost.RunEntryPoint<Program>(1);
 		var state = run.Get<PlayState>();
 		var start = state.PaddleX;
 
@@ -30,7 +30,7 @@ public sealed class GameTests
 	[Fact]
 	public void TheBallStaysInPlayOrIsServedAgain()
 	{
-		using var run = IonTestHost.Run<Game>(600);
+		using var run = IonTestHost.RunEntryPoint<Program>(600);
 		var state = run.Get<PlayState>();
 		Assert.Equal(600, run.Frames);
 		Assert.True(state.Score + state.Misses > 0, "Ten seconds of play should end with a hit or a miss.");
@@ -49,7 +49,7 @@ public sealed class SnapshotTests
 	[Fact]
 	public void StateAfter300FramesMatchesTheSnapshot()
 	{
-		using var run = IonTestHost.Run<Game>(300, host => host.WithConfiguration("Ion:Seed", "1"));
+		using var run = IonTestHost.RunEntryPoint<Program>(300, host => host.WithConfiguration("Ion:Seed", "1"));
 		var json = JsonSerializer.Serialize(run.Get<PlayState>(), GameJson.Default.PlayState);
 		JsonSnapshot.AssertMatches(json, RenderingEnvironment.GoldenPath("state-300.json"));
 	}

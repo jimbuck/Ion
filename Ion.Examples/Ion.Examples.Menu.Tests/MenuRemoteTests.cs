@@ -35,7 +35,7 @@ public sealed class MenuRemoteTests : IDisposable
 				["Ion:Remote:PrintToken"] = "false",
 				["Ion:Remote:RunDirectory"] = _runDirectory,
 			})
-			.UseGame(b => MenuApp.Configure(b), a => MenuApp.Use(a))
+			.UseEntryPoint<Program>()
 			.Start();
 		_loop = new Thread(() =>
 		{

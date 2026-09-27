@@ -28,7 +28,7 @@ public sealed class CompanionTests : IDisposable
 	{
 		_host = new IonTestHost()
 			.WithConfiguration(new Dictionary<string, string?> { ["Ion:Web:Port"] = "0", ["Ion:Web:PrintUrl"] = "false" })
-			.UseGame(b => CompanionApp.Configure(b), a => CompanionApp.Use(a))
+			.UseEntryPoint<Program>()
 			.Start();
 		Server = _host.Get<IWebServer>();
 		Game = _host.Get<PaddleGame>();
@@ -131,17 +131,15 @@ public sealed class CompanionTests : IDisposable
 				sockets.Add(socket);
 			}
 
-			var deadline = DateTime.UtcNow.AddSeconds(10);
-			while (sockets[3].State == WebSocketState.Open && DateTime.UtcNow < deadline)
+			// One deadline for the whole wait: a cancelled receive aborts a ClientWebSocket (losing the close status), so a
+			// short per-receive timeout failed whenever the game thread was slower than it (a loaded machine).
+			using var wait = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+			try
 			{
-				try
-				{
-					using var wait = new CancellationTokenSource(200);
-					await sockets[3].ReceiveAsync(new byte[256], wait.Token);
-				}
-				catch (OperationCanceledException)
-				{
-				}
+				while (sockets[3].State == WebSocketState.Open) await sockets[3].ReceiveAsync(new byte[256], wait.Token);
+			}
+			catch (OperationCanceledException)
+			{
 			}
 
 			Assert.Equal((WebSocketCloseStatus)1013, sockets[3].CloseStatus);

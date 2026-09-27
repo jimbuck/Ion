@@ -2,6 +2,9 @@ using System.Globalization;
 
 using Arch.Core;
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
 using Ion.Extensions.Ecs;
 using Ion.Extensions.Networking;
 using Ion.Testing;
@@ -51,8 +54,13 @@ public class ConvergenceTests(ITestOutputHelper output)
 		}
 	}
 
-	private static IonTestHost Host(LoopbackNetwork? loopback, params string[] args) =>
-		new IonTestHost().WithArgs(args).UseGame(b => BreakoutNetGame.Configure(b, loopback), a => BreakoutNetGame.Use(a));
+	/// <summary>The game's own Program.cs, on <paramref name="loopback"/> instead of UDP when given.</summary>
+	private static IonTestHost Host(LoopbackNetwork? loopback, params string[] args)
+	{
+		var host = new IonTestHost().UseEntryPoint<Program>(args);
+		if (loopback is not null) host.Configure(services => services.RemoveAll<INetworkTransport>().AddLoopbackTransport(loopback));
+		return host;
+	}
 
 	internal static Session Loopback(params string[] clientSimulation)
 	{
@@ -251,8 +259,7 @@ public class ConvergenceTests(ITestOutputHelper output)
 	[Fact, Trait(CATEGORY, INTEGRATION)]
 	public void AListenServerPlaysOnItsOwn()
 	{
-		using var host = new IonTestHost().UseGame(b => BreakoutNetGame.Configure(b, new LoopbackNetwork()), a => BreakoutNetGame.Use(a));
-		host.WithArgs("--Ion:Network:Port=0");
+		using var host = Host(new LoopbackNetwork(), "--Ion:Network:Port=0");
 		host.Step(400);
 		var session = host.Get<INetworkSession>();
 		Assert.Equal(NetworkMode.ListenServer, session.Mode);

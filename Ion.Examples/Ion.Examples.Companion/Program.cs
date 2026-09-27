@@ -11,46 +11,16 @@ using Ion.Extensions.Web;
 
 // Run with --Ion:Headless=true for the headless backends. The web server (Ion:Web in appsettings.json) serves the
 // controller page from wwwroot on http://127.0.0.1:15780/.
+// The routes of the web server are the [Http] and [WebSocket] methods of CompanionEndpoints (a generated table); the
+// phones' input arrives as a virtual gamepad on the scripted input path.
 var builder = IonApplication.CreateBuilder(args);
-CompanionApp.Configure(builder);
+builder.AddIon(graphics => graphics.ClearColor = new Color(0x10, 0x14, 0x1C, 0xFF)).AddWeb().AddScriptedInput()
+	.AddSystem<PaddleSystem>().AddSystem<BallSystem>().AddSystem<DrawSystem>().AddSystem<CompanionEndpoints>();
+builder.Services.AddSingleton<PaddleGame>();
 
 using var game = builder.Build();
-CompanionApp.Use(game);
-
+game.UseIon().UseWeb().UseSystem<PaddleSystem>().UseSystem<BallSystem>().UseSystem<DrawSystem>().UseSystem<CompanionEndpoints>();
 game.Run();
-
-/// <summary>The game setup, shared with the tests (Ion.Examples.Companion.Tests).</summary>
-public static class CompanionApp
-{
-	/// <summary>Registers the engine (<c>AddIon</c>), the web module, scripted input and the game.</summary>
-	public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
-	{
-		ArgumentNullException.ThrowIfNull(builder);
-		builder.Services.AddIon(builder.Configuration, graphics => graphics.ClearColor = new Color(0x10, 0x14, 0x1C, 0xFF));
-		// The web server; its routes are the [Http] and [WebSocket] methods of CompanionEndpoints (generated table).
-		builder.Services.AddWeb(builder.Configuration);
-		// The phones' input arrives as a virtual gamepad on the scripted input path.
-		builder.Services.AddScriptedInput();
-		builder.Services.AddSingleton<PaddleGame>()
-			.AddSingleton<PaddleSystem>()
-			.AddSingleton<BallSystem>()
-			.AddSingleton<DrawSystem>()
-			.AddSingleton<CompanionEndpoints>();
-		return builder;
-	}
-
-	/// <summary>Adds the engine's systems (<c>UseIon</c>), the web system and the game.</summary>
-	public static IIonApplication Use(IIonApplication game)
-	{
-		ArgumentNullException.ThrowIfNull(game);
-		return game.UseIon()
-			.UseWeb()
-			.UseSystem<PaddleSystem>()
-			.UseSystem<BallSystem>()
-			.UseSystem<DrawSystem>()
-			.UseSystem<CompanionEndpoints>();
-	}
-}
 
 /// <summary>The game state: a paddle at the bottom, a ball, the score (paddle hits) and the misses.</summary>
 public sealed class PaddleGame

@@ -18,7 +18,8 @@ Ion.Extensions.Rendering3D             Renderer3D (the pipeline), RenderGraph, s
 Ion.Extensions.Rendering2D             the sprite batch, drawn as the 3D render graph's last pass (the overlay)
 ```
 
-Registration: `services.AddRendering3D(config)` after `AddIon`, and `app.UseRendering3D()` after `UseIon()`. With an RHI
+Registration: `builder.AddRendering3D(options => ...)` and `app.UseRendering3D()`, which register and add the engine core
+(`AddIon`/`UseIon`) too (`services.AddRendering3D(config)` registers the renderer alone). With an RHI
 backend (`IGraphicsFrame` registered) the renderer draws; with the headless null backend it runs its CPU pipeline only
 (the statistics are real, nothing is drawn), so headless tests of 3D games work without a GPU.
 

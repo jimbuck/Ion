@@ -24,9 +24,11 @@ namespace Ion.Testing;
 /// </para>
 /// <para>
 /// By default the host registers every extension with <c>AddIon</c> (headless) and wires <c>UseIon</c>, then the systems
-/// added with <see cref="WithSystem{T}"/>, in order. To test a whole game whose setup already calls <c>AddIon</c> and
-/// <c>UseIon</c>, pass its setup to <see cref="UseGame"/> instead. Console logging is off; add providers in
-/// <see cref="Configure"/> to see logs.
+/// added with <see cref="WithSystem{T}"/>, in order. To test a whole game, run its own <c>Program.cs</c> with
+/// <see cref="UseEntryPoint{TProgram}"/> (or <see cref="RunEntryPoint{TProgram}"/>): the host runs the program's entry point
+/// up to <c>game.Run()</c> and takes over the application it built, headless and on the deterministic clock, with the
+/// host's configuration, services and systems added. <see cref="UseGame"/> builds a game from setup delegates instead.
+/// Console logging is off; add providers in <see cref="Configure"/> to see logs.
 /// </para>
 /// <para>
 /// Exceptions thrown by systems propagate out of <see cref="Step"/>. A frame in which the game asks to exit
@@ -54,6 +56,8 @@ public sealed class IonTestHost : IDisposable
 
 	private Action<IonApplicationBuilder>? _gameBuilder;
 	private Action<IIonApplication>? _gameApp;
+	private System.Reflection.Assembly? _program;
+	private IonEntryPoint? _entryPoint;
 	private string[] _args = [];
 
 	private IonApplication? _application;
@@ -145,7 +149,10 @@ public sealed class IonTestHost : IDisposable
 
 	private const DynamicallyAccessedMemberTypes SystemMembers = SystemMiddlewareBinder.MiddlewareAccessibility;
 
-	/// <summary>The order of the Last step that polls the event collectors (see <see cref="Collect{T}"/>).</summary>
+	/// <summary>
+	/// The order of the Last step that polled the event collectors before 0.3. The collectors are now polled after every
+	/// frame, outside the schedule (see <see cref="Collect{T}"/>), so the game's schedule is exactly its own.
+	/// </summary>
 	public const int CollectorOrder = StageOrder.Events - 10;
 
 	/// <summary>
@@ -161,7 +168,8 @@ public sealed class IonTestHost : IDisposable
 
 	/// <summary>
 	/// Adds schedule setup (for example <c>app.UseSystem&lt;T&gt;()</c> or <c>app.Update(...)</c>). Runs after
-	/// <c>UseIon</c> (or the game's own setup) and before the systems added with <see cref="WithSystem{T}"/>.
+	/// <c>UseIon</c> (or the game's own setup: its entry point's, or <see cref="UseGame"/>'s) and before the systems added
+	/// with <see cref="WithSystem{T}"/>.
 	/// </summary>
 	public IonTestHost ConfigureApp(Action<IIonApplication> app)
 	{
@@ -190,7 +198,8 @@ public sealed class IonTestHost : IDisposable
 	public IonTestHost WithConfiguration(string key, string? value) => WithConfiguration([new(key, value)]);
 
 	/// <summary>
-	/// Passes command line arguments to <see cref="IonApplication.CreateBuilder(string[])"/>.
+	/// Passes command line arguments to <see cref="IonApplication.CreateBuilder(string[])"/> (to the program's entry point
+	/// with <see cref="UseEntryPoint{TProgram}"/>).
 	/// </summary>
 	public IonTestHost WithArgs(params string[] args)
 	{
@@ -212,13 +221,44 @@ public sealed class IonTestHost : IDisposable
 		_ensureNotStarted();
 		_gameBuilder = configure;
 		_gameApp = use;
+		_program = null;
 		return this;
 	}
 
 	/// <summary>
-	/// Records every event of type <typeparamref name="T"/> the game emits from now on (polled by a Last step at
-	/// <see cref="CollectorOrder"/>, so events emitted by Last steps with a higher order are recorded the next frame).
-	/// Starts the host.
+	/// Runs the game's own entry point (its <c>Program.cs</c>) instead of the default <c>AddIon</c>/<c>UseIon</c> setup:
+	/// the host starts <c>Main</c> of the assembly that declares <typeparamref name="TProgram"/> with <paramref name="args"/>
+	/// (see <see cref="IonEntryPoint"/>) and takes over the application at its <c>game.Run()</c> call. The host's
+	/// configuration (headless, <see cref="WithConfiguration(string, string)"/>) is added when the program creates its
+	/// builder, so the program reads it while it registers; the host's services (<see cref="Configure"/>, the systems of
+	/// <see cref="WithSystem{T}"/>, the deterministic clock) are added after the program's registrations; the host's
+	/// schedule setup (<see cref="ConfigureApp"/>, <see cref="WithSystem{T}"/>) after the program's. Without any, the game
+	/// runs the schedule the generator compiled for <c>Program.cs</c> (<c>Loop.Schedule.IsGenerated</c>).
+	/// </summary>
+	/// <typeparam name="TProgram">
+	/// A type of the game's executable: its <c>Program</c> class (public for top-level statements: the Ion generator
+	/// declares it so) or any other.
+	/// </typeparam>
+	/// <param name="args">Command line arguments for <c>Main</c> (replacing <see cref="WithArgs"/>'s when not empty).</param>
+	public IonTestHost UseEntryPoint<TProgram>(params string[] args) => UseEntryPoint(typeof(TProgram).Assembly, args);
+
+	/// <summary>Runs the entry point of <paramref name="program"/> (see <see cref="UseEntryPoint{TProgram}"/>).</summary>
+	public IonTestHost UseEntryPoint(System.Reflection.Assembly program, params string[] args)
+	{
+		ArgumentNullException.ThrowIfNull(program);
+		ArgumentNullException.ThrowIfNull(args);
+		_ensureNotStarted();
+		if (program.EntryPoint is null) throw new ArgumentException($"'{program.GetName().Name}' has no entry point: pass a type of the game's executable project (for example its Program class).", nameof(program));
+		_program = program;
+		_gameBuilder = null;
+		_gameApp = null;
+		if (args.Length > 0) _args = args;
+		return this;
+	}
+
+	/// <summary>
+	/// Records every event of type <typeparamref name="T"/> the game emits from now on (polled after every frame the host
+	/// runs, with that frame's number). Starts the host.
 	/// </summary>
 	[ReadsEvent]
 	public EventCollector<T> Collect<T>() where T : unmanaged
@@ -251,7 +291,29 @@ public sealed class IonTestHost : IDisposable
 	public static IonRunResult Run<TGame>(int frames, Action<IonTestHost>? configure = null, TimeSpan? frameTime = null) where TGame : IIonGame
 	{
 		ArgumentOutOfRangeException.ThrowIfNegative(frames);
-		var host = new IonTestHost(frameTime).UseGame(TGame.Configure, TGame.Use);
+		return Run(new IonTestHost(frameTime).UseGame(TGame.Configure, TGame.Use), frames, configure);
+	}
+
+	/// <summary>
+	/// Runs the game's own <c>Program.cs</c> headless (see <see cref="UseEntryPoint{TProgram}"/>, with the deterministic
+	/// clock), runs <paramref name="frames"/> frames and returns the outcome: state (the still running host and its
+	/// services), counters, the last frame's stats and, with rendering, the image. Dispose the result.
+	/// </summary>
+	/// <typeparam name="TProgram">A type of the game's executable, usually its <c>Program</c> class.</typeparam>
+	/// <param name="frames">The number of frames to run.</param>
+	/// <param name="configure">
+	/// Configures the host before it starts: <c>host =&gt; host.WithRendering()</c> for an image,
+	/// <c>WithConfiguration("Ion:Seed", "42")</c>, <c>WithArgs(...)</c> for the program's command line.
+	/// </param>
+	/// <param name="frameTime">The frame time (<see cref="DefaultFrameTime"/> when omitted).</param>
+	public static IonRunResult RunEntryPoint<TProgram>(int frames, Action<IonTestHost>? configure = null, TimeSpan? frameTime = null)
+	{
+		ArgumentOutOfRangeException.ThrowIfNegative(frames);
+		return Run(new IonTestHost(frameTime).UseEntryPoint<TProgram>(), frames, configure);
+	}
+
+	private static IonRunResult Run(IonTestHost host, int frames, Action<IonTestHost>? configure)
+	{
 		try
 		{
 			configure?.Invoke(host);
@@ -276,6 +338,7 @@ public sealed class IonTestHost : IDisposable
 		for (var i = 0; i < frames; i++)
 		{
 			loop.Step();
+			PollCollectors(loop);
 			if (loop.IsExitRequested) return i + 1;
 		}
 
@@ -297,6 +360,7 @@ public sealed class IonTestHost : IDisposable
 		for (var i = 0; i < maxFrames; i++)
 		{
 			loop.Step();
+			PollCollectors(loop);
 			if (condition()) return true;
 			if (loop.IsExitRequested) return false;
 		}
@@ -354,8 +418,26 @@ public sealed class IonTestHost : IDisposable
 		{
 			foreach (var collector in _collectors) collector.Dispose();
 			_collectors.Clear();
-			_application?.Dispose();
+
+			// The program's Run() returns and its entry point finishes (disposing the application); then make sure.
+			try
+			{
+				_entryPoint?.Dispose();
+			}
+			finally
+			{
+				_application?.Dispose();
+			}
 		}
+	}
+
+	// Outside the schedule, so the game's schedule is exactly its own (the generated one of Program.cs, for example). A
+	// reader sees the events of the current and the previous frame, so every event of the frame just run is read.
+	private void PollCollectors(GameLoop loop)
+	{
+		if (_collectors.Count == 0) return;
+		var frame = loop.GameTime.Frame - 1; // The frame just run (the loop counts it at the end).
+		for (var i = 0; i < _collectors.Count; i++) _collectors[i].Poll(frame);
 	}
 
 	private (IonApplication Application, GameLoop Loop) _started()
@@ -365,40 +447,57 @@ public sealed class IonTestHost : IDisposable
 		if (_application is not null && _loop is not null) return (_application, _loop);
 		if (_application is not null) throw new InvalidOperationException("The game failed to start; create a new IonTestHost.");
 
-		var builder = IonApplication.CreateBuilder(_args);
-		builder.Configuration.AddInMemoryCollection(_settings);
-		builder.Services.AddLogging(logging => logging.ClearProviders());
+		IonApplication application;
+		if (_program is not null)
+		{
+			// The game's own entry point: it builds and configures the application; the host adds its settings when the
+			// builder is created and its services before it builds.
+			_entryPoint = IonEntryPoint.Start(_program, _args, _configureBuilder, _addServices);
+			application = _entryPoint.Application;
+			_application = application;
+		}
+		else
+		{
+			var builder = IonApplication.CreateBuilder(_args);
+			_configureBuilder(builder);
 
-		if (_gameBuilder is not null) _gameBuilder(builder);
-		else builder.Services.AddIon(builder.Configuration);
+			if (_gameBuilder is not null) _gameBuilder(builder);
+			else builder.Services.AddIon(builder.Configuration);
 
-		foreach (var system in _systems) system.Register(builder.Services);
-		foreach (var configure in _services) configure(builder.Services);
+			_addServices(builder);
 
-		// Registered last so it wins over the default clock and anything the game registers.
-		builder.Services.AddSingleton<IClock>(Clock);
+			application = builder.Build();
+			_application = application;
 
-		var application = builder.Build();
-		_application = application;
-
-		if (_gameApp is not null) _gameApp(application);
-		else application.UseIon();
+			if (_gameApp is not null) _gameApp(application);
+			else application.UseIon();
+		}
 
 		foreach (var use in _app) use(application);
 		foreach (var system in _systems) system.Use(application);
-
-		// A Last step at the end of the teardown band: after every Last step at a lower order, and before the event system
-		// steps the frame buffers (order StageOrder.Events).
-		application.Last(dt =>
-		{
-			for (var i = 0; i < _collectors.Count; i++) _collectors[i].Poll(dt.Frame);
-		}, order: CollectorOrder, name: "IonTestHost.PollCollectors");
 
 		var loop = application.Build();
 		loop.Initialize();
 		_loop = loop;
 
 		return (application, loop);
+	}
+
+	/// <summary>The host's configuration, added when the builder is created (before the game's registrations read it).</summary>
+	private void _configureBuilder(IonApplicationBuilder builder)
+	{
+		builder.Configuration.AddInMemoryCollection(_settings);
+		builder.Services.AddLogging(logging => logging.ClearProviders());
+	}
+
+	/// <summary>The host's services, added after the game's registrations so they win.</summary>
+	private void _addServices(IonApplicationBuilder builder)
+	{
+		foreach (var system in _systems) system.Register(builder.Services);
+		foreach (var configure in _services) configure(builder.Services);
+
+		// Registered last so it wins over the default clock and anything the game registers.
+		builder.Services.AddSingleton<IClock>(Clock);
 	}
 
 	private void _ensureNotStarted()

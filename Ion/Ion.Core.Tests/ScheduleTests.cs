@@ -29,6 +29,27 @@ public class ScheduleTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
+	public void ASystemAddedAgainIsNotAddedTwice()
+	{
+		// Modules add the systems of the modules they depend on, so UseSystem of a system already in the schedule is a
+		// no-op: it keeps its first registration (and so its place among equal orders).
+		using var host = Host(use: app => app.UseSystem<OrderA>().UseSystem<OrderB>().UseSystem<OrderA>().UseSystem(typeof(OrderB)), systems: [typeof(OrderA), typeof(OrderB)]);
+
+		// With the host's EventSystem.
+		Assert.Equal(3, host.App.Schedule.Entries.Count(e => e is SystemEntry));
+		Assert.Equal(["b-5", "a0-first", "a0-second", "b0", "a5"], RunUpdate(host));
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void ASystemWithAnotherServiceTypeIsAnotherEntry()
+	{
+		using var host = Host(services: s => s.AddSingleton<object>(sp => sp.GetRequiredService<OrderA>()), use: app => app.UseSystem<OrderA>().UseSystem<object, OrderA>(), systems: [typeof(OrderA)]);
+
+		// With the host's EventSystem.
+		Assert.Equal(3, host.App.Schedule.Entries.Count(e => e is SystemEntry));
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
 	public void BeforeAndAfterConstraintsTakePrecedenceOverOrder()
 	{
 		using var host = Host(systems: [typeof(ConstrainedC), typeof(ConstrainedD), typeof(ConstrainedE)]);

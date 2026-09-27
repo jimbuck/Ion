@@ -26,7 +26,7 @@ public class BreakoutRenderingTests
 
 	private static void MatchesTheGoldenImage(GraphicsBackend backend)
 	{
-		var host = new IonTestHost(TimeSpan.FromSeconds(1.0 / 60)).UseGame(b => BreakoutGame.Configure(b), a => BreakoutGame.Use(a));
+		var host = new IonTestHost(TimeSpan.FromSeconds(1.0 / 60)).UseEntryPoint<Program>();
 		var shot = SampleRendering.Capture(host, Width, Height, 120, backend: backend, inspect: h =>
 		{
 			Assert.IsType<SpriteBatch>(h.Get<ISpriteBatch>());
@@ -41,7 +41,7 @@ public class BreakoutRenderingTests
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]
 	public void RunsWindowedOnGlesWithoutErrors()
 	{
-		var run = SampleWindowed.Run(b => BreakoutGame.Configure(b), a => BreakoutGame.Use(a), 120, ("Ion:Graphics:PreferredBackend", "OpenGLES"));
+		var run = SampleWindowed.Run<Program>(120, ("Ion:Graphics:PreferredBackend", "OpenGLES"));
 		Assert.Equal(120, run.Frames);
 		Assert.True(run.LastFrame.Sprites >= 100, $"{run.LastFrame.Sprites} sprites");
 	}
@@ -49,7 +49,7 @@ public class BreakoutRenderingTests
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]
 	public void RunsWindowedOnVulkanWithoutValidationErrors()
 	{
-		var run = SampleWindowed.Run(b => BreakoutGame.Configure(b), a => BreakoutGame.Use(a), 240);
+		var run = SampleWindowed.Run<Program>(240);
 		Assert.Equal(240, run.Frames);
 		Assert.True(run.LastFrame.Sprites >= 100, $"{run.LastFrame.Sprites} sprites");
 	}

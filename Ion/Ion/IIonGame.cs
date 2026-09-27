@@ -2,10 +2,14 @@ namespace Ion;
 
 /// <summary>
 /// A game's setup as two static methods, so tests and tools can build the same game the program runs:
-/// <c>IonTestHost.Run&lt;TGame&gt;(frames)</c> in <c>Ion.Testing</c> builds it headless. The templates' <c>Program.cs</c>
-/// calls them directly (<c>Game.Configure(builder)</c>, <c>Game.Use(app)</c>) so the schedule generator sees the
-/// registrations.
+/// <c>IonTestHost.Run&lt;TGame&gt;(frames)</c> in <c>Ion.Testing</c> builds it headless, and <c>Program.cs</c> calls them
+/// (<c>Game.Configure(builder)</c>, <c>Game.Use(app)</c>) so the schedule generator sees the registrations.
 /// </summary>
+/// <remarks>
+/// A game no longer needs this class to be tested: keep the setup in <c>Program.cs</c> and run that file with
+/// <c>IonTestHost.UseEntryPoint&lt;Program&gt;()</c> or <c>IonTestHost.RunEntryPoint&lt;Program&gt;(frames)</c>, as the
+/// templates and samples do.
+/// </remarks>
 /// <example>
 /// <code>
 /// public sealed class Game : IIonGame

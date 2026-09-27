@@ -19,8 +19,8 @@ Projects:
 ## 1. Using it
 
 ```csharp
-builder.Services.AddWeb(builder.Configuration);          // registers nothing unless Ion:Web:Enabled
-builder.Services.AddSingleton<ScoreSystem>();            // endpoint systems are singletons
+builder.AddWeb();                                         // registers nothing unless Ion:Web:Enabled
+builder.AddSystem<ScoreSystem>();                         // endpoint systems are singletons
 app.UseIon().UseWeb().UseSystem<ScoreSystem>();
 
 [WebJson(typeof(GameJson))]                               // System.Text.Json source generation for bodies and results

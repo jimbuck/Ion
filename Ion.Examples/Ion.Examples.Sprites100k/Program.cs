@@ -13,30 +13,15 @@ using Ion.Extensions.Rendering2D;
 // 100,000 sprites across 16 textures bouncing around the window, drawn with SpriteSortMode.Texture (one draw call per
 // texture). Logs frames per second, frame time, sprites and draw calls every second.
 var builder = IonApplication.CreateBuilder(args);
-SpritesApp.Configure(builder);
+builder.AddIon(graphics => graphics.ClearColor = new Color(0x202020)).AddSystem<StressSystem>();
+builder.Services.AddSingleton(StressSettings.From(builder.Configuration));
 
 using var game = builder.Build();
-SpritesApp.Use(game);
+game.UseIon().UseSystem<StressSystem>();
 game.Run();
 
 namespace Ion.Examples.Sprites100k
 {
-	/// <summary>The sample's setup, shared with the tests.</summary>
-	public static class SpritesApp
-	{
-		/// <summary>Registers the engine and the stress system.</summary>
-		public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
-		{
-			builder.Services.AddIon(builder.Configuration, graphics => graphics.ClearColor = new Color(0x202020));
-			builder.Services.AddSingleton(StressSettings.From(builder.Configuration));
-			builder.Services.AddSingleton<StressSystem>();
-			return builder;
-		}
-
-		/// <summary>Adds the engine's systems and the stress system.</summary>
-		public static IIonApplication Use(IIonApplication app) => app.UseIon().UseSystem<StressSystem>();
-	}
-
 	/// <summary>The stress settings: <c>Sprites:Count</c> (100,000), <c>Sprites:Textures</c> (16), <c>Sprites:Frames</c> (0: run until closed).</summary>
 	public sealed record StressSettings(int Count, int Textures, int Frames)
 	{

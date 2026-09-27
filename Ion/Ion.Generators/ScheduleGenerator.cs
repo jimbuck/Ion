@@ -52,6 +52,17 @@ public sealed class ScheduleGenerator : IIncrementalGenerator
 			if (!source.Left.Right) return;
 			Execute(source.Left.Left, spc, source.Right);
 		});
+
+		// A game written with top-level statements gets a public Program class, for IonTestHost.UseEntryPoint<Program>().
+		var topLevel = context.SyntaxProvider
+			.CreateSyntaxProvider(static (node, _) => PublicProgram.IsCandidate(node), static (_, _) => true)
+			.Collect()
+			.Select(static (items, _) => items.Length > 0);
+
+		context.RegisterSourceOutput(context.CompilationProvider.Combine(topLevel), static (spc, source) =>
+		{
+			if (source.Right && PublicProgram.ShouldEmit(source.Left, spc.CancellationToken)) spc.AddSource(PublicProgram.HintName, PublicProgram.Source);
+		});
 	}
 
 	private static void Execute(Compilation compilation, SourceProductionContext context, bool profiling)

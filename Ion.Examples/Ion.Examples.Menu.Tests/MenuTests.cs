@@ -17,7 +17,7 @@ namespace Ion.Examples.Menu.Tests;
 /// </summary>
 public class MenuTreeTests
 {
-	private static IonTestHost Host() => new IonTestHost().UseGame(b => MenuApp.Configure(b), a => MenuApp.Use(a));
+	private static IonTestHost Host() => new IonTestHost().UseEntryPoint<Program>();
 
 	/// <summary>Steps until <paramref name="path"/> is in the tree (a screen change shows from the frame after the click).</summary>
 	private static void StepUntil(IonTestHost host, IUiTree tree, string path) =>
@@ -108,7 +108,7 @@ public class MenuTreeTests
 /// <summary>The same menu driven by scripted devices: the gamepad (the R36S controls), the keyboard and the mouse.</summary>
 public class MenuInputTests
 {
-	private static IonTestHost Host() => new IonTestHost().UseGame(b => MenuApp.Configure(b), a => MenuApp.Use(a));
+	private static IonTestHost Host() => new IonTestHost().UseEntryPoint<Program>();
 
 	[Fact, Trait(CATEGORY, INTEGRATION)]
 	public void TheGamepadAloneReachesAndChangesTheOptions()
@@ -211,7 +211,7 @@ public class MenuRenderingTests
 	{
 		var log = new ErrorLog();
 		Screenshot shot;
-		using (var host = new IonTestHost().UseGame(b => MenuApp.Configure(b), a => MenuApp.Use(a)))
+		using (var host = new IonTestHost().UseEntryPoint<Program>())
 		{
 			log.Attach(host).WithRendering(Width, Height).WithConfiguration("Ion:Graphics:PreferredBackend", nameof(GraphicsBackend.Vulkan));
 			host.Step();

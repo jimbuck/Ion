@@ -21,14 +21,15 @@ public static class Physics2DBuilderExtensions
 	/// <see cref="IPhysicsWorld2D"/>) resolved per scope like the ECS <see cref="World"/> it simulates (the root provider
 	/// gets the root world, each scene scope its own, disposed with the scene), the systems (transients, so the root
 	/// schedule and each scene get instances bound to their own world), and <see cref="Physics2DConfig"/> bound from
-	/// <c>Ion:Physics2D</c> in <paramref name="config"/> and then <paramref name="configure"/>. Needs the ECS module
-	/// (<c>AddEcs</c>). Add the systems with <see cref="UsePhysics2D(IIonApplication)"/> (and
+	/// <c>Ion:Physics2D</c> in <paramref name="config"/> and then <paramref name="configure"/>. Registers the ECS module
+	/// (<c>AddEcs</c>) too. Add the systems with <see cref="UsePhysics2D(IIonApplication)"/> (and
 	/// <see cref="UsePhysics2D(ISceneBuilder)"/> in scenes that simulate physics).
 	/// </summary>
 	public static IServiceCollection AddPhysics2D(this IServiceCollection services, IConfiguration? config = null, Action<Physics2DConfig>? configure = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
 		Physics2DComponents.Register();
+		services.AddEcs();
 
 		services.AddOptions<Physics2DConfig>();
 		if (config is not null) services.Configure<Physics2DConfig>(config.GetSection(Physics2DConfig.Section));
@@ -45,23 +46,40 @@ public static class Physics2DBuilderExtensions
 	}
 
 	/// <summary>
+	/// Registers the 2D physics module (see <see cref="AddPhysics2D(IServiceCollection, IConfiguration, Action{Physics2DConfig})"/>,
+	/// with the application's configuration) and what it needs: the ECS module (<c>AddEcs</c>) and the engine core
+	/// (<c>AddIon</c>), whose sprite batch the debug drawing uses. Add the systems with <see cref="UsePhysics2D(IIonApplication)"/>.
+	/// </summary>
+	public static IonApplicationBuilder AddPhysics2D(this IonApplicationBuilder builder, Action<Physics2DConfig>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.AddIon().AddEcs();
+		builder.Services.AddPhysics2D(builder.Configuration, configure);
+		return builder;
+	}
+
+	/// <summary>
 	/// Adds the 2D physics systems to the root schedule (for the root world): the physics step in FixedUpdate at
 	/// <see cref="StageOrder.Physics"/> and the debug drawing in Render at <see cref="StageOrder.PhysicsDebugDraw"/>
-	/// (drawn only while <see cref="IPhysicsWorld2D.DebugDraw"/> is on).
+	/// (drawn only while <see cref="IPhysicsWorld2D.DebugDraw"/> is on), with the systems they need: the engine's
+	/// (<c>UseIon</c>) and the ECS module's (<c>UseEcs</c>).
 	/// </summary>
 	public static IIonApplication UsePhysics2D(this IIonApplication app)
 	{
 		ArgumentNullException.ThrowIfNull(app);
 		return app
+			.UseIon()
+			.UseEcs()
 			.UseSystem<Physics2DSystem>()
 			.UseSystem<Physics2DDebugDrawSystem>();
 	}
 
-	/// <summary>Adds the 2D physics systems to a scene's schedule (for the scene's own world); see <see cref="UsePhysics2D(IIonApplication)"/>.</summary>
+	/// <summary>Adds the 2D physics systems to a scene's schedule (for the scene's own world), with the scene's ECS systems; see <see cref="UsePhysics2D(IIonApplication)"/>.</summary>
 	public static ISceneBuilder UsePhysics2D(this ISceneBuilder scene)
 	{
 		ArgumentNullException.ThrowIfNull(scene);
 		return scene
+			.UseEcs()
 			.UseSystem<Physics2DSystem>()
 			.UseSystem<Physics2DDebugDrawSystem>();
 	}

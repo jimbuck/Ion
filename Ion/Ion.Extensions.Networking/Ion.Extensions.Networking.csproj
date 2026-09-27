@@ -31,6 +31,8 @@
     <!-- The Ion schedule generator: intercepts this project's registrations and summarizes its Use* helpers. -->
     <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\Ion.Extensions.Networking.Abstractions\Ion.Extensions.Networking.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Metrics.Abstractions\Ion.Extensions.Metrics.Abstractions.csproj" />
     <!-- network.status remote method (IRemoteMethodProvider); no dependency on the remote server itself. -->
     <ProjectReference Include="..\Ion.Extensions.Remote.Abstractions\Ion.Extensions.Remote.Abstractions.csproj" />

@@ -22,13 +22,16 @@ public class ModelTests
 {
 	private const uint Width = 640, Height = 360;
 
-	private static IonTestHost Game() => new IonTestHost().UseGame(b => ModelApp.Configure(b), a => ModelApp.Use(a));
+	private static IonTestHost Game() => new IonTestHost().UseEntryPoint<Program>();
 
 	[Fact, Trait(CATEGORY, INTEGRATION)]
 	public void LoadsTheModelAndSubmitsTheSceneHeadless()
 	{
 		using var host = Game();
 		host.Step(2);
+
+		// Program.cs ran as written: the schedule the generator compiled for it is the one that runs.
+		Assert.True(host.Loop.Schedule!.IsGenerated, "The generated schedule of Program.cs is not in use.");
 		var model = host.Get<ModelSystem>().Model;
 		Assert.NotNull(model);
 		Assert.Single(model.Meshes);
@@ -71,14 +74,14 @@ public class ModelTests
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]
 	public void RunsWindowedOnVulkanWithoutValidationErrors()
 	{
-		var run = SampleWindowed.Run(b => ModelApp.Configure(b), a => ModelApp.Use(a), 120);
+		var run = SampleWindowed.Run<Program>(120);
 		Assert.Equal(120, run.Frames);
 	}
 
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]
 	public void RunsWindowedOnGlesWithoutErrors()
 	{
-		var run = SampleWindowed.Run(b => ModelApp.Configure(b), a => ModelApp.Use(a), 120, ("Ion:Graphics:PreferredBackend", "OpenGLES"));
+		var run = SampleWindowed.Run<Program>(120, ("Ion:Graphics:PreferredBackend", "OpenGLES"));
 		Assert.Equal(120, run.Frames);
 	}
 }

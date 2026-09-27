@@ -34,10 +34,10 @@ public static class BreakoutMobile
 	public static void Run(string contentRoot, IReadOnlyList<string> extra)
 	{
 		var builder = IonApplication.CreateBuilder(Arguments(contentRoot, extra));
-		BreakoutGame.Configure(builder);
+		builder.AddBreakout();
 
 		using var game = builder.Build();
-		BreakoutGame.Use(game);
+		game.UseBreakout();
 
 		game.Run();
 	}

@@ -26,7 +26,7 @@ public class ScenesRenderingTests
 	{
 		var log = new ErrorLog();
 		Screenshot menu, gameplay;
-		using (var host = log.Attach(new IonTestHost().UseGame(b => ScenesApp.Configure(b), a => ScenesApp.Use((IonApplication)a))).WithRendering(Width, Height)
+		using (var host = log.Attach(new IonTestHost().UseEntryPoint<Program>()).WithRendering(Width, Height)
 			.WithConfiguration("Ion:Graphics:PreferredBackend", backend.ToString()))
 		{
 			host.Step(3);
@@ -49,7 +49,7 @@ public class ScenesRenderingTests
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]
 	public void RunsWindowedOnGlesWithoutErrors()
 	{
-		var run = SampleWindowed.Run(b => ScenesApp.Configure(b), a => ScenesApp.Use(a), 120, ("Ion:Graphics:PreferredBackend", "OpenGLES"));
+		var run = SampleWindowed.Run<Program>(120, ("Ion:Graphics:PreferredBackend", "OpenGLES"));
 		Assert.Equal(120, run.Frames);
 		Assert.Equal(1, run.LastFrame.Sprites);
 	}
@@ -57,7 +57,7 @@ public class ScenesRenderingTests
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]
 	public void RunsWindowedOnVulkanWithoutValidationErrors()
 	{
-		var run = SampleWindowed.Run(b => ScenesApp.Configure(b), a => ScenesApp.Use(a), 240);
+		var run = SampleWindowed.Run<Program>(240);
 		Assert.Equal(240, run.Frames);
 		Assert.Equal(1, run.LastFrame.Sprites);
 	}

@@ -25,7 +25,7 @@ Install the tool from a checkout with `dotnet pack Ion/Ion.Tools -c Release -o o
 1. **Create**: `ion new ecs Arena` (add `--ion-source <path to an Ion checkout>` to build against the sources instead of
    the packages). Read `Arena/CLAUDE.md`.
 2. **Change**: systems are plain classes with stage attributes (`[Update] public void Move(GameTime dt)`), registered in
-   `Game.Configure` and added in `Game.Use`. ECS components are `record struct`s registered for serialization, which also
+   `Program.cs` (`builder.AddSystem<T>()`) and added to the schedule there (`game.UseSystem<T>()`). ECS components are `record struct`s registered for serialization, which also
    makes them visible to snapshots and to the remote protocol.
 3. **Build**: `dotnet build` must stay warning-free. Schedule mistakes are compile-time diagnostics (`ION001` to `ION013`,
    `ION3xx` for queries) with the rule in the message.
@@ -39,7 +39,7 @@ Install the tool from a checkout with `dotnet pack Ion/Ion.Tools -c Release -o o
    `ion_metrics`, `ion_logs`, `ion_call` (any method; `rpc.discover` lists them). `ion_stop` ends it. Games with the UI
    module and `AddUiRemote()` are driven by path without screenshots: `ion_ui_tree` lists the widgets, `ion_ui_click`
    clicks one, and `ion_call` reaches `ui.set_value`, `ui.type`, `ui.focus` and `ui.back`.
-7. **Lock it in**: add a headless test (`IonTestHost.Run<Game>(frames)`, assert on state and counters) and a snapshot
+7. **Lock it in**: add a headless test (`IonTestHost.RunEntryPoint<Program>(frames)` runs `Program.cs` as it is; assert on state and counters) and a snapshot
    (`JsonSnapshot.AssertMatches(run.WorldJson()!, RenderingEnvironment.GoldenPath("world.json"))`). Accept intended
    changes with `ION_UPDATE_GOLDEN=1 dotnet test` and review the diff.
 

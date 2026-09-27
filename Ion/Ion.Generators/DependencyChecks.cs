@@ -11,7 +11,8 @@ namespace Ion.Generators;
 /// <remarks>
 /// A type counts as registered when it appears anywhere in the compilation in a <c>typeof</c>, or as a type argument of
 /// a call on an <c>IServiceCollection</c> (<c>AddSingleton&lt;T&gt;()</c>, <c>TryAddScoped&lt;TService, TImpl&gt;()</c>,
-/// <c>AddSingleton(sp =&gt; new T())</c>, custom <c>services.AddMyThings&lt;T&gt;()</c> helpers...). Registrations made
+/// <c>AddSingleton(sp =&gt; new T())</c>, custom <c>services.AddMyThings&lt;T&gt;()</c> helpers...) or on the application
+/// builder (<c>builder.AddSystem&lt;T&gt;()</c>, which registers a singleton). Registrations made
 /// by assembly scanning or in another assembly are invisible, so only root schedule registrations of types declared here
 /// are checked; suppress the diagnostic (<c>dotnet_diagnostic.ION009.severity = none</c>) if that is how a project
 /// registers its systems. The runtime check still applies.
@@ -110,18 +111,40 @@ internal sealed class DependencyChecks(KnownSymbols known, RegistrationAnalyzer 
 
 					case InvocationExpressionSyntax invocation when model.GetOperation(invocation, cancellationToken) is IInvocationOperation operation:
 						var method = operation.TargetMethod;
-						var onServices = (operation.Instance is { } instance && KnownSymbols.Is(instance.Type, known.ServiceCollection))
-							|| (method.IsExtensionMethod && method.Parameters.Length > 0 && KnownSymbols.Is(method.Parameters[0].Type, known.ServiceCollection))
+						var receiver = operation.Instance?.Type ?? (method.IsExtensionMethod && method.Parameters.Length > 0 ? method.Parameters[0].Type : null);
+						var onServices = IsRegistrationReceiver(receiver)
 							|| method.ContainingType?.ToDisplayString() == "Microsoft.Extensions.DependencyInjection.ServiceDescriptor";
 						if (!onServices) break;
 
-						bool? scoped = method.Name.Contains("Scoped") ? true : method.Name.Contains("Singleton") || method.Name.Contains("Transient") ? false : null;
-						foreach (var argument in method.TypeArguments) Add(argument, scoped);
+						foreach (var argument in method.TypeArguments) Add(argument, LifetimeOf(method.Name));
+						break;
+
+					// A registration call that does not bind in this compilation: its receiver depends on the output of
+					// another source generator (builder.AddEcsSerialization(r => r.AddUnmanaged("V", GameJson.Default.V))
+					// .AddSystem<T>(), with a System.Text.Json context), which this generator cannot see. Count the type
+					// arguments of a known registration method by name, so the system is not reported as unregistered.
+					case InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Name: GenericNameSyntax generic } } when IsRegistrationName(generic.Identifier.ValueText) && model.GetOperation(node, cancellationToken) is not IInvocationOperation:
+						foreach (var argument in generic.TypeArgumentList.Arguments)
+						{
+							if (model.GetTypeInfo(argument, cancellationToken).Type is { TypeKind: not TypeKind.Error } registered) Add(registered, LifetimeOf(generic.Identifier.ValueText));
+						}
+
 						break;
 				}
 			}
 		}
 	}
+
+	private static bool? LifetimeOf(string name) => name.Contains("Scoped") ? true : name.Contains("Singleton") || name.Contains("Transient") ? false : null;
+
+	private static bool IsRegistrationName(string name) => name is "AddSystem" or "AddSingleton" or "AddScoped" or "AddTransient" or "TryAddSingleton" or "TryAddScoped" or "TryAddTransient";
+
+	/// <summary>
+	/// Whether calls on <paramref name="receiver"/> register services: an <c>IServiceCollection</c>, or the application
+	/// builder (<c>builder.AddSystem&lt;T&gt;()</c>, <c>builder.AddMyThings&lt;T&gt;()</c>).
+	/// </summary>
+	private bool IsRegistrationReceiver(ITypeSymbol? receiver) =>
+		KnownSymbols.Is(receiver, known.ServiceCollection) || KnownSymbols.Is(receiver, known.IonApplicationBuilder) || KnownSymbols.Is(receiver, known.IonApplicationBuilderInterface);
 
 	private void Add(ITypeSymbol type, bool? scoped)
 	{

@@ -165,5 +165,31 @@ internal static class GoldenScenarios
 					app.Update((GameTime dt) => Log.Calls.Add("root tick"));
 				""",
 				"loop.Step(new GameTime()); loop.Step(new GameTime());")),
+
+		// A system added again is not added twice (UseSystem is idempotent, like modules that add their dependencies):
+		// directly, through a helper, after a conditional registration, and in a scene.
+		("RepeatedSystems", Preamble + """
+			public sealed class Input { [First] public void Poll(GameTime dt) => Log.Calls.Add("input poll"); }
+			public sealed class Renderer { [Render(Order = -10)] public void Draw(GameTime dt) => Log.Calls.Add("renderer draw"); }
+			public sealed class Extraction { [Render] public void Extract(GameTime dt) => Log.Calls.Add("extract"); }
+			public sealed class Menu { [Update] public void Tick(GameTime dt) => Log.Calls.Add("menu tick"); }
+			public sealed class Late { [Last] public void Finish(GameTime dt) => Log.Calls.Add("late finish"); }
+
+			public static class Modules
+			{
+				public static IIonApplication UseRenderer(this IIonApplication app) => app.UseSystem<Input>().UseSystem<Renderer>();
+				public static IIonApplication UseExtraction(this IIonApplication app) => app.UseRenderer().UseSystem<Extraction>();
+			}
+
+			""" + App(
+				"builder.Services.AddScenes().AddSingleton<Input>().AddSingleton<Renderer>().AddSingleton<Extraction>().AddSingleton<Late>().AddScoped<Menu>();",
+				"""
+				app.UseEvents().UseRenderer().UseExtraction().UseRenderer().UseSystem<Input>();
+					if (Environment.GetEnvironmentVariable("ION_NEVER_SET") is not null) app.UseSystem<Late>();
+					app.UseScene(1, scene => scene.UseSystem<Menu>().UseSystem<Menu>());
+					app.UseSystem<Extraction>().UseSystem<Late>();
+					app.Services.GetRequiredService<IEvents>().EmitChangeScene(1);
+				""",
+				"loop.Step(new GameTime()); loop.Step(new GameTime());")),
 	];
 }

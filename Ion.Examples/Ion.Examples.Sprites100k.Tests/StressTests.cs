@@ -21,7 +21,7 @@ public class StressTests(ITestOutputHelper output)
 	private const uint Width = 1280, Height = 720;
 
 	private static IonTestHost Host(int count) => new IonTestHost()
-		.UseGame(b => SpritesApp.Configure(b), a => SpritesApp.Use(a))
+		.UseEntryPoint<Program>()
 		.WithConfiguration("Sprites:Count", count.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
 	[VulkanFact, Trait(CATEGORY, INTEGRATION)]
@@ -73,7 +73,7 @@ public class StressTests(ITestOutputHelper output)
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]
 	public void ReportsWindowedFrameTime()
 	{
-		var run = SampleWindowed.Run(b => SpritesApp.Configure(b), a => SpritesApp.Use(a), 120,
+		var run = SampleWindowed.Run<Program>(120,
 			("Ion:Graphics:Validation", "false"), ("Ion:Window:Width", "1280"), ("Ion:Window:Height", "720"));
 		var line = $"Windowed (Xvfb, Vulkan on lavapipe) 100k sprites: {run.AverageFrameMilliseconds:F2} ms/frame average, {run.WorstFrameMilliseconds:F2} ms worst, {run.LastFrame.DrawCalls} draw calls, {run.LastFrame.Sprites} sprites.";
 		output.WriteLine(line);

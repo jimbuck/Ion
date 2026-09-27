@@ -78,13 +78,37 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 		return this;
 	}
 
+	/// <summary>
+	/// Registers the system <typeparamref name="TSystem"/> as a singleton (unless it is already registered). Add it to the
+	/// schedule with <c>app.UseSystem&lt;TSystem&gt;()</c> once the application is built.
+	/// </summary>
+	public IonApplicationBuilder AddSystem<[DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] TSystem>() where TSystem : class =>
+		AddSystem(typeof(TSystem));
+
+	/// <summary>
+	/// Registers the system <paramref name="systemType"/> as a singleton (unless it is already registered), like
+	/// <see cref="AddSystem{TSystem}"/>.
+	/// </summary>
+	public IonApplicationBuilder AddSystem([DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type systemType)
+	{
+		ArgumentNullException.ThrowIfNull(systemType);
+		Services.TryAddSingleton(systemType);
+		return this;
+	}
+
+	/// <summary>The hook of a host running the program's entry point (see <see cref="IonApplicationHook"/>), if any.</summary>
+	internal IonApplicationHook? Hook { get; set; }
+
 	public IonApplication Build()
 	{
+		// A test host running the program's entry point adds its registrations after the program's.
+		Hook?.OnBuilding(this);
+
 		// Captured last, so the root schedule can reject scoped systems and scoped step parameters (ION006).
 		Services.AddSingleton(new ServiceLifetimeIndex(Services));
 
 		var host = _hostBuilder.Build();
-		var game = new IonApplication(host);
+		var game = new IonApplication(host, Hook);
 
 		return game;
 	}

@@ -30,6 +30,18 @@ public static class UiRemoteExtensions
 
 		return services;
 	}
+
+	/// <summary>
+	/// Registers the UI module's remote methods and the UI module itself (<c>AddUi</c>, with the engine core, which carries
+	/// the remote protocol). The methods answer when the remote server runs (<c>--remote</c>).
+	/// </summary>
+	public static IonApplicationBuilder AddUiRemote(this IonApplicationBuilder builder)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.AddUi();
+		builder.Services.AddUiRemote();
+		return builder;
+	}
 }
 
 /// <summary>

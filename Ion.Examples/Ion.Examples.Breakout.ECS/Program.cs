@@ -1,16 +1,15 @@
 using Ion;
 using Ion.Examples.Breakout.ECS;
 
-// The game setup lives in BreakoutGame and the game's systems in BreakoutSystems.cs, so the tests
-// (Ion.Examples.Breakout.ECS.Tests) and the mobile heads (Ion.Examples.Breakout.ECS.Android and .iOS) build exactly the
-// same game.
+// The game is a module (AddBreakout/UseBreakout in BreakoutGame.cs, its systems in BreakoutSystems.cs) because the mobile
+// heads (Ion.Examples.Breakout.ECS.Android and .iOS) run it from their own entry point; the tests run this one.
 // Run with --Ion:Headless=true to use the headless graphics and audio backends (no GPU, window or audio device), and
 // --Ion:Seed=<n> to change the random seed.
 var builder = IonApplication.CreateBuilder(args);
-BreakoutGame.Configure(builder);
+builder.AddBreakout();
 
 using var game = builder.Build();
-BreakoutGame.Use(game);
+game.UseBreakout();
 
 #if TRACY
 // Built with -p:IonTracy=true: stream every span, frame mark and counter to a Tracy server.

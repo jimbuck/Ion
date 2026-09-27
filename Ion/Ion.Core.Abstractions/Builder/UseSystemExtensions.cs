@@ -13,7 +13,9 @@ public static class UseSystemExtensions
 	/// Adds a system to the application's schedule: every public method of <paramref name="systemType"/> with a stage
 	/// attribute becomes a step, and every <see cref="BeginAttribute"/>/<see cref="EndAttribute"/> pair a scope. Steps run
 	/// by <see cref="StageAttribute.Order"/>, then registration order, so systems can be added in any order relative to
-	/// the engine's. The instance is resolved from the application's services when the schedule is built.
+	/// the engine's. The instance is resolved from the application's services when the schedule is built. Adding a system
+	/// that is already in the schedule does nothing (it keeps its first place), so modules can add the systems of the
+	/// modules they depend on.
 	/// </summary>
 	public static IIonApplication UseSystem(this IIonApplication app, [DynamicallyAccessedMembers(SystemAccessibility)] Type systemType)
 	{

@@ -48,16 +48,19 @@ public sealed class WindowedVulkanFactAttribute : FactAttribute
 public readonly record struct WindowedRun(int Frames, double AverageFrameMilliseconds, double WorstFrameMilliseconds, SpriteBatchStatistics LastFrame);
 
 /// <summary>
-/// Runs a sample in a real window (Silk.NET GLFW, the Vulkan swapchain, validation on) for some frames with its own setup
-/// (<c>AddIon</c>/<c>UseIon</c>), shuts it down and fails on any logged error, teardown included.
+/// Runs a sample's own <c>Program.cs</c> in a real window (Silk.NET GLFW, the Vulkan swapchain, validation on) for some
+/// frames, shuts it down and fails on any logged error, teardown included.
 /// </summary>
 public static class SampleWindowed
 {
-	/// <summary>Builds the sample with <paramref name="configure"/> and <paramref name="use"/> and runs <paramref name="frames"/> frames.</summary>
-	public static WindowedRun Run(Action<IonApplicationBuilder> configure, Action<IonApplication> use, int frames, params (string Key, string Value)[] settings)
+	/// <summary>
+	/// Runs the entry point of <typeparamref name="TProgram"/>'s assembly up to its <c>Run()</c> call (see
+	/// <see cref="IonEntryPoint"/>), with <paramref name="settings"/> over the windowed test settings, then runs
+	/// <paramref name="frames"/> frames of the application it built, on the real clock.
+	/// </summary>
+	public static WindowedRun Run<TProgram>(int frames, params (string Key, string Value)[] settings)
 	{
 		var log = new ErrorLog();
-		var builder = IonApplication.CreateBuilder();
 		var values = new Dictionary<string, string?>
 		{
 			["Ion:Graphics:Validation"] = "true",
@@ -67,12 +70,11 @@ public static class SampleWindowed
 			["Ion:MaxFPS"] = "0",
 		};
 		foreach (var (key, value) in settings) values[key] = value;
-		builder.Configuration.AddInMemoryCollection(values);
-		configure(builder);
-		builder.Services.AddLogging(logging => logging.AddProvider(log));
 
-		var app = builder.Build();
-		use(app);
+		using var program = IonEntryPoint.Start<TProgram>(
+			configure: builder => builder.Configuration.AddInMemoryCollection(values),
+			beforeBuild: builder => builder.Services.AddLogging(logging => logging.AddProvider(log)));
+		var app = program.Application;
 		var loop = app.Build();
 		var times = new List<double>(frames);
 		SpriteBatchStatistics last = default;
@@ -92,7 +94,7 @@ public static class SampleWindowed
 		finally
 		{
 			loop.Shutdown();
-			app.Dispose();
+			program.Dispose();
 		}
 
 		log.AssertClean();

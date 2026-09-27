@@ -383,11 +383,11 @@ public abstract class HeadlessContractTests
 	}
 }
 
-/// <summary>Runs the quad sample app (<see cref="QuadApp"/>) for a few frames and captures the last one.</summary>
+/// <summary>Runs the quad sample's own <c>Program.cs</c> for a few frames and captures the last one.</summary>
 public static class QuadSample
 {
 	/// <summary>
-	/// Builds the sample exactly as its Program does (windowed or headless) on <paramref name="backend"/> at 320x240 with the
+	/// Runs the sample's entry point (windowed or headless, see <see cref="IonEntryPoint"/>) on <paramref name="backend"/> at 320x240 with the
 	/// quad standing still, runs 3 frames and returns the last frame.
 	/// </summary>
 	public static Screenshot Run(GraphicsBackend backend, bool headless, ValidationLog log, Action<IDictionary<string, string?>>? configure = null)
@@ -406,12 +406,13 @@ public static class QuadSample
 			["Quad:Spin"] = "false",
 		};
 		configure?.Invoke(settings);
-		var builder = IonApplication.CreateBuilder();
-		builder.Configuration.AddInMemoryCollection(settings);
-		builder.Services.AddLogging(logging => logging.ClearProviders().AddProvider(log));
-		QuadApp.Configure(builder.Services, builder.Configuration);
-		using var app = builder.Build();
-		QuadApp.Use(app);
+		using var program = IonEntryPoint.Start<Program>(
+			configure: builder =>
+			{
+				builder.Configuration.AddInMemoryCollection(settings);
+				builder.Services.AddLogging(logging => logging.ClearProviders().AddProvider(log));
+			});
+		var app = program.Application;
 		var loop = app.Build();
 		loop.Initialize();
 		try

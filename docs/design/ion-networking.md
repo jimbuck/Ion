@@ -39,12 +39,13 @@ Ion.Generators                           [Replicated] and [NetworkMessage] seria
 
 ```csharp
 var builder = IonApplication.CreateBuilder(args);
-builder.Services.AddIon(builder.Configuration);
-builder.Services.AddNetworking(builder.Configuration);       // binds Ion:Network, registers the message bus, world, snapshot ring
-builder.Services.AddLiteNetLibTransport();                    // or AddWebSocketTransport(), AddLoopbackTransport()
+builder.AddIon()
+    .AddNetworking()                                          // binds Ion:Network, registers the message bus, world, snapshot ring (and the ECS module)
+    .AddLiteNetLibTransport()                                 // or AddWebSocketTransport(), AddLoopbackTransport()
+    .AddSystem<PaddleSystem>();
 
-var game = builder.Build();
-game.UseIon().UseNetworking();                                // adds the network steps; role comes from config
+using var game = builder.Build();
+game.UseIon().UseNetworking();                                // adds the network steps (and the ECS systems); role comes from config
 game.UseSystem<PaddleSystem>();
 game.Run();
 ```

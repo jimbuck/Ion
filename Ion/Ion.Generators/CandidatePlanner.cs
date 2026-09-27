@@ -77,6 +77,8 @@ internal sealed class CandidatePlanner(SystemAnalyzer systems, Action<Diagnostic
 			switch (op.Kind)
 			{
 				case OpKind.System:
+					AddSystem(candidate, op);
+					break;
 				case OpKind.Function:
 				case OpKind.Middleware:
 					candidate.Entries.Add(op);
@@ -174,6 +176,26 @@ internal sealed class CandidatePlanner(SystemAnalyzer systems, Action<Diagnostic
 
 			candidate.Stages[stage - 1].AddRange(sorted.Select(i => stageItems[i]));
 		}
+	}
+
+	/// <summary>
+	/// Adds a System op the way the runtime's <c>ScheduleModel.AddSystem</c> does: a system that is already in the model
+	/// (same service and implementation) is not added again. After an unconditional registration of the same system the
+	/// op never registers, so it is dropped; after a conditional one it registers only when the earlier one did not run, so
+	/// it is kept as conditional (the generated schedule guards it, and at most one of them is present at run time).
+	/// </summary>
+	private static void AddSystem(ScheduleCandidate candidate, RegistrationOp op)
+	{
+		var conditional = false;
+		foreach (var earlier in candidate.Entries)
+		{
+			if (earlier.Kind != OpKind.System || earlier.Service is null || earlier.Implementation is null) continue;
+			if (!SymbolEqualityComparer.Default.Equals(earlier.Service, op.Service) || !SymbolEqualityComparer.Default.Equals(earlier.Implementation, op.Implementation)) continue;
+			if (!earlier.Conditional) return;
+			conditional = true;
+		}
+
+		candidate.Entries.Add(conditional && !op.Conditional ? op.Nested(conditional: true, null) : op);
 	}
 
 	private static List<int>? Sort(List<CandidateItem> items, out List<int>? cycle) => ScheduleSorter.Sort(

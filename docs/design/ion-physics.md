@@ -19,12 +19,12 @@ Ion.Extensions.Physics3D                PhysicsWorld3D on BepuPhysics 2.5.0-beta
                                         Physics3DDebugDrawSystem, AddPhysics3D/UsePhysics3D
 ```
 
-A game library can depend on the abstractions only (components, events, the world interface). Registration, after
-`AddIon` and `AddEcs`:
+A game library can depend on the abstractions only (components, events, the world interface). Registration (it registers
+the ECS module and the renderer of its debug drawing too: the engine core for 2D, the 3D renderer for 3D):
 
 ```csharp
-builder.Services.AddEcs().AddPhysics2D(builder.Configuration, physics => physics.UnitsPerMeter = 64);
-app.UseIon().UseEcs().UsePhysics2D();   // and scene.UsePhysics2D() in scenes that simulate physics
+builder.AddPhysics2D(physics => physics.UnitsPerMeter = 64);
+app.UsePhysics2D();   // with UseIon and UseEcs; and scene.UsePhysics2D() in scenes that simulate physics
 
 var ball = world.Create(new Transform2D(position), Collider2D.Circle(16) with { Restitution = 1 }, RigidBody2D.Dynamic());
 ```

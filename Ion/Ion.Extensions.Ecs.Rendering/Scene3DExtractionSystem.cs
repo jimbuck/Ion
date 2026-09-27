@@ -4,6 +4,7 @@ using Arch.Core;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Scenes;
@@ -172,31 +173,49 @@ public static class EcsRendering3DBuilderExtensions
 {
 	/// <summary>
 	/// Registers the <see cref="Scene3DExtractionSystem"/> (a transient, so the root schedule and each scene get one bound
-	/// to their own world) and its <see cref="Scene3DExtractionOptions"/>. Needs <c>AddEcs()</c> and a 3D renderer
-	/// (<c>AddRendering3D()</c>, which provides <see cref="IMeshBatch"/>). Independent of <c>AddEcsRendering()</c> (the 2D
-	/// extraction): register both for a scene with sprites and meshes.
+	/// to their own world) and its <see cref="Scene3DExtractionOptions"/> (<paramref name="configure"/> applies on every
+	/// call). Needs <c>AddEcs()</c> and a 3D renderer (<c>AddRendering3D()</c>, which provides <see cref="IMeshBatch"/>);
+	/// <see cref="AddEcsRendering3D(IonApplicationBuilder, Action{Scene3DExtractionOptions})"/> registers them too.
+	/// Independent of <c>AddEcsRendering()</c> (the 2D extraction): register both for a scene with sprites and meshes.
 	/// </summary>
 	public static IServiceCollection AddEcsRendering3D(this IServiceCollection services, Action<Scene3DExtractionOptions>? configure = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
-		var options = new Scene3DExtractionOptions();
-		configure?.Invoke(options);
-		services.TryAddSingleton(options);
+		services.AddEcs();
+		services.AddOptions<Scene3DExtractionOptions>();
+		if (configure is not null) services.Configure(configure);
+		services.TryAddSingleton(static sp => sp.GetRequiredService<IOptions<Scene3DExtractionOptions>>().Value);
 		services.TryAddTransient(static sp => new Scene3DExtractionSystem(sp.GetRequiredService<World>(), sp.GetRequiredService<IMeshBatch>(), sp.GetRequiredService<Scene3DExtractionOptions>()));
 		return services;
 	}
 
-	/// <summary>Adds the 3D extraction to the root schedule (the root world's meshes, cameras and lights).</summary>
+	/// <summary>
+	/// Registers the 3D extraction and what it needs: the ECS module (<c>AddEcs</c>), the 3D renderer
+	/// (<c>AddRendering3D</c>) and the engine core (<c>AddIon</c>). Add the systems with
+	/// <see cref="UseEcsRendering3D(IIonApplication)"/>.
+	/// </summary>
+	public static IonApplicationBuilder AddEcsRendering3D(this IonApplicationBuilder builder, Action<Scene3DExtractionOptions>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.AddRendering3D().AddEcs();
+		builder.Services.AddEcsRendering3D(configure);
+		return builder;
+	}
+
+	/// <summary>
+	/// Adds the 3D extraction to the root schedule (the root world's meshes, cameras and lights), with the systems it needs:
+	/// the engine's (<c>UseIon</c>), the 3D renderer's (<c>UseRendering3D</c>) and the ECS module's (<c>UseEcs</c>).
+	/// </summary>
 	public static IIonApplication UseEcsRendering3D(this IIonApplication app)
 	{
 		ArgumentNullException.ThrowIfNull(app);
-		return app.UseSystem<Scene3DExtractionSystem>();
+		return app.UseRendering3D().UseEcs().UseSystem<Scene3DExtractionSystem>();
 	}
 
-	/// <summary>Adds the 3D extraction to a scene's schedule (the scene's world).</summary>
+	/// <summary>Adds the 3D extraction to a scene's schedule (the scene's world), with the scene's ECS systems (<c>UseEcs</c>).</summary>
 	public static ISceneBuilder UseEcsRendering3D(this ISceneBuilder scene)
 	{
 		ArgumentNullException.ThrowIfNull(scene);
-		return scene.UseSystem<Scene3DExtractionSystem>();
+		return scene.UseEcs().UseSystem<Scene3DExtractionSystem>();
 	}
 }

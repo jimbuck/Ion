@@ -32,7 +32,7 @@ public class BreakoutHeadlessTests(ITestOutputHelper output)
 
 	private static IonTestHost CreateHost(int? seed)
 	{
-		var host = new IonTestHost(FrameTime).UseGame(b => BreakoutGame.Configure(b), a => BreakoutGame.Use(a));
+		var host = new IonTestHost(FrameTime).UseEntryPoint<Program>();
 		if (seed is int s) host.WithConfiguration(BreakoutGame.SeedKey, s.ToString(System.Globalization.CultureInfo.InvariantCulture));
 		return host;
 	}

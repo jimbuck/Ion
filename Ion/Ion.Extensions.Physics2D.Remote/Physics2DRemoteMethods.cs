@@ -32,6 +32,18 @@ public static class Physics2DRemoteExtensions
 
 		return services;
 	}
+
+	/// <summary>
+	/// Registers the 2D physics remote methods and the 2D physics module itself (<c>AddPhysics2D</c>, with the ECS module
+	/// and the engine core, which carries the remote protocol). The methods answer when the remote server runs (<c>--remote</c>).
+	/// </summary>
+	public static IonApplicationBuilder AddPhysics2DRemote(this IonApplicationBuilder builder)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.AddPhysics2D();
+		builder.Services.AddPhysics2DRemote();
+		return builder;
+	}
 }
 
 /// <summary>

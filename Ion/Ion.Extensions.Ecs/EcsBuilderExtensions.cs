@@ -18,7 +18,7 @@ public static class EcsBuilderExtensions
 	/// <see cref="SpriteAnimationSystem"/>, registered as transients so the root schedule and each scene get instances
 	/// bound to their own world) and <see cref="FrameStats.Entities"/>. Add the systems with
 	/// <see cref="UseEcs(IIonApplication)"/> (and <see cref="UseEcs(ISceneBuilder)"/> in scenes that use ECS), and the world
-	/// serializers with <see cref="AddEcsSerialization"/>.
+	/// serializers with <see cref="AddEcsSerialization(IServiceCollection, Action{ComponentSerializerRegistry})"/>.
 	/// </summary>
 	public static IServiceCollection AddEcs(this IServiceCollection services)
 	{
@@ -50,13 +50,16 @@ public static class EcsBuilderExtensions
 	/// <summary>
 	/// Registers the world serializers: the <see cref="ComponentSerializerRegistry"/> (the built-in components, then
 	/// <paramref name="configure"/> adds the game's), <see cref="JsonWorldSerializer"/>, <see cref="BinaryWorldSerializer"/>,
-	/// and <see cref="IWorldSerializer"/> as the binary one. Separate from <see cref="AddEcs"/> so that a game that does not
+	/// and <see cref="IWorldSerializer"/> as the binary one. Separate from <see cref="AddEcs(IServiceCollection)"/> so that a game that does not
 	/// save worlds does not carry System.Text.Json's serializer into a NativeAOT image.
 	/// </summary>
 	public static IServiceCollection AddEcsSerialization(this IServiceCollection services, Action<ComponentSerializerRegistry>? configure = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
-		var registry = ComponentSerializerRegistry.CreateDefault();
+
+		// Called again: the game's components are added to the registry already registered.
+		var existing = services.LastOrDefault(static d => d.ServiceType == typeof(ComponentSerializerRegistry))?.ImplementationInstance as ComponentSerializerRegistry;
+		var registry = existing ?? ComponentSerializerRegistry.CreateDefault();
 		configure?.Invoke(registry);
 
 		services.TryAddSingleton(registry);
@@ -64,6 +67,30 @@ public static class EcsBuilderExtensions
 		services.TryAddSingleton(static sp => new BinaryWorldSerializer(sp.GetRequiredService<ComponentSerializerRegistry>()));
 		services.TryAddSingleton<IWorldSerializer>(static sp => sp.GetRequiredService<BinaryWorldSerializer>());
 		return services;
+	}
+
+	/// <summary>
+	/// Registers the ECS module (see <see cref="AddEcs(IServiceCollection)"/>). The ECS needs no other module; the modules
+	/// that simulate or draw entities (<c>AddEcsRendering</c>, <c>AddEcsRendering3D</c>, <c>AddPhysics2D</c>,
+	/// <c>AddPhysics3D</c>, <c>AddNetworking</c>) register it themselves. Add the systems with
+	/// <see cref="UseEcs(IIonApplication)"/>.
+	/// </summary>
+	public static IonApplicationBuilder AddEcs(this IonApplicationBuilder builder)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.Services.AddEcs();
+		return builder;
+	}
+
+	/// <summary>
+	/// Registers the ECS module and the world serializers (see <see cref="AddEcsSerialization(IServiceCollection, Action{ComponentSerializerRegistry})"/>);
+	/// <paramref name="configure"/> adds the game's components to the registry, on every call.
+	/// </summary>
+	public static IonApplicationBuilder AddEcsSerialization(this IonApplicationBuilder builder, Action<ComponentSerializerRegistry>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.Services.AddEcs().AddEcsSerialization(configure);
+		return builder;
 	}
 
 	/// <summary>

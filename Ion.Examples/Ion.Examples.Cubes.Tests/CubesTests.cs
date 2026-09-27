@@ -20,7 +20,7 @@ public class CubesTests
 {
 	private const uint Width = 640, Height = 360;
 
-	private static IonTestHost Game() => new IonTestHost().UseGame(b => CubesApp.Configure(b), a => CubesApp.Use(a));
+	private static IonTestHost Game() => new IonTestHost().UseEntryPoint<Program>();
 
 	[Fact, Trait(CATEGORY, INTEGRATION)]
 	public void RunsHeadlessWithoutAGpuAndBatchesTheCubes()
@@ -70,14 +70,14 @@ public class CubesTests
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]
 	public void RunsWindowedOnVulkanWithoutValidationErrors()
 	{
-		var run = SampleWindowed.Run(b => CubesApp.Configure(b), a => CubesApp.Use(a), 120);
+		var run = SampleWindowed.Run<Program>(120);
 		Assert.Equal(120, run.Frames);
 	}
 
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]
 	public void RunsWindowedOnGlesWithoutErrors()
 	{
-		var run = SampleWindowed.Run(b => CubesApp.Configure(b), a => CubesApp.Use(a), 120, ("Ion:Graphics:PreferredBackend", "OpenGLES"));
+		var run = SampleWindowed.Run<Program>(120, ("Ion:Graphics:PreferredBackend", "OpenGLES"));
 		Assert.Equal(120, run.Frames);
 	}
 }

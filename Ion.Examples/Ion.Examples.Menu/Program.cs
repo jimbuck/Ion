@@ -7,34 +7,14 @@ using Ion.Extensions.UI;
 
 // Run with --Ion:Headless=true to use the headless backends (no GPU, window or audio device), and add
 // --Ion:Headless:Render=true to render offscreen.
+// The UI module brings its remote methods (ui.tree, ui.click, ... when the game runs with --remote).
 var builder = IonApplication.CreateBuilder(args);
-MenuApp.Configure(builder);
+builder.AddIon(graphics => graphics.ClearColor = new Color(0x14, 0x17, 0x20, 0xFF)).AddUi().AddUiRemote().AddSystem<MenuSystem>();
+builder.Services.AddSingleton<MenuSettings>();
 
-var game = builder.Build();
-MenuApp.Use(game);
-
+using var game = builder.Build();
+game.UseIon().UseUi().UseSystem<MenuSystem>();
 game.Run();
-
-/// <summary>The game setup, shared with the tests (Ion.Examples.Menu.Tests).</summary>
-public static class MenuApp
-{
-	/// <summary>
-	/// Registers the engine (<c>AddIon</c>), the UI module with its remote methods (<c>ui.tree</c>, <c>ui.click</c>, ... when
-	/// the game runs with <c>--remote</c>) and the menu.
-	/// </summary>
-	public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
-	{
-		builder.Services.AddIon(builder.Configuration, graphics => graphics.ClearColor = new Color(0x14, 0x17, 0x20, 0xFF));
-		builder.Services.AddUi();
-		builder.Services.AddUiRemote();
-		builder.Services.AddSingleton<MenuSettings>();
-		builder.Services.AddSingleton<MenuSystem>();
-		return builder;
-	}
-
-	/// <summary>Adds the engine's systems (<c>UseIon</c>), the UI system and the menu.</summary>
-	public static IIonApplication Use(IIonApplication game) => game.UseIon().UseUi().UseSystem<MenuSystem>();
-}
 
 /// <summary>The screens of the sample.</summary>
 public enum MenuScreen

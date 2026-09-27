@@ -70,6 +70,7 @@ internal sealed class KnownSymbols
 	public INamedTypeSymbol? ReadsEventAttribute { get; private set; }
 	public INamedTypeSymbol? EventUsageAttribute { get; private set; }
 	public INamedTypeSymbol? IonApplicationBuilder { get; private set; }
+	public INamedTypeSymbol? IonApplicationBuilderInterface { get; private set; }
 
 	/// <summary>Whether the compilation references the Events v2 API.</summary>
 	public bool HasEvents => Events is not null && EventBus is not null && EventReader is not null && EmitsEventAttribute is not null && ReadsEventAttribute is not null;
@@ -131,6 +132,7 @@ internal sealed class KnownSymbols
 		known.ReadsEventAttribute = Get("Ion.ReadsEventAttribute");
 		known.EventUsageAttribute = Get("Ion.EventUsageAttribute");
 		known.IonApplicationBuilder = Get("Ion.IonApplicationBuilder");
+		known.IonApplicationBuilderInterface = Get("Ion.IIonApplicationBuilder");
 		known.StepBinderAttribute = Get("Ion.StepBinderAttribute");
 		known.ExpandedStepAttribute = Get("Ion.ExpandedStepAttribute");
 		known.QueryAttribute = Get("Ion.Extensions.Ecs.QueryAttribute");

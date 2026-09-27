@@ -52,6 +52,67 @@ public class DiagnosticTests
 	}
 
 	[Fact]
+	public async Task SystemsRegisteredOnTheApplicationBuilderAreNotReportedAsUnregistered()
+	{
+		// builder.AddSystem<T>() (and AddSystem(typeof(T))) registers the system, like services.AddSingleton<T>(); only the
+		// system registered nowhere is reported (ION009).
+		var test = new GeneratorTest
+		{
+			TestCode = """
+				using Ion;
+
+				public sealed class Generic { [Update] public void Run(GameTime dt) { } }
+				public sealed class ByType { [Update] public void Run(GameTime dt) { } }
+				public sealed class Lonely { [Update] public void Run(GameTime dt) { } }
+
+				public static class App
+				{
+					public static void Run()
+					{
+						var builder = IonApplication.CreateBuilder();
+						builder.AddSystem<Generic>().AddSystem(typeof(ByType));
+						var app = builder.Build();
+						app.UseSystem<Generic>().UseSystem<ByType>();
+						{|#0:app.UseSystem<Lonely>()|};
+						app.Build();
+					}
+				}
+				""",
+		};
+		test.ExpectedDiagnostics.Add(new DiagnosticResult(Diagnostics.UnregisteredSystem.Id, DiagnosticSeverity.Error).WithLocation(0));
+		await test.RunAsync();
+	}
+
+	[Fact]
+	public void SystemsRegisteredAfterACallThatDependsOnAnotherGeneratorAreNotReportedAsUnregistered()
+	{
+		// The generator cannot see other generators' output (a System.Text.Json context here), so the call to
+		// AddEcsSerialization does not bind in its compilation and neither does the rest of the chain. The AddSystem<T>()
+		// calls still count as registrations; the missing member is the compiler's to report, not ION009.
+		var result = GeneratorHarness.Run("""
+			using Ion;
+			using Ion.Extensions.Ecs;
+
+			public sealed class BallSystem { [Update] public void Run(GameTime dt) { } }
+
+			public static class App
+			{
+				public static void Run()
+				{
+					var builder = IonApplication.CreateBuilder();
+					builder.AddEcs().AddEcsSerialization(components => components.AddUnmanaged("Velocity", GameJson.Default.Velocity)).AddSystem<BallSystem>();
+					var app = builder.Build();
+					app.UseSystem<BallSystem>();
+					app.Build();
+				}
+			}
+			""");
+
+		Assert.Contains(result.Input.GetDiagnostics(), d => d.Id == "CS0103");
+		Assert.DoesNotContain(result.Diagnostics, d => d.Id == Diagnostics.UnregisteredSystem.Id);
+	}
+
+	[Fact]
 	public async Task WarnsWhenInterceptorsAreNotEnabled()
 	{
 		var test = new GeneratorTest

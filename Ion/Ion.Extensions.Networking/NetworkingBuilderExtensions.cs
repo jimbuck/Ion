@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Ion.Extensions.Ecs;
 using Ion.Extensions.Metrics;
 
 namespace Ion.Extensions.Networking;
@@ -18,13 +19,14 @@ public static class NetworkingBuilderExtensions
 	/// <paramref name="config"/> and then <paramref name="configure"/>; the <see cref="NetworkSession"/> (also as
 	/// <see cref="INetworkSession"/> and <see cref="INetworkMessages"/>), its <see cref="NetworkWorld"/> (also as
 	/// <see cref="INetworkWorld"/>) and <see cref="NetworkPrediction"/> (also as <see cref="INetworkPrediction"/>), for the
-	/// root ECS <see cref="World"/>; and the <see cref="NetworkSystem"/>. Needs the ECS module (<c>AddEcs</c>) and a
-	/// transport (<see cref="AddLoopbackTransport"/>, <c>AddLiteNetLibTransport</c>) unless the mode is
+	/// root ECS <see cref="World"/>; and the <see cref="NetworkSystem"/>. Registers the ECS module (<c>AddEcs</c>) too. Needs a
+	/// transport (<see cref="AddLoopbackTransport(IServiceCollection, LoopbackNetwork)"/>, <c>AddLiteNetLibTransport</c>) unless the mode is
 	/// <see cref="NetworkMode.Offline"/>. Add the steps with <see cref="UseNetworking"/>.
 	/// </summary>
 	public static IServiceCollection AddNetworking(this IServiceCollection services, IConfiguration? config = null, Action<NetworkConfig>? configure = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
+		services.AddEcs();
 		Ion.Extensions.Ecs.EcsComponents.Register<NetworkId>();
 		Ion.Extensions.Ecs.EcsComponents.Register<NetworkLocal>();
 
@@ -81,14 +83,41 @@ public static class NetworkingBuilderExtensions
 	}
 
 	/// <summary>
+	/// Registers the networking module (see <see cref="AddNetworking(IServiceCollection, IConfiguration, Action{NetworkConfig})"/>,
+	/// with the application's configuration) and the ECS module it replicates (<c>AddEcs</c>). Register a transport too
+	/// (<see cref="AddLoopbackTransport(IonApplicationBuilder, LoopbackNetwork)"/>, <c>AddLiteNetLibTransport</c>) unless
+	/// the mode is <see cref="NetworkMode.Offline"/>. Add the steps with <see cref="UseNetworking"/>.
+	/// </summary>
+	public static IonApplicationBuilder AddNetworking(this IonApplicationBuilder builder, Action<NetworkConfig>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.AddEcs();
+		builder.Services.AddNetworking(builder.Configuration, configure);
+		return builder;
+	}
+
+	/// <summary>
+	/// Registers the <see cref="LoopbackTransport"/> (see <see cref="AddLoopbackTransport(IServiceCollection, LoopbackNetwork)"/>)
+	/// and the networking module.
+	/// </summary>
+	public static IonApplicationBuilder AddLoopbackTransport(this IonApplicationBuilder builder, LoopbackNetwork? network = null)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.AddNetworking();
+		builder.Services.AddLoopbackTransport(network);
+		return builder;
+	}
+
+	/// <summary>
 	/// Adds the networking steps to the root schedule (see <see cref="NetworkSystem"/>): start (Init), poll and
 	/// reconciliation (First), the tick scope with the snapshot capture and the prediction step (FixedUpdate), the
-	/// interpolation (Render), the send (Last) and the stop (Destroy). They do nothing in <see cref="NetworkMode.Offline"/>.
+	/// interpolation (Render), the send (Last) and the stop (Destroy), with the ECS systems (<c>UseEcs</c>). They do
+	/// nothing in <see cref="NetworkMode.Offline"/>.
 	/// </summary>
 	public static IIonApplication UseNetworking(this IIonApplication app)
 	{
 		ArgumentNullException.ThrowIfNull(app);
-		return app.UseSystem<NetworkSystem>();
+		return app.UseEcs().UseSystem<NetworkSystem>();
 	}
 }
 

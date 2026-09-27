@@ -1,12 +1,6 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-
 using Ion.Extensions.Ecs;
-using Ion.Extensions.Ecs.Rendering;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Networking;
-using Ion.Extensions.Networking.LiteNetLib;
-using Ion.Extensions.Physics2D;
 
 // The ECS module's 2D transform is replicated too: the networking generator writes its serializer into this assembly.
 // Remote entities are drawn interpolated between snapshots.
@@ -84,72 +78,5 @@ public static class Field
 		var target = Math.Clamp(input.TargetX, half, Width - half);
 		var step = PaddleSpeed * delta;
 		control.X = Math.Clamp(control.X + Math.Clamp(target - control.X, -step, step), half, Width - half);
-	}
-}
-
-/// <summary>
-/// The Breakout Net game setup, shared by <c>Program.cs</c> and the tests.
-/// </summary>
-public static class BreakoutNetGame
-{
-	/// <summary>
-	/// Registers the engine, the ECS, physics and networking modules and the game's systems. The transport is LiteNetLib
-	/// (UDP) unless <paramref name="loopback"/> is given (tests run a server and clients in one process on it). Without a
-	/// configured <c>Ion:Network:Mode</c> the game is a listen server.
-	/// </summary>
-	public static IonApplicationBuilder Configure(IonApplicationBuilder builder, LoopbackNetwork? loopback = null)
-	{
-		ArgumentNullException.ThrowIfNull(builder);
-		RegisterComponents();
-
-		builder.Services.AddIon(builder.Configuration, graphics => graphics.ClearColor = new Color(0x223));
-		builder.Services.AddEcs().AddEcsRendering();
-		builder.Services.AddPhysics2D(builder.Configuration, physics =>
-		{
-			physics.GravityY = 0;
-			physics.UnitsPerMeter = Field.PixelsPerMeter;
-		});
-
-		var modeConfigured = builder.Configuration[$"{NetworkConfig.Section}:Mode"] is not null;
-		builder.Services.AddNetworking(builder.Configuration, network =>
-		{
-			if (!modeConfigured) network.Mode = NetworkMode.ListenServer;
-			if (string.IsNullOrEmpty(network.GameId)) network.GameId = "ion-breakout-net";
-		});
-		if (loopback is not null) builder.Services.AddLoopbackTransport(loopback);
-		else builder.Services.AddLiteNetLibTransport();
-
-		builder.Services
-			.AddSingleton<PaddleInputSource>()
-			.AddSingleton<PaddlePredictionSystem>()
-			.AddSingleton<ServerGameSystem>()
-			.AddSingleton<PresentationSystem>()
-			.AddSingleton<PlayerInputSystem>();
-		if (builder.Configuration.IsHeadless()) builder.Services.AddSingleton<NetAutopilotSystem>();
-		return builder;
-	}
-
-	/// <summary>Adds the engine's and the game's systems.</summary>
-	public static IIonApplication Use(IIonApplication app)
-	{
-		ArgumentNullException.ThrowIfNull(app);
-		app.UseIon()
-			.UseEcs()
-			.UseEcsRendering()
-			.UsePhysics2D()
-			.UseNetworking()
-			.UseSystem<PaddlePredictionSystem>()
-			.UseSystem<ServerGameSystem>()
-			.UseSystem<PresentationSystem>()
-			.UseSystem<PlayerInputSystem>();
-		if (app.Configuration.IsHeadless()) app.UseSystem<NetAutopilotSystem>();
-		return app;
-	}
-
-	/// <summary>Registers the game's own component types with Arch (NativeAOT; the generator registers the replicated ones).</summary>
-	public static void RegisterComponents()
-	{
-		Physics2DComponents.Register();
-		EcsComponents.Register<Wall>();
 	}
 }

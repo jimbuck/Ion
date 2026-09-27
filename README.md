@@ -22,6 +22,50 @@ ion publish Ion.Examples/Ion.Examples.Breakout.ECS --target r36s --sysroot <arm6
 
 `IonTarget` picks a publishing preset: `win-x64`, `win-arm64`, `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64` or `r36s` (NativeAOT, self-contained, trimmed, invariant globalization, stripped symbols; the handheld preset adds OpenGL ES, SDL, fullscreen 640x480 and an SD card folder with a launcher). Breakout ECS is a 12.6 MB executable on linux-x64 and reaches the end of its first headless frame in about 50 ms. Windows and macOS presets publish on their own OS. The Android and iOS heads of Breakout ECS build with `-p:IonMobileHeads=true` on a machine with the workload. Presets, sizes, startup times and the mobile status are in [docs/platforms/publishing.md](./docs/platforms/publishing.md), the handheld in [docs/platforms/r36s.md](./docs/platforms/r36s.md).
 
+## Setup
+
+A game's `Program.cs` registers the modules and systems it uses on the builder, adds them to the schedule on the
+application, and runs it:
+
+```csharp
+var builder = IonApplication.CreateBuilder(args);
+builder.AddIon().AddRendering3D().AddEcs().AddEcsRendering3D().AddSystem<ModelSystem>();
+
+using var game = builder.Build();
+game.UseIon().UseRendering3D().UseEcs().UseEcsRendering3D().UseSystem<ModelSystem>();
+game.Run();
+```
+
+- **Modules.** `builder.AddX()` registers a module with the application's configuration; its options delegate
+  (`builder.AddIon(graphics => graphics.ClearColor = Color.Black)`, `builder.AddRendering3D(o => o.Shadows = false)`)
+  applies after its configuration section is bound. `game.UseX()` adds the module's systems. `builder.AddSystem<T>()`
+  registers a game system as a singleton and `game.UseSystem<T>()` adds it. The `IServiceCollection` forms
+  (`builder.Services.AddRendering3D(builder.Configuration)`) remain for composing the engine by hand, as
+  `Ion.Examples.Scenes` and `Ion.Examples.Quad` do.
+- **Dependencies.** A module registers and adds what it needs, so `builder.AddEcsRendering3D()` and
+  `game.UseEcsRendering3D()` alone make the game above. A module registered twice, directly or through another one, is
+  registered once, and its options apply whichever call comes first; a system added again with `UseSystem` stays where it
+  was first added (at run time and in the generated schedule). Listing the modules a game uses is still a good idea for
+  the reader.
+
+| Builder and application | Registers and adds |
+|---|---|
+| `AddIon`, `UseIon` | the engine core: metrics, assets, graphics and input (windowed, or headless with `--headless`), the 2D renderer, audio, scenes, coroutines, the remote protocol. `AddAudio`, `AddMetrics` (with their options), `AddScenes`, `AddCoroutines`, `AddAssets` and `AddRemote` register it too. |
+| `AddRendering3D`, `UseRendering3D` | the 3D renderer, and the engine core |
+| `AddEcs`, `UseEcs` | the ECS module (no other module); `AddEcsSerialization` adds the world serializers |
+| `AddEcsRendering`, `UseEcsRendering` | the 2D extraction, the ECS module and the engine core (sprite batch, window) |
+| `AddEcsRendering3D`, `UseEcsRendering3D` | the 3D extraction, the ECS module and the 3D renderer (with the engine core) |
+| `AddPhysics2D`, `UsePhysics2D` | 2D physics, the ECS module and the engine core (the debug drawing's sprite batch); `AddPhysics2DRemote` adds its remote methods |
+| `AddPhysics3D`, `UsePhysics3D` | 3D physics, the ECS module and the 3D renderer (the debug drawing) |
+| `AddUi`, `UseUi` | the UI module and the engine core; `AddUiRemote` adds its remote methods |
+| `AddNetworking`, `UseNetworking` | networking and the ECS module; `AddLiteNetLibTransport` and `AddLoopbackTransport` add a transport and networking |
+| `AddWeb`, `UseWeb` | the web server (no other module; its HTTP listener is `Ion.Extensions.Http`) |
+| `AddInputRecording`, `AddInputPlayback`, `AddScriptedInput` | input recording, playback and scripted input |
+
+Keep the registrations in `Program.cs` (or in methods it calls) between `CreateBuilder` and `Run()`: the schedule
+generator reads them there and compiles the schedule into direct calls. Tests run that same file with
+`IonTestHost.UseEntryPoint<Program>()` (see [Testing](#testing)).
+
 ## Systems and the schedule
 
 The game loop runs seven stages: `Init` (once), then every frame `First`, `FixedUpdate` (zero or more times, fixed step), `Update`, `Render`, `Last`, and `Destroy` (once). A **system** is any class registered in DI and added with `UseSystem<T>()`; each public method with a stage attribute is a **step** of that stage. A step runs and returns: there is no `next`.
@@ -40,7 +84,7 @@ public sealed class FrameTimer
     [End(Stage.Render, Order = -100)] public void Stop(GameTime dt) { ... }   // always runs, in a finally
 }
 
-builder.Services.AddSingleton<PaddleSystem>().AddSingleton<FrameTimer>();
+builder.AddSystem<PaddleSystem>().AddSystem<FrameTimer>();
 app.UseSystem<PaddleSystem>().UseSystem<FrameTimer>().UseIon();          // registration order is only a tie breaker
 app.Update((GameTime dt, IInputState input) => { ... });                 // function step with injected services
 app.Render(Hud.Draw, order: 50);                                         // a static method group
@@ -170,9 +214,8 @@ Methods that emit or read an event type for their caller (such as `EmitChangeSce
 `Ion.Extensions.Ecs` integrates [Arch](https://github.com/genaray/Arch) 2.1 (picked by measurement against Friflo, roadmap section 5.7). Games keep Arch's own `World`, `Entity` and `QueryDescription`; the module adds a world per scope, a command buffer played back at the end of every stage, generated query loops, built-in components and systems, and the 2D and 3D render extraction (`Ion.Extensions.Ecs.Rendering`). A game library can depend on `Ion.Extensions.Ecs.Abstractions` only (the attributes, `Commands` and the components).
 
 ```csharp
-builder.Services.AddIon(builder.Configuration).AddEcs().AddEcsRendering();
-builder.Services.AddSingleton<MoveSystem>();
-app.UseIon().UseEcs().UseEcsRendering().UseSystem<MoveSystem>();
+builder.AddEcsRendering().AddSystem<MoveSystem>();       // with the ECS module and the engine
+app.UseEcsRendering().UseSystem<MoveSystem>();
 
 public record struct Velocity(Vector2 Value);
 public record struct Frozen;
@@ -201,9 +244,8 @@ public sealed partial class MoveSystem(World world)
 - **3D.** `AddEcsRendering3D()`/`UseEcsRendering3D()` add `Scene3DExtractionSystem` (Render at `StageOrder.Extract`, inside the 3D renderer's scope, next to the 2D extraction): every frame it submits each `MeshRenderer` + `GlobalTransform` entity without `Hidden` to the 3D renderer, adds `Camera` entities (looking down their -Z) and `DirectionalLight` (shining along -Z), `PointLight` and `SpotLight` entities, and passes the world's `SceneEnvironment` (`world.SetEnvironment(...)`) when it changes. `world.SpawnModel(model, transform)` (or `commands.SpawnModel`) turns a loaded `IModel` into entities: a root, one entity per glTF node with its transform, parent and name, and a `MeshRenderer` per primitive; `world.SetHidden(root, true)` hides it and `world.DestroyRecursive(root)` removes it. 10,000 mesh entities extract in about 80 us with no allocation.
 
 ```csharp
-builder.Services.AddRendering3D(builder.Configuration);
-builder.Services.AddEcs().AddEcsRendering3D();
-app.UseIon().UseRendering3D().UseEcs().UseEcsRendering3D();
+builder.AddEcsRendering3D();      // with the ECS module, the 3D renderer and the engine
+app.UseEcsRendering3D();
 
 [Init] public void Spawn(GameTime dt)   // in a system with World world, IRenderer3D renderer, IAssetManager assets
 {
@@ -371,12 +413,11 @@ GPU resources in an `[Init]` step (see `Ion.Examples/Ion.Examples.Quad`):
 
 ```csharp
 var builder = IonApplication.CreateBuilder(args);
-builder.Services.AddIon(builder.Configuration);
-builder.Services.AddSingleton<MyRenderSystem>();            // takes IGraphicsFrame; creates GPU resources in [Init]
+builder.AddIon().AddSystem<MyRenderSystem>();                // takes IGraphicsFrame; creates GPU resources in [Init]
 
-using var app = builder.Build();
-app.UseIon().UseSystem<MyRenderSystem>();
-app.Run();
+using var game = builder.Build();
+game.UseIon().UseSystem<MyRenderSystem>();
+game.Run();
 ```
 
 NativeAOT: the samples publish with `-p:PublishAot=true` (the quad sample also for `linux-arm64`, see
@@ -387,12 +428,12 @@ why they are harmless are listed in [docs/plans/spikes/2026-silknet-spike.md](./
 `Ion.Extensions.Rendering3D` is the 3D renderer, written once against the RHI (Vulkan and OpenGL ES render the same
 pixels). It is immediate mode: every frame, Render steps submit cameras, lights and mesh renderers, and the renderer
 culls, sorts, batches and draws them when the Render stage closes, with the sprite batch drawn on top as the last pass.
-The ECS extraction (`AddEcsRendering3D()`, see [ECS](#ecs)) calls the same API for entities. Register it after `AddIon`:
+The ECS extraction (`AddEcsRendering3D()`, see [ECS](#ecs)) calls the same API for entities. It registers the engine
+core (`AddIon`) too:
 
 ```csharp
-builder.Services.AddIon(builder.Configuration);
-builder.Services.AddRendering3D(builder.Configuration);     // Ion:Rendering3D: ShadowMapSize, ShadowDistance, DepthPrepass, MaxCameras
-app.UseIon().UseRendering3D();
+builder.AddRendering3D(options => options.Shadows = true);  // Ion:Rendering3D: ShadowMapSize, ShadowDistance, DepthPrepass, MaxCameras
+app.UseRendering3D();                                       // with UseIon
 
 public sealed class Scene(IRenderer3D renderer, IAssetManager assets)
 {
@@ -448,12 +489,11 @@ The design (pipeline, graph API, bind group conventions for custom materials, wh
 `Ion.Extensions.UI` is an immediate-mode UI on the 2D renderer: Update steps describe the UI every frame with the `Ui`
 context, and interactive widgets report what happened to them. The calls are laid out once per frame (flex-style) and
 kept as the hit-test tree and as an inspectable tree (`IUiTree`, in the dependency-free `Ion.Extensions.UI.Abstractions`)
-that tools and the remote protocol read and drive by path. Register it after `AddIon`:
+that tools and the remote protocol read and drive by path. It registers the engine core (`AddIon`) too:
 
 ```csharp
-builder.Services.AddIon(builder.Configuration);
-builder.Services.AddUi();
-app.UseIon().UseUi();       // Update scope at StageOrder.UiFrame (-550), drawing at StageOrder.Ui (700)
+builder.AddUi();
+app.UseUi();                // with UseIon; Update scope at StageOrder.UiFrame (-550), drawing at StageOrder.Ui (700)
 
 public sealed class Menu(Ui ui)
 {
@@ -485,7 +525,7 @@ public sealed class Menu(Ui ui)
   - **Tree**: `IUiTree` lists the nodes (path such as `options/Volume`, kind, text, rectangle, enabled, focused, value)
     and queues `Click`, `SetValue`, `Focus`, `Type` and `Back`, applied at the start of the next frame's Update as the
     equivalent input would be. `Ion.Examples.Menu.Tests` drives the menu sample end to end through it, and through the
-    remote protocol: `services.AddUiRemote()` (`Ion.Extensions.UI.Remote`) adds `ui.tree`, `ui.click`, `ui.set_value`,
+    remote protocol: `builder.AddUiRemote()` (`Ion.Extensions.UI.Remote`) adds `ui.tree`, `ui.click`, `ui.set_value`,
     `ui.focus`, `ui.type` and `ui.back` (and `Ion.Extensions.Physics2D.Remote` adds `physics2d.bodies` and `physics2d.raycast`).
   - Nothing is allocated per frame once every widget has been seen (tested); `UiBenchmarks` measures a 500-widget screen.
 
@@ -498,7 +538,7 @@ them into a static route table, and the server calls them on the game thread at 
 (`StageOrder.Web`), so they touch game state freely:
 
 ```csharp
-builder.Services.AddWeb(builder.Configuration);        // --Ion:Web:Enabled=true (off by default, loopback only)
+builder.AddWeb().AddSystem<ScoreSystem>();              // --Ion:Web:Enabled=true (off by default, loopback only)
 app.UseIon().UseWeb().UseSystem<ScoreSystem>();
 
 [WebJson(typeof(GameJson))]
@@ -559,7 +599,7 @@ foreach (var p in input.Gamepads) { /* connected gamepads */ }
   - **Focus loss** releases every held key and mouse button without a `Released` edge, since the key up events go to another window. Gamepads are not affected.
   - **Gamepads.** Buttons use the SDL game controller layout (`GamepadButton`), sticks range from -1 to 1 with a radial dead zone and triggers from 0 to 1. The Silk.NET windowing module feeds real ones (GLFW or SDL) into the same tracker, and the headless backend scripts them.
 
-**Recording and playback.** `services.AddInputRecording("input.ioni")` writes every frame's input events to a compact binary file (completed when the application is disposed); `services.AddInputPlayback("input.ioni")` replays it at the recorded frame numbers, replacing device and scripted input until the recording ends. Replaying into an `IonTestHost` reproduces the same `Pressed`/`Down` sequence frame by frame, which makes a recorded play session a deterministic test. `InputRecorder` and `InputPlayer` can also be used directly (`InputTracker.Recorder`, `InputTracker.Playback`, or `InputPlayer.Play(frame, sink)` into any `IInputEventSink`).
+**Recording and playback.** `builder.AddInputRecording("input.ioni")` writes every frame's input events to a compact binary file (completed when the application is disposed); `builder.AddInputPlayback("input.ioni")` replays it at the recorded frame numbers, replacing device and scripted input until the recording ends. Replaying into an `IonTestHost` reproduces the same `Pressed`/`Down` sequence frame by frame, which makes a recorded play session a deterministic test. `InputRecorder` and `InputPlayer` can also be used directly (`InputTracker.Recorder`, `InputTracker.Playback`, or `InputPlayer.Play(frame, sink)` into any `IInputEventSink`).
 
 #### Input and fixed steps
 `IInputState` edges (`Pressed`, `Released`), deltas (`WheelDelta`, `MouseDelta`) and `Text` depend on the stage that reads them. From `First`, `Update`, `Render` and `Last` they describe the current frame. From `FixedUpdate` they describe everything since the previous fixed step, so a click is seen by exactly one fixed step even when `MaxFPS` is above `FixedUpdateRate` and some frames run no fixed step. Events get the same guarantee: an event that leaves the two-frame window before any fixed step ran is still delivered to readers in `FixedUpdate`. The loop publishes the running stage through `ILoopContext`.
@@ -588,7 +628,9 @@ Assert.Equal(1, host.Get<ScoreSystem>().Lives);
 
 `host.Audio` is the headless `NullAudioManager`: set `host.Audio.NullOutput.CaptureEnabled = true` before stepping to assert on the mixed samples (`host.Audio.NullOutput.Captured`).
 
-`Configure` and `ConfigureApp` add service registrations and schedule setup, `WithConfiguration` adds settings, and `UseGame(configure, use)` builds a whole game that calls `AddIon`/`UseIon` itself (see `Ion.Examples/Ion.Examples.Breakout.ECS.Tests`, which plays 600 frames of Breakout with the autopilot and checks the run is deterministic). Disposing the host runs Destroy and disposes the application.
+`Configure` and `ConfigureApp` add service registrations and schedule setup, `WithConfiguration` adds settings. Disposing the host runs Destroy and disposes the application.
+
+**Testing the game's own `Program.cs`.** `UseEntryPoint<Program>(args)` runs the game's entry point, the way ASP.NET Core's `WebApplicationFactory<Program>` does: the program runs on its own thread up to `game.Run()`, which hands the application it built to the host instead of starting the loop (and returns when the host is disposed, so `using var game` disposes it). The host's configuration (headless, `WithConfiguration`, `WithArgs`) is in place when the program creates its builder, so it reads it while it registers; the host's services (`Configure`, the deterministic clock) are added after the program's and win; `ConfigureApp` and `WithSystem` add to its schedule. With nothing added, the game runs the schedule the generator compiled for `Program.cs` (`host.Loop.Schedule.IsGenerated`). An exception thrown before `Run()`, or a program that never gets there, fails the test with a message that says so. `IonTestHost.RunEntryPoint<Program>(frames, host => ...)` runs frames and returns the outcome, and `IonEntryPoint.Start<Program>(...)` hands over the application to drive yourself (a windowed run on the real clock). The Ion generator declares the `Program` class of top-level statements public, so a test project can name it. `UseGame(configure, use)` and `Run<TGame>` (an `IIonGame`) still build a game from setup delegates. Every sample's tests run its `Program.cs` this way (`Ion.Examples/Ion.Examples.Breakout.ECS.Tests` plays 600 frames of Breakout with the autopilot and checks the run is deterministic).
 
 **Screenshots and golden images.** `WithRendering(width, height)` turns on headless rendering (`Ion:Headless:Render=true`, on Vulkan by default, or OpenGL ES with `Ion:Graphics:PreferredBackend=OpenGLES`); systems then render through `IGraphicsFrame` and `Screenshot()` returns the last frame as RGBA8 pixels (it throws `NotSupportedException` when rendering is off). `GoldenImage.AssertMatches(shot, "Golden/quad.png", tolerance: 2)` compares it with a golden PNG, writes a missing golden (and fails, so CI never passes silently) and writes `.actual.png` and `.diff.png` next to the golden on a mismatch; `ION_UPDATE_GOLDEN=1` refreshes goldens. The 2D sprite batch is not on the RHI yet, so sprites are still only recorded in this mode.
 
@@ -690,8 +732,8 @@ builds, off until turned on.
 ECS physics: `Ion.Extensions.Physics2D` on Box2D v3 (picked by a 10,000-body benchmark on x64 and arm64) and `Ion.Extensions.Physics3D` on BepuPhysics v2. An entity with a `Collider2D` (or `Collider3D`) and a transform is a body, static unless it has a `RigidBody2D`/`RigidBody3D`; `Joint2D`/`Joint3D` connect two bodies. The physics step runs in FixedUpdate at `StageOrder.Physics` (-700), before the game's fixed steps: it pushes what game code changed (kinematic bodies are driven to their transform), steps with the fixed delta, writes the moved bodies back into their transforms and velocities, and emits `Collision2D`/`Trigger2D` (`Collision3D`/`Trigger3D`) begin and end events on `IEvents`. `IPhysicsWorld2D`/`IPhysicsWorld3D` (one per scope, like the ECS `World`) has ray casts, overlaps and impulses. `--Ion:Physics2D:DebugDraw=true` draws every collider over the frame. Stepping is deterministic (replay tests hash 10,000 steps); see `docs/design/ion-physics.md`.
 
 ```csharp
-builder.Services.AddEcs().AddPhysics2D(builder.Configuration, physics => physics.UnitsPerMeter = 64);
-app.UseIon().UseEcs().UsePhysics2D();
+builder.AddPhysics2D(physics => physics.UnitsPerMeter = 64);   // with the ECS module and the engine
+app.UsePhysics2D();
 
 world.Create(new Transform2D(position), Collider2D.Circle(16) with { Restitution = 1 }, RigidBody2D.Dynamic(new Vector2(0, -100)));
 ```
@@ -703,8 +745,8 @@ Multiplayer networking (`docs/design/ion-networking.md`): server-authoritative r
 [Replicated, Interpolated] public record struct Position(Vector2 Value);
 [NetworkMessage(Direction = MessageDirection.ClientToServer)] public record struct Fire(float Angle);
 
-builder.Services.AddEcs().AddNetworking(builder.Configuration).AddLiteNetLibTransport();
-app.UseIon().UseEcs().UseNetworking();
+builder.AddIon().AddNetworking().AddLiteNetLibTransport();     // networking brings the ECS module
+app.UseIon().UseNetworking();
 ```
 
 ### Ion.Extensions.Scenes

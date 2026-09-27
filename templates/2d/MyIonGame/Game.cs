@@ -2,41 +2,12 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 using Ion;
-using Ion.Extensions.Graphics;
-using Ion.Extensions.Remote;
 
 namespace MyIonGame;
 
-/// <summary>
-/// The game's setup: services and schedule. Program.cs and the tests both use it.
-/// </summary>
-public sealed class Game : IIonGame
-{
-	/// <summary>Registers the engine, the game's state and its systems.</summary>
-	public static void Configure(IonApplicationBuilder builder)
-	{
-		builder.Services.AddIon(builder.Configuration, graphics => graphics.ClearColor = new Color(0x1B, 0x26, 0x3B));
-		builder.Services.AddSingleton(_ => GameSettings.From(builder.Configuration));
-		builder.Services.AddSingleton<PlayState>();
-		builder.Services.AddSingleton<PaddleSystem>();
-
-		// The state is a remote resource: resources.get/set "Game.State" read and write it on a running game
-		// (--remote-allow-mutations), and the snapshot test serializes it with the same metadata.
-		builder.Services.AddRemoteResource("Game.State", "Paddle, ball, score and misses.", GameJson.Default.PlayState,
-			static sp => sp.GetRequiredService<PlayState>(),
-			static (sp, value) => sp.GetRequiredService<PlayState>().CopyFrom(value));
-	}
-
-	/// <summary>Adds the engine's systems and the game's systems to the schedule.</summary>
-	public static void Use(IIonApplication app)
-	{
-		app.UseIon()
-			.UseSystem<PaddleSystem>();
-	}
-}
+// The game's settings and state (Program.cs registers them).
 
 /// <summary>Settings from configuration (appsettings.json, command line): <c>Game:*</c> and <c>Ion:Seed</c>.</summary>
 public sealed record GameSettings(float PaddleSpeed, float BallSpeed, int Seed)

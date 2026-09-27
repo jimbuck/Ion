@@ -40,6 +40,10 @@ public static class BuilderExtensions
 	/// A game that depends only on the interfaces (<see cref="IWindow"/>, <see cref="IInputState"/>, <see cref="ISpriteBatch"/>,
 	/// <see cref="IAudioManager"/>, and assets loaded with <c>Load&lt;ITexture2D&gt;</c>, <c>Load&lt;IFontSet&gt;</c> and
 	/// <c>Load&lt;ISoundEffect&gt;</c>) runs unchanged on all of them.
+	/// <para>
+	/// The engine is registered once: every module that needs it calls <c>AddIon</c> too, and a later call only applies its
+	/// <paramref name="configureOptions"/> (the graphics output, headless or windowed, is chosen by the first call).
+	/// </para>
 	/// </remarks>
 	/// <param name="services">The service collection.</param>
 	/// <param name="config">The application configuration; <c>Ion:*</c> sections are bound from it.</param>
@@ -50,7 +54,25 @@ public static class BuilderExtensions
 	/// </param>
 	public static IServiceCollection AddIon(this IServiceCollection services, IConfiguration config, Action<GraphicsConfig>? configureOptions = null)
 	{
+		ArgumentNullException.ThrowIfNull(services);
+		ArgumentNullException.ThrowIfNull(config);
 		var headless = IsHeadless(config, configureOptions);
+
+		// Registered once: modules that need the engine call AddIon too. A later call only adds its graphics options.
+		if (!services.TryAddIonModule(ModuleName))
+		{
+			var selection = services.Select(static d => d.ImplementationInstance).OfType<IonBackendSelection>().LastOrDefault();
+			if (selection is not null && selection.Headless != headless)
+			{
+				throw new InvalidOperationException(headless
+					? "AddIon was called again with options that select the headless backends (GraphicsOutput.None), but the engine was already registered with the windowed ones. Select the output in the first AddIon call (before the modules that depend on it) or with Ion:Graphics:Output."
+					: "AddIon was called again after the engine was registered with the headless backends; the graphics output is chosen by the first AddIon call.");
+			}
+
+			if (!headless) ThrowIfReservedBackend(config, configureOptions);
+			if (configureOptions is not null) services.Configure(configureOptions);
+			return services;
+		}
 
 		services
 			.AddMetrics(config)
@@ -93,6 +115,9 @@ public static class BuilderExtensions
 			// Release builds unless IonRemote=true.
 			.AddRemote(config);
 	}
+
+	/// <summary>The module name <see cref="AddIon(IServiceCollection, IConfiguration, Action{GraphicsConfig})"/> records (see <see cref="IonModuleServiceCollectionExtensions"/>).</summary>
+	internal const string ModuleName = "Ion";
 
 	/// <summary>
 	/// Adds the systems of every Ion extension registered by <see cref="AddIon"/>, using the headless graphics and audio

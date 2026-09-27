@@ -4,6 +4,7 @@ using Arch.Core;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Scenes;
@@ -226,29 +227,48 @@ public static class EcsRenderingBuilderExtensions
 {
 	/// <summary>
 	/// Registers the <see cref="SpriteExtractionSystem"/> (a transient, so the root schedule and each scene get one bound to
-	/// their own world) and its <see cref="SpriteExtractionOptions"/>. Needs <c>AddEcs()</c> and a sprite batch.
+	/// their own world) and its <see cref="SpriteExtractionOptions"/> (<paramref name="configure"/> applies on every call).
+	/// Needs <c>AddEcs()</c> and a sprite batch; <see cref="AddEcsRendering(IonApplicationBuilder, Action{SpriteExtractionOptions})"/>
+	/// registers them too.
 	/// </summary>
 	public static IServiceCollection AddEcsRendering(this IServiceCollection services, Action<SpriteExtractionOptions>? configure = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
-		var options = new SpriteExtractionOptions();
-		configure?.Invoke(options);
-		services.TryAddSingleton(options);
+		services.AddEcs();
+		services.AddOptions<SpriteExtractionOptions>();
+		if (configure is not null) services.Configure(configure);
+		services.TryAddSingleton(static sp => sp.GetRequiredService<IOptions<SpriteExtractionOptions>>().Value);
 		services.TryAddTransient(static sp => new SpriteExtractionSystem(sp.GetRequiredService<World>(), sp.GetRequiredService<ISpriteBatch>(), sp.GetRequiredService<IWindow>(), sp.GetRequiredService<SpriteExtractionOptions>()));
 		return services;
 	}
 
-	/// <summary>Adds the sprite extraction to the root schedule (the root world's sprites).</summary>
+	/// <summary>
+	/// Registers the sprite extraction and what it needs: the ECS module (<c>AddEcs</c>) and the engine core (<c>AddIon</c>,
+	/// whose graphics provide the sprite batch and the window). Add the systems with
+	/// <see cref="UseEcsRendering(IIonApplication)"/>.
+	/// </summary>
+	public static IonApplicationBuilder AddEcsRendering(this IonApplicationBuilder builder, Action<SpriteExtractionOptions>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.AddIon().AddEcs();
+		builder.Services.AddEcsRendering(configure);
+		return builder;
+	}
+
+	/// <summary>
+	/// Adds the sprite extraction to the root schedule (the root world's sprites), with the systems it needs: the engine's
+	/// (<c>UseIon</c>) and the ECS module's (<c>UseEcs</c>).
+	/// </summary>
 	public static IIonApplication UseEcsRendering(this IIonApplication app)
 	{
 		ArgumentNullException.ThrowIfNull(app);
-		return app.UseSystem<SpriteExtractionSystem>();
+		return app.UseIon().UseEcs().UseSystem<SpriteExtractionSystem>();
 	}
 
-	/// <summary>Adds the sprite extraction to a scene's schedule (the scene's world).</summary>
+	/// <summary>Adds the sprite extraction to a scene's schedule (the scene's world), with the scene's ECS systems (<c>UseEcs</c>).</summary>
 	public static ISceneBuilder UseEcsRendering(this ISceneBuilder scene)
 	{
 		ArgumentNullException.ThrowIfNull(scene);
-		return scene.UseSystem<SpriteExtractionSystem>();
+		return scene.UseEcs().UseSystem<SpriteExtractionSystem>();
 	}
 }

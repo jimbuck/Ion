@@ -18,35 +18,20 @@ using Ion.Extensions.Rendering3D;
 // a row of spheres from rough to polished metal, a sun with shadows, two point lights and a skybox that also lights the
 // scene (image based ambient from its mips). The camera circles the scene. Everything is an entity of the ECS module: the
 // model is spawned as one entity per glTF node, and the 3D extraction (AddEcsRendering3D) submits the entities every frame.
+// AddEcsRendering3D registers what it needs (the engine, the 3D renderer, the ECS module) and UseEcsRendering3D adds
+// their systems; listing them too (builder.AddIon().AddRendering3D().AddEcs()...) changes nothing.
 //   --Model:Frames=<n>          exit after n frames
 //   --Model:Screenshot=<file>   with Frames, save the last frame as PNG
 //   --Ion:Headless=true         no window (add --Ion:Headless:Render=true to render offscreen)
 var builder = IonApplication.CreateBuilder(args);
-ModelApp.Configure(builder);
+builder.AddEcsRendering3D().AddSystem<ModelSystem>();
 
 using var game = builder.Build();
-ModelApp.Use(game);
+game.UseEcsRendering3D().UseSystem<ModelSystem>();
 game.Run();
 
 namespace Ion.Examples.Model
 {
-	/// <summary>The sample's setup, shared with the tests.</summary>
-	public static class ModelApp
-	{
-		/// <summary>Registers the engine, the 3D renderer, the ECS module with its 3D extraction, and the sample's system.</summary>
-		public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
-		{
-			builder.Services.AddIon(builder.Configuration);
-			builder.Services.AddRendering3D(builder.Configuration);
-			builder.Services.AddEcs().AddEcsRendering3D();
-			builder.Services.AddSingleton<ModelSystem>();
-			return builder;
-		}
-
-		/// <summary>Adds the engine's systems, the 3D renderer's, the ECS module's (with the 3D extraction) and the sample's.</summary>
-		public static IIonApplication Use(IIonApplication app) => app.UseIon().UseRendering3D().UseEcs().UseEcsRendering3D().UseSystem<ModelSystem>();
-	}
-
 	/// <summary>Turns an entity about the y axis at <see cref="Speed"/> radians per second (the spawned model's root).</summary>
 	/// <param name="Speed">The angular speed.</param>
 	public readonly record struct Spin(float Speed);

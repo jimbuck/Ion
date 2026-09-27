@@ -5,9 +5,13 @@ This file tells a coding agent how to work on it without reading the engine's so
 
 ## Layout
 
-- `MyIonGame/Program.cs`: the entry point. Keep its calls (`CreateBuilder`, `Game.Configure`, `Build`, `Game.Use`, `Run`)
-  as they are: the Ion schedule generator reads them and compiles the schedule into direct calls.
-- `MyIonGame/Game.cs`: services and schedule (`Game : IIonGame`), settings, `PlayState` and its JSON metadata (`GameJson`).
+- `MyIonGame/Program.cs`: the entry point and the game's setup: the modules and systems registered on `builder`
+  (`builder.AddIon()`, `builder.AddSystem<T>()`, `builder.Services...`) and added to the schedule on `game`
+  (`game.UseIon()`, `game.UseSystem<T>()`). Keep the registrations in this file (or in methods it calls), between
+  `CreateBuilder` and `game.Run()`: the Ion schedule generator reads them and compiles the schedule into direct calls, and
+  the tests run this file as it is. A module's `AddX`/`UseX` also registers and adds the modules it needs, so listing one
+  twice is harmless.
+- `MyIonGame/Game.cs`: settings, `PlayState` and its JSON metadata (`GameJson`).
 - `MyIonGame/PaddleSystem.cs`: the game's system. Add new systems in new files.
 - `MyIonGame/appsettings.json`: configuration (`Ion:*` for the engine, `Game:*` for the game).
 - `MyIonGame.Tests/`: headless tests (`GameTests`) and a state snapshot test (`SnapshotTests`, snapshots in `Golden/`).
@@ -24,8 +28,8 @@ with a stage attribute (`[Init]`, `[Update]`, `[FixedUpdate]`, `[Render]`, ...) 
 - Simulation in `[FixedUpdate]` (fixed `dt`), input and presentation in `[Update]` and `[Render]`. Drawing only in `Render`.
 - Ordering: steps run by `Order` (default 0) then registration order: `[Update(Order = 10)]`, `[After<OtherSystem>]`,
   `[Before<OtherSystem>]`. Engine steps use the bands below -500 and above 500. Check with `ion schedule`.
-- New system: write the class, register it (`builder.Services.AddSingleton<MySystem>()` in `Configure`) and add it to the
-  schedule (`.UseSystem<MySystem>()` in `Use`).
+- New system: write the class, register it (`builder.AddSystem<MySystem>()` in `Program.cs`) and add it to the
+  schedule (`game.UseSystem<MySystem>()`).
 - Events: `events.Emit(new Scored(1))` with `record struct Scored(int Points)`; read with a reader created once in the
   constructor: `private EventReader<Scored> _scored = events.Reader<Scored>();` then `foreach (var e in _scored.Read())`.
 - No `async`/`Task` in steps (the build reports ION005). Randomness from `GameSettings.Seed` (`Ion:Seed`).
@@ -57,7 +61,8 @@ Expose more state the same way: `builder.Services.AddRemoteResource(name, descri
 
 ## Tests
 
-- `IonTestHost.Run<Game>(frames, host => ...)` builds the game headless with a fixed clock, runs the frames and returns
+- `IonTestHost.RunEntryPoint<Program>(frames, host => ...)` runs `Program.cs` headless with a fixed clock (the host's
+  configuration, such as `host.WithConfiguration("Ion:Seed", "7")`, is in place while it registers), runs the frames and returns
   state (`run.Get<PlayState>()`, `run.Host`), `run.Counters`, `run.LastFrame` and, with `host.WithRendering()`, `run.Image`.
 - Script input with `run.Host.Input.Press(Key.Right)`, `Release`, `Tap`, `Click(position)`; advance with `run.Host.Step(n)`.
 - `JsonSnapshot.AssertMatches(json, RenderingEnvironment.GoldenPath("name.json"))` compares with `Golden/`. Update

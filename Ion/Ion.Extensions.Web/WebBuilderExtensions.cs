@@ -65,6 +65,18 @@ public static class WebBuilderExtensions
 		return services;
 	}
 
+	/// <summary>
+	/// Registers the web server with the application's configuration (see
+	/// <see cref="AddWeb(IServiceCollection, IConfiguration, Action{WebOptions})"/>): only when it is enabled. The server
+	/// needs no other module (it runs on its own HTTP listener). Add the system with <see cref="UseWeb"/>.
+	/// </summary>
+	public static IonApplicationBuilder AddWeb(this IonApplicationBuilder builder, Action<WebOptions>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.Services.AddWeb(builder.Configuration, configure);
+		return builder;
+	}
+
 	/// <summary>Adds a route table built by hand (or by another generator) to the server's routes.</summary>
 	public static IServiceCollection AddWebRoutes(this IServiceCollection services, WebRouteTable table)
 	{
@@ -74,7 +86,7 @@ public static class WebBuilderExtensions
 		return services;
 	}
 
-	/// <summary>Adds the <see cref="WebSystem"/> when <see cref="AddWeb"/> registered the server; otherwise does nothing.</summary>
+	/// <summary>Adds the <see cref="WebSystem"/> when <see cref="AddWeb(IServiceCollection, IConfiguration, Action{WebOptions})"/> registered the server; otherwise does nothing.</summary>
 	public static IIonApplication UseWeb(this IIonApplication app)
 	{
 		ArgumentNullException.ThrowIfNull(app);

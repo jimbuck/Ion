@@ -21,9 +21,8 @@ is retained and stable.
 Registration:
 
 ```csharp
-builder.Services.AddIon(builder.Configuration);
-builder.Services.AddUi(options => options.AutoFocus = true);   // Ui, IUiTree, the UI system
-app.UseIon().UseUi();
+builder.AddUi(options => options.AutoFocus = true);   // Ui, IUiTree, the UI system (and the engine core)
+app.UseUi();                                          // with UseIon
 
 public sealed class MenuSystem(Ui ui, IAssetManager assets)
 {

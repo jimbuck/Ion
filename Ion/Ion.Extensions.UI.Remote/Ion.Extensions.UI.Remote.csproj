@@ -14,6 +14,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ion.Extensions.UI.Abstractions\Ion.Extensions.UI.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.UI\Ion.Extensions.UI.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Remote.Abstractions\Ion.Extensions.Remote.Abstractions.csproj" />
   </ItemGroup>
 </Project>

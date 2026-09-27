@@ -24,8 +24,9 @@ public sealed record BreakoutSettings(int Seed)
 }
 
 /// <summary>
-/// The Breakout ECS game setup, shared by <c>Program.cs</c> and the headless tests: <see cref="Configure"/> registers the
-/// services and <see cref="Use"/> wires the pipeline.
+/// The Breakout ECS game as a module: <see cref="AddBreakout"/> registers it and <see cref="UseBreakout"/> adds its systems.
+/// <c>Program.cs</c> is the two calls; the mobile heads (<c>Ion.Examples.Breakout.ECS.Android</c> and <c>.iOS</c>) compile
+/// this file, not <c>Program.cs</c>, and make the same two calls from their own entry point (<see cref="BreakoutMobile"/>).
 /// </summary>
 public static class BreakoutGame
 {
@@ -36,69 +37,61 @@ public static class BreakoutGame
 	public const int DefaultSeed = 6014;
 
 	/// <summary>
-	/// Registers the game's services with <paramref name="builder"/>, including <c>AddIon</c>. When the configuration asks
-	/// for headless mode (<c>Ion:Headless=true</c>) the <see cref="HeadlessAutopilotSystem"/> is registered too.
+	/// Registers the game: the engine, the ECS module with the sprite extraction, the 2D physics module and the game's
+	/// systems. When the configuration asks for headless mode (<c>Ion:Headless=true</c>) the
+	/// <see cref="HeadlessAutopilotSystem"/> is registered too.
 	/// </summary>
-	public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
+	public static IonApplicationBuilder AddBreakout(this IonApplicationBuilder builder)
 	{
 		ArgumentNullException.ThrowIfNull(builder);
 
 		RegisterComponents();
 
 		var seed = int.TryParse(builder.Configuration[SeedKey], out var configured) ? configured : DefaultSeed;
-
-		builder.Services.AddIon(builder.Configuration, graphics =>
-		{
-			graphics.ClearColor = new Color(0x333);
-		});
-
-		// The ECS module: the root World (resolved by every system below), Commands played back at the end of every stage,
-		// transform propagation, FrameStats.Entities, and the sprite extraction into the sprite batch.
-		builder.Services.AddEcs()
-						.AddEcsRendering();
-
-		// The 2D physics module (Box2D v3): no gravity, the world in pixels (64 px to the meter), and the debug drawing of
-		// every collider on unless Ion:Physics2D:DebugDraw says otherwise.
 		var debugDraw = builder.Configuration[$"{Physics2DConfig.Section}:DebugDraw"] is null;
-		builder.Services.AddPhysics2D(builder.Configuration, physics =>
-		{
-			physics.GravityY = 0;
-			physics.UnitsPerMeter = BreakoutPhysics.PixelsPerMeter;
-			physics.DebugDraw |= debugDraw;
-		});
 
-		builder.Services.AddSingleton(new BreakoutSettings(seed))
-						.AddSingleton<MouseCaptureSystem>()
-						.AddSingleton<ScoreSystem>()
-						.AddSingleton<SoundEffectsSystem>()
-						.AddSingleton<PaddleSystem>()
-						.AddSingleton<BallSystem>()
-						.AddSingleton<BlockSystem>()
-						.AddSingleton<CollisionEventSystem>()
-						.AddSingleton<LevelSystem>();
+		// The engine, and the ECS module: the root World (resolved by every system below), Commands played back at the end
+		// of every stage, transform propagation, FrameStats.Entities, and the sprite extraction into the sprite batch.
+		builder.AddIon(graphics => graphics.ClearColor = new Color(0x333))
+			.AddEcsRendering()
+			// The 2D physics module (Box2D v3): no gravity, the world in pixels (64 px to the meter), and the debug drawing
+			// of every collider on unless Ion:Physics2D:DebugDraw says otherwise.
+			.AddPhysics2D(physics =>
+			{
+				physics.GravityY = 0;
+				physics.UnitsPerMeter = BreakoutPhysics.PixelsPerMeter;
+				physics.DebugDraw |= debugDraw;
+			})
+			// The game runs in the root schedule (no scenes), so its systems are singletons: a scoped system there is error ION006.
+			.AddSystem<MouseCaptureSystem>()
+			.AddSystem<ScoreSystem>()
+			.AddSystem<SoundEffectsSystem>()
+			.AddSystem<PaddleSystem>()
+			.AddSystem<BallSystem>()
+			.AddSystem<BlockSystem>()
+			.AddSystem<CollisionEventSystem>()
+			.AddSystem<LevelSystem>();
+		builder.Services.AddSingleton(new BreakoutSettings(seed));
 
-		// The game runs in the root schedule (no scenes), so its systems are singletons: a scoped system there is error ION006.
-		if (builder.Configuration.IsHeadless()) builder.Services.AddSingleton<HeadlessAutopilotSystem>();
+		if (builder.Configuration.IsHeadless()) builder.AddSystem<HeadlessAutopilotSystem>();
 
 		return builder;
 	}
 
 	/// <summary>
-	/// Adds the engine's systems (<c>UseIon</c>) and the game's systems to <paramref name="app"/>, plus the
-	/// <see cref="HeadlessAutopilotSystem"/> when running headless.
+	/// Adds the game's systems and the ones of the modules it uses (the engine's, the ECS module's with the sprite
+	/// extraction, the 2D physics'), plus the <see cref="HeadlessAutopilotSystem"/> when running headless.
 	/// </summary>
 	/// <remarks>
 	/// Registration order only breaks ties between steps of equal order: the engine's steps use the reserved order bands
-	/// (see <see cref="StageOrder"/>), so a game system can be added before <c>UseIon</c> and its steps still run after
-	/// the window, input and sprite batch setup. <see cref="MouseCaptureSystem"/> is added first to show it.
+	/// (see <see cref="StageOrder"/>), so a game system can be added before the engine's and its steps still run after the
+	/// window, input and sprite batch setup. <see cref="MouseCaptureSystem"/> is added first to show it.
 	/// </remarks>
-	public static IIonApplication Use(IIonApplication app)
+	public static IIonApplication UseBreakout(this IIonApplication app)
 	{
 		ArgumentNullException.ThrowIfNull(app);
 
 		app.UseSystem<MouseCaptureSystem>()
-			.UseIon()
-			.UseEcs()
 			.UseEcsRendering()
 			.UsePhysics2D()
 			.UseSystem<CollisionEventSystem>()

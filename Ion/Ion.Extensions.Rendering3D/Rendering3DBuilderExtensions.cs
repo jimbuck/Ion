@@ -20,13 +20,16 @@ public static class Rendering3DBuilderExtensions
 	/// <see cref="IModel"/> (glTF 2.0) and <see cref="ICubemap"/> loaders, and its frame statistics. Register it after the
 	/// graphics backend (<c>AddIon</c>): with an RHI backend (<see cref="IGraphicsFrame"/>) it draws, with the headless
 	/// null backend it runs its CPU pipeline only. Binds <see cref="Rendering3DOptions"/> from <c>Ion:Rendering3D</c>.
-	/// Add its system with <see cref="UseRendering3D"/>.
+	/// Registers the renderer once: a later call only binds the options again. Add its system with
+	/// <see cref="UseRendering3D"/>. On an application builder, <c>builder.AddRendering3D()</c> (namespace <c>Ion</c>)
+	/// also registers the engine (<c>AddIon</c>).
 	/// </summary>
 	public static IServiceCollection AddRendering3D(this IServiceCollection services, IConfiguration? config = null)
 	{
 		ArgumentNullException.ThrowIfNull(services);
 		var options = services.AddOptions<Rendering3DOptions>();
 		if (config is not null) options.Bind(config.GetSection("Ion:Rendering3D"));
+		if (!services.TryAddIonModule(ModuleName)) return services;
 
 		services
 			.AddSingleton(static sp => new Renderer3D(
@@ -43,12 +46,19 @@ public static class Rendering3DBuilderExtensions
 		return services;
 	}
 
+	/// <summary>The module name <see cref="AddRendering3D"/> records (see <see cref="IonModuleServiceCollectionExtensions"/>).</summary>
+	internal const string ModuleName = "Ion.Rendering3D";
+
 	/// <summary>
 	/// Adds the 3D renderer's system: GPU resources at Init (<see cref="StageOrder.Rendering3D"/>, after the device), a
 	/// scope around every Render stage (submissions are collected while it is open; when it closes the renderer culls,
 	/// sorts, batches and executes its render graph, the 2D overlay last), and teardown in Destroy before the device.
 	/// </summary>
-	public static IIonApplication UseRendering3D(this IIonApplication app) => app.UseSystem<Rendering3DSystem>();
+	/// <remarks>
+	/// Not an extension method: call <c>app.UseRendering3D()</c> from the <c>Ion</c> namespace, which also adds the engine's
+	/// systems (<c>UseIon</c>) the renderer needs.
+	/// </remarks>
+	public static IIonApplication UseRendering3D(IIonApplication app) => app.UseSystem<Rendering3DSystem>();
 }
 
 /// <summary>

@@ -21,31 +21,14 @@ using Ion.Extensions.Rendering3D;
 //   --Cubes:Screenshot=<file>   with Frames, save the last frame as PNG (headless, or windowed with Ion:Graphics:RetainLastFrame=true)
 //   --Ion:Headless=true         no window (add --Ion:Headless:Render=true to render offscreen)
 var builder = IonApplication.CreateBuilder(args);
-CubesApp.Configure(builder);
+builder.AddIon().AddRendering3D().AddEcs().AddEcsRendering3D().AddSystem<CubesSystem>();
 
 using var game = builder.Build();
-CubesApp.Use(game);
+game.UseIon().UseRendering3D().UseEcs().UseEcsRendering3D().UseSystem<CubesSystem>();
 game.Run();
 
 namespace Ion.Examples.Cubes
 {
-	/// <summary>The sample's setup, shared with the tests.</summary>
-	public static class CubesApp
-	{
-		/// <summary>Registers the engine, the 3D renderer, the ECS module with its 3D extraction, and the sample's system.</summary>
-		public static IonApplicationBuilder Configure(IonApplicationBuilder builder)
-		{
-			builder.Services.AddIon(builder.Configuration);
-			builder.Services.AddRendering3D(builder.Configuration);
-			builder.Services.AddEcs().AddEcsRendering3D();
-			builder.Services.AddSingleton<CubesSystem>();
-			return builder;
-		}
-
-		/// <summary>Adds the engine's systems, the 3D renderer's, the ECS module's (with the 3D extraction) and the sample's.</summary>
-		public static IIonApplication Use(IIonApplication app) => app.UseIon().UseRendering3D().UseEcs().UseEcsRendering3D().UseSystem<CubesSystem>();
-	}
-
 	/// <summary>A cube of the grid: its place in the grid (the wave animates its height and turn from it).</summary>
 	/// <param name="X">The x position.</param>
 	/// <param name="Z">The z position.</param>

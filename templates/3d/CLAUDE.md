@@ -5,9 +5,13 @@ shadows, glTF models). This file tells a coding agent how to work on it without 
 
 ## Layout
 
-- `MyIonGame/Program.cs`: the entry point. Keep its calls (`CreateBuilder`, `Game.Configure`, `Build`, `Game.Use`, `Run`)
-  as they are: the Ion schedule generator reads them and compiles the schedule into direct calls.
-- `MyIonGame/Game.cs`: services and schedule (`Game : IIonGame`), settings, `SpinState` and its JSON metadata (`GameJson`).
+- `MyIonGame/Program.cs`: the entry point and the game's setup: the modules and systems registered on `builder`
+  (`builder.AddIon()`, `builder.AddSystem<T>()`, `builder.Services...`) and added to the schedule on `game`
+  (`game.UseIon()`, `game.UseSystem<T>()`). Keep the registrations in this file (or in methods it calls), between
+  `CreateBuilder` and `game.Run()`: the Ion schedule generator reads them and compiles the schedule into direct calls, and
+  the tests run this file as it is. A module's `AddX`/`UseX` also registers and adds the modules it needs, so listing one
+  twice is harmless.
+- `MyIonGame/Game.cs`: settings, `SpinState` and its JSON metadata (`GameJson`).
 - `MyIonGame/SceneSystem3D.cs`: creates meshes and materials, simulates, submits the scene.
 - `MyIonGame/appsettings.json`: configuration (`Ion:*` for the engine, `Game:*` for the game).
 - `MyIonGame.Tests/`: a headless test (`GameTests`) and a state snapshot test (`SnapshotTests`, snapshots in `Golden/`).
@@ -28,8 +32,8 @@ Constructor parameters are injected (`IRenderer3D`, `ISpriteBatch` for a 2D HUD 
 - Headless without a GPU the renderer still runs its CPU pipeline: `IRenderer3D.LastFrameStatistics` (submitted, visible,
   culled, batches, draw calls) is meaningful in tests.
 - Ordering: `[Update(Order = 10)]`, `[After<OtherSystem>]`, `[Before<OtherSystem>]`; check with `ion schedule`.
-- New system: write the class, register it (`builder.Services.AddSingleton<MySystem>()` in `Configure`) and add it to the
-  schedule (`.UseSystem<MySystem>()` in `Use`).
+- New system: write the class, register it (`builder.AddSystem<MySystem>()` in `Program.cs`) and add it to the
+  schedule (`game.UseSystem<MySystem>()`).
 - No `async`/`Task` in steps (the build reports ION005).
 
 ## Commands
@@ -56,7 +60,8 @@ state, `resources.set` writes it, `ion_step {"frames": 60}` advances, `ion_scree
 
 ## Tests
 
-- `IonTestHost.Run<Game>(frames, host => ...)` builds the game headless with a fixed clock, runs the frames and returns
+- `IonTestHost.RunEntryPoint<Program>(frames, host => ...)` runs `Program.cs` headless with a fixed clock (the host's
+  configuration, such as `host.WithConfiguration("Ion:Seed", "7")`, is in place while it registers), runs the frames and returns
   state (`run.Get<SpinState>()`, `run.Get<IRenderer3D>()`), `run.Counters`, `run.LastFrame` and, with
   `host.WithRendering()`, `run.Image`.
 - `JsonSnapshot.AssertMatches(json, RenderingEnvironment.GoldenPath("name.json"))` compares with `Golden/`. Update

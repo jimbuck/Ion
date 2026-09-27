@@ -280,4 +280,13 @@ public static class LiteNetLibTransportExtensions
 		services.TryAddSingleton<INetworkTransport>(static _ => new LiteNetLibTransport());
 		return services;
 	}
+
+	/// <summary>Registers the <see cref="LiteNetLibTransport"/> and the networking module (<c>AddNetworking</c>).</summary>
+	public static IonApplicationBuilder AddLiteNetLibTransport(this IonApplicationBuilder builder)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.AddNetworking();
+		builder.Services.AddLiteNetLibTransport();
+		return builder;
+	}
 }

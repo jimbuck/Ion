@@ -24,6 +24,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ion.Testing\Ion.Testing.csproj" />
+    <!-- A game with top-level statements, for the entry point tests. -->
+    <ProjectReference Include="..\Ion.Testing.TestProgram\Ion.Testing.TestProgram.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Ion.Examples\Ion.Examples.Breakout.ECS\Assets\bonk.wav" Link="Assets\bonk.wav" CopyToOutputDirectory="PreserveNewest" />
