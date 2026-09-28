@@ -265,6 +265,52 @@ public class Physics2DTests
 	}
 
 	[Fact]
+	public void RayCastsSkipSensorsAndFindTheClosestSolidColliderBehindThem()
+	{
+		using var host = Hosts.Physics(c => c.GravityY = 0);
+		var world = host.Get<World>();
+		var physics = host.Get<IPhysicsWorld2D>();
+		var zone = world.Create(new Transform2D(new Vector2(-2, 0)), Collider2D.Box(new Vector2(2, 2)) with { IsSensor = true });
+		var pickup = world.Create(new Transform2D(new Vector2(0, 0)), Collider2D.Circle(0.5f) with { IsSensor = true }, RigidBody2D.Dynamic());
+		var wall = world.Create(new Transform2D(new Vector2(5, 0)), Collider2D.Box(new Vector2(2, 2)));
+		host.Step();
+
+		Assert.True(physics.RayCast(new Vector2(-10, 0), new Vector2(20, 0), out var hit));
+		Assert.Equal(wall, hit.Entity);
+		Assert.Equal(4f, hit.Point.X, 2);
+		Assert.Equal(0.7f, hit.Fraction, 2);
+
+		// A ray that only crosses sensors hits nothing.
+		Assert.False(physics.RayCast(new Vector2(-10, 0), new Vector2(11, 0), out hit));
+		Assert.Equal(default, hit);
+
+		// Opting in returns the closest sensor, from either side.
+		Assert.True(physics.RayCast(new Vector2(-10, 0), new Vector2(20, 0), out hit, includeSensors: true));
+		Assert.Equal(zone, hit.Entity);
+		Assert.Equal(-3f, hit.Point.X, 2);
+		Assert.True(physics.RayCast(new Vector2(3, 0), new Vector2(-10, 0), out hit, includeSensors: true));
+		Assert.Equal(pickup, hit.Entity);
+
+		// The layer mask still applies, and overlap queries keep reporting sensors.
+		Assert.False(physics.RayCast(new Vector2(-10, 0), new Vector2(20, 0), out _, mask: 2, includeSensors: true));
+		Span<Entity> found = new Entity[4];
+		Assert.Equal(1, physics.OverlapPoint(new Vector2(-2, 0), found));
+		Assert.Equal(zone, found[0]);
+
+		// Queries allocate nothing (after a warm-up for the JIT).
+		long before = 0;
+		for (var i = 0; i < 200; i++)
+		{
+			if (i == 100) before = GC.GetAllocatedBytesForCurrentThread();
+			physics.RayCast(new Vector2(-10, 0), new Vector2(20, 0), out hit);
+			physics.RayCast(new Vector2(-10, 0), new Vector2(20, 0), out hit, includeSensors: true);
+			physics.OverlapCircle(Vector2.Zero, 3, found);
+		}
+
+		Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+	}
+
+	[Fact]
 	public void ForcesAndImpulsesMoveDynamicBodies()
 	{
 		using var host = Hosts.Physics(c => c.GravityY = 0);

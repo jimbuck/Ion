@@ -767,12 +767,12 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 	}
 
 	/// <inheritdoc/>
-	public bool RayCast(Vector3 origin, Vector3 direction, float maxDistance, out RayHit3D hit, uint mask = uint.MaxValue)
+	public bool RayCast(Vector3 origin, Vector3 direction, float maxDistance, out RayHit3D hit, uint mask = uint.MaxValue, bool includeSensors = false)
 	{
 		hit = default;
 		if (direction.LengthSquared() == 0 || !(maxDistance > 0)) return false;
 		var normalized = Vector3.Normalize(direction);
-		var handler = new RayHandler(this, mask);
+		var handler = new RayHandler(this, mask, includeSensors);
 		Simulation.RayCast(origin, normalized, maxDistance, _pool, ref handler);
 		if (!handler.Found) return false;
 		var slot = SlotOf(handler.Collidable);
@@ -826,10 +826,12 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 		return found;
 	}
 
-	internal bool Passes(CollidableReference collidable, uint mask)
+	internal bool Passes(CollidableReference collidable, uint mask, bool includeSensors = true)
 	{
 		var slot = SlotOf(collidable);
-		return slot > 0 && (Slots[slot].Collider.Layer & mask) != 0;
+		if (slot == 0) return false;
+		ref readonly var collider = ref Slots[slot].Collider;
+		return (collider.Layer & mask) != 0 && (includeSensors || !collider.IsSensor);
 	}
 
 	/// <inheritdoc/>
@@ -1029,14 +1031,15 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 		}
 	}
 
-	private struct RayHandler(PhysicsWorld3D world, uint mask) : IRayHitHandler
+	private struct RayHandler(PhysicsWorld3D world, uint mask, bool includeSensors) : IRayHitHandler
 	{
 		public bool Found;
 		public float T = float.MaxValue;
 		public Vector3 Normal;
 		public CollidableReference Collidable;
 
-		public readonly bool AllowTest(CollidableReference collidable) => world.Passes(collidable, mask);
+		// Sensors are skipped before the narrow phase, so the ray goes on to the closest collider behind them.
+		public readonly bool AllowTest(CollidableReference collidable) => world.Passes(collidable, mask, includeSensors);
 
 		public readonly bool AllowTest(CollidableReference collidable, int childIndex) => true;
 

@@ -1,6 +1,6 @@
 ---
 title: Queries and events
-description: Ray casts, overlap queries, collision and trigger events in Ion's 2D and 3D physics, with their filtering rules and known issues.
+description: Ray casts, overlap queries, collision and trigger events in Ion's 2D and 3D physics, with their filtering rules.
 sidebar:
   order: 4
 ---
@@ -11,14 +11,15 @@ and `IPhysicsWorld3D`; events arrive on `IEvents` like any other game event.
 
 ## Ray casts
 
-A ray cast returns the **closest** hit on a collider whose `Layer` intersects the mask.
+A ray cast returns the **closest** hit on a collider whose `Layer` intersects the mask. Sensors are skipped: the ray
+goes through them to the closest solid collider behind (pass `includeSensors: true` to hit them too).
 
 ```csharp title="2D"
-bool RayCast(Vector2 origin, Vector2 translation, out RayHit2D hit, uint mask = uint.MaxValue);
+bool RayCast(Vector2 origin, Vector2 translation, out RayHit2D hit, uint mask = uint.MaxValue, bool includeSensors = false);
 ```
 
 ```csharp title="3D"
-bool RayCast(Vector3 origin, Vector3 direction, float maxDistance, out RayHit3D hit, uint mask = uint.MaxValue);
+bool RayCast(Vector3 origin, Vector3 direction, float maxDistance, out RayHit3D hit, uint mask = uint.MaxValue, bool includeSensors = false);
 ```
 
 | | 2D (`RayHit2D`) | 3D (`RayHit3D`) |
@@ -28,6 +29,7 @@ bool RayCast(Vector3 origin, Vector3 direction, float maxDistance, out RayHit3D 
 | `Point` | the hit point in world units | the same |
 | `Normal` | the surface normal at the hit | the same |
 | Distance | `Fraction`: 0 at the origin, 1 at the end of the ray | `Distance` along the normalized direction |
+| Sensors | skipped unless `includeSensors` | the same |
 
 A 3D ray with a zero direction or a `maxDistance` that is not positive returns `false`.
 
@@ -56,24 +58,21 @@ var feet = transform.Position;
 var grounded = physics.RayCast(feet + new Vector3(0, 0.05f, 0), -Vector3.UnitY, 0.15f, out var ground, mask: GroundLayer);
 ```
 
-:::caution[Known issue: ray casts can return sensors]
-The `IPhysicsWorld2D.RayCast` documentation says sensors are skipped, but the 2D ray cast currently returns sensor
-colliders too: the adapter passes only the layer mask to Box2D and does not filter sensors itself. This is listed as a
-known issue of the v0.3 release. The 3D ray cast filters by layer only, so it returns sensors as well.
-
-Until it is fixed, keep sensors on their own layer and leave that layer out of the ray's mask:
-
-```csharp
-const uint Solid = 1 << 0, Triggers = 1 << 5;
-var checkpoint = Collider2D.Box(new Vector2(64, 64)) with { IsSensor = true, Layer = Triggers };
-physics.RayCast(origin, translation, out var hit, mask: Solid);   // never hits the checkpoint
+```csharp title="Hitting sensors on purpose"
+// A cursor ray that can pick trigger zones as well as walls: the closest of either.
+if (physics.RayCast(camera, pointer - camera, out var picked, includeSensors: true)) Select(picked.Entity);
 ```
-:::
+
+Sensors are skipped inside the cast (in the Box2D callback in 2D, before Bepu's narrow phase in 3D), not by dropping a
+sensor hit afterwards, so a sensor in front of a wall never hides the wall. Combine `includeSensors` with a mask to hit
+only some sensors: put them on their own layer and cast with that layer's bit.
 
 ## Overlap queries
 
 Overlap queries write the entities they find into a span **you** provide and return how many they wrote. Nothing
-allocates. Each entity appears once, and the span's length bounds the results.
+allocates. Each entity appears once, and the span's length bounds the results. Unlike ray casts, overlap queries report
+sensors too (asking what is inside an area usually includes the trigger zones there); keep sensors on their own layer
+and leave it out of the mask to skip them.
 
 | 2D method | Test |
 |---|---|
@@ -245,7 +244,8 @@ See [testing](/Ion/tooling/testing/).
 ## Remote queries
 
 With `Ion.Extensions.Physics2D.Remote` (`builder.AddPhysics2DRemote()`), a running game answers `physics2d.raycast` and
-`physics2d.bodies` over the remote protocol, so a tool or a coding agent can inspect the simulation:
+`physics2d.bodies` over the remote protocol, so a tool or a coding agent can inspect the simulation. The remote ray cast
+skips sensors like `RayCast`; add `"includeSensors": true` to hit them:
 
 ```bash
 ion remote physics2d.raycast '{"origin": [0, 300], "to": [800, 300]}'

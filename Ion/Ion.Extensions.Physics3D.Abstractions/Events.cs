@@ -73,13 +73,17 @@ public interface IPhysicsWorld3D
 	/// </summary>
 	ConvexHullId CreateConvexHull(ReadOnlySpan<Vector3> points);
 
-	/// <summary>Casts a ray from <paramref name="origin"/> along <paramref name="direction"/> up to <paramref name="maxDistance"/>; returns the closest hit on a collider in <paramref name="mask"/>.</summary>
-	bool RayCast(Vector3 origin, Vector3 direction, float maxDistance, out RayHit3D hit, uint mask = uint.MaxValue);
+	/// <summary>
+	/// Casts a ray from <paramref name="origin"/> along <paramref name="direction"/> up to <paramref name="maxDistance"/>;
+	/// returns the closest hit on a collider in <paramref name="mask"/>. Sensors (<see cref="Collider3D.IsSensor"/>) are
+	/// skipped unless <paramref name="includeSensors"/> is true: the ray goes through them to the closest collider behind.
+	/// </summary>
+	bool RayCast(Vector3 origin, Vector3 direction, float maxDistance, out RayHit3D hit, uint mask = uint.MaxValue, bool includeSensors = false);
 
-	/// <summary>Writes the entities whose bounding boxes overlap the box from <paramref name="min"/> to <paramref name="max"/>; returns how many (at most the span's length).</summary>
+	/// <summary>Writes the entities whose bounding boxes (sensors included) overlap the box from <paramref name="min"/> to <paramref name="max"/>; returns how many (at most the span's length).</summary>
 	int OverlapBox(Vector3 min, Vector3 max, Span<Entity> results, uint mask = uint.MaxValue);
 
-	/// <summary>Writes the entities whose bounding boxes overlap the sphere; returns how many (at most the span's length).</summary>
+	/// <summary>Writes the entities whose bounding boxes (sensors included) overlap the sphere; returns how many (at most the span's length).</summary>
 	int OverlapSphere(Vector3 center, float radius, Span<Entity> results, uint mask = uint.MaxValue);
 
 	/// <summary>Applies a linear impulse at the body's center (changes its velocity immediately). Returns false when the entity has no dynamic body yet.</summary>

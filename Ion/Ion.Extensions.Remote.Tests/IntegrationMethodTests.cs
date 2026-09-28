@@ -184,6 +184,15 @@ public sealed class Physics2DRemoteTests
 		Assert.False(miss["hit"]!.GetValue<bool>());
 		Assert.Equal(RemoteErrorCodes.InvalidParams, RemoteGame.ErrorCode(game.Call("physics2d.raycast", new JsonObject { ["origin"] = new JsonArray(0) })));
 
+		// Sensors are skipped: the ray through the sensor hits the wall behind it.
+		var through = game.Result("physics2d.raycast", new JsonObject { ["origin"] = new JsonArray(0, 0), ["to"] = new JsonArray(200, 0) })!;
+		Assert.Equal("Wall", through["name"]!.GetValue<string>());
+		Assert.Equal(90f, through["point"]![0]!.GetValue<float>(), 1);
+		var sensor = game.Result("physics2d.raycast", new JsonObject { ["origin"] = new JsonArray(0, 0), ["to"] = new JsonArray(200, 0), ["includeSensors"] = true })!;
+		Assert.Equal("Sensor", sensor["name"]!.GetValue<string>());
+		Assert.Equal(40f, sensor["point"]![0]!.GetValue<float>(), 1);
+		Assert.Equal(RemoteErrorCodes.InvalidParams, RemoteGame.ErrorCode(game.Call("physics2d.raycast", new JsonObject { ["origin"] = new JsonArray(0, 0), ["to"] = new JsonArray(200, 0), ["includeSensors"] = "yes" })));
+
 		// Read methods: the read token is enough.
 		var read = game.Call("physics2d.raycast", new JsonObject { ["origin"] = new JsonArray(0, 0), ["to"] = new JsonArray(200, 0) }, token: game.Server.ReadToken);
 		Assert.Null(read["error"]);

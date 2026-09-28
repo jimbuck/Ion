@@ -196,7 +196,7 @@ methods. The methods answer when the game runs with `--remote`, and do nothing w
 | Method | Parameters | Returns |
 |---|---|---|
 | `physics2d.bodies` (read, watchable) | `name?` (an `EntityName`, exact or a prefix ending in `*`), `type?` (`static`, `kinematic` or `dynamic`), `limit?` (default 1000) | `bodies` (entity, name, type, position, rotation, velocity, angularVelocity, shape, sensor, layer, simulated), `total`, `truncated`, `bodyCount`, `stepCount`, `gravity` |
-| `physics2d.raycast` (read) | `origin` `[x, y]`, and `translation` `[dx, dy]` or `to` `[x, y]`, `mask?` | `hit`, and when it hits: entity, name, point, normal, fraction |
+| `physics2d.raycast` (read) | `origin` `[x, y]`, and `translation` `[dx, dy]` or `to` `[x, y]`, `mask?`, `includeSensors?` (default false) | `hit`, and when it hits: entity, name, point, normal, fraction |
 
 Both are read methods, so the read token is enough. They run on the game thread at the end of a frame and see the state of
 the last fixed step. Scene physics worlds are not exposed, only the root one.
@@ -208,8 +208,8 @@ ion remote physics2d.raycast '{"origin": [0, 300], "to": [800, 300], "mask": 1}'
 ```
 
 Give entities an `EntityName` component to make the output readable. The `physics2d.raycast` method goes through
-`IPhysicsWorld2D.RayCast`, so it shares its [known issue with sensors](/Ion/physics/queries-and-events/). There is no 3D
-remote module yet. See also the [ion CLI](/Ion/tooling/ion-cli/) and the [MCP server](/Ion/tooling/mcp-server/).
+`IPhysicsWorld2D.RayCast`, so it [skips sensors](/Ion/physics/queries-and-events/) unless `includeSensors` is true.
+There is no 3D remote module yet. See also the [ion CLI](/Ion/tooling/ion-cli/) and the [MCP server](/Ion/tooling/mcp-server/).
 
 ## Networking
 

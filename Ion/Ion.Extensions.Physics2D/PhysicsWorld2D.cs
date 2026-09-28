@@ -700,17 +700,43 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 	// ---- Queries ----
 
 	/// <inheritdoc/>
-	public bool RayCast(Vector2 origin, Vector2 translation, out RayHit2D hit, uint mask = uint.MaxValue)
+	public bool RayCast(Vector2 origin, Vector2 translation, out RayHit2D hit, uint mask = uint.MaxValue, bool includeSensors = false)
 	{
-		var result = B2.WorldCastRayClosest(Id, ToB2(origin * _toPhysics), ToB2(translation * _toPhysics), Filter(mask));
-		if (!result.hit)
+		// Box2D's closest-hit cast does not skip sensors: filter them in the callback (-1 ignores the shape and keeps the
+		// ray's length) so the cast goes on to the closest collider that is not one.
+		var context = new RayContext { IncludeSensors = includeSensors };
+		B2.WorldCastRay(Id, ToB2(origin * _toPhysics), ToB2(translation * _toPhysics), Filter(mask), &ClosestHit, &context);
+		if (!context.Hit)
 		{
 			hit = default;
 			return false;
 		}
 
-		hit = new RayHit2D(EntityOf(result.shapeId), FromB2(result.point) * _toWorld, FromB2(result.normal), result.fraction);
+		hit = new RayHit2D(EntityOf(context.Shape), FromB2(context.Point) * _toWorld, FromB2(context.Normal), context.Fraction);
 		return true;
+	}
+
+	[UnmanagedCallersOnly]
+	private static float ClosestHit(B2.ShapeId shape, B2.Vec2 point, B2.Vec2 normal, float fraction, void* context)
+	{
+		var ray = (RayContext*)context;
+		if (!ray->IncludeSensors && B2.ShapeIsSensor(shape)) return -1;
+		ray->Hit = true;
+		ray->Shape = shape;
+		ray->Point = point;
+		ray->Normal = normal;
+		ray->Fraction = fraction;
+		return fraction;   // clip the ray: only closer shapes are reported next
+	}
+
+	private struct RayContext
+	{
+		public bool IncludeSensors;
+		public bool Hit;
+		public B2.ShapeId Shape;
+		public B2.Vec2 Point;
+		public B2.Vec2 Normal;
+		public float Fraction;
 	}
 
 	/// <inheritdoc/>

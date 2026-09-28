@@ -33,17 +33,18 @@ public interface IPhysicsWorld2D
 
 	/// <summary>
 	/// Casts a ray from <paramref name="origin"/> along <paramref name="translation"/> and returns the closest hit on a
-	/// collider in <paramref name="mask"/> (sensors are skipped).
+	/// collider in <paramref name="mask"/>. Sensors (<see cref="Collider2D.IsSensor"/>) are skipped unless
+	/// <paramref name="includeSensors"/> is true: the ray goes through them to the closest collider behind.
 	/// </summary>
-	bool RayCast(Vector2 origin, Vector2 translation, out RayHit2D hit, uint mask = uint.MaxValue);
+	bool RayCast(Vector2 origin, Vector2 translation, out RayHit2D hit, uint mask = uint.MaxValue, bool includeSensors = false);
 
-	/// <summary>Writes the entities whose colliders overlap the box from <paramref name="min"/> to <paramref name="max"/> into <paramref name="results"/>; returns how many were found (at most its length).</summary>
+	/// <summary>Writes the entities whose colliders (sensors included) overlap the box from <paramref name="min"/> to <paramref name="max"/> into <paramref name="results"/>; returns how many were found (at most its length).</summary>
 	int OverlapBox(Vector2 min, Vector2 max, Span<Entity> results, uint mask = uint.MaxValue);
 
-	/// <summary>Writes the entities whose colliders overlap the circle into <paramref name="results"/>; returns how many were found (at most its length).</summary>
+	/// <summary>Writes the entities whose colliders (sensors included) overlap the circle into <paramref name="results"/>; returns how many were found (at most its length).</summary>
 	int OverlapCircle(Vector2 center, float radius, Span<Entity> results, uint mask = uint.MaxValue);
 
-	/// <summary>Writes the entities whose colliders contain <paramref name="point"/> into <paramref name="results"/>; returns how many were found (at most its length).</summary>
+	/// <summary>Writes the entities whose colliders (sensors included) contain <paramref name="point"/> into <paramref name="results"/>; returns how many were found (at most its length).</summary>
 	int OverlapPoint(Vector2 point, Span<Entity> results, uint mask = uint.MaxValue);
 
 	/// <summary>Applies a force (world units, newtons scaled by <see cref="Physics2DConfig.UnitsPerMeter"/>) at the body's center of mass until the next step. Returns false when the entity has no body yet.</summary>

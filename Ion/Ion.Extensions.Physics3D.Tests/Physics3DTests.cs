@@ -190,6 +190,52 @@ public class Physics3DTests
 	}
 
 	[Fact]
+	public void RayCastsSkipSensorsAndFindTheClosestSolidColliderBehindThem()
+	{
+		using var host = Hosts.Physics(c => c.GravityY = 0);
+		var world = host.Get<World>();
+		var physics = host.Get<IPhysicsWorld3D>();
+		var zone = world.Create(new Transform(new Vector3(-2, 0, 0)), Collider3D.Box(new Vector3(2, 2, 2)) with { IsSensor = true });
+		var pickup = world.Create(new Transform(Vector3.Zero), Collider3D.Sphere(0.5f) with { IsSensor = true }, RigidBody3D.Dynamic());
+		var wall = world.Create(new Transform(new Vector3(5, 0, 0)), Collider3D.Box(new Vector3(2, 2, 2)));
+		host.Step();
+
+		Assert.True(physics.RayCast(new Vector3(-10, 0, 0), Vector3.UnitX, 20, out var hit));
+		Assert.Equal(wall, hit.Entity);
+		Assert.Equal(4f, hit.Point.X, 2);
+		Assert.Equal(14f, hit.Distance, 2);
+
+		// A ray that only crosses sensors hits nothing.
+		Assert.False(physics.RayCast(new Vector3(-10, 0, 0), Vector3.UnitX, 11, out hit));
+		Assert.Equal(default, hit);
+
+		// Opting in returns the closest sensor, from either side.
+		Assert.True(physics.RayCast(new Vector3(-10, 0, 0), Vector3.UnitX, 20, out hit, includeSensors: true));
+		Assert.Equal(zone, hit.Entity);
+		Assert.Equal(-3f, hit.Point.X, 2);
+		Assert.True(physics.RayCast(new Vector3(3, 0, 0), -Vector3.UnitX, 10, out hit, includeSensors: true));
+		Assert.Equal(pickup, hit.Entity);
+
+		// The layer mask still applies, and overlap queries keep reporting sensors.
+		Assert.False(physics.RayCast(new Vector3(-10, 0, 0), Vector3.UnitX, 20, out _, mask: 2, includeSensors: true));
+		Span<Entity> found = new Entity[4];
+		Assert.Equal(1, physics.OverlapBox(new Vector3(-2.1f, -0.1f, -0.1f), new Vector3(-1.9f, 0.1f, 0.1f), found));
+		Assert.Equal(zone, found[0]);
+
+		// Queries allocate nothing (after a warm-up for the JIT).
+		long before = 0;
+		for (var i = 0; i < 200; i++)
+		{
+			if (i == 100) before = GC.GetAllocatedBytesForCurrentThread();
+			physics.RayCast(new Vector3(-10, 0, 0), Vector3.UnitX, 20, out hit);
+			physics.RayCast(new Vector3(-10, 0, 0), Vector3.UnitX, 20, out hit, includeSensors: true);
+			physics.OverlapSphere(Vector3.Zero, 3, found);
+		}
+
+		Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+	}
+
+	[Fact]
 	public void ConvexHullsCollide()
 	{
 		using var host = Hosts.Physics();

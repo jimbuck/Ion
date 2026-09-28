@@ -76,12 +76,13 @@ public sealed class Physics2DRemoteMethods(IServiceProvider services) : IRemoteM
 					("name?", String("Only entities whose EntityName matches: exact, or a prefix ending in '*'.")),
 					("type?", String("Only bodies of this type: static, kinematic or dynamic.")),
 					("limit?", Integer("At most this many bodies (default 1000)."))), watchable: true)
-			.Read("physics2d.raycast", "Casts a ray in the 2D physics world and returns the closest hit (entity, name, point, normal, fraction) on a collider in the mask.", RayCast,
+			.Read("physics2d.raycast", "Casts a ray in the 2D physics world and returns the closest hit (entity, name, point, normal, fraction) on a collider in the mask. Sensors are skipped unless includeSensors is true.", RayCast,
 				Object(
 					("origin", Vector("The start point [x, y] in world units.")),
 					("translation?", Vector("The ray [dx, dy]; give this or 'to'.")),
 					("to?", Vector("The end point [x, y]; give this or 'translation'.")),
-					("mask?", Integer("The layer mask (default: every layer)."))));
+					("mask?", Integer("The layer mask (default: every layer).")),
+					("includeSensors?", Boolean("Whether sensors can be hit (default false: the ray goes through them)."))));
 	}
 
 	private JsonNode Bodies(RemoteRequest request)
@@ -139,8 +140,9 @@ public sealed class Physics2DRemoteMethods(IServiceProvider services) : IRemoteM
 		var translation = ReadVector(request, "translation") ?? (ReadVector(request, "to") is { } to ? to - origin
 			: throw RemoteException.InvalidParams("Give 'translation' ([dx, dy]) or 'to' ([x, y])."));
 		var mask = request.GetOptionalInt64("mask") is { } m ? unchecked((uint)m) : uint.MaxValue;
+		var includeSensors = request.GetBool("includeSensors");
 
-		if (!physics.RayCast(origin, translation, out var hit, mask)) return new JsonObject { ["hit"] = false };
+		if (!physics.RayCast(origin, translation, out var hit, mask, includeSensors)) return new JsonObject { ["hit"] = false };
 		var world = physics.Entities;
 		return new JsonObject
 		{

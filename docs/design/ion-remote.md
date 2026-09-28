@@ -188,7 +188,7 @@ needed: registering a component for serialization is the opt-in, and it is the o
 | `ui.type` | mutate | `path`, `text` | `{queued, path, frame}` (a text input takes focus and inserts at the caret) |
 | `ui.back` | mutate | | `{queued, frame}` (gamepad B / Escape) |
 | `physics2d.bodies` (+watch) | read | `name?` (exact or `prefix*`), `type?` (`static`, `kinematic`, `dynamic`), `limit?` | `{bodies[{entity, name, type, position, rotation, velocity, angularVelocity, shape, sensor, layer, simulated}], total, truncated, bodyCount, stepCount, gravity}` |
-| `physics2d.raycast` | read | `origin` `[x, y]`, `translation?` `[dx, dy]` or `to?` `[x, y]`, `mask?` | `{hit: false}` or `{hit, entity, name, point, normal, fraction}` (the closest hit) |
+| `physics2d.raycast` | read | `origin` `[x, y]`, `translation?` `[dx, dy]` or `to?` `[x, y]`, `mask?`, `includeSensors?` | `{hit: false}` or `{hit, entity, name, point, normal, fraction}` (the closest hit; sensors skipped unless `includeSensors`) |
 
 The `ui.*` methods come from `Ion.Extensions.UI.Remote` (`services.AddUiRemote()`, over `IUiTree`; commands are queued
 and applied at the start of the next frame's Update, so their effect shows in the tree published at the end of that
