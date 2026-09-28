@@ -1,12 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 196 64" width="196" height="64"><title>Ion</title><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5eead4"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs><style>
-.l{animation:ion-step 4.5s cubic-bezier(.4,0,.2,1) infinite}
-.l2{animation-delay:-1.5s}.l3{animation-delay:-3s}
-@keyframes ion-step{
-0%,26%{transform:translateX(-7px);stroke-opacity:.3;stroke-width:2.5px}
-33%,59%{transform:translateX(0);stroke-opacity:.6;stroke-width:3px}
-66%,90%{transform:translateX(7px);stroke-opacity:1;stroke-width:4px}
-96%{transform:translateX(11px);stroke-opacity:0;stroke-width:4px}
-97%{transform:translateX(-9px);stroke-opacity:0;stroke-width:2.5px}
-100%{transform:translateX(-7px);stroke-opacity:.3;stroke-width:2.5px}}
-@media (prefers-reduced-motion:reduce){.l{animation:none}}
-</style><g transform="translate(4 4) scale(0.875)"><path class="l l3" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.3" style="transform:translateX(-7px)"/><path class="l l2" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-width="3" stroke-linejoin="round" stroke-opacity="0.6" style="transform:translateX(0px)"/><path class="l l1" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-width="4" stroke-linejoin="round" stroke-opacity="1" style="transform:translateX(7px)"/></g><text x="70" y="45" font-family="Inter Variable, Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="38" font-weight="700" letter-spacing="-1" fill="#f3f7f7">Ion</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 196 64" width="196" height="64"><title>Ion</title><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5eead4"/><stop offset="1" stop-color="#0d9488"/></linearGradient>
+<radialGradient id="core"><stop offset="0" stop-color="#ecfeff"/><stop offset=".35" stop-color="#99f6e4" stop-opacity=".9"/><stop offset="1" stop-color="#14b8a6" stop-opacity="0"/></radialGradient>
+<radialGradient id="plume" cx=".9" cy=".5" r=".9"><stop offset="0" stop-color="#5eead4" stop-opacity=".55"/><stop offset=".5" stop-color="#14b8a6" stop-opacity=".18"/><stop offset="1" stop-color="#14b8a6" stop-opacity="0"/></radialGradient></defs><style>
+.plume{transform-origin:26px 32px;animation:ion-plume 3.2s ease-in-out infinite}
+.core{transform-origin:39px 32px;animation:ion-core 3.2s ease-in-out infinite}
+.r{animation:ion-charge 3.2s ease-in-out infinite}
+.r2{animation-delay:.35s}.r3{animation-delay:.7s}
+.p{animation:ion-stream 2.6s linear infinite}
+@keyframes ion-plume{0%,100%{opacity:.7;transform:scaleX(.9)}50%{opacity:1;transform:scaleX(1.08)}}
+@keyframes ion-core{0%,100%{opacity:.75;transform:scale(.92)}50%{opacity:1;transform:scale(1.06)}}
+@keyframes ion-charge{0%,100%{stroke-opacity:var(--o)}50%{stroke-opacity:1}}
+@keyframes ion-stream{0%{transform:translateX(0);opacity:0}15%{opacity:.9}100%{transform:translateX(-30px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.plume,.core,.r,.p{animation:none}}
+</style><g transform="translate(4 4) scale(0.875)"><ellipse class="plume" cx="14" cy="32" rx="22" ry="9" fill="url(#plume)"/><circle class="p" cx="26" cy="29.5" r="1.0" fill="#99f6e4" style="animation-delay:-1.69s;animation-duration:2.27s"/><circle class="p" cx="26" cy="32.5" r="1.1" fill="#99f6e4" style="animation-delay:-0.15s;animation-duration:2.71s"/><circle class="p" cx="26" cy="25.5" r="1.2" fill="#99f6e4" style="animation-delay:-0.18s;animation-duration:2.29s"/><circle class="p" cx="26" cy="30.9" r="1.4" fill="#99f6e4" style="animation-delay:-0.32s;animation-duration:2.42s"/><circle class="p" cx="26" cy="33.8" r="1.5" fill="#99f6e4" style="animation-delay:-1.50s;animation-duration:2.60s"/><circle class="p" cx="26" cy="38.7" r="0.9" fill="#99f6e4" style="animation-delay:-2.23s;animation-duration:2.49s"/><circle class="p" cx="26" cy="27.0" r="1.0" fill="#99f6e4" style="animation-delay:-0.80s;animation-duration:3.02s"/><path class="r r1" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" transform="translate(-7 0)" fill="none" stroke="url(#g)" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.3"/><path class="r r2" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" transform="translate(0 0)" fill="none" stroke="url(#g)" stroke-width="3" stroke-linejoin="round" stroke-opacity="0.6"/><circle class="core" cx="39" cy="32" r="11" fill="url(#core)"/><path class="r r3" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" transform="translate(7 0)" fill="none" stroke="url(#g)" stroke-width="4" stroke-linejoin="round" stroke-opacity="1" style="--o:.85"/></g><text x="70" y="45" font-family="Inter Variable, Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="38" font-weight="700" letter-spacing="-1" fill="#f3f7f7">Ion</text></svg>
