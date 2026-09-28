@@ -258,11 +258,11 @@ The ECS module registers these through a provider, so the remote server needs no
 | `world.list` | read | | `[{index, entities, default}]` |
 | `world.query` (+watch) | read | `components?`, `with?`, `without?`, `name?` (exact or `prefix*`), `limit?` (default 1000), `world?` | `{entities[{entity, name, components}], total, truncated}` |
 | `world.get_components` (+watch) | read | `entity`, `components?`, `world?` | `{entity, name, components}` |
-| `world.list_components` | read | `entity`, `world?` | the remote-visible components by name, others by type name |
+| `world.list_components` | read | `entity`, `world?` | `{entity, components[], other[]}`: remote-visible components by name, the rest by type name |
 | `world.insert_components` | mutate | `entity`, `components` (name to value), `world?` | the entity with those components |
 | `world.mutate_components` | mutate | `entity`, `component`, `path` (`Position.0`; empty replaces), `value`, `world?` | `{entity, component, value}` |
 | `world.remove_components` | mutate | `entity`, `components[]`, `world?` | `{entity, removed[]}` |
-| `world.spawn` | mutate | `components?`, `name?`, `world?` | the new entity (nothing is created if a component name is wrong) |
+| `world.spawn` | mutate | `components?`, `name?`, `world?` | `{entity, name, components}` (nothing is created if a component name is wrong) |
 | `world.despawn` | mutate | `entity`, `world?` | `{entity, despawned}` |
 
 - **Entities** are addressed by id (a number, as `world.query` returns it) or by `EntityName` (a string).

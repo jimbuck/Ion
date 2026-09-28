@@ -38,6 +38,9 @@ ion bench FullFrame -- --job short
 ion bench '*SpriteBatch*'
 ```
 
+Inside the repository, `npm run bench -- --filter '*Schedule*' --job short` is the same `dotnet run` (see the dev
+tasks table in the root `README.md`).
+
 Results land in `BenchmarkDotNet.Artifacts/results/` under the working directory (Markdown, CSV and HTML reports).
 
 :::caution[Always Release, always quiet]

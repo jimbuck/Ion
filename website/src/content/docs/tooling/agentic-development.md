@@ -43,7 +43,8 @@ See [The ion command line](/Ion/tooling/ion-cli/) and [MCP server](/Ion/tooling/
    ECS components are `record struct`s registered for serialization, which also makes them visible to snapshots and to
    the remote protocol.
 3. **Build.** `dotnet build` must stay warning-free. Schedule mistakes are compile-time diagnostics (`ION001` to
-   `ION013`, `ION3xx` for queries) whose messages state the rule. See [Diagnostics](/Ion/reference/diagnostics/).
+   `ION014` for the schedule, `ION1xx` for events, `ION3xx` for queries) whose messages state the rule. See
+   [Diagnostics](/Ion/reference/diagnostics/).
 4. **Run.** `ion run --headless --frames 600 --seed 1 --summary out/run.json`. Headless runs use a fixed 60 Hz clock, so
    the same seed gives the same state and the same pixels. Read the summary: `status`, `exitCode`, `exception` (type,
    message and a stack trace naming the step), `errors`, `warnings`, `frameStats`, `counters`, `schedule`.
@@ -178,7 +179,8 @@ ION_SLOW_TESTS=1 dotnet test Ion/Ion.Tools.Tests -c Release --filter AcceptanceS
 ```
 
 (`Ion.Tools.Tests.TemplateTests.AcceptanceScenarioWithOnlyTheCliAndMcp` builds the engine from source into the new game,
-so it is marked slow; the screenshot and diff steps are skipped without a Vulkan or EGL driver.) The steps:
+so it is marked slow; the screenshot and diff steps are skipped without a Vulkan or EGL driver. `npm run test:templates`
+runs every template test the same way.) The steps:
 
 1. `ion new ecs Arena --ion-source /path/to/Ion`, then `cd Arena`.
 2. Add `GravitySystem` as above.

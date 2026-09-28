@@ -46,7 +46,8 @@ Any client that launches stdio servers works. The usual JSON configuration is:
 ```
 
 If the tool is not installed globally, point `command` at `dotnet` and `args` at the tool's DLL:
-`["path/to/Ion/Ion.Tools/bin/Release/net10.0/Ion.Tools.dll", "mcp"]`.
+`["path/to/Ion/Ion.Tools/bin/Release/net10.0/Ion.Tools.dll", "mcp"]`. Inside the Ion repository, `npm run mcp` starts
+the server from source.
 
 ### Protocol details
 
@@ -194,6 +195,18 @@ Headless rendering (`render`, on by default) needs a Vulkan driver or EGL with O
 on Linux CI). On a machine without either, pass `render: false` and check state with the query tools and the summary
 instead of pictures. A game running headless without rendering answers `ion_screenshot` with error `-32005`.
 :::
+
+## Common problems
+
+| Message | Cause and fix |
+|---|---|
+| `No game is connected: call ion_run with live=true, or ion_connect.` | A live tool was called before a game was started or attached. |
+| `No token file at '...'. Start the game with --remote (or ion_run live=true).` | `ion_connect` found no `remote.json`. Start the game with `--remote` from its project directory, or pass `tokenFile`. |
+| `The game exited with code N before its remote server started.` | The game failed at startup; the message ends with the tail of `.ion/run/game.log`. With `configuration: "Release"`, the remote module is compiled out unless the project sets `IonRemote=true`. |
+| `The game answered with error -32002: ...` | The session has no mutate scope: the game was started with `--remote` only, or `ion_run` with `allowMutations: false`. |
+| `The game answered with error -32004: ...` | No such entity, component, field path or resource. `ion_query` lists entities; `ion_call rpc.discover` and `registry.schema` list what exists. |
+| `The game answered with error -32005: Screenshots need a rendering backend ...` | The live game runs headless without rendering (`render: false`, or no driver). |
+| `isError: true` on a headless `ion_run` | The game's exit code was not 0. Read `summary.status`, `summary.exception` and `summary.errors`. |
 
 ## See also
 

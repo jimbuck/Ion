@@ -30,6 +30,14 @@ ion --version
 
 You can also run it in place without installing: `dotnet Ion/Ion.Tools/bin/Release/net10.0/Ion.Tools.dll <command>`.
 
+Inside the Ion repository, the root `package.json` wraps the same steps as npm tasks (run `npm install` once):
+
+```bash
+npm run ion -- run --headless --frames 600   # dotnet run -c Release --project Ion/Ion.Tools -- <args>
+npm run mcp                                  # the MCP server from source
+npm run install:tools                        # pack Ion.Tools into artifacts/packages and dotnet tool update -g
+```
+
 The game templates (`templates/2d`, `templates/3d`, `templates/ecs`) are embedded in the tool, so `ion new` works offline.
 
 ## Commands at a glance
@@ -101,7 +109,7 @@ project with a headless test and a snapshot test, `CLAUDE.md`, `appsettings.json
 prints the next steps:
 
 ```text
-Created the ecs game 'Arena' in /work/Arena (14 files).
+Created the ecs game 'Arena' in /work/Arena (13 files).
   cd Arena
   ion run --headless --frames 600 --screenshot out/frame600.png --summary out/run.json
   dotnet test
@@ -213,6 +221,7 @@ system and step that failed.
 Because the options are plain configuration keys, `dotnet run` does the same thing:
 
 ```bash
+# From the solution directory; Arena/Arena.csproj is the game project.
 dotnet run --project Arena -- --headless --Ion:Run:Frames=600 --Ion:Seed=1 --Ion:Run:Summary=out/run.json
 dotnet run --project Arena -- --headless-render --Ion:Run:Frames=600 --Ion:Run:Screenshot=out/frame.png
 ```
@@ -333,6 +342,19 @@ ion mcp
 
 Serves the Model Context Protocol on standard input and output until the input ends. Register it with your agent, for
 example `claude mcp add ion -- ion mcp`. See [MCP server](/Ion/tooling/mcp-server/).
+
+## Common problems
+
+| Message or symptom | Cause and fix |
+|---|---|
+| `ion: Unknown option(s): --foo. Pass game arguments after '--'.` | Only the options listed above are known. Game settings go after `--`: `ion run -- --Ion:Window:Width=640`. |
+| `ion: Several projects in '...': A.csproj, B.csproj. Pass the one to run.` | The directory holds more than one non-test project. Pass the `.csproj` path. |
+| `ion: No token file at .../.ion/run/remote.json; is the game running with --remote?` | Start the game with `ion run --remote` (or `--remote-allow-mutations`, `--pause-at`), or point `ion remote` at the file with `--token-file`. A game started with `dotnet run` writes the file under its current directory. |
+| `ion: error -32002: ...` from `ion remote` | The game runs without the mutate scope. Restart it with `--remote-allow-mutations`. |
+| `--remote` prints `Ion remote: --remote was requested but the remote module is compiled out of this build` | A Release build without `IonRemote=true`. Use `-c Debug` (the default) or set `<IonRemote>true</IonRemote>`. |
+| `"status": "crashed"` in the summary with no `exception` | The process died before the game's report ran (a build-time or startup failure). Read `output`, the tail of the process output. |
+| `ion trace` says `the game did not write trace.json` | The game does not install the metrics module. `AddIon` does; without it call `builder.AddMetrics()`. |
+| `ion run --screenshot` writes a warning `Screenshot not written: No screenshot source` | Headless rendering was not available. On Linux install Mesa (lavapipe or llvmpipe); see [Graphics backends](/Ion/rendering/graphics-backends/). |
 
 ## See also
 

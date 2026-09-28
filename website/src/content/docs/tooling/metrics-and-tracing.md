@@ -224,7 +224,8 @@ is the same as `MetricsIds.Register(name)`.
 
 ### The 0.2 trace timers
 
-`ITraceManager`, `ITraceTimer` and `ITraceTimer<T>` from `Ion.Extensions.Debug` still work as obsolete adapters over the
+`ITraceManager`, `ITraceTimer` and `ITraceTimer<T>` (namespace `Ion.Extensions.Debug`, shipped in
+`Ion.Extensions.Metrics.Abstractions`) still work as obsolete adapters over the
 frame profiler and will be removed in 0.4. They intern a name on every `Start` and box an instance per recording; move to
 `MetricsScope` with a `SpanId` registered once.
 
