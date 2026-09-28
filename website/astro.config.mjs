@@ -28,6 +28,12 @@ export default defineConfig({
 			editLink: { baseUrl: 'https://github.com/jimbuck/Ion/edit/main/website/' },
 			lastUpdated: true,
 			customCss: ['./src/styles/custom.css'],
+			// Dark only: a fixed dark theme and no theme picker.
+			components: {
+				ThemeProvider: './src/components/ThemeProvider.astro',
+				ThemeSelect: './src/components/ThemeSelect.astro',
+			},
+			expressiveCode: { themes: ['night-owl'], useStarlightUiThemeColors: true },
 			// Pagefind full-text search over every page (Starlight's built-in integration).
 			pagefind: true,
 			plugins: [starlightLinksValidator({ errorOnRelativeLinks: false, errorOnLocalLinks: false })],

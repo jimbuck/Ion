@@ -1,10 +1,39 @@
-:root {
-	--sl-color-accent-low: #1f1747;
-	--sl-color-accent: #7c5cff;
-	--sl-color-accent-high: #d6ccff;
+/* Dark slate gray and teal. The site is dark only (see src/components/ThemeProvider.astro). */
+:root,
+:root[data-theme='dark'] {
+	color-scheme: dark;
+
+	/* Teal accent */
+	--sl-color-accent-low: #0f3b3a;
+	--sl-color-accent: #14b8a6;
+	--sl-color-accent-high: #99f6e4;
+
+	/* Slate grays, from brightest text to the page background */
+	--sl-color-white: #f1f5f5;
+	--sl-color-gray-1: #dbe4e4;
+	--sl-color-gray-2: #b4c3c3;
+	--sl-color-gray-3: #85999a;
+	--sl-color-gray-4: #587070;
+	--sl-color-gray-5: #34494a;
+	--sl-color-gray-6: #22302f;
+	--sl-color-gray-7: #1a2525;
+	--sl-color-black: #141d1d;
+
+	--sl-color-bg-nav: #182222;
+	--sl-color-bg-sidebar: #162020;
+	--sl-color-hairline: #2b3b3b;
+	--sl-color-hairline-light: #34494a;
 }
-:root[data-theme='light'] {
-	--sl-color-accent-low: #e6e0ff;
-	--sl-color-accent: #5b3be6;
-	--sl-color-accent-high: #231466;
+
+/* Hero title with a teal glow */
+.hero h1 {
+	background: linear-gradient(90deg, #f1f5f5 20%, #2dd4bf);
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+}
+
+/* Code blocks sit slightly above the page */
+.expressive-code .frame {
+	--ec-frm-edBg: #0f1717;
 }
