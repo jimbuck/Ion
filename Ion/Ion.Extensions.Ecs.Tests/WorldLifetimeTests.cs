@@ -102,6 +102,38 @@ public class WorldLifetimeTests
 	}
 
 	[Fact]
+	public void ASingletonSceneSystemRunsOnTheScenesWorld()
+	{
+		// builder.AddSystem<T>() registers a singleton; used by a scene, the system is still created from the scene's scope,
+		// so its World and Commands are the scene's (before, it silently got the root world's).
+		using var host = Hosts.Ecs()
+			.Configure(services => services.AddJournal().AddSingleton<SceneProbe>())
+			.ConfigureApp(app =>
+			{
+				app.UseScene(1, scene => scene.UseEcs().UseSystem<SceneProbe>());
+				app.UseScene(2, scene => scene.UseEcs().UseSystem<SceneProbe>());
+			});
+
+		host.Step();
+		var worlds = host.Get<EcsWorlds>();
+		var scenes = host.Get<SceneSystem>();
+		Assert.True(scenes.ActiveScene!.Schedule.IsGenerated);
+		var first = scenes.ActiveScene.Services.GetRequiredService<World>();
+		Assert.NotSame(worlds.Root, first);
+		Assert.Equal(1, first.Count<Transform2D>());
+		Assert.Equal(0, worlds.Root.Count<Transform2D>());
+
+		host.Events.EmitChangeScene(2);
+		host.Step(2);
+
+		var second = scenes.ActiveScene!.Services.GetRequiredService<World>();
+		Assert.DoesNotContain(first, worlds.Worlds);
+		Assert.Equal(1, second.Count<Transform2D>());
+		Assert.Equal(0, worlds.Root.Count<Transform2D>());
+		Assert.Equal([$"scene world {first.Id}", $"scene world {second.Id}"], host.Get<Journal>().Entries);
+	}
+
+	[Fact]
 	public void FrameStatsCountTheEntitiesOfEveryWorld()
 	{
 		using var host = Hosts.Ecs().WithSystem<RootProbe>();

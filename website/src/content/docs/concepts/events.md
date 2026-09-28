@@ -140,7 +140,7 @@ Input has the same guarantee: see [Stages](/Ion/concepts/stages/#input-and-event
 | `WindowClosedEvent` | The window | The user closed the window; the window system turns it into `ExitGameEvent`. |
 | `WindowFocusGainedEvent`, `WindowFocusLostEvent` | The window | Focus changes. |
 | `AssetReloadedEvent` | Asset hot reload | An asset was reloaded; see [Assets](/Ion/rendering/assets/). |
-| `ChangeSceneEvent(int NextSceneId)` | `EmitChangeScene(...)` | Switches the active scene; see [Scenes](/Ion/ecs/scenes/). |
+| `ChangeSceneEvent(int NextSceneId, SceneTransition Transition = default)` | `EmitChangeScene(...)` | Switches the active scene, at once or with a transition; see [Scenes](/Ion/ecs/scenes/). |
 | `Collision2D`, `Trigger2D`, `Collision3D`, `Trigger3D` | The physics modules | Contact begin and end; see [Queries and events](/Ion/physics/queries-and-events/). |
 
 ```csharp

@@ -141,7 +141,9 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 		// A test host running the program's entry point adds its registrations after the program's.
 		Hook?.OnBuilding(this);
 
-		// Captured last, so the root schedule can reject scoped systems and scoped step parameters (ION006).
+		// Captured last, so the root schedule can reject scoped systems and scoped step parameters (ION006), and scenes can
+		// create the systems registered as singletons from their own scope (and dispose them with it).
+		Services.AddScoped<ScopeOwnedInstances>();
 		Services.AddSingleton(new ServiceLifetimeIndex(Services));
 
 		var host = _hostBuilder.Build();

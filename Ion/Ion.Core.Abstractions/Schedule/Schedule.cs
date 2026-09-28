@@ -24,7 +24,7 @@ public sealed class Schedule
 		ArgumentNullException.ThrowIfNull(services);
 
 		Plan = plan;
-		var binder = new Binder(services, FrameProfiler.IsProfilingEnabled && services.GetService<IStepProfiler>() is { CanRecord: true } profiler ? profiler : null);
+		var binder = new Binder(services, plan.IsRoot, FrameProfiler.IsProfilingEnabled && services.GetService<IStepProfiler>() is { CanRecord: true } profiler ? profiler : null);
 
 		foreach (var stage in plan.Stages)
 		{
@@ -125,7 +125,7 @@ public sealed class Schedule
 	/// <inheritdoc/>
 	public override string ToString() => Plan.Print();
 
-	private sealed class Binder(IServiceProvider services, IStepProfiler? profiler)
+	private sealed class Binder(IServiceProvider services, bool isRoot, IStepProfiler? profiler)
 	{
 		private readonly Dictionary<SystemEntry, object> _instances = [];
 
@@ -182,7 +182,7 @@ public sealed class Schedule
 
 			if (!_instances.TryGetValue(system, out var instance))
 			{
-				instance = services.GetRequiredService(system.ServiceType);
+				instance = SystemActivator.Resolve(services, system.ServiceType, isRoot);
 				_instances[system] = instance;
 			}
 

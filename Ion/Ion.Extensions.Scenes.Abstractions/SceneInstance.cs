@@ -14,6 +14,12 @@ public class SceneInstance
 	/// <summary>The scene's schedule.</summary>
 	public Schedule Schedule { get; }
 
+	/// <summary>
+	/// The scene's services (the scope created when it loaded, disposed when it unloads). Resolve from it to reach the
+	/// scene's own instances from outside the scene, for example its <c>World</c> or its coroutine runner.
+	/// </summary>
+	public IServiceProvider Services { get; }
+
 	/// <summary>Runs the scene's Init stage.</summary>
 	public GameLoopDelegate Init => Schedule.Init;
 	/// <summary>Runs the scene's First stage.</summary>
@@ -29,10 +35,11 @@ public class SceneInstance
 	/// <summary>Runs the scene's Destroy stage.</summary>
 	public GameLoopDelegate Destroy => Schedule.Destroy;
 
-	internal SceneInstance(int id, Schedule schedule)
+	internal SceneInstance(int id, Schedule schedule, IServiceProvider services)
 	{
 		Id = id;
 		Name = $"Scene{id}";
 		Schedule = schedule;
+		Services = services;
 	}
 }

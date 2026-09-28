@@ -40,11 +40,12 @@ dotnet_diagnostic.ION101.severity = error
 Turning off a compile-time check does not turn off the runtime check: a real schedule error still throws at
 `Build()`.
 
-## Schedule (ION001 to ION014)
+## Schedule (ION001 to ION015)
 
 The generator reports `ION001` to `ION013` at the offending method (or at the registration call) with the runtime's
 message. `ION006`, `ION008` and `ION009` are reported at compile time only for types declared in the project that no
-service registration call in the project mentions.
+service registration call in the project mentions. `ION015` is reported at run time only (it depends on how a service
+was registered, which the generator cannot always see).
 
 | Id | Severity | Title |
 |---|---|---|
@@ -62,6 +63,7 @@ service registration call in the project mentions.
 | `ION012` | Warning | Constraint on a system that is not in the schedule |
 | `ION013` | Warning | System without steps |
 | `ION014` | Warning | Ion schedule generator is disabled |
+| `ION015` | Error | Singleton instance used by a scene |
 
 ### ION001: Unknown stage
 
@@ -185,6 +187,16 @@ or `The compiler does not support interceptor locations (Roslyn 4.12 or later, .
 **Cause:** the generator needs C# interceptors. **Fix:** reference Ion through the `Ion` or `Ion.Core` package (whose
 build props enable the namespace), or add the property yourself when you reference the generator as a project; build
 with the .NET SDK 9.0.200 or later. The game still runs, on the runtime path.
+
+### ION015: Singleton instance used by a scene
+
+**Message:** `System 'X' is registered as a singleton instance but is used by schedule 'Scene 1'. A scene creates its systems from its own scope (so they get the scene's World and scoped services), which an instance cannot be. Register the type instead (builder.AddSystem<X>(), AddScoped or AddTransient) or a factory.`
+
+**Cause:** a scene uses a system registered with `services.AddSingleton(new X(...))`. Scenes create their systems from
+the scene's scope, once per load, including systems registered as singletons by type or factory; an instance built
+before the application started cannot be. Reported at run time, when `Build()` plans the scenes. **Fix:** register the
+type (`builder.AddSystem<X>()`) or a factory (`AddSingleton(sp => new X(...))`, which the scene calls with its own
+provider). See [Scenes](/Ion/ecs/scenes/#scene-systems-and-registration-lifetimes).
 
 ## Events (ION101 to ION106)
 

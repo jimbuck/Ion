@@ -1,5 +1,6 @@
 using Ion.Examples.Tests;
 using Ion.Extensions.Graphics;
+using Ion.Extensions.Scenes;
 using Ion.Testing;
 
 using Xunit;
@@ -10,7 +11,7 @@ namespace Ion.Examples.Scenes.Tests;
 
 /// <summary>
 /// The Scenes sample rendered headless on the Vulkan backend: the main menu scene's green square on the cornflower blue
-/// clear color, then (after Tab) the gameplay scene's red square, each compared with a golden image.
+/// clear color, then (after Tab and its 0.4 s fade) the gameplay scene's red square, each compared with a golden image.
 /// </summary>
 public class ScenesRenderingTests
 {
@@ -32,8 +33,10 @@ public class ScenesRenderingTests
 			host.Step(3);
 			menu = host.Screenshot();
 
+			// Tab fades out over 0.2 s, loads the gameplay scene under a black frame and fades in over 0.2 s: 24 frames at
+			// the host's 60 Hz clock, and a few more.
 			host.Input.Tap(Key.Tab);
-			host.Step(3);
+			host.Step(30);
 			gameplay = host.Screenshot();
 		}
 
@@ -44,6 +47,27 @@ public class ScenesRenderingTests
 		Assert.Equal(Color.DarkRed.ToRgba8(), gameplay.GetPixel(50, 50));
 		GoldenImage.AssertMatches(menu, RenderingEnvironment.GoldenPath("scenes_menu.png"), tolerance: 2);
 		GoldenImage.AssertMatches(gameplay, RenderingEnvironment.GoldenPath("scenes_gameplay.png"), tolerance: 2);
+	}
+
+	[Fact, Trait(CATEGORY, INTEGRATION)]
+	public void TabFadesToTheGameplaySceneHeadless()
+	{
+		using var host = new IonTestHost().UseEntryPoint<Program>();
+		var scenes = host.Get<SceneSystem>();
+		host.Step(3);
+		Assert.Equal((int)Scene.MainMenu, scenes.CurrentSceneId);
+
+		// The press is seen in the next frame, whose Update emits the change; the fade starts the frame after.
+		host.Input.Tap(Key.Tab);
+		host.Step(6);
+		Assert.Equal((int)Scene.MainMenu, scenes.CurrentSceneId);
+		Assert.Equal(TransitionPhase.Out, scenes.Transition.Phase);
+		Assert.Equal(2, host.SpriteBatch.LastFrame.Rects); // the menu's square and the fade over it
+
+		host.Step(24);
+		Assert.Equal((int)Scene.Gameplay, scenes.CurrentSceneId);
+		Assert.False(scenes.Transition.IsActive);
+		Assert.Equal(1, host.SpriteBatch.LastFrame.Rects);
 	}
 
 	[WindowedVulkanFact, Trait(CATEGORY, E2E)]

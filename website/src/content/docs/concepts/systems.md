@@ -112,7 +112,8 @@ public sealed class LevelSystem(World world)
 :::note[Lifetimes]
 `AddSystem<T>()` registers the system as a singleton, which is what the root schedule needs. The root schedule resolves
 from the root service provider, so scoped systems and scoped step parameters are rejected there (`ION006`). Scene
-schedules resolve from the scene's scope, so systems added inside `UseScene(...)` may be scoped. See
+schedules resolve from the scene's scope, so systems added inside `UseScene(...)` may be scoped, and a system
+registered as a singleton is created from the scene's scope too (once per load), so it gets the scene's services. See
 [Services and configuration](/Ion/concepts/services-and-configuration/).
 :::
 

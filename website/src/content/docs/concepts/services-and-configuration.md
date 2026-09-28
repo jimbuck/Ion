@@ -32,7 +32,7 @@ public sealed class ScoreSystem(ScoreBoard board, IEvents events, ILogger<ScoreS
 
 | Lifetime | In the root schedule | In a scene's schedule |
 |---|---|---|
-| Singleton | Yes. One instance for the application. The default for `AddSystem<T>()`. | Yes, shared with the root. |
+| Singleton | Yes. One instance for the application. The default for `AddSystem<T>()`. | A **system** is created from the scene's scope once per load (with its registered type or factory) and disposed when the scene unloads, so it gets the scene's `World`; a singleton registered as an instance is error `ION015`. A singleton **service** injected into a scene is shared with the root. |
 | Scoped | **No**: error `ION006`, because the root schedule resolves from the root provider. | Yes. One instance per scene scope, disposed when the scene unloads. |
 | Transient | Resolved once, when the schedule is built (like everything a schedule resolves). | Resolved once per scene load. |
 
@@ -63,7 +63,7 @@ inject most often:
 | `IAssetManager` | `AddIon` | Loading assets. |
 | `IAudioManager` | `AddIon` | Playing sounds. |
 | `IMetrics` | `AddIon` | Counters, gauges, profiling. |
-| `ICoroutineRunner` | `AddIon` | The shared coroutine runner. |
+| `ICoroutineRunner` | `AddIon` | The coroutine runner: the application's from the root provider, the scene's (its coroutines stop when it unloads) from a scene's scope. |
 | `IRenderer3D` | `AddRendering3D` | The 3D renderer. |
 | `World`, `Commands` | `AddEcs` | The ECS world of the current scope and its command buffer. |
 

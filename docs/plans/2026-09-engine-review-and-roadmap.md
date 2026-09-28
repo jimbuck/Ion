@@ -111,6 +111,11 @@ The only instrumentation is the Debug package's trace timers, which produce Chro
 ### 3.6 Scenes, coroutines, assets, audio, storage
 
 - Scenes: a process-wide static `_scenesAdded` means the second `IonApplication` in a process never gets a `SceneSystem`; `SceneSystem` never calls `next`; unknown scene ids warn and then throw `KeyNotFoundException`; transitions are dead code; `Dispose` skips the scene's `Destroy`. The scoped-DI-per-scene design itself is good.
+  *Later fixes:* the scene system runs transitions itself (`SceneTransition` on `ChangeSceneEvent`, out and in phases on
+  game time, `SceneSystem.Transition` for renderers, a built-in fade drawn by `SceneFadeSystem`); scene id 0 loads (a
+  separate "has scene" state instead of the sentinel id); scene systems registered as singletons are created from the
+  scene's scope (so they get the scene's `World`, `ION015` for singleton instances); a scene's coroutines stop when it
+  unloads (`ScopedCoroutineRunner`).
 - Coroutines: pull-based and correct for "no async", but transient runner, boxed `IWait` structs per yield, LINQ in `IsActive`, `FindIndex` + `RemoveAt` in `Stop`, and a source generator that only emits an unused attribute.
 - Assets: synchronous only, no caching for textures or sounds (every `Load` creates a new GPU texture), scoped manager never disposes, loaders hard-cast, `AssetBatch` fully commented out, paths rooted at `Environment.CurrentDirectory` rather than `AppContext.BaseDirectory`.
 - Audio: NAudio `DirectSoundOut` (Windows-only), `pitchShift` computed and discarded, `MasterVolume` defaults to 10, fixed 48 kHz stereo with no resampling, trace timer leaked on `volume == 0`.

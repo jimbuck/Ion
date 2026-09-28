@@ -30,7 +30,9 @@ else
 }
 
 builder.Services.AddScenes();
+builder.Services.AddSceneFade();
 builder.Services.AddCoroutines();
+// A singleton used by a scene: the scene still creates its own instance from its scope, once per load.
 builder.AddSystem<TestMiddleware>();
 
 using var game = builder.Build();
@@ -74,11 +76,12 @@ game.Update((GameTime dt, IEvents events, IInputState input) =>
 {
 	while (intEvents.TryRead(out var e)) Console.WriteLine($"Int event! {e}");
 
-	// Tab switches between the two scenes.
+	// Tab switches between the two scenes with a fade to black: the current scene keeps running while the screen darkens
+	// (0.2 s), the next one loads under the black frame and fades in (0.2 s). Pressing Tab again mid-fade turns it around.
 	if (input.Pressed(Key.Tab))
 	{
 		gameplay = !gameplay;
-		events.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu);
+		events.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu, SceneTransition.Fade(0.4f));
 	}
 });
 
@@ -115,8 +118,11 @@ else
 	game.UseGraphics();
 }
 
-// Steps the shared ICoroutineRunner once per frame in the Update stage.
+// Steps the shared coroutine runner once per frame in the Update stage.
 game.UseCoroutines();
+
+// Draws the fade transitions (UseIon adds it for games that use the whole engine).
+game.UseSceneFade();
 
 game.Run();
 

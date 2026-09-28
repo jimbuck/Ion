@@ -46,6 +46,12 @@ public static class ScheduleDiagnosticCodes
 
 	/// <summary>Warning: a system passed to <c>UseSystem</c> has no stage or scope methods, so it never runs.</summary>
 	public const string SystemWithoutSteps = "ION013";
+
+	/// <summary>
+	/// Error: a scene uses a system registered as a singleton instance (<c>AddSingleton(new T())</c>). Scenes create their
+	/// systems from the scene's scope, including systems registered as singletons, which an instance cannot be.
+	/// </summary>
+	public const string SingletonInstanceInScene = "ION015";
 }
 
 /// <summary>The severity of a <see cref="ScheduleDiagnostic"/>.</summary>

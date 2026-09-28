@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Ion.Extensions.Metrics;
 using Ion.Extensions.Assets;
@@ -108,6 +109,9 @@ public static class BuilderExtensions
 			services.AddSingleton(sp => new RunReportSystem(sp, config, logs));
 		}
 
+		// Draws the built-in fade scene transition (nothing while none runs).
+		services.TryAddSingleton<SceneFadeSystem>();
+
 		return services
 			.AddScenes()
 			.AddCoroutines()
@@ -153,7 +157,25 @@ public static class BuilderExtensions
 
 		return app
 			.UseCoroutines()
+			.UseSceneFade()
 			.UseRemote();
+	}
+
+	/// <summary>
+	/// Adds the <see cref="SceneFadeSystem"/>, which draws the built-in fade scene transition
+	/// (<c>SceneTransition.Fade</c>) with the 2D renderer. <see cref="UseIon"/> adds it; call it (after registering the
+	/// graphics and <c>services.AddSceneFade()</c>) in games composed from parts.
+	/// </summary>
+	public static IIonApplication UseSceneFade(this IIonApplication app) => app.UseSystem<SceneFadeSystem>();
+
+	/// <summary>
+	/// Registers the <see cref="SceneFadeSystem"/> (<see cref="AddIon"/> does), for games composed from parts. It needs the
+	/// scene system (<c>AddScenes</c>), a sprite batch and a window.
+	/// </summary>
+	public static IServiceCollection AddSceneFade(this IServiceCollection services)
+	{
+		services.TryAddSingleton<SceneFadeSystem>();
+		return services;
 	}
 
 	/// <summary>

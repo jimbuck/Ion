@@ -104,7 +104,7 @@ internal sealed class CoreRemoteMethods(RemoteServer server) : IRemoteMethodProv
 			["paused"] = server.IsPaused,
 			["headless"] = configuration is not null && bool.TryParse(configuration["Ion:Headless"], out var headless) && headless,
 			["headlessRender"] = configuration is not null && bool.TryParse(configuration["Ion:Headless:Render"], out var render) && render,
-			["scene"] = scenes?.CurrentSceneId,
+			["scene"] = scenes is { HasScene: true } ? scenes.CurrentSceneId : null,
 			["sceneLoading"] = scenes?.IsLoading ?? false,
 			["fps"] = metrics is null ? null : Math.Round(metrics.LastFrame.Fps, 2),
 			["allowMutations"] = server.Options.AllowMutations,

@@ -412,6 +412,10 @@ internal static class SchedulePlanner
 				{
 					context.Error(ScheduleDiagnosticCodes.ScopedServiceInRoot, $"System '{system.ServiceType.Name}' is registered as scoped but is used by the root schedule, which resolves from the root provider. Register it as a singleton, or use it inside a scene (UseScene).");
 				}
+				else if (!root && lifetimes?.Singleton(system.ServiceType) is { ImplementationInstance: not null })
+				{
+					context.Error(ScheduleDiagnosticCodes.SingletonInstanceInScene, $"System '{system.ServiceType.Name}' is registered as a singleton instance but is used by schedule '{context.Model.Name}'. A scene creates its systems from its own scope (so they get the scene's World and scoped services), which an instance cannot be. Register the type instead (builder.AddSystem<{system.ServiceType.Name}>(), AddScoped or AddTransient) or a factory.");
+				}
 			}
 
 			foreach (var (serviceType, owner) in InjectedServices(item))
@@ -568,15 +572,25 @@ internal static class StepSignature
 
 /// <summary>
 /// The lifetimes of the registered services, captured when the application is built, so that root schedules can reject
-/// scoped systems and scoped step parameters (ION006).
+/// scoped systems and scoped step parameters (ION006), and scene schedules can create the systems registered as
+/// singletons from the scene's scope (see <see cref="SystemActivator"/>).
 /// </summary>
 internal sealed class ServiceLifetimeIndex
 {
 	private readonly Dictionary<Type, ServiceLifetime> _lifetimes = [];
+	private readonly Dictionary<Type, ServiceDescriptor> _singletons = [];
 
 	public ServiceLifetimeIndex(IEnumerable<ServiceDescriptor> descriptors)
 	{
-		foreach (var descriptor in descriptors) _lifetimes[descriptor.ServiceType] = descriptor.Lifetime;
+		foreach (var descriptor in descriptors)
+		{
+			_lifetimes[descriptor.ServiceType] = descriptor.Lifetime;
+			if (descriptor.IsKeyedService) continue;
+
+			// The last registration of a service type is the one GetService returns.
+			if (descriptor.Lifetime == ServiceLifetime.Singleton) _singletons[descriptor.ServiceType] = descriptor;
+			else _singletons.Remove(descriptor.ServiceType);
+		}
 	}
 
 	public bool IsScoped(Type type)
@@ -584,5 +598,63 @@ internal sealed class ServiceLifetimeIndex
 		if (_lifetimes.TryGetValue(type, out var lifetime)) return lifetime == ServiceLifetime.Scoped;
 		if (type.IsConstructedGenericType && _lifetimes.TryGetValue(type.GetGenericTypeDefinition(), out lifetime)) return lifetime == ServiceLifetime.Scoped;
 		return false;
+	}
+
+	/// <summary>The registration of <paramref name="type"/> when it is a (non-keyed) singleton.</summary>
+	public ServiceDescriptor? Singleton(Type type) => _singletons.GetValueOrDefault(type);
+}
+
+/// <summary>
+/// Resolves the system instances of a schedule. The root schedule resolves every system from the root provider. A nested
+/// (scene) schedule resolves from the scene's scope, and a system registered as a singleton is created there too (with
+/// its registered factory or type, so its dependencies, such as the scene's <c>World</c>, come from the scene), once per
+/// load, and disposed with the scene: a singleton resolved as usual would be built from the root provider and silently
+/// get the root's scoped services. A singleton registered as an instance cannot be created again, so a scene that uses
+/// one is an error (ION015).
+/// </summary>
+internal static class SystemActivator
+{
+	public static object Resolve(IServiceProvider services, Type serviceType, bool isRoot)
+	{
+		if (!isRoot && services.GetService<ServiceLifetimeIndex>()?.Singleton(serviceType) is { ImplementationInstance: null } descriptor)
+		{
+			var instance = descriptor.ImplementationFactory is { } factory
+				? factory(services)
+				: ActivatorUtilities.CreateInstance(services, descriptor.ImplementationType!);
+
+			if (instance is IDisposable or IAsyncDisposable) services.GetService<ScopeOwnedInstances>()?.Add(instance);
+			return instance;
+		}
+
+		return services.GetRequiredService(serviceType);
+	}
+}
+
+/// <summary>
+/// The instances a scope created itself (the scene's copies of singleton systems, see <see cref="SystemActivator"/>),
+/// disposed with the scope, last created first. Registered as a scoped service by the application builder.
+/// </summary>
+internal sealed class ScopeOwnedInstances : IDisposable
+{
+	private readonly List<object> _instances = [];
+
+	public void Add(object instance) => _instances.Add(instance);
+
+	public void Dispose()
+	{
+		for (var i = _instances.Count - 1; i >= 0; i--)
+		{
+			switch (_instances[i])
+			{
+				case IDisposable disposable:
+					disposable.Dispose();
+					break;
+				case IAsyncDisposable asyncDisposable:
+					asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+					break;
+			}
+		}
+
+		_instances.Clear();
 	}
 }

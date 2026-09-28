@@ -42,6 +42,6 @@ internal class SceneBuilder(int sceneId, IConfiguration config, IServiceProvider
 	{
 		var schedule = Schedule.Build(Services, logWarnings: false);
 		Schedule.Freeze();
-		return new SceneInstance(SceneId, schedule);
+		return new SceneInstance(SceneId, schedule, Services);
 	}
 }

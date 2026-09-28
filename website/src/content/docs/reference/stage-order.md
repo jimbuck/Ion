@@ -48,6 +48,7 @@ The constants live in `StageOrder` in `Ion.Core.Abstractions`
 | `EngineTeardownFirst` | 500 | none | First order of the teardown band. |
 | `PhysicsDebugDraw` | 650 | Render | `Physics2DDebugDrawSystem` (sprite batch) and `Physics3DDebugDrawSystem` (3D renderer): collider outlines on top of the game's drawing. |
 | `Ui` | 700 | Render | `UiSystem`: submits the frame's widgets to the sprite batch. |
+| `SceneTransition` | 750 | Render | `SceneFadeSystem`: the fade scene transition, over the scene, the game's drawing and the UI. Draw custom transitions here too. |
 | `MetricsOverlay` | 800 | Render | `MetricsOverlaySystem`: the overlay stays on top of the UI. |
 | `NetworkSend` | 870 | Last, Destroy | `NetworkSystem`: delta-encode snapshots, pack messages and flush (Last); disconnect peers (Destroy). |
 | `WindowClose` | 900 | Render, Destroy | `SilkWindowSystem` and `NullWindowSystem`: a closed window becomes an exit request (Render); the native window is released late in Destroy. |
@@ -144,6 +145,7 @@ at order 0 appear as "user".
 | 0 | user |
 | 650 | physics debug drawing |
 | 700 | UI drawing |
+| 750 | scene transition (fade) |
 | 800 | metrics overlay |
 | 900 | window close check |
 | 950 | ECS command playback |
@@ -204,6 +206,7 @@ Console.WriteLine(game.PrintSchedule());
       -300    SpriteExtractionSystem.Extract
          0    ScoreSystem.RenderScore
        700    Physics2DDebugDrawSystem.Draw
+       750    SceneFadeSystem.Draw
        800    MetricsOverlaySystem.Draw
        900    NullWindowSystem.CheckClosed
        950    EcsCommandsSystem.FlushRender

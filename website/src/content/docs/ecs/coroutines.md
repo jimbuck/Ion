@@ -38,7 +38,7 @@ public record struct RoundOverEvent(int Winner);
 
 | Call | Does |
 |---|---|
-| `builder.AddIon()` | Registers `ICoroutineRunner` (a singleton `CoroutineRunner`) and `CoroutineSystem`. |
+| `builder.AddIon()` | Registers the application's `CoroutineRunner` (a singleton), `ICoroutineRunner` (that runner from the root provider, a `ScopedCoroutineRunner` from a scene's scope, see [Coroutines and scenes](#coroutines-and-scenes)) and `CoroutineSystem`. |
 | `game.UseIon()` | Adds `CoroutineSystem`, which steps the runner once per frame. |
 | `services.AddCoroutines()` / `game.UseCoroutines()` | The same, for games that compose the engine from parts (the Scenes sample does). |
 | `builder.AddCoroutines()` | An alias of `AddIon()`. |
@@ -51,7 +51,7 @@ public record struct RoundOverEvent(int Winner);
 |---|---|
 | `Start(IEnumerator routine)` | Adds a coroutine. Its code first runs at the runner's next step. |
 | `Stop(IEnumerator routine)` | Removes that coroutine (by reference). Stopping one that is not running is a no-op. |
-| `StopAll()` | Removes every coroutine. |
+| `StopAll()` | Removes every coroutine (on a scene's runner, every coroutine that runner started). |
 | `IsActive(IEnumerator routine)` | Whether it is still running. |
 | `Count` | The number of running coroutines. |
 | `Update(GameTime dt)` | Steps every coroutine. Called for you by `CoroutineSystem`. |
@@ -205,32 +205,22 @@ before the UI frame, the active scene (-500) and your own Update steps (0). Cons
 
 ## Coroutines and scenes
 
-The runner is a singleton shared by the whole application, including scene-scoped systems. Coroutines are **not**
-stopped when a scene unloads. A coroutine started by a scene system that keeps touching the scene's `World` after the
-scene is gone would use a released world. Stop the scene's coroutines in its Destroy stage:
+Which runner you get depends on where `ICoroutineRunner` is resolved:
+
+| Resolved from | `ICoroutineRunner` is | Its coroutines stop |
+|---|---|---|
+| The root provider: root systems, singletons, the application's function steps | The application's `CoroutineRunner` | When you stop them, or the application exits |
+| A scene's scope: scene systems (whatever their registration lifetime) and scene function steps | That scene's `ScopedCoroutineRunner` | When the scene unloads (its scope is disposed), or when you stop them |
+
+Both run their coroutines on the same runner, stepped once per frame by `CoroutineSystem`, so a scene's coroutines behave
+exactly like the application's until the scene unloads. A scene system can therefore start work that touches the scene's
+`World` without cleaning up after itself:
 
 ```csharp
-public sealed class WaveSystem(ICoroutineRunner coroutines, World world) : IDisposable
+public sealed class WaveSystem(ICoroutineRunner coroutines, World world)
 {
-    private readonly List<IEnumerator<Wait>> _running = [];
-
     [Init]
-    public void Init(GameTime dt) => Run(Waves());
-
-    [Destroy]
-    public void Destroy(GameTime dt) => Dispose();
-
-    public void Dispose()
-    {
-        foreach (var routine in _running) coroutines.Stop(routine);
-        _running.Clear();
-    }
-
-    private void Run(IEnumerator<Wait> routine)
-    {
-        _running.Add(routine);
-        coroutines.Start(routine);
-    }
+    public void Init(GameTime dt) => coroutines.Start(Waves());   // stops when the scene unloads
 
     private IEnumerator<Wait> Waves()
     {
@@ -245,8 +235,19 @@ public sealed class WaveSystem(ICoroutineRunner coroutines, World world) : IDisp
 public record struct Enemy;
 ```
 
-Registered scoped (`builder.Services.AddScoped<WaveSystem>()`) and added with `scene.UseSystem<WaveSystem>()`, it is
-disposed with the scene either way. See [Scenes](/Ion/ecs/scenes/).
+A scene's runner sees only its own coroutines: `Count`, `IsActive`, `Stop` and `StopAll` ignore the application's and
+other scenes'. Its `Update` steps the shared runner (at most once per frame, like a manual call on the application's).
+Starting a coroutine on it after its scene unloaded throws `ObjectDisposedException`.
+
+To go the other way:
+
+- **A coroutine that outlives its scene** (music that keeps fading after a level ends, say): inject the concrete
+  `CoroutineRunner` instead of `ICoroutineRunner`. It is the application's runner wherever it is resolved.
+- **Tie a coroutine to the active scene from outside it** (from a root system): start it on the scene's runner,
+  `scenes.ActiveScene!.Services.GetRequiredService<ICoroutineRunner>().Start(routine)`, where `scenes` is the
+  `SceneSystem`.
+
+The root runner's `Count`, `IsActive` and `StopAll` cover every coroutine, the scenes' included.
 
 ## Coroutines or systems?
 

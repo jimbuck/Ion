@@ -21,7 +21,7 @@ The 0.3 work rebuilt most of the engine. Released versions stop at 0.2.5; the te
 - **Registration order no longer matters.** Engine steps use reserved order bands (`-1000..-500` and `500..1000`), see
   [Stage order](/Ion/reference/stage-order/).
 - **Validation at build.** `IonApplication.Build()` throws `IonScheduleException` listing every schedule error
-  (`ION001` to `ION013`); see [Diagnostics](/Ion/reference/diagnostics/).
+  (`ION001` to `ION013`, and `ION015`); see [Diagnostics](/Ion/reference/diagnostics/).
 - **Legacy middleware** (`GameLoopDelegate next`) keeps working for one release as opaque middleware, reported as
   `ION010`.
 - **Setup on the builder.** Modules register on the builder (`builder.AddX()`) and pull in their dependencies;
@@ -41,6 +41,10 @@ The 0.3 work rebuilt most of the engine. Released versions stop at 0.2.5; the te
 - **Input v2**: the shared `InputTracker`, stage-aware edges (a click is seen by exactly one fixed step), gamepads,
   text input, touch.
 - **Scene enum overloads** are the generic `UseScene<TScene>` and `EmitChangeScene<TScene>`.
+- **Scenes**: every `int` is a scene id, 0 included (`HasScene` replaces the sentinel id); a scene creates its systems
+  from its scope even when they are registered as singletons (`ION015` for singleton instances); `ICoroutineRunner` in a
+  scene is the scene's runner, whose coroutines stop when it unloads; the unused `Transition` class is replaced by
+  `SceneTransition`.
 - **Stage 7 windowing change**: `SilkWindow.View` is now the Silk.NET `IView` (a view on Android and iOS).
 
 ### Features, by stage of the work
@@ -63,6 +67,7 @@ The 0.3 work rebuilt most of the engine. Released versions stop at 0.2.5; the te
 | Native and multi-platform builds | `IonTarget` publishing presets, `ion publish`, the R36S ArkOS layout, size and startup tracking, the Android and iOS heads, touch input. |
 | Audio | A mixer with voices, buses, fades and pitch; WAV, OGG and MP3 decoding at load time; OpenAL and null outputs. |
 | Testing | `Ion.Testing` with a deterministic clock, scripted input, event collection, screenshots and golden images. |
+| Scenes | Transitions across frames (`SceneTransition.Fade`, custom transitions drawn from `SceneSystem.Transition`), the built-in `SceneFadeSystem`. See [Scenes](/Ion/ecs/scenes/#transitions). |
 
 ### Selected fixes
 

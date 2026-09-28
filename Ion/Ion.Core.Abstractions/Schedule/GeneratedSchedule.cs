@@ -177,7 +177,7 @@ public abstract class GeneratedScheduleFactory
 			}
 		}
 
-		schedule = Create(new GeneratedScheduleContext(services, byCandidate));
+		schedule = Create(new GeneratedScheduleContext(services, byCandidate, model.IsRoot));
 		mismatch = null;
 		return true;
 	}
@@ -210,11 +210,13 @@ public sealed class GeneratedScheduleContext
 {
 	private readonly ScheduleEntry?[] _entries;
 	private readonly object?[] _instances;
+	private readonly bool _isRoot;
 
-	internal GeneratedScheduleContext(IServiceProvider services, ScheduleEntry?[] entries)
+	internal GeneratedScheduleContext(IServiceProvider services, ScheduleEntry?[] entries, bool isRoot)
 	{
 		Services = services;
 		_entries = entries;
+		_isRoot = isRoot;
 		_instances = new object?[entries.Length];
 	}
 
@@ -232,7 +234,10 @@ public sealed class GeneratedScheduleContext
 	/// <summary>Whether registration <paramref name="entry"/> (an index into the generator's list) ran.</summary>
 	public bool IsActive(int entry) => _entries[entry] is not null;
 
-	/// <summary>The instance of system registration <paramref name="entry"/>, resolved once; null when it did not run.</summary>
+	/// <summary>
+	/// The instance of system registration <paramref name="entry"/>, resolved once (a scene creates the systems registered
+	/// as singletons from its own scope, like the runtime binder); null when it did not run.
+	/// </summary>
 	public T System<T>(int entry) where T : class => (T)Instance(entry)!;
 
 	/// <summary>A service injected into a step of registration <paramref name="entry"/>; default when it did not run.</summary>
@@ -286,6 +291,6 @@ public sealed class GeneratedScheduleContext
 	private object? Instance(int entry)
 	{
 		if (_entries[entry] is not SystemEntry system) return null;
-		return _instances[entry] ??= Services.GetRequiredService(system.ServiceType);
+		return _instances[entry] ??= SystemActivator.Resolve(Services, system.ServiceType, _isRoot);
 	}
 }

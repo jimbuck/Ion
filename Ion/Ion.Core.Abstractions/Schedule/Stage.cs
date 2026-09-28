@@ -152,6 +152,14 @@ public static class StageOrder
 	/// </summary>
 	public const int PhysicsDebugDraw = 650;
 
+	/// <summary>
+	/// The scene transition drawing (Render): the built-in fade (<c>SceneFadeSystem</c>) covers the frame here, inside the
+	/// sprite batch scope (<see cref="SpriteBatch"/>), after the scene, the game's own drawing and the UI (<see cref="Ui"/>),
+	/// and before <see cref="MetricsOverlay"/> (so the overlay stays readable during a fade). Draw custom transitions at
+	/// this order too.
+	/// </summary>
+	public const int SceneTransition = 750;
+
 	/// <summary>The metrics overlay (Render), inside the sprite batch scope and after the game's own drawing.</summary>
 	public const int MetricsOverlay = 800;
 

@@ -13,6 +13,13 @@ namespace Ion.Extensions.Coroutines;
 /// Each running coroutine owns an <see cref="EventReaderSet"/> over the application's <see cref="IEvents"/> (its own
 /// cursors, so an event resumes each waiting coroutine once and a later wait does not see it again).
 /// <para>
+/// This is the application's runner, resolved as <see cref="ICoroutineRunner"/> from the root provider. Resolved from a
+/// service scope (a scene's), <see cref="ICoroutineRunner"/> is a <see cref="ScopedCoroutineRunner"/> that starts its
+/// coroutines here, tagged with the scope, and stops them when the scope is disposed (the scene unloads).
+/// <see cref="Count"/>, <see cref="IsActive"/> and <see cref="StopAll"/> on this runner cover every coroutine, scoped
+/// ones included.
+/// </para>
+/// <para>
 /// The current <see cref="Wait"/> of each coroutine is stored inline in its handle (a struct union, see <see cref="Wait"/>),
 /// so stepping allocates nothing for <c>IEnumerator&lt;Wait&gt;</c> coroutines. A non-generic <see cref="IEnumerator"/>
 /// coroutine works the same way, but the routine itself boxes every struct it yields.
@@ -32,9 +39,48 @@ public class CoroutineRunner(IEvents events) : ICoroutineRunner, IDisposable
 	public int Count => _routines.Count;
 
 	/// <inheritdoc/>
-	public void Start(IEnumerator routine)
+	public void Start(IEnumerator routine) => Start(routine, null);
+
+	/// <summary>Starts <paramref name="routine"/> owned by <paramref name="owner"/> (see <see cref="ScopedCoroutineRunner"/>).</summary>
+	internal void Start(IEnumerator routine, object? owner)
 	{
-		_routines.Add(new CoroutineHandle(routine, new EventReaderSet(events)));
+		ArgumentNullException.ThrowIfNull(routine);
+		_routines.Add(new CoroutineHandle(routine, new EventReaderSet(events), owner));
+	}
+
+	/// <summary>The number of running coroutines owned by <paramref name="owner"/>.</summary>
+	internal int CountOwnedBy(object owner)
+	{
+		var count = 0;
+		for (var i = 0; i < _routines.Count; i++)
+		{
+			if (ReferenceEquals(_routines[i].Owner, owner)) count++;
+		}
+
+		return count;
+	}
+
+	/// <summary>Whether <paramref name="routine"/> runs and is owned by <paramref name="owner"/>.</summary>
+	internal bool IsActive(IEnumerator routine, object owner)
+	{
+		var index = _indexOf(routine);
+		return index >= 0 && ReferenceEquals(_routines[index].Owner, owner);
+	}
+
+	/// <summary>Stops <paramref name="routine"/> if it runs and is owned by <paramref name="owner"/>.</summary>
+	internal void Stop(IEnumerator routine, object owner)
+	{
+		var index = _indexOf(routine);
+		if (index >= 0 && ReferenceEquals(_routines[index].Owner, owner)) _removeAt(index);
+	}
+
+	/// <summary>Stops every coroutine owned by <paramref name="owner"/> (safe while stepping).</summary>
+	internal void StopOwnedBy(object owner)
+	{
+		for (var i = _routines.Count - 1; i >= 0; i--)
+		{
+			if (ReferenceEquals(_routines[i].Owner, owner)) _removeAt(i);
+		}
 	}
 
 	/// <inheritdoc/>
@@ -152,7 +198,7 @@ public class CoroutineRunner(IEvents events) : ICoroutineRunner, IDisposable
 	// IEnumerator<Wait> is read without boxing; a non-generic routine's Current is already an object (boxed by the routine).
 	private static Wait _currentOf(IEnumerator routine) => routine is IEnumerator<Wait> typed ? typed.Current : Wait.FromYield(routine.Current);
 
-	private sealed class CoroutineHandle(IEnumerator enumerator, EventReaderSet events)
+	private sealed class CoroutineHandle(IEnumerator enumerator, EventReaderSet events, object? owner)
 	{
 		// The current wait, stored inline, and its running state.
 		private Wait _wait;
@@ -161,6 +207,8 @@ public class CoroutineRunner(IEvents events) : ICoroutineRunner, IDisposable
 
 		public IEnumerator Enumerator { get; } = enumerator;
 		public EventReaderSet Events { get; } = events;
+		// The ScopedCoroutineRunner that started the coroutine, or null for the application's own.
+		public object? Owner { get; } = owner;
 		public bool IsStopped { get; set; }
 
 		public void SetWait(in Wait wait)

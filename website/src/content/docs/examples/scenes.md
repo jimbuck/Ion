@@ -1,6 +1,6 @@
 ---
 title: Scenes
-description: Two scenes with their own schedules, function steps with injected services, a Begin/End scope, coroutines, profiling keys, and composing the engine from its parts instead of AddIon.
+description: Two scenes with their own schedules and a fade transition between them, function steps with injected services, a Begin/End scope, coroutines, profiling keys, and composing the engine from its parts instead of AddIon.
 sidebar:
   order: 8
 ---
@@ -8,8 +8,8 @@ sidebar:
 **Source:** [`Ion.Examples/Ion.Examples.Scenes`](https://github.com/jimbuck/Ion/tree/main/Ion.Examples/Ion.Examples.Scenes)
 and its tests in [`Ion.Examples.Scenes.Tests`](https://github.com/jimbuck/Ion/tree/main/Ion.Examples/Ion.Examples.Scenes.Tests).
 
-A small tour of the schedule rather than a game. Two scenes, each with its own steps, switch on Tab: the main menu
-scene draws a green square and the gameplay scene a red one. Around them, root-level function steps show injected
+A small tour of the schedule rather than a game. Two scenes, each with its own steps, switch on Tab with a fade to
+black: the main menu scene draws a green square and the gameplay scene a red one. Around them, root-level function steps show injected
 services, events, a coroutine and runtime profiling controls. Unlike the other samples, this one composes the engine
 from its parts with the `IServiceCollection` registrations instead of `AddIon`/`UseIon`.
 
@@ -20,14 +20,16 @@ from its parts with the `IServiceCollection` registrations instead of `AddIon`/`
 ## What it shows
 
 - `UseScene(id, scene => ...)`: scenes with their own schedule, systems and function steps, switched with
-  `events.EmitChangeScene(...)`.
+  `events.EmitChangeScene(..., SceneTransition.Fade(0.4f))` and faded by `SceneFadeSystem`.
+- A singleton system (`builder.AddSystem<TestMiddleware>()`) used by a scene: the scene creates its own instance, from
+  its scope, each time it loads.
 - Function steps: `game.Init(...)`, `game.First(...)`, `game.Update(...)`, `game.Render(...)` taking a lambda whose
   parameters after `GameTime` are services, resolved once.
 - A `[Begin]`/`[End]` scope that wraps the rest of a scene's Render stage.
 - Coroutines started from a step (`ICoroutineRunner.Start`) that wait with `Wait.For(TimeSpan)`.
 - Profiling at run time: `IMetrics.IsProfiling` and `WriteTrace()` on key presses.
 - Composing the engine by hand: `AddMetrics`, `AddNullGraphics` or `AddGraphics`, `AddHeadlessRendering`, `AddScenes`,
-  `AddCoroutines`, and the matching `UseX` calls after the game's own steps.
+  `AddSceneFade`, `AddCoroutines`, and the matching `UseX` calls after the game's own steps.
 - An event reader created once, outside the step (the fix for `ION103`).
 
 ## Run it
@@ -39,7 +41,7 @@ dotnet run --project Ion.Examples/Ion.Examples.Scenes -- --Ion:PrintSchedule=tru
 
 | Key | Action |
 |---|---|
-| Tab | Switch between the main menu and gameplay scenes. |
+| Tab | Fade between the main menu and gameplay scenes (0.2 s out, 0.2 s in). Press it again mid-fade to turn back. |
 | Enter | Start a five-second countdown coroutine (printed to the console). |
 | F5 / F6 | Start profiling / stop and write the kept frames to `Ion:Metrics:TraceOutput` (`trace.json`). |
 | F9 | Capture the next 120 frames as a trace (the metrics module's capture key). |
@@ -66,7 +68,9 @@ else
 }
 
 builder.Services.AddScenes();
+builder.Services.AddSceneFade();
 builder.Services.AddCoroutines();
+// A singleton used by a scene: the scene still creates its own instance from its scope, once per load.
 builder.AddSystem<TestMiddleware>();
 
 using var game = builder.Build();
@@ -93,8 +97,11 @@ else
 	game.UseGraphics();
 }
 
-// Steps the shared ICoroutineRunner once per frame in the Update stage.
+// Steps the shared coroutine runner once per frame in the Update stage.
 game.UseCoroutines();
+
+// Draws the fade transitions (UseIon adds it for games that use the whole engine).
+game.UseSceneFade();
 
 game.Run();
 ```
@@ -131,11 +138,12 @@ game.Update((GameTime dt, IEvents events, IInputState input) =>
 {
 	while (intEvents.TryRead(out var e)) Console.WriteLine($"Int event! {e}");
 
-	// Tab switches between the two scenes.
+	// Tab switches between the two scenes with a fade to black: the current scene keeps running while the screen darkens
+	// (0.2 s), the next one loads under the black frame and fades in (0.2 s). Pressing Tab again mid-fade turns it around.
 	if (input.Pressed(Key.Tab))
 	{
 		gameplay = !gameplay;
-		events.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu);
+		events.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu, SceneTransition.Fade(0.4f));
 	}
 });
 ```
@@ -184,7 +192,11 @@ game.UseScene(Scene.Gameplay, scene =>
 - Each scene has its own dependency injection scope and its own schedule, built with the same ordering rules as the
   root. The `SceneSystem` runs the active scene's schedule at `StageOrder.Scenes` (-500) in every stage.
 - `UseScene<TScene>` and `EmitChangeScene<TScene>` take any enum (`where TScene : struct, Enum`); an `int` id works too.
-- Scene systems are resolved from the scene's scope, so they may be scoped services. Root systems must not be (`ION006`).
+- Scene systems are created from the scene's scope, so they may be scoped services. `TestMiddleware` is registered as a
+  singleton (`AddSystem`), and the scene still creates its own instance each time it loads. Root systems must not be
+  scoped (`ION006`).
+- The change is animated by a `SceneTransition`: the menu keeps running while `SceneFadeSystem` darkens the frame, the
+  gameplay scene loads when it is black, then it fades in. See [Transitions](/Ion/ecs/scenes/#transitions).
 - A step added to a scene after it loaded is error `ION004`: register steps inside the configure callback.
 
 ## A scope around the scene's rendering
@@ -232,14 +244,17 @@ static IEnumerator CountDown(int from)
 }
 ```
 
-`UseCoroutines()` steps the shared `ICoroutineRunner` once per frame in Update at `StageOrder.Coroutines` (-600). This
-routine is a plain `IEnumerator`, which boxes what it yields; an `IEnumerator<Wait>` routine allocates nothing per frame.
+`UseCoroutines()` steps the shared `CoroutineRunner` once per frame in Update at `StageOrder.Coroutines` (-600). The
+countdown is started by a root step, so it is an application coroutine and keeps counting across scene changes; started
+from a scene system it would stop when that scene unloads. This routine is a plain `IEnumerator`, which boxes what it
+yields; an `IEnumerator<Wait>` routine allocates nothing per frame.
 See [Coroutines](/Ion/ecs/coroutines/).
 
 ## The tests
 
 [`ScenesRenderingTests`](https://github.com/jimbuck/Ion/blob/main/Ion.Examples/Ion.Examples.Scenes.Tests/ScenesRenderingTests.cs)
-render each scene headless at 320 x 180 and compare it with a golden image, on Vulkan and on OpenGL ES:
+render each scene headless at 320 x 180 and compare it with a golden image, on Vulkan and on OpenGL ES, stepping past
+the fade before the second screenshot:
 
 ```csharp title="ScenesRenderingTests.cs"
 using (var host = log.Attach(new IonTestHost().UseEntryPoint<Program>()).WithRendering(Width, Height)
@@ -249,7 +264,7 @@ using (var host = log.Attach(new IonTestHost().UseEntryPoint<Program>()).WithRen
 	menu = host.Screenshot();
 
 	host.Input.Tap(Key.Tab);
-	host.Step(3);
+	host.Step(30);   // 0.4 s of fade at the host's 60 Hz clock, and a few more frames
 	gameplay = host.Screenshot();
 }
 
@@ -257,7 +272,9 @@ Assert.Equal(Color.ForestGreen.ToRgba8(), menu.GetPixel(50, 50));
 Assert.Equal(Color.DarkRed.ToRgba8(), gameplay.GetPixel(50, 50));
 ```
 
-The windowed tests run 120 and 240 frames and check that one sprite (the square) was drawn per frame.
+`TabFadesToTheGameplaySceneHeadless` runs without a GPU: mid-fade the menu is still the active scene and the recording
+sprite batch saw two rectangles (the square and the fade over it); 24 frames later the gameplay scene is active and the
+fade is gone. The windowed tests run 120 and 240 frames and check that one sprite (the square) was drawn per frame.
 
 ## Ideas to extend it
 
@@ -281,8 +298,13 @@ public sealed class Bouncer(ISpriteBatch spriteBatch, IWindow window)
 }
 ```
 
-Register it scoped (`builder.Services.AddScoped<Bouncer>()`) and add it with `scene.UseSystem<Bouncer>()` inside the
-gameplay scene: it is created when the scene loads and disposed when it unloads, so it starts over each time.
+Register it (`builder.AddSystem<Bouncer>()`, or `builder.Services.AddScoped<Bouncer>()`) and add it with
+`scene.UseSystem<Bouncer>()` inside the gameplay scene: it is created from the scene's scope when the scene loads and
+disposed when it unloads, so it starts over each time.
+
+**A custom transition.** Emit `SceneTransition.Custom(style, outSeconds, inSeconds)` and draw it yourself from
+`SceneSystem.Transition` in a Render step at `StageOrder.SceneTransition`, for example a wipe whose width is the
+transition's `Coverage`.
 
 **An ECS world per scene.** Add the ECS module and call `scene.UseEcs()`: each scene scope gets its own `World`,
 disposed with the scene.
