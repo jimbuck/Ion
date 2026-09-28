@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/brand/ion-lockup-dark.svg">
-    <img src="./docs/brand/ion-lockup-light.svg" alt="Ion" width="196">
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/brand/ion-lockup-dark-animated.svg">
+    <img src="./docs/brand/ion-lockup-light-animated.svg" alt="Ion" width="196">
   </picture>
 </p>
 

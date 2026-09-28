@@ -110,7 +110,7 @@ body::after {
 .card,
 .sl-link-card,
 .ion-stat,
-.logo-card,
+
 .pagination-links a,
 .expressive-code,
 .hero .sl-link-button {
@@ -126,7 +126,7 @@ body::after {
 .card::before,
 .sl-link-card::before,
 .ion-stat::before,
-.logo-card::before,
+
 .pagination-links a::before,
 .expressive-code::before,
 .hero .sl-link-button::before {
@@ -654,75 +654,6 @@ footer.sl-flex {
 	}
 }
 
-/* ---------- Temporary logo gallery (src/content/docs/logo-options.mdx) ---------- */
-.logo-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-	gap: 1.25rem;
-	margin-top: 1.5rem;
-}
-.logo-grid > .logo-card {
-	margin-top: 0 !important;
-}
-.logo-card {
-	--ion-fill: linear-gradient(180deg, #1a2626, var(--sl-color-bg));
-	padding: 1.25rem;
-}
-.logo-card > * {
-	margin: 0 !important;
-}
-.logo-big {
-	height: 9rem;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-.logo-big img {
-	height: 7.5rem;
-	max-width: 100%;
-	object-fit: contain;
-}
-.logo-card b {
-	display: block;
-	margin-top: 0.75rem !important;
-	color: var(--ion-teal);
-	font-size: 1rem;
-}
-.logo-card p {
-	color: var(--sl-color-gray-3);
-	font-size: 0.85rem;
-	line-height: 1.5;
-	margin-top: 0.25rem !important;
-}
-.logo-row {
-	display: flex;
-	gap: 0.75rem;
-	align-items: center;
-	margin-top: 0.9rem !important;
-	padding-top: 0.8rem;
-	border-top: 1px solid var(--sl-color-hairline);
-}
-.logo-nav,
-.logo-fav {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.5rem;
-	background: var(--sl-color-bg-sidebar);
-	padding: 0.4rem 0.7rem;
-	font-weight: 700;
-	color: var(--sl-color-white);
-}
-.logo-nav img {
-	height: 1.6rem;
-}
-.logo-fav {
-	font-size: 0.75rem;
-	font-weight: 500;
-	background: var(--sl-color-gray-6);
-}
-.logo-fav img {
-	height: 1rem;
-}
 
 /* No rounded corners anywhere, including Starlight's own components (search, sidebar, tabs, copy buttons, badges) */
 *,
