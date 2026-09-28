@@ -679,6 +679,8 @@ footer.sl-flex {
 }
 .logo-big img {
 	height: 7.5rem;
+	max-width: 100%;
+	object-fit: contain;
 }
 .logo-card b {
 	display: block;
