@@ -1,0 +1,58 @@
+---
+title: Ion
+description: A performant, agent-friendly 2D/3D game engine for .NET, built on middleware and ECS.
+template: splash
+hero:
+  tagline: A performant 2D/3D game engine for .NET 10. Middleware pipelines, an Arch-powered ECS, compile-time generated schedules, and tooling built for humans and coding agents alike.
+  image:
+    file: ../../assets/logo.svg
+  actions:
+    - text: Get started
+      link: /Ion/getting-started/introduction/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/jimbuck/Ion
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+```csharp
+var builder = IonApplication.CreateBuilder(args);
+builder.AddEcsRendering3D().AddSystem<ModelSystem>();
+
+using var game = builder.Build();
+game.UseEcsRendering3D().UseSystem<ModelSystem>();
+game.Run();
+```
+
+<CardGrid stagger>
+	<Card title="Middleware and ECS" icon="puzzle">
+		Systems are plain classes with stage attributes. Ordering is declarative, and an Arch-based ECS with generated queries sits alongside.
+	</Card>
+	<Card title="Generated, not reflected" icon="rocket">
+		Roslyn source generators compile the schedule, event bus, queries, network serializers and web routes into direct calls. Native AOT ready.
+	</Card>
+	<Card title="2D and 3D" icon="star">
+		A WebGPU-shaped RHI over Vulkan and OpenGL ES, a batched sprite renderer, and a PBR 3D renderer with glTF, shadows and instancing.
+	</Card>
+	<Card title="Batteries included" icon="setting">
+		Audio, input and touch, immediate-mode UI, Box2D and Bepu physics, scenes, coroutines, assets with hot reload, metrics and tracing.
+	</Card>
+	<Card title="Agent-friendly" icon="laptop">
+		A remote JSON-RPC protocol, the ion CLI and an MCP server let coding agents run, inspect, screenshot and test a live game.
+	</Card>
+	<Card title="Everywhere you play" icon="open-book">
+		Windows, macOS, Linux, Android, iOS and the R36S handheld, with one-line publish presets.
+	</Card>
+</CardGrid>
+
+## Where to next
+
+<CardGrid>
+	<LinkCard title="Your first game" href="/Ion/getting-started/first-game/" description="From ion new to a running window in five minutes." />
+	<LinkCard title="Core concepts" href="/Ion/concepts/application/" description="The builder, stages, systems, events and the generated schedule." />
+	<LinkCard title="Examples" href="/Ion/examples/" description="Walkthroughs of every sample in the repository." />
+	<LinkCard title="Reference" href="/Ion/reference/" description="Stage orders, diagnostics, configuration keys and the module map." />
+</CardGrid>
