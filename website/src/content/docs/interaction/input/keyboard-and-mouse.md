@@ -206,6 +206,7 @@ frame, exactly like device events. With `IonTestHost`:
 
 ```csharp title="CursorTests.cs"
 using System.Numerics;
+using Ion;
 using Ion.Testing;
 using Xunit;
 

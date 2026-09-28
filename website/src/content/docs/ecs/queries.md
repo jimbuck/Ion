@@ -161,8 +161,10 @@ allowed.
 - Entities are visited in Arch's own order: archetypes and chunks in order, entities from last to first within a chunk,
   the same order as `World.Query`. It is deterministic for a given sequence of operations, which is what golden tests
   rely on.
-- Query steps are ordered with the stage's other steps by `Order`, `[Before<T>]` and `[After<T>]`. At equal `Order`, a
-  query step runs after the same system's non-query steps.
+- Query steps are ordered with the stage's other steps by `Order`, `[Before<T>]` and `[After<T>]`. Ties are broken
+  by registration order, then by declaration order; the generated loop lives in a generated file, so do not rely on
+  where a query step lands among the same system's plain steps at equal `Order`. Give it an `Order` (or a
+  `[Before<T>]`/`[After<T>]`) when the relative order matters.
 - The step keeps the method's name in the schedule: `MoveSystem.Move` in `--Ion:PrintSchedule=true`, in traces and in
   exceptions. The generated method (`__IonQuery_Move`) is hidden.
 
@@ -254,6 +256,18 @@ the run-time guard.
 
 Parallel queries (running a query's chunks on several threads through Arch's job scheduler) are not built. Every query
 runs on the game thread today. The roadmap lists them as open work for the ECS module.
+
+## Common problems
+
+| Symptom | Cause and fix |
+|---|---|
+| Build error ION301 | The system (or a class it is nested in) is not `partial`. Add `partial`. |
+| Warning ION307 and the query never runs | `[Query]` without a stage attribute. Add `[Update]`, `[FixedUpdate]`, ... |
+| Build error ION302 on a component parameter | The component is passed by value. Use `ref T` (or `in T` to read). |
+| Build error ION306 on a service parameter | Services are injected through the constructor, not query parameters. |
+| `StructuralChangeException` at run time | A helper called from the body created or destroyed entities or added or removed components. Take a `Commands` parameter and record the change there. |
+| `NotSupportedException` naming a component, NativeAOT only | A component used only through `World` (never in a `[Query]`) is not registered. Call `EcsComponents.Register<T>()` at startup (see [Components and serialization](/Ion/ecs/components-and-serialization/)). |
+| The query matches nothing | No entity has every required component (parameters and `All`) without the `None` ones. Check that the components are added on the same entity, and count with `world.CountEntities(new QueryDescription().WithAll<T0, T1>())` from a plain step. |
 
 ## See also
 

@@ -156,7 +156,7 @@ move it, A activates, B goes back, and sliders adjust with the D-pad. Tips for s
 - Size fonts and panels for 640x480 (there is no UI scaling); see
   [Layout and styling](/Ion/interaction/ui/layout-and-styling/#resolution-and-scaling).
 
-The gamepad path is tested with scripted input (the Menu sample's `MenuInputTests`); it has not been verified on the
+The gamepad path is tested with scripted input (the Menu sample's `MenuTests`); it has not been verified on the
 device itself yet. See [R36S](/Ion/platforms/r36s/) for building and deploying.
 
 ## Testing navigation
@@ -164,7 +164,7 @@ device itself yet. See [R36S](/Ion/platforms/r36s/) for building and deploying.
 Script the gamepad or keyboard with `IonTestHost.Input` and assert on `IUiTree.FocusedPath`. From the Menu sample's
 tests:
 
-```csharp title="MenuInputTests.cs"
+```csharp title="MenuTests.cs"
 [Fact]
 public void TheGamepadAloneReachesAndChangesTheOptions()
 {

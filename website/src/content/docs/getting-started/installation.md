@@ -58,16 +58,19 @@ dotnet pack Ion/Ion.Tools -c Release -o out
 dotnet tool install -g Ion.Tools --add-source out
 ```
 
-You can also run it in place without installing: `dotnet Ion/Ion.Tools/bin/Release/net10.0/Ion.Tools.dll new 2d MyGame`.
+The repository's npm scripts do the same: `npm run install:tools` packs and installs (or updates) the tool, and
+`npm run ion -- new 2d MyGame` runs it from source without installing (`dotnet run --project Ion/Ion.Tools -- new 2d MyGame`).
 
 `ion new` takes these options:
 
 | Syntax | Meaning |
 |---|---|
-| `ion new <2d\|3d\|ecs> [name]` | Creates the game from a template. The name defaults to `MyGame`; it must start with a letter and contain only letters, digits and `_`. |
+| `ion new <2d\|3d\|ecs> [name]` | Creates the game from a template. The name must start with a letter and contain only letters, digits and `_`. Without a name, the game is called after the `--output` folder, or `MyGame`. |
 | `--output <dir>` | Writes into this folder instead of a folder named after the game. |
 | `--ion-source <repo>` | Builds against an Ion source checkout (project references) instead of the NuGet packages. |
 | `--force` | Writes into a folder that is not empty. |
+
+The command ends by printing the next steps (`cd`, `ion run --headless ...`, `dotnet test`).
 
 ### Option B: dotnet new templates
 
@@ -79,14 +82,16 @@ dotnet new install Ion.Templates
 dotnet new ion-2d -n MyGame
 ```
 
-From a checkout, pack the templates project and install the package file:
+From a checkout, pack the templates project and install the pack from the output folder (`npm run install:templates`
+runs the same two commands):
 
 ```bash
 dotnet pack templates/Ion.Templates.csproj -c Release -o out
-dotnet new install out/Ion.Templates.*.nupkg
+dotnet new install Ion.Templates --add-source out --force
 ```
 
-Each template has one parameter, `IonSource` (`--IonSource <path>`), the equivalent of `--ion-source`.
+Each template has one parameter, `IonSource` (`--IonSource <path>`), the equivalent of `--ion-source`. `dotnet new`'s
+usual `-n <Name>` and `-o <dir>` set the name and the folder.
 
 ## 3. Packages or sources
 
@@ -107,9 +112,9 @@ ion new ecs Arena --ion-source ~/src/Ion
 ```
 
 :::caution[The repository does not publish packages from CI]
-The repository's workflows build, test and publish samples but do not push NuGet packages. If `dotnet restore` cannot
-find `Ion` 0.3.0, create the game with `--ion-source` (or set `IonSource` in `Directory.Build.props` by hand) and point
-it at a clone of the repository.
+The repository's workflows build, test and publish samples but do not push NuGet packages (`npm run pack` writes them
+to `artifacts/packages` locally). If `dotnet restore` cannot find `Ion` 0.3.0, create the game with `--ion-source` (or
+set `IonSource` in `Directory.Build.props` by hand) and point it at a clone of the repository.
 :::
 
 When you reference Ion by `ProjectReference` in a project that was not made from a template, add the generator and its

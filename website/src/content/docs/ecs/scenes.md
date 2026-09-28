@@ -143,9 +143,10 @@ So `builder.AddSystem<T>()` is fine for scene systems. The reverse still fails: 
 error `ION006`. A singleton used by both the root schedule and a scene runs as two instances (the root's and the
 scene's): keep state that must be shared in a separate singleton service that both inject.
 
-:::note[Before 0.3]
-A scene system registered as a singleton was built from the root provider, so its `World` was the **root** world and its
-entities outlived the scene. The scene system now creates it from the scene's scope.
+:::note[Earlier releases]
+In earlier releases a scene system registered as a singleton was built from the root provider, so its `World` was the
+**root** world and its entities outlived the scene. The scene system now creates it from the scene's scope (see the
+[changelog](/Ion/reference/changelog/)).
 :::
 
 ## Changing scenes
@@ -329,6 +330,18 @@ and Breakout samples do). It adds:
 The enum overloads it used to generate are now the generic `UseScene<TScene>` and `EmitChangeScene<TScene>` in the
 library, so the main Ion generator can compile scene registrations into the generated schedule. You do not need the
 scene generator for anything on this page.
+
+## Common problems
+
+| Symptom | Cause and fix |
+|---|---|
+| Build error ION015 | A scene uses a system registered as an instance (`AddSingleton(new T())`). Register the type (`builder.AddSystem<T>()`) or a factory instead. |
+| Build error ION006 | A scoped system or scoped step parameter in the root schedule. Move it into a scene, or register it as a singleton or transient. |
+| "Tried to load unknown scene" in the log | The id was never registered with `UseScene`. The current scene stays. |
+| Entities created in a scene survive the scene change | They were created in the root world: the system that creates them runs in the root schedule, or holds a `World` resolved from the root provider. Add the system with `scene.UseSystem<T>()` and inject `World` in its constructor. |
+| Nothing draws in a scene that creates sprites | The scene's schedule needs its own extraction: `scene.UseEcsRendering()` (the root's `UseEcsRendering()` draws the root world only). |
+| A coroutine keeps running after the scene unloaded | It was started on the application's runner (a root system, or the concrete `CoroutineRunner`). Start it through the `ICoroutineRunner` resolved from the scene's scope. |
+| `CurrentSceneId` is 0 | Either no scene is loaded or the scene with id 0 is active. Check `HasScene`. |
 
 ## See also
 

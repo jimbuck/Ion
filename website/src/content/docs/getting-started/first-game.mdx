@@ -28,17 +28,18 @@ It takes about fifteen minutes. You need the .NET 10 SDK and the `ion` tool or t
    (With the template pack: `dotnet new ion-2d -n Starship`.) If the Ion packages are not on your feed, add
    `--ion-source <path to an Ion checkout>`.
 
-   The template ships a paddle game. Delete its game files so you can write your own:
+   The template ships a paddle game. Delete its game files and its snapshot so you can write your own:
 
    ```bash
    rm Starship/PaddleSystem.cs Starship/Game.cs Starship.Tests/Golden/state-300.json
    ```
 
-   You are left with this layout (you will create the files marked new):
+   You are left with this layout (you will create the files marked new; `Program.cs` and `GameTests.cs` get replaced):
 
    <FileTree>
    - Starship.slnx
    - Directory.Build.props
+   - Directory.Build.targets
    - CLAUDE.md
    - Starship/
      - Assets/
@@ -51,8 +52,12 @@ It takes about fifteen minutes. You need the .NET 10 SDK and the `ion` tool or t
      - Starship.csproj
    - Starship.Tests/
      - GameTests.cs
+     - Golden/ empty now
      - Starship.Tests.csproj
    </FileTree>
+
+   `appsettings.json` keeps a `Game` section with the paddle game's speeds; it does no harm, and you can delete it.
+   `CLAUDE.md` still describes `PaddleSystem`; update it when you are done (it is the file coding agents read first).
 
 2. **Add a sprite**
 

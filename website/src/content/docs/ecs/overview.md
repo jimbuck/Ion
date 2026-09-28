@@ -203,6 +203,16 @@ Mixing is normal: a game can keep its score in a singleton service, its balls an
 and headless snapshot tests. See [Templates](/Ion/getting-started/templates/).
 :::
 
+## Common problems
+
+| Symptom | Cause and fix |
+|---|---|
+| Entities recorded with `Commands` never appear | `UseEcs()` (or `UseEcsRendering()`) is missing from the schedule, so nothing plays the commands back. |
+| Sprites do not draw | `AddEcsRendering()` and `UseEcsRendering()` are both needed; the entity needs a `Transform2D` and a `Sprite` with a texture, and `default(Transform2D)` has a zero scale. See [ECS rendering](/Ion/ecs/ecs-rendering/). |
+| A scene's entities land in the root world | The system is in the root schedule or was given a root `World`. Add it with `scene.UseSystem<T>()`. See [Scenes](/Ion/ecs/scenes/). |
+| `StructuralChangeException` | A `[Query]` body changed the world's structure. Record the change with `Commands`. See [Queries](/Ion/ecs/queries/). |
+| `NotSupportedException` about a component, NativeAOT only | Register the component with `EcsComponents.Register<T>()`. See [Components and serialization](/Ion/ecs/components-and-serialization/). |
+
 ## Planned
 
 These are on the roadmap and not built yet: parallel queries (Arch's job-scheduled chunk queries are not exposed through

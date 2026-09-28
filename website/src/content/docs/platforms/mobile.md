@@ -168,9 +168,11 @@ setters (title, size, position, state, border) do nothing. Size your game from `
 `WindowResizeEvent` rather than setting a size.
 
 :::caution[Fixed-size layouts]
-Breakout's play field is a fixed 2030 x 984 window-space layout. On a phone, as on the R36S's 640 x 480 panel, it needs
-a scaled view (a virtual resolution in the 2D renderer), which is not done yet. Plan your own layout around the window
-size, or scale with a camera transform (`SpriteBatchOptions.Transform`).
+Breakout ECS places its walls and paddle from `window.Size`, but its blocks, paddle and ball have fixed pixel sizes
+(`BreakoutConstants`: 192 x 64 blocks in a 10 x 10 grid, a 244 px paddle), so the play field wants about 2030 x 984
+pixels of window space. On a phone, as on the R36S's 640 x 480 panel, that needs a scaled view (a virtual resolution in
+the 2D renderer), which is not done yet. Plan your own layout around the window size, or scale with a camera
+transform (`SpriteBatchOptions.Transform`).
 :::
 
 ## Touch input

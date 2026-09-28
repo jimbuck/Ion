@@ -146,6 +146,17 @@ DOTNET_ENVIRONMENT=laptop dotnet run --project MyGame
 
 Remember to copy the file to the output folder (`<Content Include="appsettings.*.json" CopyToOutputDirectory="PreserveNewest" />`).
 
+## Common problems
+
+| Symptom | Cause and fix |
+|---|---|
+| No window opens on Linux, and the log says neither GLFW nor SDL is applicable | The X11, xkb, Wayland or GL client libraries are missing. Install the package list above. |
+| The log says Vulkan could not start and the game runs on OpenGL ES | No Vulkan driver (or an old one). `Auto` did the right thing; install `mesa-vulkan-drivers` or your GPU's driver to get Vulkan back, or set `Ion:Graphics:PreferredBackend=OpenGLES` to stop probing. |
+| A warning that the audio output failed and the null output replaced it | No audio device (a server, a container, a headless VM). Sound is mixed but not heard; nothing else changes. |
+| `dotnet publish -p:IonTarget=win-x64` fails on Linux with "Cross-OS native compilation is not supported" | NativeAOT does not cross-compile between operating systems. Publish on Windows (or macOS for `osx-*`). |
+| A NativeAOT publish on Linux fails at the link step | `clang` or `zlib1g-dev` is missing on the build machine. |
+| `appsettings.laptop.json` is ignored | The file is not copied to the output folder, or `DOTNET_ENVIRONMENT` is not set to `laptop`. |
+
 ## See also
 
 - [Platforms overview](/Ion/platforms/overview/): the support matrix.

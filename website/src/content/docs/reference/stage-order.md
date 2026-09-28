@@ -48,10 +48,10 @@ The constants live in `StageOrder` in `Ion.Core.Abstractions`
 | `EngineTeardownFirst` | 500 | none | First order of the teardown band. |
 | `PhysicsDebugDraw` | 650 | Render | `Physics2DDebugDrawSystem` (sprite batch) and `Physics3DDebugDrawSystem` (3D renderer): collider outlines on top of the game's drawing. |
 | `Ui` | 700 | Render | `UiSystem`: submits the frame's widgets to the sprite batch. |
-| `SceneTransition` | 750 | Render | `SceneFadeSystem`: the fade scene transition, over the scene, the game's drawing and the UI. Draw custom transitions here too. |
+| `SceneTransition` | 750 | Render | `SceneFadeSystem` (the `Ion` package): the fade scene transition, over the scene, the game's drawing and the UI. Draw custom transitions here too. |
 | `MetricsOverlay` | 800 | Render | `MetricsOverlaySystem`: the overlay stays on top of the UI. |
 | `NetworkSend` | 870 | Last, Destroy | `NetworkSystem`: delta-encode snapshots, pack messages and flush (Last); disconnect peers (Destroy). |
-| `WindowClose` | 900 | Render, Destroy | `SilkWindowSystem` and `NullWindowSystem`: a closed window becomes an exit request (Render); the native window is released late in Destroy. |
+| `WindowClose` | 900 | Render, Destroy | `SilkWindowSystem` and `NullWindowSystem`: a closed window becomes an exit request (Render). `SilkWindowSystem` also releases the native window here in Destroy. |
 | `Ecs` | 950 | every stage | `EcsCommandsSystem` (`Ion.Extensions.Ecs`): plays back `Commands` at the end of every stage. |
 | `Web` | 960 | Init, Last, Destroy | `WebSystem` (`Ion.Extensions.Web`): starts the server; hands queued requests to `[Http]`/`[WebSocket]` methods on the game thread; stops it. |
 | `Remote` | 970 | Init, Last | `RemoteSystem` (`Ion.Extensions.Remote`): applies queued remote protocol requests at the end of the frame. |
@@ -205,7 +205,7 @@ Console.WriteLine(game.PrintSchedule());
       -400    TransformPropagationSystem.PropagateBeforeRender
       -300    SpriteExtractionSystem.Extract
          0    ScoreSystem.RenderScore
-       700    Physics2DDebugDrawSystem.Draw
+       650    Physics2DDebugDrawSystem.Draw
        750    SceneFadeSystem.Draw
        800    MetricsOverlaySystem.Draw
        900    NullWindowSystem.CheckClosed

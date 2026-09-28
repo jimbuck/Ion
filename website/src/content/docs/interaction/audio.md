@@ -321,6 +321,7 @@ write the same code against `IAudioManager`; tests assert on what was played, an
 `IonTestHost.Audio` is that `NullAudioManager`:
 
 ```csharp title="SoundTests.cs"
+using Ion;
 using Ion.Extensions.Audio;
 using Ion.Testing;
 using Xunit;
@@ -344,6 +345,11 @@ public class SoundTests
 	}
 }
 ```
+
+The headless loader still needs the file: it reads it from the `Assets` folder next to the test binary, so copy the
+sound into the test project's output (the engine's own tests link `bonk.wav` with
+`<None Include="Assets\bonk.wav" CopyToOutputDirectory="PreserveNewest" />`). A missing file throws
+`FileNotFoundException` at `Load`, headless or not.
 
 Each `SoundPlay` has `Sound`, `Volume`, `PitchShift`, `MasterVolume` (at the time of the call), `EffectiveVolume`
 (volume times master), `Pan`, `Loop`, `Bus` and `Voice`. `host.Audio.Clear()` forgets the recorded plays.

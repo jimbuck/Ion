@@ -97,7 +97,7 @@ header.header {
 	color: var(--sl-color-white);
 }
 .site-title img {
-	height: 1.75rem;
+	height: 2.4rem;
 }
 site-search button[data-open-modal] {
 	border-radius: 999px;

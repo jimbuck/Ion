@@ -121,17 +121,17 @@ Several clicks on one button in one frame count once.
 ## Testing through the tree
 
 The [Menu](/Ion/examples/menu/) sample's tests drive every screen through `IUiTree` only, which is also exactly what an
-agent can do remotely:
+agent can do remotely. Adapted from `MenuTests.cs`:
 
-```csharp title="MenuTreeTests.cs"
+```csharp title="MenuTests.cs"
 using Ion.Extensions.UI;
 using Ion.Testing;
 using Xunit;
 
-public class MenuTreeTests
+public class MenuTests
 {
 	[Fact]
-	public void AnAgentChangesEveryOption()
+	public void AnAgentChangesEveryOptionThroughTheTree()
 	{
 		using var host = new IonTestHost().UseEntryPoint<Program>();
 		host.Step();

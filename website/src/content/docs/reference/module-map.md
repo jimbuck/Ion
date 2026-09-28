@@ -44,10 +44,11 @@ composing the engine by hand, as the Scenes and Quad samples do. With them you r
 
 | Package | Purpose | Entry points | Depends on |
 |---|---|---|---|
-| `Ion` | The batteries-included engine package: the `AddIon`/`UseIon` composition, headless selection, run settings (`Ion:Run:*`), and the builder forms of the core modules. Ships the schedule generator as an analyzer. | `AddIon`, `UseIon`, `AddRendering3D`, `UseRendering3D`, `AddGraphics`, `UseGraphics`, builder `AddAudio`, `AddMetrics`, `AddScenes`, `AddCoroutines`, `AddAssets`, `AddRemote` | `Ion.Core`, Assets, Audio, Coroutines, Metrics, Graphics.Null, Graphics.Headless, Windowing.SilkNet, Rendering2D, Rendering3D, Scenes, Remote |
+| `Ion` | The batteries-included engine package: the `AddIon`/`UseIon` composition, headless selection, run settings (`Ion:Run:*`), the built-in scene fade (`SceneFadeSystem`) and the builder forms of the core modules. Ships the schedule generator as an analyzer. | `AddIon`, `UseIon`, `AddRendering3D`, `UseRendering3D`, `AddGraphics`, `UseGraphics`, `AddSceneFade`, `UseSceneFade`, builder `AddAudio`, `AddMetrics`, `AddScenes`, `AddCoroutines`, `AddAssets`, `AddRemote` | `Ion.Core`, Assets, Audio, Coroutines, Metrics, Graphics.Null, Graphics.Headless, Windowing.SilkNet, Rendering2D, Rendering3D, Scenes, Remote |
 | `Ion.Core` | The application builder, game loop, schedule runtime, event bus, storage and input plumbing. Ships the schedule generator as an analyzer. | `IonApplication.CreateBuilder`, `AddSystem`, `UseEvents`, `AddScriptedInput`, `AddInputRecording`, `AddInputPlayback` | `Ion.Core.Abstractions`, `Ion.Extensions.Metrics.Abstractions`, Microsoft.Extensions.Hosting |
-| `Ion.Core.Abstractions` | The types games and libraries compile against: stages and step attributes, `StageOrder`, `GameTime`, `IEvents`, `IInputState` and `InputTracker`, `GameConfig`, schedule model, diagnostics codes, frame stats. | `UseSystem`, `AddInputTracker`, function steps (`app.Update(...)` and friends) | Microsoft.Extensions abstractions |
+| `Ion.Core.Abstractions` | The types games and libraries compile against: stages and step attributes, `StageOrder`, `GameTime`, `IEvents`, `IInputState` and `InputTracker`, `GameConfig`, `StorageConfig`, `InputConfig`, schedule model, diagnostics codes, frame stats. | `UseSystem`, `AddInputTracker`, `AddScriptedInput`, `AddInputRecording`, `AddInputPlayback` (service forms), function steps (`app.Update(...)` and friends) | Microsoft.Extensions abstractions (`Ion.Core.InternalGenerators` at build time) |
 | `Ion.Generators` | Source generator: the compile-time schedule and composition root, interceptors, the generated event bus, `[Query]` loops, diagnostics `ION001` to `ION014`, `ION101` to `ION106`, `ION301` to `ION307`. | (analyzer) | Roslyn 4.4 (`netstandard2.0`) |
+| `Ion.Core.InternalGenerators` | An internal generator used while building `Ion.Core.Abstractions` and `Ion.Extensions.Scenes.Abstractions`. Not a package. | (analyzer) | Roslyn 4.4 (`netstandard2.0`) |
 
 ## Assets, audio, coroutines, scenes, metrics
 
@@ -60,8 +61,8 @@ composing the engine by hand, as the Scenes and Quad samples do. With them you r
 | `Ion.Extensions.Coroutines` | The shared coroutine runner, stepped in Update. | `AddCoroutines`, `UseCoroutines` | Coroutines.Abstractions |
 | `Ion.Extensions.Coroutines.Abstractions` | `ICoroutineRunner`, `Wait`, `IWait`. | | Core.Abstractions |
 | `Ion.Extensions.Coroutines.Generators` | An early generator that only adds a `[Coroutine]` marker attribute; no other project references it. | (analyzer) | Roslyn |
-| `Ion.Extensions.Scenes` | Scenes with their own scope and schedule, run by `SceneSystem`. | `AddScenes`, `UseScene`, `UseScene<TScene>`, `EmitChangeScene` | Scenes.Abstractions |
-| `Ion.Extensions.Scenes.Abstractions` | `ISceneBuilder`, scene events, `scene.UseSystem`. | | Core.Abstractions |
+| `Ion.Extensions.Scenes` | Scenes with their own scope and schedule, run by `SceneSystem`; `CurrentScene` (`HasScene`, `SceneId`). | `AddScenes`, `UseScene`, `UseScene<TScene>` | Scenes.Abstractions |
+| `Ion.Extensions.Scenes.Abstractions` | `ISceneBuilder`, scene events (`EmitChangeScene`, `EmitChangeScene<TScene>`, `SceneTransition`), `scene.UseSystem`. | `EmitChangeScene` | Core.Abstractions |
 | `Ion.Extensions.Scenes.Generators` | Source generator for scene enums (`Scene`/`Scenes`, a `[ScenesEnum]` marker) and the `Use{Stage}<TService...>` overloads on scene builders. | (analyzer) | Roslyn |
 | `Ion.Extensions.Metrics` | Frame profiler, frame stats, frame log, Chrome traces, the `Ion` meter, the overlay. | `AddMetrics`, `UseMetrics` (obsolete: `AddDebugUtils`, `UseDebugUtils`) | Metrics.Abstractions, Graphics.Abstractions, Assets.Abstractions |
 | `Ion.Extensions.Metrics.Abstractions` | `IMetrics`, counters, gauges, histograms, span ids. | | Core.Abstractions |
@@ -87,11 +88,11 @@ composing the engine by hand, as the Scenes and Quad samples do. With them you r
 |---|---|---|---|
 | `Ion.Extensions.Ecs` | The ECS module on Arch 2.1: a `World` per scope, `Commands` playback, `[Query]` binding, transform propagation, sprite animation, `NameRegistry`, world serialization. | `AddEcs`, `UseEcs`, `scene.UseEcs()`, `AddEcsSerialization` | Ecs.Abstractions, `Ion.Core`, Scenes.Abstractions, Remote.Abstractions |
 | `Ion.Extensions.Ecs.Abstractions` | `[Query]` and filters, `Commands`, built-in components (`Transform2D`, `Sprite`, `Parent`/`Children`, ...), `SpawnModel`, `EcsComponents.Register<T>()`. | | Core.Abstractions, Graphics.Abstractions, Arch |
-| `Ion.Extensions.Ecs.Rendering` | Sprite and 3D extraction from entities. | `AddEcsRendering`, `UseEcsRendering`, `AddEcsRendering3D`, `UseEcsRendering3D` (and the scene forms) | `Ion.Extensions.Ecs`, `Ion` |
-| `Ion.Extensions.Physics2D` | 2D physics on Box2D v3, synchronized with `Transform2D`, with events, queries and debug drawing. | `AddPhysics2D`, `UsePhysics2D`, `scene.UsePhysics2D()` | Physics2D.Abstractions, `Ion.Extensions.Ecs`, `Ion`, Box2D.NET |
+| `Ion.Extensions.Ecs.Rendering` | Sprite and 3D extraction from entities. | `AddEcsRendering`, `UseEcsRendering`, `AddEcsRendering3D`, `UseEcsRendering3D` (and the scene forms) | `Ion.Extensions.Ecs`, `Ion`, Graphics.Abstractions |
+| `Ion.Extensions.Physics2D` | 2D physics on Box2D v3, synchronized with `Transform2D`, with events, queries and debug drawing. | `AddPhysics2D`, `UsePhysics2D`, `scene.UsePhysics2D()` | Physics2D.Abstractions, `Ion.Extensions.Ecs`, `Ion`, Scenes.Abstractions, `Box2D.NET.Bindings.Release` (Box2D v3 natives; `Box2DStaticLink` links them into a NativeAOT executable) |
 | `Ion.Extensions.Physics2D.Abstractions` | `RigidBody2D`, `Collider2D`, `Joint2D`, `Collision2D`, `Trigger2D`, `IPhysicsWorld2D`, `Physics2DConfig`. | | Core.Abstractions, Ecs.Abstractions |
 | `Ion.Extensions.Physics2D.Remote` | Remote methods `physics2d.bodies` and `physics2d.raycast`. | `AddPhysics2DRemote` | Physics2D, Remote.Abstractions |
-| `Ion.Extensions.Physics3D` | 3D physics on BepuPhysics v2, synchronized with `Transform`, with events, queries and debug drawing. | `AddPhysics3D`, `UsePhysics3D`, `scene.UsePhysics3D()` | Physics3D.Abstractions, `Ion.Extensions.Ecs`, `Ion`, BepuPhysics |
+| `Ion.Extensions.Physics3D` | 3D physics on BepuPhysics v2, synchronized with `Transform`, with events, queries and debug drawing. | `AddPhysics3D`, `UsePhysics3D`, `scene.UsePhysics3D()` | Physics3D.Abstractions, `Ion.Extensions.Ecs`, `Ion`, Scenes.Abstractions, `BepuPhysics` |
 | `Ion.Extensions.Physics3D.Abstractions` | `RigidBody3D`, `Collider3D`, `Joint3D`, `Collision3D`, `Trigger3D`, `IPhysicsWorld3D`, `Physics3DConfig`. | | Core.Abstractions, Ecs.Abstractions |
 
 ## UI, web, networking, remote

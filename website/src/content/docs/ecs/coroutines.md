@@ -285,6 +285,16 @@ Assert.Equal(0, host.Get<ICoroutineRunner>().Count);
 
 See [Testing](/Ion/tooling/testing/) and [Time and determinism](/Ion/concepts/time-and-determinism/).
 
+## Common problems
+
+| Symptom | Cause and fix |
+|---|---|
+| Coroutines never advance | `UseIon()` (or `UseCoroutines()`) is not in the schedule, so `CoroutineSystem` never steps the runner. |
+| A coroutine started in Update runs a frame late | The runner steps at `StageOrder.Coroutines` (-600), before your Update steps. Start it in Init or First to run it the same frame, or accept the one-frame delay. |
+| `ObjectDisposedException` from `Start` | The `ICoroutineRunner` belongs to a scene that has unloaded. Resolve the runner again from the active scene, or inject the concrete `CoroutineRunner` for application-wide work. |
+| `Wait.For<TEvent>()` never resumes | The event is never emitted (warning ION102 points at it), or `TEvent` is not the type being emitted. Events are unmanaged structs; the coroutine's own reader sees each event once. |
+| Allocations per frame in the profiler | The coroutine is a non-generic `IEnumerator` yielding structs. Write it as `IEnumerator<Wait>`. |
+
 ## See also
 
 - [Scenes](/Ion/ecs/scenes/)

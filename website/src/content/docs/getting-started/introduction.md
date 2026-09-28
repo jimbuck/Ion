@@ -85,14 +85,15 @@ public sealed class PlayerSystem(IInputState input, ISpriteBatch sprites)
 
 Ion is a set of packages that build on `Ion.Core`. The `Ion` package bundles the engine core (metrics, assets, graphics
 and input, the 2D renderer, audio, scenes, coroutines and the remote protocol) behind a single `AddIon()`/`UseIon()`
-pair. Everything else is opt-in, and every module registers what it depends on.
+pair, and ships the 3D renderer as well (`AddRendering3D()` turns it on). Everything else is opt-in, and every module
+registers what it depends on. "Part of the core" below means the package comes with `Ion`.
 
 | Area | Module (package) | Builder call | Read more |
 |---|---|---|---|
 | Engine core | `Ion`, `Ion.Core` | `AddIon()` / `UseIon()` | [The application](/Ion/concepts/application/) |
 | 2D rendering | `Ion.Extensions.Rendering2D` (part of the core) | `AddIon()` | [Rendering overview](/Ion/rendering/overview/), [Sprites](/Ion/rendering/sprites/) |
 | Graphics backends | `Ion.Extensions.Graphics.Vulkan`, `.GLES`, `.Headless`, `.Null` | `AddIon()` picks one | [Graphics backends](/Ion/rendering/graphics-backends/) |
-| 3D rendering | `Ion.Extensions.Rendering3D` | `AddRendering3D()` | [3D overview](/Ion/rendering/3d/overview/) |
+| 3D rendering | `Ion.Extensions.Rendering3D` (part of the core) | `AddRendering3D()` | [3D overview](/Ion/rendering/3d/overview/) |
 | Assets and hot reload | `Ion.Extensions.Assets` (part of the core) | `AddIon()` | [Assets](/Ion/rendering/assets/) |
 | ECS | `Ion.Extensions.Ecs` | `AddEcs()` | [ECS overview](/Ion/ecs/overview/) |
 | ECS rendering | `Ion.Extensions.Ecs.Rendering` | `AddEcsRendering()`, `AddEcsRendering3D()` | [ECS rendering](/Ion/ecs/ecs-rendering/) |
@@ -116,11 +117,14 @@ The [module map](/Ion/reference/module-map/) lists every package with its depend
 
 | Platform | Status | Graphics |
 |---|---|---|
-| Windows (x64, arm64) | Supported | Vulkan, OpenGL ES fallback |
-| Linux (x64, arm64) | Supported | Vulkan, OpenGL ES fallback (OpenGL ES first on arm64) |
-| macOS (arm64, x64) | Supported | Vulkan through MoltenVK (you ship `libMoltenVK.dylib`) |
-| R36S handheld (ArkOS, linux-arm64) | Supported, with a dedicated publish preset | OpenGL ES 3.1 through Panfrost, SDL, 640x480 |
-| Android, iOS | Builds with the mobile workloads; not yet run on a device | Vulkan then OpenGL ES; MoltenVK on iOS |
+| Windows x64 | Built and tested in CI | Vulkan, OpenGL ES fallback |
+| Windows arm64 | Publish preset only; not built in CI | Vulkan, OpenGL ES fallback |
+| Linux x64 | Built, tested, rendered and AOT-published on every pull request | Vulkan, OpenGL ES fallback |
+| Linux arm64 | Cross-compiled in CI and run under QEMU; not yet run on arm64 hardware | OpenGL ES first, then Vulkan |
+| macOS arm64 | Built and tested in CI | Vulkan through MoltenVK (you ship `libMoltenVK.dylib`) |
+| macOS x64 | Publish preset only; not built in CI | Vulkan through MoltenVK |
+| R36S handheld (ArkOS, linux-arm64) | Dedicated publish preset (`r36s`), measured under QEMU; not yet run on the device | OpenGL ES 3.1 through Panfrost, SDL, 640x480 |
+| Android, iOS | Head projects compile with the mobile workloads; not yet run on a device | Vulkan then OpenGL ES; MoltenVK on iOS |
 | Headless (CI, servers, tests) | Supported everywhere | None, or offscreen Vulkan (Mesa lavapipe) or OpenGL ES (EGL) |
 | Browser (WebAssembly, WebGPU) | Planned, not built | |
 
