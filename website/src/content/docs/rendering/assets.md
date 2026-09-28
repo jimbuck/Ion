@@ -44,8 +44,10 @@ Copy the folder to the build output in your project file (the templates already 
 </ItemGroup>
 ```
 
-To load from somewhere else, set `Ion:Storage:AssetsPath` (relative paths resolve against the game root, which is the
-executable's folder unless `Ion:Storage:GamePath` or `--contentRoot` says otherwise):
+To load from somewhere else, set `Ion:Storage:AssetsPath`. Relative paths resolve against the game root, which is the
+host's content root: the executable's folder (`AppContext.BaseDirectory`), not the working directory, unless
+`--contentRoot` on the command line or the `DOTNET_CONTENTROOT` environment variable moves it, or `Ion:Storage:GamePath`
+points elsewhere. So `dotnet run` from any directory finds the same `Assets` folder next to the built executable:
 
 ```json title="appsettings.json"
 { "Ion": { "Storage": { "AssetsPath": "../../../Assets" } } }

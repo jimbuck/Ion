@@ -44,6 +44,8 @@ All light colors are sRGB `Color`s, converted to linear by the renderer and mult
 | `CastShadows` | `true` | Whether this light casts shadows (only the main light can) |
 | `ShadowBias` | `0` (the renderer's default, 1.5 texels) | Depth bias in shadow map texels |
 
+The constructor takes the same values: `new DirectionalLight(color, intensity: 1f, castShadows: true)`.
+
 Two ways to submit one:
 
 ```csharp

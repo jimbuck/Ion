@@ -414,7 +414,7 @@ The [metrics module](/Ion/tooling/metrics-and-tracing/) reads the same numbers i
 | Implementation | When | Behavior |
 |---|---|---|
 | `SpriteBatch` (`Ion.Extensions.Rendering2D`) | Windowed, or `--headless-render` | Draws on the GPU. Textures must come from its loader, `TextureFactory` or `RenderTarget2D`; fonts from its font loader |
-| `NullSpriteBatch` (`Ion.Extensions.Graphics.Null`) | `--headless` | Draws nothing; `LastFrame` records counts (`DrawCalls`, `Sprites`, `Strings`, `Rects`, `Points`, `Lines`, `Glyphs`) and the last 256 commands |
+| `NullSpriteBatch` (`Ion.Extensions.Graphics.Null`) | `--headless` | Draws nothing; `LastFrame` (an `ISpriteBatchStats`) records counts (`Frame`, `DrawCalls`, `Sprites`, `Strings`, `Rects`, `Points`, `Lines`) and the last 256 `Commands` (kind, position, size, color, texture, font, text) |
 
 Code written against `ISpriteBatch`, `ITexture2D` and `IFontSet` runs on both. `SetRenderTarget` and `RenderTarget2D`
 need the GPU implementation.

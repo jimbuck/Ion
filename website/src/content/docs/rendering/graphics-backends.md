@@ -109,7 +109,13 @@ builder.AddIon(graphics =>
 | `ClearColor` | `Color` | `Color.Black` | The color the frame is cleared to. Set in code |
 | `ClearColorHex` | `string?` | | `ClearColor` as hex for configuration: `RGB`, `RGBA`, `RRGGBB` or `RRGGBBAA`, with or without `#` |
 | `Output` | `GraphicsOutput` | `Window` | `Window`, or `None` to select the headless backends (same as `Ion:Headless=true`) |
-| `Gles:MaxFeatureLevel` | `GlesFeatureLevel` | `Es32` | OpenGL ES only: cap the feature level (`Es30`, `Es31`, `Es32`) to test the fallback paths |
+
+One more key lives next to these but on its own options class, `GlesConfig` (in `Ion.Extensions.Graphics.GLES`), bound
+from `Ion:Graphics:Gles`. It is not a `GraphicsConfig` property, so it cannot be set from the `AddIon` callback:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `Ion:Graphics:Gles:MaxFeatureLevel` | `GlesFeatureLevel` | `Es32` | OpenGL ES only: cap the feature level (`Es30`, `Es31`, `Es32`) to test the fallback paths |
 
 There is no frame rate setting under `Ion:Graphics`: frame pacing is controlled by `Ion:MaxFPS` (0 means uncapped) and
 `Ion:VSync` on `GameConfig` (see [The game loop](/Ion/concepts/game-loop/)).
@@ -294,6 +300,18 @@ and the device before anything that creates GPU resources.
 The device is created by the graphics Init step (`StageOrder.Graphics`). Create your GPU resources in an `[Init]` step
 with the default order (0) or later. Accessing `IGraphicsFrame.Device` earlier throws `InvalidOperationException`.
 :::
+
+## Common problems
+
+| Message or symptom | Cause and fix |
+|---|---|
+| `No Vulkan device found. Install a Vulkan driver (on Linux CI: Mesa lavapipe, package mesa-vulkan-drivers).` | Vulkan was forced (or its probe passed) on a machine without a usable driver. Install one, or set `Ion:Graphics:PreferredBackend=OpenGLES` |
+| `The window has no GL context: create it with the OpenGL ES API (Ion:Graphics:PreferredBackend = OpenGLES, or AddRhiGraphics, which sets it).` | `AddGlesGraphics` or the OpenGL ES device was used with a window created for Vulkan. Use `AddRhiGraphics`, or set `PreferredBackend` to `OpenGLES` before the window is created |
+| `Graphics backend Direct3D12 is reserved and has no implementation; use Auto, Vulkan or OpenGLES.` (`NotSupportedException`) | A reserved `GraphicsBackend` value in configuration or the `AddIon` callback |
+| `AddIon was called again with options that select the headless backends ...` (`InvalidOperationException`) | Two `AddIon` calls disagree about the output. Choose windowed or headless in the first call, or with `Ion:Headless` / `Ion:Graphics:Output` |
+| `Capturing a windowed frame needs Ion:Graphics:RetainLastFrame = true` | `IScreenshotSource.Capture` in a windowed run without the copy enabled |
+| `No frame is being rendered (IsRendering is false).` | `IGraphicsFrame.ColorAttachment()` outside the Render stage, or while the window is minimized. Check `IsRendering` first |
+| Nothing renders after `Auto` picked Vulkan on a machine whose driver cannot present | The probe only checks that a device exists. Force `OpenGLES` |
 
 ## See also
 
