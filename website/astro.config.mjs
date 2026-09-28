@@ -27,6 +27,15 @@ export default defineConfig({
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/jimbuck/Ion' }],
 			editLink: { baseUrl: 'https://github.com/jimbuck/Ion/edit/main/website/' },
 			lastUpdated: true,
+			// Social card with the logo for links to any page.
+			head: [
+				{ tag: 'meta', attrs: { property: 'og:image', content: `${site}${base}/og.png` } },
+				{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+				{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+				{ tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+				{ tag: 'meta', attrs: { name: 'twitter:image', content: `${site}${base}/og.png` } },
+				{ tag: 'meta', attrs: { name: 'theme-color', content: '#121a1a' } },
+			],
 			customCss: ['./src/styles/custom.css'],
 			// Dark only: a fixed dark theme and no theme picker.
 			components: {
