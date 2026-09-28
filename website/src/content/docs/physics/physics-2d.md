@@ -137,7 +137,7 @@ var rounded = Collider2D.Box(new Vector2(64, 32)) with { Radius = 4 };
 | `IsSensor` | false | Detects overlaps (`Trigger2D`) without colliding. |
 | `Layer` | 1 (bit 0) | The layers this collider belongs to, a bit mask. |
 | `Mask` | `uint.MaxValue` (all) | The layers it collides with. |
-| `EnableEvents` | true | Whether its contacts raise `Collision2D` events and it can enter sensors. |
+| `EnableEvents` | true | Whether this collider takes part in events: a contact raises `Collision2D` when either collider has it, a sensor overlap raises `Trigger2D` only when both the sensor and the visitor have it. |
 | `HasBody` | (read only) | Whether the physics world has created its body yet. |
 
 Two colliders collide when each one's `Layer` intersects the other's `Mask`. Contacts combine the two surfaces with Box2D's
@@ -156,8 +156,11 @@ var coin = Collider2D.Circle(8) with { IsSensor = true, Layer = Pickups, Mask = 
 ### Sensors
 
 A sensor raises `Trigger2D` events (`Sensor`, `Visitor`, `Phase`) when a collider enters or leaves it, and never pushes
-anything. Following Box2D 3.1's rules, sensors see **dynamic and kinematic** bodies, not static ones, and the visitor needs
-`EnableEvents` (on by default). See [queries and events](/Ion/physics/queries-and-events/).
+anything. A sensor can sit on a static, kinematic or dynamic body, and it detects colliders on any body type, other
+sensors included (two overlapping sensors each report the other as a visitor). Both the sensor and the visitor need
+`EnableEvents` (on by default), and their `Layer` and `Mask` must match as for a contact. Sensor overlaps are computed at
+the end of the step from the final positions, so a small fast body can cross a thin sensor between two steps without an
+event; use a ray cast for those. See [queries and events](/Ion/physics/queries-and-events/).
 
 ### Validation
 
@@ -350,6 +353,19 @@ Assert.InRange(ball.Get<Transform2D>().Position.X, 5.8f, 6.1f);
 
 To test the game's own `Program.cs`, use `new IonTestHost().UseEntryPoint<Program>()` or
 `IonTestHost.RunEntryPoint<Program>(frames)`. See [testing](/Ion/tooling/testing/).
+
+## Common problems
+
+| Symptom | Cause and fix |
+|---|---|
+| A dynamic body hangs in the air | It was created with `default(RigidBody2D)` or `new RigidBody2D()`, whose `GravityScale` is 0. Use `RigidBody2D.Dynamic()` or the constructor. |
+| Everything is sluggish or floats down slowly | `UnitsPerMeter` is 1 in a pixel game, so a 32 pixel ball is a 32 meter boulder, and `GravityY` is still 9.81 pixels per second squared. Set both (see the caution above). |
+| A body sits somewhere other than its sprite | The entity has a [parent](/Ion/ecs/transforms/): the physics step treats `Transform2D` as a world transform. Put bodies on root entities. Or the collider's `Offset` or size does not match the sprite; turn the [debug drawing](/Ion/physics/debug-draw/) on to compare. |
+| `ApplyLinearImpulse` (or a query) does not find the entity | The body is created by the next physics step after the collider is added. Wait one fixed step, or set `RigidBody2D.LinearVelocity` on the component instead, which the step applies when it creates the body. |
+| `InvalidOperationException` in FixedUpdate naming an entity | The collider's geometry is degenerate (a zero size, a rounding radius too large, a polygon without a convex hull); see [validation](#validation). The exception comes from the step, not from `world.Create`. |
+| Two bodies pass through each other | Each `Layer` must be in the other's `Mask`, on both sides. Fast small bodies against thin moving bodies also need `IsBullet`; continuous collision against static bodies is on by default. |
+| A kinematic body keeps drifting after you stop moving it | It cannot: the step zeroes its velocity when its `Transform2D` stops changing. If it still drifts, something writes the transform every frame (an `Update` step with the frame delta, for example). |
+| A joint is never created (`IsCreated` stays false) | Both entities need a `Collider2D` (and so a body) and must be different entities; the joint is created in the step after both bodies exist. |
 
 ## See also
 

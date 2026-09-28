@@ -177,7 +177,7 @@ handler still reads about. Check `world.IsAlive(entity)` before touching compone
 
 | | 2D | 3D |
 |---|---|---|
-| Collision events | Colliders with `EnableEvents` (on by default); sensors never raise `Collision*` | A pair raises events when either collider has `EnableEvents` |
+| Collision events | A pair raises events when either collider has `EnableEvents` (on by default); sensors never raise `Collision*` | A pair raises events when either collider has `EnableEvents` |
 | Touching means | Box2D's begin and end touch events | A contact at depth 0 or deeper in the narrow phase; speculative contacts do not count |
 | Order | Box2D's (deterministic) | Sorted by body pair, then diffed with the previous step (deterministic with any thread count) |
 
@@ -194,9 +194,10 @@ public readonly record struct Trigger3D(Entity Sensor, Entity Visitor, ContactPh
 
 | Rule | 2D | 3D |
 |---|---|---|
-| Who can visit | dynamic and kinematic bodies (not static ones) | any body the pair rules allow; a sensor on a kinematic body also sees kinematic and static bodies |
-| Events need | `EnableEvents` on the visitor (Box2D 3.1's rule) | `EnableEvents` on both |
+| Who can visit | any collider on any body type, other sensors included (each sensor reports the other) | any body the pair rules allow: a dynamic body, or a kinematic body (a sensor on a kinematic body also sees kinematic and static bodies); two overlapping sensors raise one event, with one of them as the sensor |
+| Events need | `EnableEvents` on both the sensor and the visitor | `EnableEvents` on both |
 | Layers | `Layer` and `Mask` filter sensors like any collider | the same |
+| Detection | at the end of the step, from the final positions (no continuous detection) | a contact at depth 0 or deeper in the narrow phase |
 
 ```csharp title="A goal zone"
 public sealed class GoalSystem(World world, IEvents events)
