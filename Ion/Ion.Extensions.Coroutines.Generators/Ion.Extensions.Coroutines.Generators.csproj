@@ -2,6 +2,8 @@
 
   <!-- LangVersion, Nullable, ImplicitUsings and Deterministic come from Directory.Build.props. -->
   <PropertyGroup>
+    <!-- Build-time only: nothing to ship as a package. -->
+    <IsPackable>false</IsPackable>
     <TargetFramework>netstandard2.0</TargetFramework>
     <!-- Analyzers never publish natively; ignore PublishAot passed on the command line (avoids NETSDK1207). -->
     <PublishAot>false</PublishAot>

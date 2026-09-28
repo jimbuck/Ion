@@ -191,6 +191,7 @@ My Changelog
 
 ### Other
 
+* Root `package.json` runs every dev task from the repository root (`npm run build`, `test`, `test:slow`, `goldens:update`, `bench`, `ion`, `mcp`, `pack`, `install:tools`, `example:<name>`, `docs`, `ci` and more; see the README). `npm run pack` packs the whole solution: `Ion.Core.InternalGenerators` and `Ion.Extensions.Coroutines.Generators` are no longer packable (they failed with NU5017).
 * `UseDelegateServicesGenerator` (Ion.Core.InternalGenerators) and `UseDelegateServicesSceneGenerator` stay: they emit the public `Use{Stage}<TService...>` overloads, which the schedule generator intercepts but does not replace.
 * New `Ion.Generators.Tests` (golden output, every diagnostic with its message checked against the runtime's, and each scenario run with and without the generator) and `Ion.Benchmarks.GeneratedApp` (the benchmark applications compiled with the generator; rows `Ion_GeneratedSchedule` and `Step_8Systems_GeneratedSchedule`).
 * The Breakout ECS sample's setup moved to `BreakoutGame.Configure(builder)` / `BreakoutGame.Use(app)`; all its randomness is seeded from `Ion:Seed` (default 6014; the block tilt used an unseeded `Random`). New `Ion.Examples.Breakout.ECS.Tests` plays 600 headless frames with the autopilot and asserts launches, score, blocks, sprites and a frame-by-frame deterministic replay.

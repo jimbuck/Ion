@@ -20,6 +20,24 @@ dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -p:IonTarget=linux-x64    
 ion publish Ion.Examples/Ion.Examples.Breakout.ECS --target r36s --sysroot <arm64 sysroot>   # the R36S handheld, with the ArkOS layout
 ```
 
+Every dev task also runs from the repository root through npm (run `npm install` once; it only installs `cross-env` so the scripts work in any shell):
+
+| Task | Command |
+|---|---|
+| First-time setup (restore .NET and the docs site) | `npm run setup` |
+| Build, clean rebuild, Debug build | `npm run build`, `npm run rebuild`, `npm run build:debug` |
+| Tests (all, without rebuilding, under Xvfb on Linux) | `npm test`, `npm run test:nobuild`, `npm run test:xvfb` |
+| Generator tests, template tests, every slow test | `npm run test:generators`, `npm run test:templates`, `npm run test:slow` |
+| Rewrite golden files | `npm run goldens:update` |
+| Format, check formatting | `npm run format`, `npm run format:check` |
+| Benchmarks | `npm run bench -- --filter '*Schedule*'` |
+| The `ion` CLI and MCP server from source | `npm run ion -- run --headless --frames 600`, `npm run mcp` |
+| Pack every package, or just the tool or templates, into `artifacts/packages` | `npm run pack`, `npm run pack:tools`, `npm run pack:templates` |
+| Install the tool or templates from source | `npm run install:tools`, `npm run install:templates` |
+| Run a sample (arguments after `--`) | `npm run example:breakout -- --headless`, also `breakout-ecs`, `breakout-net`, `companion`, `menu`, `cubes`, `model`, `scenes`, `sprites`, `quad` |
+| Docs site (dev server, install, build, preview) | `npm run docs`, `npm run docs:install`, `npm run docs:build`, `npm run docs:preview` |
+| Build, test and build the docs, like CI | `npm run ci` |
+
 `IonTarget` picks a publishing preset: `win-x64`, `win-arm64`, `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64` or `r36s` (NativeAOT, self-contained, trimmed, invariant globalization, stripped symbols; the handheld preset adds OpenGL ES, SDL, fullscreen 640x480 and an SD card folder with a launcher). Breakout ECS is a 12.6 MB executable on linux-x64 and reaches the end of its first headless frame in about 50 ms. Windows and macOS presets publish on their own OS. The Android and iOS heads of Breakout ECS build with `-p:IonMobileHeads=true` on a machine with the workload. Presets, sizes, startup times and the mobile status are in [docs/platforms/publishing.md](./docs/platforms/publishing.md), the handheld in [docs/platforms/r36s.md](./docs/platforms/r36s.md).
 
 ## Setup
