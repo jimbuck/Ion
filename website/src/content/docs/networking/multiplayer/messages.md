@@ -182,10 +182,10 @@ Inject `INetworkMessages`:
 
 | Method | On a server | On a client |
 |---|---|---|
-| `Send(peer, in message)` | To one client (to `NetworkPeer.Server`: delivered locally) | To the server |
+| `Send(peer, in message)` | To one client (to `NetworkPeer.Server`: delivered locally, whatever the message's direction) | To the server |
 | `Send(peer, in message, delivery)` | Same, with a delivery override | Same |
 | `Broadcast(in message)` | To every connected client | To the server |
-| `SendToServer(in message)` | Delivered locally (listen servers) | To the server |
+| `SendToServer(in message)` | Delivered locally (a listen server's own input reaches its readers this way) | To the server |
 
 ```csharp
 public sealed class PlayerInputSystem(IInputState input, INetworkSession session, INetworkMessages messages)

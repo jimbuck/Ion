@@ -124,8 +124,9 @@ snapshot for 102 arrives at client tick 105:
 
 A client runs `InputLeadTicks` (2 by default) ahead of its estimate of the server tick, starting a full round trip plus
 the lead ahead of the tick in the server's accept. That way its input stamped for tick `N` arrives before the server
-simulates `N`. When the smoothed error exceeds 3 ticks, the client resynchronizes its tick (`NetworkStats.Resyncs`,
-metric `net_resyncs`) and discards stored predictions, which belonged to the old timeline.
+simulates `N`. Every snapshot updates a smoothed estimate of the error; when it exceeds 3 ticks (or a single
+measurement is more than 12 ticks off), the client resynchronizes its tick (`NetworkStats.Resyncs`, metric
+`net_resyncs`) and discards stored predictions, which belonged to the old timeline.
 
 :::note
 Drift is corrected by resynchronizing. Nudging the client's clock rate by up to 1 percent, as in the original design, is

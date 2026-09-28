@@ -47,8 +47,8 @@ The server then logs a warning naming the address, and prints one URL per networ
 fragment (`http://192.168.1.20:15780/#token=...`). Browsers never send the fragment to the server, so it stays out of
 logs and proxies; a page served by the game reads it from `location.hash`.
 
-`Bind` accepts an IP address (IPv4 or IPv6), `localhost` (loopback) or `*` (every interface). Anything else fails at
-startup with `InvalidOperationException`.
+`Bind` accepts an IP address (IPv4 or IPv6), `localhost` (loopback) or `*` (also `+`) for every interface. Anything
+else fails at startup with `InvalidOperationException`.
 
 ## Tokens for mutating endpoints
 

@@ -49,7 +49,8 @@ How it works:
 - `Flush` in `Last` asks LiteNetLib's logic thread to send immediately instead of at its next update (every 5 ms).
 - MTU discovery is off and the MTU is fixed at **1,200 bytes**, so the largest unreliable or sequenced packet is known
   up front: **1,150 bytes** after LiteNetLib's headers. Reliable packets can be up to 32 KiB (LiteNetLib fragments them).
-- An unreliable packet that does not fit is sent reliably instead (counted in `LiteNetLibTransport.Oversized`).
+- An unreliable or sequenced packet that does not fit is sent as `ReliableUnordered` instead (counted in
+  `LiteNetLibTransport.Oversized`); anything over 32 KiB is dropped.
 - LiteNetLib's own disconnect timeout is 10 seconds; Ion's `IdleTimeout` and `HandshakeTimeout` apply on top.
 - A fixed connection key keeps stray LiteNetLib clients of other applications out before Ion's handshake runs. It is
   not a secret: use `JoinSecret` to restrict who may join.

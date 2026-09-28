@@ -82,7 +82,8 @@ inputs, which is the right choice for anything that matters for fairness.
 
 Every inbound message and update is checked against the sender's rights. A client may only send messages whose
 `Direction` is `ClientToServer` or `Both`, and only owner-authority, non-predicted components of entities it owns.
-Everything else is dropped and counted as a violation; after `MaxViolations` (50) violations the client is disconnected.
+Everything else is dropped and counted as a violation (malformed and rate-limited packets count too); a client with
+more than `MaxViolations` (50) violations is disconnected with `DisconnectReason.Violations`.
 
 ### Network ids and ownership
 
@@ -241,7 +242,7 @@ All keys are under `Ion:Network` (`NetworkConfig`):
 | `PingInterval` | `00:00:00.250` | How often round trip time is measured. |
 | `MaxMessagesPerSecond` | `600` | Per-client message rate before the server drops them. |
 | `MaxBytesPerSecond` | `262144` | Per-client byte rate before the server drops packets. |
-| `MaxViolations` | `50` | Violations before a client is disconnected. |
+| `MaxViolations` | `50` | Violations (unauthorized messages or updates, malformed or rate-limited packets) a client may accumulate before it is disconnected. |
 | `Simulate:Latency`, `Simulate:Jitter`, `Simulate:Loss`, `Simulate:Reorder`, `Simulate:Seed` | off, seed `1` | A simulated network (see [Transports](/Ion/networking/multiplayer/transports/)). |
 
 ## Metrics and inspection

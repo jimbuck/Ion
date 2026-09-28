@@ -79,7 +79,7 @@ Without it the server still runs (static files, `/rpc`), but no `[Http]` or `[We
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `Ion:Web:Bind` | `127.0.0.1` | An IP address, `localhost` (loopback), or `*` (every interface). |
+| `Ion:Web:Bind` | `127.0.0.1` | An IP address, `localhost` (loopback), or `*` (also `+`) for every interface. |
 | `Ion:Web:AllowNonLoopback` | `false` | Required for any non-loopback `Bind`; logged as a warning when used. |
 | `Ion:Web:Port` | `15780` | The TCP port. `0` picks a free port. |
 | `Ion:Web:PrintUrl` | `true` | Print the URL (and a generated token) once to standard error at startup. |
@@ -273,7 +273,7 @@ All keys live under `Ion:Web` and bind to `WebOptions`.
 | Key | Default | Meaning |
 |---|---|---|
 | `Enabled` | `false` | Run the server. Nothing listens otherwise. |
-| `Bind` | `127.0.0.1` | IP address, `localhost`, or `*`. Non-loopback needs `AllowNonLoopback`. |
+| `Bind` | `127.0.0.1` | IP address, `localhost`, or `*` (also `+`). Non-loopback needs `AllowNonLoopback`. |
 | `AllowNonLoopback` | `false` | The explicit, logged opt-in for a LAN bind. |
 | `Port` | `15780` | `0` picks a free port. |
 | `Token` | none | Bearer token for mutating endpoints. On a LAN bind without one, a token is generated per run. |

@@ -34,7 +34,7 @@ socket.onopen = () => socket.send("hello");
 
 ## The handler
 
-The method must have exactly this shape, or the generator reports `ION403`:
+The method must have this shape (the parameter may be `in` or by value), or the generator reports `ION403`:
 
 ```csharp
 public void AnyName(in WebSocketMessage message)
