@@ -43,7 +43,6 @@ which also names the per-user data folder.
 | `Resizable` | `bool` | `true` | Whether the user can resize the window |
 | `ShowCursor` | `bool` | `true` | Whether the mouse cursor is visible initially |
 | `Platform` | `WindowPlatform` | `Auto` | `Auto`, `Glfw` or `Sdl` (see below) |
-| `ResolutionX`, `ResolutionY` | `uint?` | | Declared, not used by the current window module |
 
 Every key works on the command line too:
 

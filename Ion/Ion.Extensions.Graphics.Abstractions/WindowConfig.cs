@@ -11,8 +11,6 @@ public class WindowConfig
 	public int? Width { get; set; }
 	public int? WindowX { get; set; }
 	public int? WindowY { get; set; }
-	public uint? ResolutionX { get; set; }
-	public uint? ResolutionY { get; set; }
 
 	/// <summary>
 	/// The initial state: normal, maximized, minimized, hidden, <see cref="WindowState.FullScreen"/> (exclusive, at the

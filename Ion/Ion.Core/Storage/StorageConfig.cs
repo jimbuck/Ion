@@ -2,12 +2,14 @@ namespace Ion;
 
 /// <summary>
 /// Optional storage overrides, bound from the <c>Ion:Storage</c> configuration section.
-/// Relative paths are resolved against <see cref="AppContext.BaseDirectory"/>.
+/// Relative paths are resolved against the content root: the folder of the game's executable
+/// (<see cref="AppContext.BaseDirectory"/>), unless <c>--contentRoot</c> (or <c>DOTNET_CONTENTROOT</c>) sets another.
 /// </summary>
 public class StorageConfig
 {
 	/// <summary>
-	/// Root of the read-only game content. Defaults to <see cref="AppContext.BaseDirectory"/> (the folder of the game's executable).
+	/// Root of the read-only game content. Defaults to the content root (the folder of the game's executable, where
+	/// <c>appsettings.json</c> is read from).
 	/// </summary>
 	public string? GamePath { get; set; }
 

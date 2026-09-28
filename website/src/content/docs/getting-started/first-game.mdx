@@ -238,9 +238,8 @@ It takes about fifteen minutes. You need the .NET 10 SDK and the `ion` tool or t
    A 960 by 540 window opens (the size comes from `Ion:Window` in `appsettings.json`). Steer with the arrow keys or A
    and D; press Escape to quit.
 
-   Run from the project folder: like any .NET host, Ion reads `appsettings.json` from the current directory (the
-   content root), so `dotnet run --project Starship` from the solution folder would start with the engine defaults
-   instead.
+   Ion reads `appsettings.json` from the executable's folder (the build copies it there), so
+   `dotnet run --project Starship` from the solution folder picks up the same settings.
 
 8. **Run it headless**
 

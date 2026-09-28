@@ -45,7 +45,7 @@ Copy the folder to the build output in your project file (the templates already 
 ```
 
 To load from somewhere else, set `Ion:Storage:AssetsPath` (relative paths resolve against the game root, which is the
-executable's folder unless `Ion:Storage:GamePath` says otherwise):
+executable's folder unless `Ion:Storage:GamePath` or `--contentRoot` says otherwise):
 
 ```json title="appsettings.json"
 { "Ion": { "Storage": { "AssetsPath": "../../../Assets" } } }

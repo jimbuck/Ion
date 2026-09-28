@@ -108,11 +108,11 @@ builder.AddIon(graphics =>
 | `Adapter` | `string?` | `null` | Pick the GPU whose name contains this text (case-insensitive). `null`: prefer a discrete GPU, then integrated, then anything |
 | `ClearColor` | `Color` | `Color.Black` | The color the frame is cleared to. Set in code |
 | `ClearColorHex` | `string?` | | `ClearColor` as hex for configuration: `RGB`, `RGBA`, `RRGGBB` or `RRGGBBAA`, with or without `#` |
-| `Output` | `GraphicsOutput` | `Window` | `None` selects the headless backends (same as `Ion:Headless=true`). `File` is declared but not used by the current backends |
+| `Output` | `GraphicsOutput` | `Window` | `Window`, or `None` to select the headless backends (same as `Ion:Headless=true`) |
 | `Gles:MaxFeatureLevel` | `GlesFeatureLevel` | `Es32` | OpenGL ES only: cap the feature level (`Es30`, `Es31`, `Es32`) to test the fallback paths |
 
-`GraphicsConfig` also declares `MaxFPS` and `CanvasSelector`, which nothing reads today. Frame pacing is controlled by
-`Ion:MaxFPS` and `Ion:VSync` on `GameConfig` (see [The game loop](/Ion/concepts/game-loop/)).
+There is no frame rate setting under `Ion:Graphics`: frame pacing is controlled by `Ion:MaxFPS` (0 means uncapped) and
+`Ion:VSync` on `GameConfig` (see [The game loop](/Ion/concepts/game-loop/)).
 
 :::caution[Two VSync settings]
 `Ion:Graphics:VSync` sets the **present mode** (FIFO vs mailbox). `Ion:VSync` (on `GameConfig`) tells the **game loop**

@@ -232,7 +232,8 @@ Then run the published binary on the server machine:
 
 Notes:
 
-- Publish with `appsettings.json` copied to the output (`CopyToOutputDirectory`), and override per machine with
+- Publish with `appsettings.json` copied to the output (`CopyToOutputDirectory`): it is read from the executable's
+  folder, so a service manager can start the server from any working directory. Override per machine with
   environment variables or arguments.
 - Register every ECS component you store with `EcsComponents.Register<T>()` before building; the networking generator
   registers replicated ones and physics modules register theirs.

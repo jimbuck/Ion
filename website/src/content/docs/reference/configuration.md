@@ -6,7 +6,9 @@ sidebar:
 ---
 
 Ion reads its settings from .NET configuration: `appsettings.json`, `appsettings.{Environment}.json`, environment
-variables and the command line, later sources winning. Every key below can be set in any of them:
+variables and the command line, later sources winning. The JSON files are read from the executable's folder, whatever
+the working directory (`--contentRoot <folder>` reads them from another folder). Every key below can be set in any of
+them:
 
 ```json title="appsettings.json"
 {
@@ -71,11 +73,12 @@ Honoured by every game that uses `AddIon`/`UseIon` (what `ion run` passes).
 
 ## Storage (Ion:Storage)
 
-Bound to `StorageConfig`. Relative paths resolve against the executable's folder (`AppContext.BaseDirectory`).
+Bound to `StorageConfig`. Relative paths resolve against the content root: the executable's folder
+(`AppContext.BaseDirectory`), unless `--contentRoot` sets another.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `Ion:Storage:GamePath` | path | the executable's folder | The root of the read-only game content. The mobile heads set it to where they unpacked the assets. |
+| `Ion:Storage:GamePath` | path | the content root (the executable's folder) | The root of the read-only game content. The mobile heads set it to where they unpacked the assets. |
 | `Ion:Storage:AssetsPath` | path | `Assets` under `GamePath` | The folder assets are loaded from. Relative values resolve against `GamePath`. |
 | `Ion:Storage:UserPath` | path | a per-game folder named after `Ion:Title` under the user's local application data | Per-user data (settings, saves). |
 
@@ -107,8 +110,6 @@ Bound to `WindowConfig`.
 | `Ion:Window:ShowCursor` | bool | `true` | Whether the mouse cursor is visible. |
 | `Ion:Window:Platform` | `WindowPlatform` | `Auto` | `Auto` (GLFW on desktop, SDL on Android and iOS), `Glfw` or `Sdl`. |
 
-`ResolutionX` and `ResolutionY` are bound but not used by the built-in backends.
-
 ## Graphics (Ion:Graphics)
 
 Bound to `GraphicsConfig`; `AddIon(graphics => ...)` configures it after binding.
@@ -123,11 +124,11 @@ Bound to `GraphicsConfig`; `AddIon(graphics => ...)` configures it after binding
 | `Ion:Graphics:RetainLastFrame` | bool | `false` | Windowed backends copy every presented frame so screenshots work. Costs a full-frame copy per frame. The remote protocol turns it on. |
 | `Ion:Graphics:Adapter` | string | none | Use the first GPU whose name contains this text (case-insensitive). Otherwise discrete, then integrated, then anything. |
 | `Ion:Graphics:ClearColorHex` | string | black | The clear color as `RGB`, `RGBA`, `RRGGBB` or `RRGGBBAA`, with or without `#`. In code, set `ClearColor`. |
-| `Ion:Graphics:Output` | `GraphicsOutput` | `Window` | `None` selects the headless backends, like `Ion:Headless`. The Silk.NET window is only created for `Window`. |
+| `Ion:Graphics:Output` | `GraphicsOutput` | `Window` | `Window`, or `None` to select the headless backends, like `Ion:Headless`. |
 | `Ion:Graphics:Gles:MaxFeatureLevel` | `GlesFeatureLevel` | `Es32` | The highest OpenGL ES feature level to use (`Es30`, `Es31` or `Es32`). Lower it to force the ES 3.0 or 3.1 paths. |
 
-`MaxFPS` and `CanvasSelector` also exist on `GraphicsConfig` but are not read by the built-in backends; frame pacing is
-`Ion:MaxFPS`.
+There is no frame rate key under `Ion:Graphics`: the loop's frame rate cap is `Ion:MaxFPS`, and `Ion:Graphics:VSync` only
+sets the present mode (set `Ion:VSync=true` or `Ion:MaxFPS=0` too for a vsynced game).
 
 ## Rendering 3D (Ion:Rendering3D)
 

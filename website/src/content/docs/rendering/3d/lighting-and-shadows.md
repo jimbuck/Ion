@@ -57,8 +57,9 @@ renderer.AddLight(new DirectionalLight(Color.White, 3f), sun.ToMatrix());
 
 The direction is normalized for you; a zero direction becomes straight down.
 
-**The first directional light submitted in a frame is the main light.** It is shaded with the shadow map when it casts
-shadows. Further directional lights are added to the local light list (without shadows).
+**The first directional light submitted in a frame with `CastShadows` set is the main light**, and it is shaded with the
+shadow map. When no directional light casts shadows (or `Ion:Rendering3D:Shadows` is off), the first directional light
+submitted is the main light instead. The other directional lights are added to the local light list (without shadows).
 
 ## Point lights
 
@@ -108,7 +109,7 @@ first.
 The main directional light renders a shadow map when:
 
 - `Ion:Rendering3D:Shadows` is `true` (the default),
-- the first directional light of the frame has `CastShadows` set (the default), and
+- at least one directional light of the frame has `CastShadows` set (the default; the first such light gets the map), and
 - at least one camera renders.
 
 | Option (`Ion:Rendering3D:...`) | Default | Effect |
@@ -231,9 +232,10 @@ world.Create(new Transform(new Vector3(2.5f, 1.8f, 1.5f)),
 	new PointLight(new Color(0xFF, 0x90, 0x40), intensity: 2.5f, range: 5f), new EntityName("warm light"));
 ```
 
-Because the main light is "the first directional light submitted", in an ECS world with several directional lights,
-which one gets the shadow map depends on query order, and if that light has `CastShadows = false` there are no shadows
-at all. Keep a single directional light per world when you need its shadows, and use point and spot lights for the rest.
+Because the shadow map goes to the first shadow-casting directional light submitted, in an ECS world with several
+directional lights that cast shadows, which one gets it depends on query order. Set `CastShadows = false` on every
+directional light except the one that should cast (fill and rim lights, for example), and it gets the shadow map
+whatever the order.
 
 ## See also
 

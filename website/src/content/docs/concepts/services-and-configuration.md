@@ -82,11 +82,19 @@ overriding earlier ones:
 
 Read values while you register with `builder.Configuration`, and at run time through `IConfiguration` or options.
 
-:::caution[appsettings.json is read from the current directory]
-Like any .NET host, Ion reads `appsettings.json` from the **content root**, which defaults to the current directory, not
-the executable's folder. `dotnet run` from the project folder finds it; `dotnet run --project Game` from a parent folder,
-or launching the executable from elsewhere, starts with the engine defaults. Run from the folder that holds the file, or
-pass `--contentRoot <folder>`. Assets are different: they are loaded relative to the executable (see
+:::note[appsettings.json is read from the executable's folder]
+Ion reads `appsettings.json` and `appsettings.{Environment}.json` from the **content root**, which `CreateBuilder` sets
+to the executable's folder (`AppContext.BaseDirectory`) instead of the .NET host's default, the current directory. So
+`dotnet run --project Game` from another folder, or launching the executable from anywhere, finds the settings that
+were copied next to it. Keep them copied to the output:
+
+```xml
+<Content Include="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+```
+
+To read them from another folder, pass `--contentRoot <folder>` (or set `DOTNET_CONTENTROOT`); an explicit content root
+always wins. As in any .NET host, a relative content root resolves against the executable's folder, not the current
+directory. Game content, assets and relative `Ion:Storage` paths resolve against the same content root (see
 [Storage](/Ion/concepts/storage/)).
 :::
 

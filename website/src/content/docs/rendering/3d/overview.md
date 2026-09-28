@@ -150,7 +150,8 @@ When the Render stage closes (the `End` of the renderer's scope at `StageOrder.R
    - Each object's world bounding box is its mesh's box transformed by the world matrix.
    - Cameras are sorted by `Priority` (then submission order) and resolved against their target into viewport pixels,
      view and projection matrices and a frustum.
-   - Light lists: the first directional light is the main light (with the shadow map); extra directional lights and the
+   - Light lists: the first shadow-casting directional light is the main light (with the shadow map; the first
+     directional light when none casts); the other directional lights and the
      point and spot lights whose range touches the view fill up to 8 local lights per camera.
    - The shadow projection is fitted to the camera's view up to `ShadowDistance` and snapped to whole shadow map
      texels, so shadows do not shimmer as the camera moves.

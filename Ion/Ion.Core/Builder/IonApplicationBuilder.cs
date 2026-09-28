@@ -18,7 +18,7 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 
 	internal IonApplicationBuilder(string[] args)
 	{
-		_hostBuilder = Host.CreateApplicationBuilder(IonCommandLine.Normalize(args));
+		_hostBuilder = Host.CreateApplicationBuilder(CreateHostSettings(IonCommandLine.Normalize(args)));
 
 		Services.AddLogging(config =>
 		{
@@ -64,6 +64,43 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 #pragma warning restore CS0618
 
 		Services.AddSingleton<IPersistentStorage, PersistentStorage>();
+	}
+
+	/// <summary>
+	/// The host settings of <see cref="IonApplication.CreateBuilder(string[])"/>: the content root, where
+	/// <c>appsettings.json</c> and <c>appsettings.{Environment}.json</c> are read from and what relative <c>Ion:Storage</c>
+	/// paths resolve against, is the folder of the game's executable (<see cref="AppContext.BaseDirectory"/>) rather than
+	/// the working directory, unless it is set explicitly with <c>--contentRoot</c> on the command line or the
+	/// <c>DOTNET_CONTENTROOT</c> environment variable.
+	/// </summary>
+	internal static HostApplicationBuilderSettings CreateHostSettings(string[] args)
+	{
+		var settings = new HostApplicationBuilderSettings { Args = args };
+		if (FindExplicitContentRoot(args) is null && DefaultContentRoot() is { } root) settings.ContentRootPath = root;
+		return settings;
+	}
+
+	/// <summary>
+	/// The content root given on the command line or in <c>DOTNET_CONTENTROOT</c>, read the way the host reads it, or null.
+	/// </summary>
+	internal static string? FindExplicitContentRoot(string[] args)
+	{
+		var config = new ConfigurationBuilder()
+			.AddEnvironmentVariables(prefix: "DOTNET_")
+			.AddCommandLine(args)
+			.Build();
+		var value = config[HostDefaults.ContentRootKey];
+		return string.IsNullOrWhiteSpace(value) ? null : value;
+	}
+
+	/// <summary>
+	/// <see cref="AppContext.BaseDirectory"/>, or null where it is not a folder (some mobile runtimes), which keeps the
+	/// host's default (the working directory).
+	/// </summary>
+	internal static string? DefaultContentRoot()
+	{
+		var baseDirectory = AppContext.BaseDirectory;
+		return !string.IsNullOrEmpty(baseDirectory) && Directory.Exists(baseDirectory) ? baseDirectory : null;
 	}
 
 	/// <summary>

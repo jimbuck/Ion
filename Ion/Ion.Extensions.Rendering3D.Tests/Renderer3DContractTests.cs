@@ -138,6 +138,40 @@ public abstract class Renderer3DContractTests
 	}
 
 	[RhiFact, Trait(CATEGORY, INTEGRATION)]
+	public void AShadowCastingLightAfterANonCastingOneStillCastsShadows()
+	{
+		// The same scene as above, but a blue light that does not cast shadows is submitted first. The white sun that casts
+		// comes second and must own the shadow map: the red channel of the ground under the box stays dark.
+		MeshHandle plane = default, box = default;
+		MaterialHandle white = default;
+		var shot = Render(new Scene3DScript
+		{
+			Init = (r, _) =>
+			{
+				plane = r.CreateMesh(MeshPrimitives.Plane(10));
+				box = r.CreateMesh(MeshPrimitives.Cube(1));
+				white = r.CreateMaterial(new PbrMaterial(Color.White, roughness: 0.8f));
+				r.SetEnvironment(new SceneEnvironment { AmbientColor = Color.White, AmbientIntensity = 0.05f });
+			},
+			Render = (r, _) =>
+			{
+				r.SetCamera(new Camera { Projection = ProjectionKind.Orthographic, OrthographicSize = 2.5f, Near = 0.1f, Far = 50f, CullingMask = 0b01 }, Transform.LookAt(new Vector3(0, 10, 0), Vector3.Zero, -Vector3.UnitZ));
+				r.AddLight(new DirectionalLight(Color.Blue, 1f, castShadows: false), -Vector3.UnitY);
+				r.AddLight(new DirectionalLight(Color.White, 2f), -Vector3.UnitY);
+				r.Draw(plane, white, Matrix4x4.Identity);
+				r.Submit(new MeshRenderer(box, white) { LayerMask = 0b10 }, Matrix4x4.CreateScale(2) * Matrix4x4.CreateTranslation(-1.2f, 3, 0));
+			},
+		}, inspect: host => Assert.True(host.Get<Renderer3D>().ShadowActive));
+
+		var lit = shot.GetPixel(52, 32);
+		var shadowed = shot.GetPixel(12, 32);
+		Assert.True(lit.R > 200, $"lit ground is {lit}");
+		Assert.True(shadowed.R < 90, $"shadowed ground is {shadowed}");
+		// The non-casting blue light still lights the shadowed ground.
+		Assert.True(shadowed.B > shadowed.R + 40, $"shadowed ground is {shadowed}");
+	}
+
+	[RhiFact, Trait(CATEGORY, INTEGRATION)]
 	public void TheSkyboxShowsTheFrontFaceAheadAndTheRightFaceOnTheRight()
 	{
 		// Six single-color faces and four cameras in the four quadrants, looking ahead (-Z), right (+X), up (+Y) and left

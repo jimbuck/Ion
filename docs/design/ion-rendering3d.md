@@ -75,7 +75,7 @@ grow by doubling and are reset (not cleared) each frame. 10,000 submissions cost
 - Views: cameras sorted by `Priority` (then submission order), resolved against their target (the frame or a render
   target) into viewport pixels, view and projection matrices and a `Frustum`. The first camera on a target clears it;
   later ones draw a clear triangle limited to their viewport (`Clear = Color`) or the skybox (`Clear = Skybox`).
-- Lights: the first directional light is the main light (and gets the shadow map when it casts shadows); further
+- Lights: the first directional light that casts shadows is the main light and gets the shadow map (when none casts, or shadows are off, the first directional light is the main light); further
   directional lights and the point and spot lights whose range sphere is inside the view fill up to 8 local lights per
   view.
 - Shadows: `ShadowMath.Fit` covers the bounding sphere of the first frame camera's frustum slice up to

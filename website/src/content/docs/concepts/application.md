@@ -32,7 +32,7 @@ registered on the builder; things that run every frame are added on the applicat
 | What | Details |
 |---|---|
 | Command line | `args`, after Ion's short switches are expanded (`--headless` becomes `--Ion:Headless=true`; see [Services and configuration](/Ion/concepts/services-and-configuration/)). |
-| `appsettings.json` | And `appsettings.{Environment}.json`, from the content root. |
+| `appsettings.json` | And `appsettings.{Environment}.json`, from the content root: the executable's folder (`AppContext.BaseDirectory`), not the current directory, unless `--contentRoot` or `DOTNET_CONTENTROOT` sets one. |
 | Environment variables | The standard .NET host sources. |
 | Logging | A single-line console logger with an `[HH:mm:ss] ` timestamp, plus the debug logger. |
 | Core options | `GameConfig` bound from `Ion`, `StorageConfig` from `Ion:Storage`, `InputConfig` from `Ion:Input`. |

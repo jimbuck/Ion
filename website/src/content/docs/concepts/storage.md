@@ -32,7 +32,7 @@ public sealed class SettingsSystem(IPersistentStorage storage)
 
 | Property | Default location | Use |
 |---|---|---|
-| `Game` | The executable's folder (`AppContext.BaseDirectory`) | Read-only content shipped with the game. |
+| `Game` | The content root: the executable's folder (`AppContext.BaseDirectory`) unless `--contentRoot` sets another | Read-only content shipped with the game. |
 | `Assets` | `Assets` under `Game` | Textures, fonts, sounds, models. The asset loaders read from here. |
 | `User` | A per-game folder under the user's local application data, named after `Ion:Title` | Per-user data: settings, profiles. |
 | `Saves` | `Saves` under `User` | Save games. |
@@ -43,7 +43,7 @@ that are invalid on any supported OS (`< > : " / \ | ? *` and control characters
 same everywhere: a title of `Block:Breaker` gives a folder named `Block_Breaker`.
 
 If the environment has no local application data folder (some containers and service accounts), the user folder falls
-back to `UserData/<title>` under the executable's folder.
+back to `UserData/<title>` under the content root (the executable's folder).
 
 :::caution[Set a title]
 Two games that keep the default title `Ion` share the same user folder. Set `Ion:Title` in `appsettings.json` (the
@@ -56,9 +56,13 @@ Override any folder in the `Ion:Storage` section (`StorageConfig`):
 
 | Key | Default | Resolved against |
 |---|---|---|
-| `Ion:Storage:GamePath` | The executable's folder | The executable's folder, when relative |
+| `Ion:Storage:GamePath` | The content root (the executable's folder) | The content root, when relative |
 | `Ion:Storage:AssetsPath` | `Assets` under the game folder | The game folder, when relative |
-| `Ion:Storage:UserPath` | The per-game local application data folder | The executable's folder, when relative |
+| `Ion:Storage:UserPath` | The per-game local application data folder | The content root, when relative |
+
+The content root is where `appsettings.json` is read from: the executable's folder, whatever the working directory,
+unless `--contentRoot <folder>` (or `DOTNET_CONTENTROOT`) is given. Moving it moves the settings and the game content
+together.
 
 `Saves` always follows `User`.
 

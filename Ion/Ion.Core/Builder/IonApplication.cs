@@ -43,6 +43,9 @@ public class IonApplication : IIonApplication, IDisposable
 	/// <summary>
 	/// Creates the application builder: the configuration from the command line (<paramref name="args"/>, with the short
 	/// switches of <see cref="IonCommandLine"/>), <c>appsettings.json</c> and the environment, and the core services.
+	/// <c>appsettings.json</c> (and <c>appsettings.{Environment}.json</c>) are read from the folder of the game's
+	/// executable (<see cref="AppContext.BaseDirectory"/>), whatever the working directory; <c>--contentRoot=&lt;folder&gt;</c>
+	/// (or the <c>DOTNET_CONTENTROOT</c> environment variable) reads them from another folder.
 	/// </summary>
 	public static IonApplicationBuilder CreateBuilder(string[] args)
 	{

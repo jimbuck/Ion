@@ -287,6 +287,37 @@ public class RendererCpuTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
+	public void TheFirstShadowCastingDirectionalLightOwnsTheShadowMap()
+	{
+		using var renderer = NewRenderer();
+		var cube = renderer.CreateMesh(MeshPrimitives.Cube());
+		renderer.BeginFrame();
+		LookDownMinusZ(renderer);
+		// The first light does not cast; the second does and must own the shadow map. The third casts too but comes later.
+		renderer.AddLight(new DirectionalLight(Color.Blue, 1f, castShadows: false), -Vector3.UnitY);
+		renderer.AddLight(new DirectionalLight(Color.Red), -Vector3.UnitX);
+		renderer.AddLight(new DirectionalLight(Color.Green), -Vector3.UnitZ);
+		renderer.Draw(cube, default, Matrix4x4.CreateTranslation(0, 0, -5));
+		renderer.RunCpuPipeline();
+
+		Assert.True(renderer.ShadowActive);
+		Assert.Equal(1, renderer.LastFrameStatistics.ShadowCasters);
+		Assert.Equal(1, renderer.MainLightIndex);
+		// The two other directional lights are extra lights in the view.
+		Assert.Equal(3, renderer.LastFrameStatistics.Lights);
+
+		// With shadows off, the first directional light stays the main light.
+		using var noShadows = NewRenderer(new Rendering3DOptions { Shadows = false });
+		noShadows.BeginFrame();
+		LookDownMinusZ(noShadows);
+		noShadows.AddLight(new DirectionalLight(Color.Blue, 1f, castShadows: false), -Vector3.UnitY);
+		noShadows.AddLight(new DirectionalLight(Color.Red), -Vector3.UnitX);
+		noShadows.RunCpuPipeline();
+		Assert.False(noShadows.ShadowActive);
+		Assert.Equal(0, noShadows.MainLightIndex);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
 	public void CamerasRenderByPriorityAndPointLightsAreCulledPerView()
 	{
 		using var renderer = NewRenderer();

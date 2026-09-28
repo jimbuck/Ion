@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Ion;
@@ -15,22 +16,34 @@ internal class PersistentStorage : IPersistentStorage
 	public IPersistentStorageProvider User => _user;
 	public IPersistentStorageProvider Saves => _saves;
 
-	public PersistentStorage(IOptions<GameConfig> config, IOptions<StorageConfig> storageConfig)
+	/// <summary>
+	/// Resolves the storage folders. Relative paths, and the default game folder, are based on the host's content root
+	/// (<paramref name="environment"/>: the executable's folder unless <c>--contentRoot</c> moves it), or on
+	/// <see cref="AppContext.BaseDirectory"/> without a host.
+	/// </summary>
+	public PersistentStorage(IOptions<GameConfig> config, IOptions<StorageConfig> storageConfig, IHostEnvironment? environment = null)
 	{
 		var storage = storageConfig.Value;
+		var baseDirectory = ResolveBaseDirectory(environment);
 
-		var gameRoot = ResolveGameRoot(storage);
+		var gameRoot = ResolveGameRoot(storage, baseDirectory);
 		_game = new PersistentStorageProvider(gameRoot);
 		_assets = new PersistentStorageProvider(ResolveAssetsRoot(storage, gameRoot));
-		_user = new PersistentStorageProvider(ResolveUserRoot(storage, config.Value.Title));
+		_user = new PersistentStorageProvider(ResolveUserRoot(storage, config.Value.Title, baseDirectory));
 		_saves = _user.Subpath("Saves");
 	}
 
-	internal static string ResolveGameRoot(StorageConfig storage)
+	internal static string ResolveBaseDirectory(IHostEnvironment? environment)
+	{
+		var root = environment?.ContentRootPath;
+		return string.IsNullOrWhiteSpace(root) ? AppContext.BaseDirectory : root;
+	}
+
+	internal static string ResolveGameRoot(StorageConfig storage, string baseDirectory)
 	{
 		return string.IsNullOrWhiteSpace(storage.GamePath)
-			? AppContext.BaseDirectory
-			: Path.GetFullPath(storage.GamePath, AppContext.BaseDirectory);
+			? baseDirectory
+			: Path.GetFullPath(storage.GamePath, baseDirectory);
 	}
 
 	internal static string ResolveAssetsRoot(StorageConfig storage, string gameRoot)
@@ -40,15 +53,15 @@ internal class PersistentStorage : IPersistentStorage
 			: Path.GetFullPath(storage.AssetsPath, gameRoot);
 	}
 
-	internal static string ResolveUserRoot(StorageConfig storage, string? title)
+	internal static string ResolveUserRoot(StorageConfig storage, string? title, string baseDirectory)
 	{
-		if (!string.IsNullOrWhiteSpace(storage.UserPath)) return Path.GetFullPath(storage.UserPath, AppContext.BaseDirectory);
+		if (!string.IsNullOrWhiteSpace(storage.UserPath)) return Path.GetFullPath(storage.UserPath, baseDirectory);
 
 		var gameFolder = SanitizeFolderName(title);
 		var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify);
 
 		// Some environments (containers, service accounts without a home) have no local app data folder.
-		if (string.IsNullOrEmpty(localAppData)) return Path.Combine(AppContext.BaseDirectory, "UserData", gameFolder);
+		if (string.IsNullOrEmpty(localAppData)) return Path.Combine(baseDirectory, "UserData", gameFolder);
 
 		return Path.Combine(localAppData, gameFolder);
 	}

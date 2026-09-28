@@ -17,9 +17,18 @@ public class GraphicsConfig
 	/// </summary>
 	public GraphicsBackend PreferredBackend { get; set; } = GraphicsBackend.Auto;
 
-	/// <summary>Wait for vertical blank when presenting (FIFO). Off: mailbox where supported, else immediate.</summary>
+	/// <summary>
+	/// Wait for vertical blank when presenting (FIFO). Off: mailbox where supported, else immediate. This only sets the
+	/// present mode: the game loop still sleeps to honour <see cref="GameConfig.MaxFPS"/> unless <see cref="GameConfig.VSync"/>
+	/// is set or <c>MaxFPS</c> is 0.
+	/// </summary>
 	public bool VSync { get; set; }
-	public uint MaxFPS { get; set; }
+
+	/// <summary>
+	/// Where frames go (<c>Ion:Graphics:Output</c>): <see cref="GraphicsOutput.Window"/> (the default) or
+	/// <see cref="GraphicsOutput.None"/>, which selects the headless backends. The frame rate cap is
+	/// <see cref="GameConfig.MaxFPS"/> (<c>Ion:MaxFPS</c>).
+	/// </summary>
 	public GraphicsOutput Output { get; set; } = GraphicsOutput.Window;
 
 	/// <summary>
@@ -68,7 +77,6 @@ public class GraphicsConfig
 			ClearColor = ParseHexColor(value);
 		}
 	}
-	public string? CanvasSelector { get; set; }
 
 	private static Color ParseHexColor(string value)
 	{
@@ -99,11 +107,6 @@ public enum GraphicsOutput : byte
 	/// Indicates no graphical output should be generated. Useful for servers and unit tests.
 	/// </summary>
 	None = 0,
-
-	/// <summary>
-	/// Indicates that graphics will be rendered to a file. Useful for simulations and automated tests.
-	/// </summary>
-	File,
 
 	/// <summary>
 	/// Indicates that graphics will be rendered to a window. Default value for games.

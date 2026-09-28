@@ -58,6 +58,9 @@ public sealed partial class Renderer3D
 	/// <summary>Whether the last frame rendered a shadow map.</summary>
 	public bool ShadowActive => _shadowActive;
 
+	/// <summary>The index, in submission order, of the last frame's main directional light (-1: none).</summary>
+	internal int MainLightIndex => _mainLight;
+
 	/// <summary>
 	/// Starts a frame: forgets the previous frame's submissions (cameras, lights, mesh renderers). Called by the 3D
 	/// renderer system when the Render stage opens.
@@ -203,8 +206,17 @@ public sealed partial class Renderer3D
 
 	private void PrepareLights()
 	{
-		// The main light: the first directional light (it gets the shadow map when it casts shadows).
+		// The main light: the first directional light that casts shadows (it gets the shadow map), or the first
+		// directional light when none casts or shadows are off. The others are extra lights in the per-view list.
 		_mainLight = _directional.Count > 0 ? 0 : -1;
+		if (Options.Shadows)
+		{
+			for (var d = 0; d < _directional.Count; d++)
+			{
+				if (_directional.Items[d].Light.CastShadows) { _mainLight = d; break; }
+			}
+		}
+
 		_shadowActive = false;
 		_shadowCasterCount = 0;
 
@@ -213,8 +225,9 @@ public sealed partial class Renderer3D
 			var view = _views[v];
 			var count = 0;
 			// Extra directional lights first (they light everything), then point and spot lights inside the frustum.
-			for (var d = 1; d < _directional.Count && count < ViewUniforms.MaxLights; d++)
+			for (var d = 0; d < _directional.Count && count < ViewUniforms.MaxLights; d++)
 			{
+				if (d == _mainLight) continue;
 				ref readonly var light = ref _directional.Items[d];
 				var color = ColorSpace.ToLinear(light.Light.Color) * light.Light.Intensity;
 				view.Lights[count++] = new LightUniform
