@@ -36,6 +36,7 @@ from its parts with the `IServiceCollection` registrations instead of `AddIon`/`
 
 ```bash
 dotnet run --project Ion.Examples/Ion.Examples.Scenes
+npm run example:scenes            # the same, in Release
 dotnet run --project Ion.Examples/Ion.Examples.Scenes -- --Ion:PrintSchedule=true
 ```
 
@@ -274,7 +275,8 @@ Assert.Equal(Color.DarkRed.ToRgba8(), gameplay.GetPixel(50, 50));
 
 `TabFadesToTheGameplaySceneHeadless` runs without a GPU: mid-fade the menu is still the active scene and the recording
 sprite batch saw two rectangles (the square and the fade over it); 24 frames later the gameplay scene is active and the
-fade is gone. The windowed tests run 120 and 240 frames and check that one sprite (the square) was drawn per frame.
+fade is gone. The windowed tests run 120 and 240 frames without logged errors and check that the last frame drew one
+sprite (the square).
 
 ## Ideas to extend it
 

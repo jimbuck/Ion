@@ -30,6 +30,7 @@ path over the remote protocol.
 
 ```bash
 dotnet run --project Ion.Examples/Ion.Examples.Menu
+npm run example:menu              # the same, in Release
 dotnet run --project Ion.Examples/Ion.Examples.Menu -- --remote-allow-mutations     # let an agent drive it
 ```
 

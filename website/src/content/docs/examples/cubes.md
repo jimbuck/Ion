@@ -30,6 +30,7 @@ the grid. Every object is an ECS entity; the 3D extraction submits them to the r
 
 ```bash
 dotnet run --project Ion.Examples/Ion.Examples.Cubes
+npm run example:cubes             # the same, in Release
 dotnet run --project Ion.Examples/Ion.Examples.Cubes -- --Ion:Headless=true --Ion:Headless:Render=true --Cubes:Frames=120 --Cubes:Screenshot=cubes.png
 ```
 

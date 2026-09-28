@@ -32,6 +32,7 @@ scene. Everything is an entity.
 
 ```bash
 dotnet run --project Ion.Examples/Ion.Examples.Model
+npm run example:model             # the same, in Release
 dotnet run --project Ion.Examples/Ion.Examples.Model -- --Ion:Headless=true --Ion:Headless:Render=true --Model:Frames=60 --Model:Screenshot=model.png
 ```
 

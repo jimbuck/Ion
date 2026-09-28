@@ -68,7 +68,8 @@ All three templates share this shape (shown for a game named `Arena`):
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- The Ion packages this game uses. -->
     <IonVersion>0.3.0</IonVersion>
-    <!-- An Ion source checkout to build against instead of the packages; empty uses the packages. -->
+    <!-- An Ion source checkout to build against instead of the packages; empty uses the packages.
+         ion new --ion-source (or dotnet new --IonSource) fills it in. -->
     <IonSource></IonSource>
     <!-- The Ion schedule generator emits C# interceptors in this namespace. -->
     <InterceptorsNamespaces>$(InterceptorsNamespaces);Ion.Generated</InterceptorsNamespaces>
@@ -102,7 +103,9 @@ path (`assets.Load<ITexture2D>("tiles.png")`).
 
 ### appsettings.json
 
-Every template starts from the same configuration. `Ion:*` configures the engine, `Game:*` is the game's own:
+Every template starts from the same `Ion:*` settings, which configure the engine; `Game:*` is the game's own (the ECS
+template's `Balls` is shown; the 2D template has `PaddleSpeed` and `BallSpeed`, the 3D template `Cubes` and
+`SpinSpeed`):
 
 ```json title="Arena/appsettings.json"
 {
@@ -208,7 +211,7 @@ register their dependencies, `builder.AddRendering3D()` alone would do the same.
 |---|---|
 | `Game.cs` | `GameSettings` (read from `Game:PaddleSpeed`, `Game:BallSpeed` and `Ion:Seed` through `IonRun.Seed`), `PlayState` (paddle, ball, score, misses) and `GameJson`, a source-generated `JsonSerializerContext` that works under NativeAOT. |
 | `PaddleSystem.cs` | `[Init]` places the paddle and serves; `[Update]` moves the paddle from the keyboard; `[FixedUpdate]` moves the ball and bounces it; `[Render]` draws both with `ISpriteBatch.DrawRect`. Counts hits with an `IMetrics` counter named `hits`. |
-| `GameTests.cs` | `HoldingRightMovesThePaddleRight` (scripted input), `TheBallStaysInPlayOrIsServedAgain` (600 frames, checks the `hits` counter against the score and `LastFrame.Sprites`), and `StateAfter300FramesMatchesTheSnapshot` (JSON snapshot in `Golden/state-300.json`). |
+| `GameTests.cs` | Class `GameTests`: `HoldingRightMovesThePaddleRight` (scripted input) and `TheBallStaysInPlayOrIsServedAgain` (600 frames, checks the `hits` counter against the score and `LastFrame.Sprites`). Class `SnapshotTests`: `StateAfter300FramesMatchesTheSnapshot` (JSON snapshot in `Golden/state-300.json`). |
 
 The simulation is in `FixedUpdate` and the ball's serve angle comes from a seeded `Random`, so the same seed gives the
 same state after the same number of frames. That is what makes the snapshot test stable.
@@ -219,7 +222,7 @@ same state after the same number of frames. That is what makes the snapshot test
 |---|---|
 | `Game.cs` | `GameSettings` (`Game:Cubes`, default 5; `Game:SpinSpeed`, default 1.2 rad/s), `SpinState` and `GameJson`. |
 | `SceneSystem3D.cs` | `[Init]` creates a cube and a plane mesh (`MeshPrimitives`), two `PbrMaterial`s and the ambient light; `[FixedUpdate]` advances the spin; `[Render]` submits the camera, a directional light, the ground and the cubes every frame. |
-| `GameTests.cs` | `CubesSpinAndAreSubmitted` (60 frames, asserts the angle and `IRenderer3D.LastFrameStatistics`) and a snapshot of the state plus the renderer's `Submitted` and `Batches` counts. |
+| `GameTests.cs` | `CubesSpinAndAreSubmitted` (60 frames, asserts the angle and `IRenderer3D.LastFrameStatistics`) and `StateAfter120FramesMatchesTheSnapshot` (the state plus the renderer's `Submitted` and `Batches` counts, in `Golden/state-120.json`). |
 
 The 3D renderer runs its CPU pipeline (culling, sorting, batching) even headless without a GPU, so its statistics are
 meaningful in tests. Screenshots need headless rendering and a Vulkan or EGL driver.
@@ -230,7 +233,7 @@ meaningful in tests. Screenshots need headless rendering and a Vulkan or EGL dri
 |---|---|
 | `Game.cs` | `GameSettings` (`Game:Balls`, default 8; `Ion:Seed`), the components `Velocity` and `Ball` (a tag), and `GameJson` for the component serializer. |
 | `Systems.cs` | `BallSystem` spawns seeded balls in `[Init]` and moves them in a `[FixedUpdate, Query]` method; `DrawSystem` draws every entity with `Ball` in a `[Render, Query, All<Ball>]` method. Both classes are `partial` so the generator can expand the queries. |
-| `GameTests.cs` | `BallsMoveAndStayInsideTheWindow` (600 frames, queries the root world), `TheSameSeedGivesTheSameWorld` (two runs compared as JSON) and a world snapshot in `Golden/world-120.json`. |
+| `GameTests.cs` | `BallsMoveAndStayInsideTheWindow` (600 frames, queries the root world and checks the `bounces` counter), `TheSameSeedGivesTheSameWorld` (two runs with `Ion:Seed` 7 compared as JSON) and `WorldAfter120FramesMatchesTheSnapshot` (`Golden/world-120.json`). |
 
 Components registered with `AddEcsSerialization` appear in world snapshots (`run.WorldJson()`) and over the remote
 protocol. Register every component you add. See [Components and serialization](/Ion/ecs/components-and-serialization/).

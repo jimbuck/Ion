@@ -28,6 +28,7 @@ Start here to see the shape of every Ion game.
 
 ```bash
 dotnet run --project Ion.Examples/Ion.Examples.Breakout
+npm run example:breakout          # the same, in Release
 ```
 
 Click to capture the mouse, click again to launch the ball, and press Escape to release the mouse.

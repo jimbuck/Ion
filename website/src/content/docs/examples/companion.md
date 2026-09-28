@@ -31,6 +31,7 @@ arrives on the same scripted input path a real device would use.
 
 ```bash
 dotnet run --project Ion.Examples/Ion.Examples.Companion
+npm run example:companion         # the same, in Release
 ```
 
 Then open [http://127.0.0.1:15780/](http://127.0.0.1:15780/) in a browser (a phone emulator in your browser's dev tools

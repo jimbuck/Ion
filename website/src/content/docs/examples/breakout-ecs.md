@@ -37,6 +37,7 @@ bullets, blocks are tilted static boxes, the paddle is a kinematic capsule, and 
 
 ```bash
 dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS
+npm run example:breakout-ecs      # the same, in Release
 ```
 
 Click to capture the mouse, click again to launch a ball (each click adds one), and press Escape to release the mouse.
@@ -358,7 +359,7 @@ so the shared code keeps compiling. See [Mobile](/Ion/platforms/mobile/).
 ## Publishing
 
 ```bash
-dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -p:IonTarget=linux-x64      # 12.6 MB, about 50 ms to the first headless frame
+dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -p:IonTarget=linux-x64      # 12.6 MB; about 80 ms from start to exit after one headless frame
 dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -p:IonTarget=r36s -p:IonArm64SysRoot=$HOME/sysroot-bionic-arm64
 ```
 

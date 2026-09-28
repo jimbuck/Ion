@@ -61,8 +61,9 @@ It takes about fifteen minutes. You need the .NET 10 SDK and the `ion` tool or t
 
 2. **Add a sprite**
 
-   Put any small PNG (64 by 64 pixels works well) at `Starship/Assets/ship.png`. The project file already copies
-   everything under `Assets/` to the output folder:
+   Put any small PNG (64 by 64 pixels works well) at `Starship/Assets/ship.png`. It must be a real image file: the
+   headless texture loader used by the tests reads its header for the size. The project file already copies everything
+   under `Assets/` to the output folder (of the game and, through the project reference, of the tests):
 
    ```xml title="Starship/Starship.csproj"
    <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
@@ -229,9 +230,13 @@ It takes about fifteen minutes. You need the .NET 10 SDK and the `ion` tool or t
    game.Run();
    ```
 
-   `AddIon()` registers the engine core: window and input, graphics, the 2D renderer, audio, assets and more.
-   `AddSystem<T>()` registers a system as a singleton. Keep these calls in `Program.cs` (or methods it calls): the Ion
-   source generator reads them and compiles the schedule into direct method calls.
+   `AddIon()` registers the engine core: window and input, graphics, the 2D renderer, audio, assets and more; its
+   delegate sets the clear color (`Color` lives in the `Ion` namespace). `AddSystem<T>()` registers a system as a
+   singleton. Keep these calls in `Program.cs` (or methods it calls): the Ion source generator reads them and compiles
+   the schedule into direct method calls.
+
+   The template's `Program.cs` also registered the paddle state as a remote resource (`AddRemoteResource`); you dropped
+   that with `Game.cs`. See [Remote protocol](/Ion/tooling/remote-protocol/) to expose `GameState` the same way.
 
 7. **Run it in a window**
 
@@ -264,7 +269,8 @@ It takes about fifteen minutes. You need the .NET 10 SDK and the `ion` tool or t
    ```
 
    `ion schedule` shows your `ShipSystem.Steer` and `ScoreSystem.Tally` at order 0 in `Update`, after the engine's setup
-   steps (negative orders, such as the coroutine runner at -600) and before any teardown steps (positive orders).
+   steps (negative orders, such as the coroutine runner at -600) and before the engine's teardown steps (positive
+   orders, such as the window close check at 900 in `Render`).
 
 9. **Test it**
 
@@ -314,7 +320,12 @@ It takes about fifteen minutes. You need the .NET 10 SDK and the `ion` tool or t
 
    `IonTestHost.RunEntryPoint<Program>(frames)` runs `Program.cs` on its own thread up to `game.Run()`, then takes over
    the application: headless, on a fixed 60 Hz clock, with scripted input (`host.Input`). The Ion generator makes the
-   top-level `Program` class public so the test project can name it.
+   top-level `Program` class public so the test project can name it, and the test namespace `Starship.Tests` sees
+   `GameState` and `StarCaught` from `Starship` without a `using`.
+
+   In the second test, `Collect<StarCaught>()` starts the game (`Init` runs, the star is spawned), then the test drops
+   the star onto the ship. The next frame's `FixedUpdate` catches it and emits the event, and `Update` tallies it in the
+   same frame.
 
 </Steps>
 

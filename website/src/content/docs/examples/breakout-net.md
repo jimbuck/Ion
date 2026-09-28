@@ -29,6 +29,7 @@ immediately. The same executable is a listen server, a dedicated server or a cli
 dotnet run --project Ion.Examples/Ion.Examples.Breakout.Net                                             # a listen server: server and first player
 dotnet run --project Ion.Examples/Ion.Examples.Breakout.Net -- --Ion:Headless=true --Ion:Network:Mode=Server   # a dedicated server
 dotnet run --project Ion.Examples/Ion.Examples.Breakout.Net -- --Ion:Network:Mode=Client                # a client of Ion:Network:Connect
+npm run example:breakout-net -- --Ion:Network:Mode=Client                                               # the same, in Release
 ```
 
 Start a listen server, then one or more clients in other terminals. Click to capture the mouse and click again to

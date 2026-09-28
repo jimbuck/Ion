@@ -28,6 +28,7 @@ hardware and to check changes to the batcher.
 
 ```bash
 dotnet run -c Release --project Ion.Examples/Ion.Examples.Sprites100k
+npm run example:sprites           # the same
 dotnet run -c Release --project Ion.Examples/Ion.Examples.Sprites100k -- --Sprites:Count=250000 --Sprites:Textures=4
 dotnet run -c Release --project Ion.Examples/Ion.Examples.Sprites100k -- --Sprites:Frames=600
 ```

@@ -36,6 +36,14 @@ Every sample is an executable project. From the repository root:
 dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS
 ```
 
+The root `package.json` has a Release shortcut for each one (`npm install` once first): `npm run example:breakout`,
+`example:breakout-ecs`, `example:breakout-net`, `example:companion`, `example:menu`, `example:cubes`, `example:model`,
+`example:scenes`, `example:sprites` and `example:quad`. Arguments follow `--`, as with `dotnet run`:
+
+```bash
+npm run example:breakout-ecs -- --headless --Ion:Run:Frames=600
+```
+
 Everything after `--` is configuration. These keys work in every sample that uses `AddIon`:
 
 | Flag | Effect |
@@ -109,6 +117,19 @@ public class SmokeTests
 	}
 }
 ```
+
+## Common problems
+
+- **A test is skipped with "No Vulkan driver" or "No EGL OpenGL ES 3 driver".** The rendering tests need Mesa: on
+  Debian and Ubuntu, `mesa-vulkan-drivers` for lavapipe and `libegl1 libegl-mesa0` for OpenGL ES. Skipped is not
+  failed; the headless tests without rendering still run.
+- **"No display" skips the windowed tests.** Run them under `xvfb-run -a` on Linux, or on a desktop session.
+- **The window opens on a machine without Vulkan.** Pass `--Ion:Graphics:PreferredBackend=OpenGLES`, or run headless
+  with `--headless-render` to keep rendering offscreen.
+- **A golden image test fails after a rendering change you meant to make.** Re-run the tests with
+  `ION_UPDATE_GOLDEN=1` (`npm run goldens:update` does it for the whole solution) and commit the new PNGs.
+- **Frame times look slow.** Debug builds of the engine and the samples are much slower in per-sprite and per-entity
+  loops; use `-c Release` or the `npm run example:*` scripts.
 
 ## Publishing a sample
 

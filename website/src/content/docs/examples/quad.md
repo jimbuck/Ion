@@ -30,6 +30,7 @@ renderer.
 
 ```bash
 dotnet run --project Ion.Examples/Ion.Examples.Quad
+npm run example:quad              # the same, in Release
 dotnet run --project Ion.Examples/Ion.Examples.Quad -- --Ion:Graphics:PreferredBackend=OpenGLES
 dotnet run --project Ion.Examples/Ion.Examples.Quad -- --Ion:Headless=true --Quad:Frames=60 --Quad:Screenshot=quad.png
 ```
