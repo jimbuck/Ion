@@ -92,18 +92,54 @@ body::after {
 	z-index: -1;
 	pointer-events: none;
 	opacity: 0.35;
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'%3E%3Cg fill='none' stroke='%232dd4bf' stroke-opacity='.12' stroke-width='1'%3E%3Cpath d='M28 1 55 16.5v32L28 64 1 48.5v-32Z'/%3E%3Cpath d='M28 65 55 80.5V97M1 97V80.5L28 65'/%3E%3C/g%3E%3C/svg%3E");
-	background-size: 56px 97px;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='55.43' height='96' viewBox='0 0 55.43 96'%3E%3Cpath d='M27.71 0 55.43 16 55.43 48 27.71 64 0 48 0 16ZM27.71 64V96' fill='none' stroke='%232dd4bf' stroke-opacity='.12' stroke-width='1'/%3E%3C/svg%3E");
+	background-size: 55.43px 96px;
 	mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.9), transparent 55rem);
 	-webkit-mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.9), transparent 55rem);
 }
 
-/* Hex language: a corner clipped at the hexagon's 30 degree angle */
+/* Hex language: a corner clipped at the hexagon's 30 degree angle. A notched box is drawn as two clipped layers:
+   the element itself is the 1px "border" (its background is the border colour) and ::before is the fill, inset 1px,
+   so the cut corner keeps its edge and the box looks closed. Set --ion-fill and --ion-line per element. */
 :root {
 	--ion-notch: 10px;
 	--ion-notch-sm: 6px;
 	--ion-clip: polygon(var(--ion-notch) 0, 100% 0, 100% calc(100% - var(--ion-notch)), calc(100% - var(--ion-notch)) 100%, 0 100%, 0 var(--ion-notch));
 	--ion-clip-sm: polygon(var(--ion-notch-sm) 0, 100% 0, 100% calc(100% - var(--ion-notch-sm)), calc(100% - var(--ion-notch-sm)) 100%, 0 100%, 0 var(--ion-notch-sm));
+}
+.card,
+.sl-link-card,
+.ion-stat,
+.logo-card,
+.pagination-links a,
+.expressive-code,
+.hero .sl-link-button {
+	--ion-line: var(--sl-color-hairline);
+	--ion-fill: var(--sl-color-bg);
+	position: relative;
+	isolation: isolate;
+	border: 0 !important;
+	background: var(--ion-line) !important;
+	clip-path: var(--ion-clip);
+	transition: --ion-line 150ms ease, transform 150ms ease;
+}
+.card::before,
+.sl-link-card::before,
+.ion-stat::before,
+.logo-card::before,
+.pagination-links a::before,
+.expressive-code::before,
+.hero .sl-link-button::before {
+	content: '';
+	position: absolute;
+	inset: 1px;
+	z-index: -1;
+	background: var(--ion-fill);
+	clip-path: var(--ion-clip);
+}
+.hero .sl-link-button,
+.hero .sl-link-button::before {
+	clip-path: var(--ion-clip-sm);
 }
 
 /* ---------- Header ---------- */
@@ -324,11 +360,14 @@ h1[data-page-title] {
 
 /* ---------- Code blocks ---------- */
 .expressive-code {
+	--ion-fill: var(--ec-frm-edBg);
+	--ec-brdWd: 0px;
 	margin-block: 1.25rem;
+	padding: 1px;
 }
 .expressive-code .frame {
 	clip-path: var(--ion-clip);
-	box-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -20px rgb(0 0 0 / 0.8);
+	box-shadow: none;
 }
 .expressive-code .frame.has-title .title {
 	font-family: var(--sl-font-mono);
@@ -387,15 +426,11 @@ h1[data-page-title] {
 /* ---------- Cards, link cards, steps, tabs ---------- */
 .card,
 .sl-link-card {
-	clip-path: var(--ion-clip);
-	border-radius: 0;
-	border: 1px solid var(--sl-color-hairline);
-	background: linear-gradient(180deg, rgb(255 255 255 / 0.03), transparent);
-	transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+	--ion-fill: linear-gradient(180deg, #1a2626, var(--sl-color-bg));
 }
 .sl-link-card:hover {
-	border-color: var(--ion-teal-line);
-	background: linear-gradient(180deg, var(--ion-teal-soft), transparent);
+	--ion-line: var(--ion-teal-line);
+	--ion-fill: linear-gradient(180deg, #14302d, var(--sl-color-bg));
 	transform: translateY(-1px);
 }
 .sl-link-card .title {
@@ -458,14 +493,11 @@ footer.sl-flex {
 	color: var(--sl-color-gray-3);
 }
 .pagination-links a {
-	clip-path: var(--ion-clip);
-	border-radius: 0;
-	border-color: var(--sl-color-hairline);
 	box-shadow: none;
 }
 .pagination-links a:hover {
-	border-color: var(--ion-teal-line);
-	background: var(--ion-teal-soft);
+	--ion-line: var(--ion-teal-line);
+	--ion-fill: #14302d;
 }
 .pagination-links a .link-title {
 	color: var(--sl-color-white);
@@ -495,21 +527,27 @@ footer.sl-flex {
 	max-width: 36rem;
 	line-height: 1.6;
 }
-.hero .sl-link-button {
-	clip-path: var(--ion-clip-sm);
-}
 .hero .sl-link-button.primary {
-	background: var(--ion-teal);
+	--ion-line: var(--ion-teal);
+	--ion-fill: var(--ion-teal);
 	color: #06201d;
-	border-color: var(--ion-teal);
 	font-weight: 600;
 	box-shadow: 0 8px 24px -10px rgb(45 212 191 / 0.6);
 }
 .hero .sl-link-button.primary:hover {
-	background: var(--sl-color-accent-high);
-	border-color: var(--sl-color-accent-high);
+	--ion-line: var(--sl-color-accent-high);
+	--ion-fill: var(--sl-color-accent-high);
+}
+.hero .sl-link-button.secondary {
+	--ion-line: var(--sl-color-gray-4);
+	color: var(--sl-color-white);
+}
+.hero .sl-link-button.secondary:hover {
+	--ion-line: var(--ion-teal);
 }
 .hero .sl-link-button.minimal {
+	--ion-line: transparent;
+	--ion-fill: transparent;
 	color: var(--sl-color-gray-1);
 }
 .hero .sl-link-button.minimal:hover {
@@ -580,11 +618,8 @@ footer.sl-flex {
 	margin-top: 0 !important;
 }
 .ion-stat {
-	clip-path: var(--ion-clip);
-	border: 1px solid var(--sl-color-hairline);
-	border-radius: 0;
+	--ion-fill: linear-gradient(180deg, #1a2626, var(--sl-color-bg));
 	padding: 1rem 1.1rem;
-	background: linear-gradient(180deg, rgb(255 255 255 / 0.03), transparent);
 }
 .ion-stat > * {
 	margin: 0 !important;
@@ -630,9 +665,7 @@ footer.sl-flex {
 	margin-top: 0 !important;
 }
 .logo-card {
-	clip-path: var(--ion-clip);
-	border: 1px solid var(--sl-color-hairline);
-	background: linear-gradient(180deg, rgb(255 255 255 / 0.03), transparent);
+	--ion-fill: linear-gradient(180deg, #1a2626, var(--sl-color-bg));
 	padding: 1.25rem;
 }
 .logo-card > * {
