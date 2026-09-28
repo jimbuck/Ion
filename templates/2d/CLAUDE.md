@@ -1,6 +1,6 @@
 # MyIonGame
 
-An [Ion](https://github.com/jwbuck/Ion) 2D game (no ECS: plain systems and a state class, drawn with the sprite batch).
+An [Ion](https://github.com/jimbuck/Ion) 2D game (no ECS: plain systems and a state class, drawn with the sprite batch).
 This file tells a coding agent how to work on it without reading the engine's source.
 
 ## Layout

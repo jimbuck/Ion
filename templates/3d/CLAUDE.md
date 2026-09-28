@@ -1,6 +1,6 @@
 # MyIonGame
 
-An [Ion](https://github.com/jwbuck/Ion) 3D game on the immediate-mode 3D renderer (PBR materials, directional light with
+An [Ion](https://github.com/jimbuck/Ion) 3D game on the immediate-mode 3D renderer (PBR materials, directional light with
 shadows, glTF models). This file tells a coding agent how to work on it without reading the engine's source.
 
 ## Layout

@@ -1,6 +1,6 @@
 # MyIonGame
 
-An [Ion](https://github.com/jwbuck/Ion) game on the built-in ECS (Arch 2.1). This file tells a coding agent how to work
+An [Ion](https://github.com/jimbuck/Ion) game on the built-in ECS (Arch 2.1). This file tells a coding agent how to work
 on it without reading the engine's source.
 
 ## Layout
