@@ -41,6 +41,8 @@ export default defineConfig({
 			components: {
 				ThemeProvider: './src/components/ThemeProvider.astro',
 				ThemeSelect: './src/components/ThemeSelect.astro',
+				// Version, author and key pages under every page.
+				Footer: './src/components/Footer.astro',
 			},
 			expressiveCode: { themes: ['night-owl'], useStarlightUiThemeColors: true },
 			// Pagefind full-text search over every page (Starlight's built-in integration).
