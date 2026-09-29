@@ -1,7 +1,4 @@
 using Ion.Core;
-using Ion.Extensions.Debug;
-
-using Microsoft.Extensions.Configuration;
 
 namespace Ion.Tests;
 
@@ -66,55 +63,6 @@ public class InjectionTests
 		Assert.Equal(1, frame.Stats.FixedSteps);
 		Assert.Equal(3, host.Get<TestSystem>().UpdateCount);
 	}
-
-#pragma warning disable CS0618 // The obsolete trace timer adapters.
-	[Fact, Trait(CATEGORY, INTEGRATION)]
-	public void TheObsoleteTraceTimersStillRecord()
-	{
-		var output = Path.Combine(Path.GetTempPath(), $"ion-trace-{Guid.NewGuid():N}.json");
-		using var host = new LoopTestHost(new ManualClock(), services: s => s.AddDebugUtils(new ConfigurationBuilder().Build(), d => d.TraceOutput = output), use: app => app.UseDebugUtils());
-
-		var traceManager = host.Get<ITraceManager>();
-		var profiler = host.Get<FrameProfiler>();
-		var loop = host.BuildLoop();
-		loop.Initialize();
-
-		traceManager.Start();
-		Assert.True(profiler.IsActive);
-
-		profiler.BeginFrame(99);
-		var instance = host.Get<ITraceTimer<GameLoop>>().Start("Probe");
-		instance.Then("Probe2");
-		instance.Stop();
-		traceManager.CreateTimer("Custom").Start("Work").Stop();
-		profiler.EndFrame();
-
-		var names = profiler.GetFrame(0).Spans.ToArray().Select(s => s.Id.Name).ToList();
-		Assert.Equal(["GameLoop::Probe", "GameLoop::Probe2", "Custom::Work"], names);
-
-		try
-		{
-			traceManager.OutputTrace();
-			Assert.True(File.Exists(output));
-		}
-		finally
-		{
-			File.Delete(output);
-		}
-
-		traceManager.Stop();
-		Assert.False(profiler.IsActive);
-		traceManager.Clear();
-		Assert.Equal(0, profiler.Count);
-
-		// Not recording: a shared instance, nothing recorded.
-		profiler.BeginFrame(100);
-		host.Get<ITraceTimer<GameLoop>>().Start("Idle").Stop();
-		profiler.EndFrame();
-		Assert.Equal(0, profiler.GetFrame(0).Spans.Length);
-		loop.Shutdown();
-	}
-#pragma warning restore CS0618
 
 	private sealed class FakeEvents : IEvents
 	{

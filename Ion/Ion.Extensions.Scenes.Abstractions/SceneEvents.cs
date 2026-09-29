@@ -10,7 +10,7 @@ namespace Ion.Extensions.Scenes;
 public record struct ChangeSceneEvent(int NextSceneId, SceneTransition Transition = default);
 
 /// <summary>Scene helpers for the event bus.</summary>
-public static class EventEmitterExtensions
+public static class SceneEventExtensions
 {
 	/// <summary>Asks the scene system to load the scene <paramref name="nextSceneId"/>.</summary>
 	[EmitsEvent(typeof(ChangeSceneEvent))]
@@ -40,19 +40,4 @@ public static class EventEmitterExtensions
 	[EmitsEvent(typeof(ChangeSceneEvent))]
 	public static void EmitChangeScene<TScene>(this IEvents events, TScene nextSceneId, SceneTransition transition) where TScene : struct, Enum =>
 		events.EmitChangeScene(Convert.ToInt32(nextSceneId, System.Globalization.CultureInfo.InvariantCulture), transition);
-
-	/// <inheritdoc cref="EmitChangeScene(IEvents, int)"/>
-	[Obsolete("IEventEmitter is an adapter over IEvents and will be removed in the next release. Inject IEvents and call EmitChangeScene on it.")]
-	[EmitsEvent(typeof(ChangeSceneEvent))]
-	public static void EmitChangeScene(this IEventEmitter eventEmitter, int nextSceneId)
-	{
-		ArgumentNullException.ThrowIfNull(eventEmitter);
-		eventEmitter.Emit(new ChangeSceneEvent(nextSceneId));
-	}
-
-	/// <inheritdoc cref="EmitChangeScene{TScene}(IEvents, TScene)"/>
-	[Obsolete("IEventEmitter is an adapter over IEvents and will be removed in the next release. Inject IEvents and call EmitChangeScene on it.")]
-	[EmitsEvent(typeof(ChangeSceneEvent))]
-	public static void EmitChangeScene<TScene>(this IEventEmitter eventEmitter, TScene nextSceneId) where TScene : struct, Enum =>
-		eventEmitter.EmitChangeScene(Convert.ToInt32(nextSceneId, System.Globalization.CultureInfo.InvariantCulture));
 }

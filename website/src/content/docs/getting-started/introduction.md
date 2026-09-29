@@ -41,9 +41,8 @@ in the rest of these docs.
 | **Testable** | `Ion.Testing` runs your real `Program.cs` headless on a fixed clock, frame by frame, with scripted input, JSON snapshots and golden images. |
 
 :::note[Still 0.x]
-Ion is pre-1.0 and its API still moves between releases. Obsolete APIs are kept as adapters for one release and flagged
-by the compiler (for example `ITraceTimer`, replaced by `IMetrics`). The
-[changelog](/Ion/reference/changelog/) lists every breaking change.
+Ion is pre-1.0 and its API still moves between releases, without compatibility shims: a replaced API is removed in the
+release that replaces it. The [changelog](/Ion/reference/changelog/) lists every breaking change.
 :::
 
 ## How a game is put together

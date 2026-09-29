@@ -27,7 +27,7 @@ Install the tool from a checkout with `dotnet pack Ion/Ion.Tools -c Release -o o
 2. **Change**: systems are plain classes with stage attributes (`[Update] public void Move(GameTime dt)`), registered in
    `Program.cs` (`builder.AddSystem<T>()`) and added to the schedule there (`game.UseSystem<T>()`). ECS components are `record struct`s registered for serialization, which also
    makes them visible to snapshots and to the remote protocol.
-3. **Build**: `dotnet build` must stay warning-free. Schedule mistakes are compile-time diagnostics (`ION001` to `ION013`,
+3. **Build**: `dotnet build` must stay warning-free. Schedule mistakes are compile-time diagnostics (`ION001` to `ION009` and `ION011` to `ION013`,
    `ION3xx` for queries) with the rule in the message.
 4. **Run**: `ion run --headless --frames 600 --seed 1 --summary out/run.json`. Headless runs use a fixed 60 Hz clock, so
    the same seed gives the same state and the same pixels. Read the summary: `status`, `exitCode`, `exception` (type,

@@ -70,7 +70,7 @@ public class IonApplication : IIonApplication, IDisposable
 	/// Plans, validates and binds the root schedule: resolves every system and injected service and creates the stage
 	/// runners. Warnings are logged once (category <c>Ion.Schedule</c>).
 	/// </summary>
-	/// <exception cref="IonScheduleException">The schedule has errors (ION001 to ION013).</exception>
+	/// <exception cref="IonScheduleException">The schedule has errors (ION001 to ION009, ION011 to ION013).</exception>
 	public Ion.Schedule BuildSchedule() => Schedule.Build(Services);
 
 	/// <inheritdoc/>

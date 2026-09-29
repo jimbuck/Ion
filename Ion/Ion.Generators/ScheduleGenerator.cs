@@ -17,7 +17,7 @@ namespace Ion.Generators;
 /// match what the generator saw;</item>
 /// <item>a <c>ScheduleRegistrations</c> summary of every method that takes a builder, so that applications calling into
 /// this assembly see its registrations too;</item>
-/// <item>the schedule diagnostics (ION001 to ION013) as compiler diagnostics;</item>
+/// <item>the schedule diagnostics (ION001 to ION009, ION011 to ION013) as compiler diagnostics;</item>
 /// <item>Events v2 (<c>IonEvents.g.cs</c>, see <see cref="EventBusEmitter"/>): an <c>EventUsage</c> summary of the event
 /// types the assembly emits and reads, and for an application a closed, typed event bus with interceptors that route its
 /// <c>Emit</c>/<c>Reader</c> calls to typed fields, with the event diagnostics ION101 to ION106.</item>

@@ -42,10 +42,6 @@ public static class BuilderExtensions
 		services.TryAddSingleton<MetricsSystem>();
 		services.TryAddSingleton<MetricsOverlaySystem>();
 
-#pragma warning disable CS0618 // The 0.2 trace manager stays available for one release, as an adapter.
-		services.TryAddSingleton<Ion.Extensions.Debug.ITraceManager, TraceManagerAdapter>();
-#pragma warning restore CS0618
-
 		return services;
 	}
 

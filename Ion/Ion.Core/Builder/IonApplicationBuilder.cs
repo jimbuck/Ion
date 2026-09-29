@@ -1,6 +1,4 @@
 ﻿
-using Ion.Extensions.Debug;
-
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Microsoft.Extensions.Configuration;
@@ -40,9 +38,6 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 		Services.TryAddSingleton(FrameProfiler.Disabled);
 		Services.AddSingleton<IStepProfiler>(static sp => sp.GetRequiredService<FrameProfiler>());
 		Services.AddSingleton<IFrameStatsSource, EventStatsSource>();
-#pragma warning disable CS0618 // The obsolete trace timers stay registered for one release, as adapters over the profiler.
-		Services.Add(ServiceDescriptor.Transient(typeof(ITraceTimer<>), typeof(TraceTimerAdapter<>)));
-#pragma warning restore CS0618
 		Services.AddSingleton<IClock, StopwatchClock>();
 		Services.AddSingleton<GameLoopContext>();
 		Services.AddSingleton<ILoopContext>(static sp => sp.GetRequiredService<GameLoopContext>());
@@ -55,13 +50,6 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 			: new EventBus(sp.GetRequiredService<ILoopContext>()));
 		Services.AddSingleton<IEvents>(static sp => sp.GetRequiredService<EventBus>());
 		Services.AddSingleton<EventSystem>();
-
-#pragma warning disable CS0618 // The obsolete adapters stay registered for one release.
-		Services.AddSingleton<EventEmitter>(static sp => new EventEmitter(sp.GetRequiredService<IEvents>()));
-		Services.AddSingleton<IEventEmitter>(static sp => sp.GetRequiredService<EventEmitter>());
-		Services.AddTransient<IEventListener>(static sp => new EventListener(sp.GetRequiredService<IEvents>()));
-		Services.AddSingleton<IEventListenerFactory, EventListenerFactory>();
-#pragma warning restore CS0618
 
 		Services.AddSingleton<IPersistentStorage, PersistentStorage>();
 	}

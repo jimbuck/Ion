@@ -32,12 +32,12 @@ The 0.3 work rebuilt most of the engine. Released versions stop at 0.2.5; the te
 - **Samples and templates run from `Program.cs`.** Every sample's setup moved from a static `XxxApp` class into
   `Program.cs`, and its tests run that `Program.cs` with `UseEntryPoint<Program>()`.
 - **Events v2.** `IEvent` is removed; events are unmanaged structs on typed channels (`IEvents`, `EventReader<T>`).
-  `IEventEmitter` and `IEventListener` are obsolete adapters for one release.
+  `IEventEmitter` and `IEventListener` are removed.
 - **.NET 10.** Every project targets `net10.0`; the source generators target `netstandard2.0` on Roslyn 4.4.
 - **Veldrid removed; `AddIon` uses the Silk.NET stack** (Silk.NET windowing, the Vulkan and OpenGL ES RHI backends,
   the 2D renderer on the RHI). `ISpriteBatch` gains `Begin(SpriteBatchOptions)`, `End()` and `SetRenderTarget`.
 - **Audio rewritten without NAudio**: an engine mixer with an OpenAL output.
-- **Metrics v2**: `Ion.Extensions.Debug*` is now `Ion.Extensions.Metrics*`; the 0.2 names are obsolete adapters.
+- **Metrics v2**: `Ion.Extensions.Debug*` is now `Ion.Extensions.Metrics*`; the 0.2 names (`AddDebugUtils`, `ITraceTimer<T>`, `ITraceManager`) are removed.
 - **Fixed step decoupled from `MaxFPS`**: `FixedUpdateRate` (default 60 Hz) sets the fixed step; `MaxFPS` only paces
   rendering.
 - **Input v2**: the shared `InputTracker`, stage-aware edges (a click is seen by exactly one fixed step), gamepads,

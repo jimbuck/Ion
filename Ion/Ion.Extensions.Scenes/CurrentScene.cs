@@ -16,10 +16,6 @@ public interface ICurrentScene
 /// <summary>The default <see cref="ICurrentScene"/>, set by the scene system when a scene loads.</summary>
 public sealed class CurrentScene : ICurrentScene
 {
-	/// <summary>The value of <see cref="SceneId"/> before any scene loads. It is also a valid scene id: use <see cref="HasScene"/> to tell them apart.</summary>
-	[Obsolete("0 is a valid scene id; use ICurrentScene.HasScene (or IsRoot) to tell whether a scene is loaded.")]
-	public static readonly int Root = 0;
-
 	/// <inheritdoc/>
 	public int SceneId { get; private set; }
 

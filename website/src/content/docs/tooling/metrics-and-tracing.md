@@ -222,13 +222,6 @@ public sealed class PathfindingSystem(IMetrics metrics)
 Spans may be recorded from any thread; they land in the frame that is current on the loop thread. `IMetrics.Span(name)`
 is the same as `MetricsIds.Register(name)`.
 
-### The 0.2 trace timers
-
-`ITraceManager`, `ITraceTimer` and `ITraceTimer<T>` (namespace `Ion.Extensions.Debug`, shipped in
-`Ion.Extensions.Metrics.Abstractions`) still work as obsolete adapters over the
-frame profiler and will be removed in 0.4. They intern a name on every `Start` and box an instance per recording; move to
-`MetricsScope` with a `SpanId` registered once.
-
 ## dotnet-counters
 
 With `Meter` on, the module publishes a `System.Diagnostics.Metrics.Meter` named `Ion`:

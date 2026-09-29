@@ -155,32 +155,6 @@ public class FrameProfilerTests
 		Assert.Equal(["+Tests.Work", "-Tests.Work", "frame", "frame"], sink.Calls);
 	}
 
-#pragma warning disable CS0618 // The obsolete adapter.
-	[Fact, Trait(CATEGORY, UNIT)]
-	public void TheObsoleteTraceTimerAdapterReusesItsInstances()
-	{
-		var profiler = new FrameProfiler(historyFrames: 2, spansPerFrame: 64) { IsActive = true };
-		var timer = new Ion.Extensions.Debug.TraceTimerAdapter(profiler, "Legacy");
-		void Frame()
-		{
-			profiler.BeginFrame((uint)profiler.FramesCompleted);
-			var outer = timer.Start("Outer");
-			timer.Start("Inner").Stop();
-			outer.Then("Next");
-			outer.Stop();
-			profiler.EndFrame();
-		}
-
-		Frame();
-		Assert.Equal(["Legacy::Inner", "Legacy::Outer", "Legacy::Next"], profiler.GetFrame(0).Spans.ToArray().Select(s => s.Id.Name));
-
-		for (var i = 0; i < 10; i++) Frame();
-		var before = GC.GetAllocatedBytesForCurrentThread();
-		for (var i = 0; i < 100; i++) Frame();
-		Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
-	}
-#pragma warning restore CS0618
-
 	private sealed class Listener : IFrameListener
 	{
 		public List<uint> Frames { get; } = [];

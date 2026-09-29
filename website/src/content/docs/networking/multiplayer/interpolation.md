@@ -39,7 +39,7 @@ The generated blend works member by member:
 |---|---|
 | `float`, `double`, `Vector2`, `Vector3`, `Vector4` | Linear |
 | `Quaternion` | Spherical (slerp) |
-| Anything else (integers, `bool`, enums, `FixedString`, `NetworkId`) | Switches from the older to the newer value at the midpoint |
+| Anything else (integers, `bool`, enums, `FixedString32`/`64`/`128`, `NetworkId`) | Switches from the older to the newer value at the midpoint |
 | Nested structs | Member by member, by the same rules |
 
 

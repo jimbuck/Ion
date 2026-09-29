@@ -178,9 +178,6 @@ Bound to `MetricsConfig`.
 | `Ion:Metrics:OverlayFontSize` | float | `16` | The overlay's font size. |
 | `Ion:Metrics:OverlayRefreshSeconds` | double | `0.25` | How often the overlay text refreshes. |
 
-Obsolete (removed in 0.4): `Ion:Debug:TraceEnabled` maps to `Ion:Metrics:Profiling`, and `Ion:Debug:TraceOutput`
-(default `./trace.json`) to `Ion:Metrics:TraceOutput`, when the game still calls `AddDebugUtils`.
-
 ## Remote protocol (Ion:Remote)
 
 Bound to `RemoteOptions`. The server is compiled out of Release builds unless the game sets `IonRemote=true`.

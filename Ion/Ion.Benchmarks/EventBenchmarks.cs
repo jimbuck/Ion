@@ -13,8 +13,8 @@ public record struct ScoreEvent(long Score);
 /// Cost of the frame events, 100 events of 4 types per frame and 1 or 8 listeners that each read all 4 types (or the
 /// latest of 2): the runtime <see cref="EventBus"/> (typed channels found through a per-type slot), the same bus called
 /// through <see cref="IEvents"/> (a generic interface call per emit), the generated bus (<c>Ion.Benchmarks.GeneratedApp</c>,
-/// whose emits are routed to typed fields at compile time), the obsolete <c>IEventEmitter</c>/<c>IEventListener</c>
-/// adapters, and the typed-channel prototype that Events v2 was designed from.
+/// whose emits are routed to typed fields at compile time), and the typed-channel prototype that Events v2 was designed
+/// from.
 /// </summary>
 [MemoryDiagnoser]
 public class EventBenchmarks
@@ -28,11 +28,6 @@ public class EventBenchmarks
 	private IEvents _events = null!;
 	private Readers[] _readers = null!;
 	private GeneratedEventsBenchmark _generated = null!;
-#pragma warning disable CS0618 // The legacy rows measure the obsolete adapters.
-	private IEventEmitter _legacyEmitter = null!;
-	private IEventListener[] _legacyListeners = null!;
-#pragma warning restore CS0618
-	private EventBus _legacyBus = null!;
 	private TypedChannels _typed = null!;
 
 	/// <summary>One listener: a reader per event type.</summary>
@@ -54,13 +49,6 @@ public class EventBenchmarks
 
 		_generated = new GeneratedEventsBenchmark(Listeners);
 		if (!_generated.IsGenerated) throw new InvalidOperationException("The generated event bus is not installed.");
-
-#pragma warning disable CS0618
-		_legacyBus = new EventBus();
-		_legacyEmitter = new EventEmitter(_legacyBus);
-		_legacyListeners = new IEventListener[Listeners];
-		for (var i = 0; i < Listeners; i++) _legacyListeners[i] = new EventListener(_legacyBus);
-#pragma warning restore CS0618
 
 		_typed = new TypedChannels(Listeners);
 	}
@@ -183,33 +171,6 @@ public class EventBenchmarks
 
 	[Benchmark]
 	public int Ion_GeneratedBus_Emit100_ReadAll_Step() => _generated.Frame();
-
-	[Benchmark]
-	public int Legacy_Adapters_Emit100_PollAll_Step()
-	{
-#pragma warning disable CS0618
-		var emitter = _legacyEmitter;
-		for (var i = 0; i < EventsPerType; i++)
-		{
-			emitter.Emit(new PingEvent(i));
-			emitter.Emit(new PongEvent(i));
-			emitter.Emit(new HitEvent(i, i));
-			emitter.Emit(new ScoreEvent(i));
-		}
-
-		var handled = 0;
-		foreach (var l in _legacyListeners)
-		{
-			while (l.On<PingEvent>(out var e)) handled += e.Value;
-			while (l.On<PongEvent>(out var e)) handled += (int)e.Value;
-			while (l.On<HitEvent>(out var e)) handled += e.A;
-			while (l.On<ScoreEvent>(out var e)) handled += (int)e.Score;
-		}
-#pragma warning restore CS0618
-
-		_legacyBus.Step();
-		return handled;
-	}
 
 	[Benchmark]
 	public int Prototype_TypedChannels_Emit100_PollAll_Step()

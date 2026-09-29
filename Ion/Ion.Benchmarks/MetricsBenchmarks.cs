@@ -13,7 +13,6 @@ namespace Ion.Benchmarks;
 /// <remarks>
 /// Targets (roadmap 4.6): a disabled scope below 1 ns and 0 B, an enabled one below 30 ns and 0 B. The enabled cost is
 /// dominated by two <see cref="System.Diagnostics.Stopwatch.GetTimestamp"/> reads (clock_gettime through the vDSO on Linux).
-/// The obsolete <c>ITraceTimer</c> adapter rows are for comparison with the 0.2 numbers in section 5.4.
 /// </remarks>
 [MemoryDiagnoser]
 public class MetricsBenchmarks
@@ -26,10 +25,6 @@ public class MetricsBenchmarks
 	private FrameProfiler _enabled = null!;
 	private FrameProfiler _stats = null!;
 	private MetricsCounter _counter = null!;
-#pragma warning disable CS0618 // The obsolete adapter, measured for comparison.
-	private Ion.Extensions.Debug.ITraceTimer _legacyDisabled = null!;
-	private Ion.Extensions.Debug.ITraceTimer _legacyEnabled = null!;
-#pragma warning restore CS0618
 
 	[GlobalSetup]
 	public void Setup()
@@ -41,10 +36,6 @@ public class MetricsBenchmarks
 		_disabled.BeginFrame(0);
 		_enabled.BeginFrame(0);
 		_stats.BeginFrame(0);
-#pragma warning disable CS0618
-		_legacyDisabled = new Ion.Extensions.Debug.TraceTimerAdapter(_disabled, "Bench");
-		_legacyEnabled = new Ion.Extensions.Debug.TraceTimerAdapter(_enabled, "Bench");
-#pragma warning restore CS0618
 	}
 
 	[Benchmark(Baseline = true, OperationsPerInvoke = Ops)]
@@ -107,23 +98,6 @@ public class MetricsBenchmarks
 		_stats.EndFrame(ref stats);
 		_stats.BeginFrame((uint)_stats.FramesCompleted);
 	}
-
-#pragma warning disable CS0618
-	[Benchmark(OperationsPerInvoke = Ops)]
-	public void LegacyTraceTimer_Disabled()
-	{
-		var timer = _legacyDisabled;
-		for (var i = 0; i < Ops; i++) timer.Start("Bench").Stop();
-	}
-
-	[Benchmark(OperationsPerInvoke = Ops)]
-	public void LegacyTraceTimer_Enabled()
-	{
-		var timer = _legacyEnabled;
-		for (var i = 0; i < Ops; i++) timer.Start("Bench").Stop();
-		Rotate(_enabled);
-	}
-#pragma warning restore CS0618
 
 	private static void Rotate(FrameProfiler profiler)
 	{

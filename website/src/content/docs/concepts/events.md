@@ -224,11 +224,6 @@ Assert.True(host.RunUntil(() => scores.Count > 0, maxFrames: 600));
 Assert.Equal(10, scores[0].Points);
 ```
 
-## Legacy API
-
-`IEventEmitter`, `IEventListener`, `IEventListenerFactory`, `EventEmitter` and `EventListener` are obsolete adapters over
-`IEvents`, kept for one release. Move to `IEvents.Emit` and `EventReader<T>`.
-
 ## See also
 
 - [Stages](/Ion/concepts/stages/): which stage runs when, and why a reader might see an event a frame late.

@@ -64,7 +64,7 @@ composing the engine by hand, as the Scenes and Quad samples do. With them you r
 | `Ion.Extensions.Scenes` | Scenes with their own scope and schedule, run by `SceneSystem`; `CurrentScene` (`HasScene`, `SceneId`). | `AddScenes`, `UseScene`, `UseScene<TScene>` | Scenes.Abstractions |
 | `Ion.Extensions.Scenes.Abstractions` | `ISceneBuilder`, scene events (`EmitChangeScene`, `EmitChangeScene<TScene>`, `SceneTransition`), `scene.UseSystem`. | `EmitChangeScene` | Core.Abstractions |
 | `Ion.Extensions.Scenes.Generators` | Source generator for scene enums (`Scene`/`Scenes`, a `[ScenesEnum]` marker) and the `Use{Stage}<TService...>` overloads on scene builders. | (analyzer) | Roslyn |
-| `Ion.Extensions.Metrics` | Frame profiler, frame stats, frame log, Chrome traces, the `Ion` meter, the overlay. | `AddMetrics`, `UseMetrics` (obsolete: `AddDebugUtils`, `UseDebugUtils`) | Metrics.Abstractions, Graphics.Abstractions, Assets.Abstractions |
+| `Ion.Extensions.Metrics` | Frame profiler, frame stats, frame log, Chrome traces, the `Ion` meter, the overlay. | `AddMetrics`, `UseMetrics` | Metrics.Abstractions, Graphics.Abstractions, Assets.Abstractions |
 | `Ion.Extensions.Metrics.Abstractions` | `IMetrics`, counters, gauges, histograms, span ids. | | Core.Abstractions |
 | `Ion.Extensions.Metrics.Tracy` | Live Tracy zones, frame marks and plots (native TracyClient, win-x64 and linux-x64). | `UseMetricsTracy` | Core.Abstractions, Tracy-CSharp |
 

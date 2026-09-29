@@ -379,22 +379,4 @@ public class MetricsModuleTests
 		Assert.Contains("fps", strings[0].Text);
 		Assert.Equal(1, host.SpriteBatch.LastFrame.Rects);
 	}
-
-#pragma warning disable CS0618 // The 0.2 registration forwarders.
-	[Fact, Trait(CATEGORY, INTEGRATION)]
-	public void AddDebugUtilsForwardsToMetrics()
-	{
-		var builder = IonApplication.CreateBuilder();
-		builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Ion:Debug:TraceEnabled"] = "true", ["Ion:Debug:TraceOutput"] = "legacy.json" });
-		Ion.Extensions.Debug.BuilderExtensions.AddDebugUtils(builder.Services, builder.Configuration);
-		using var app = builder.Build();
-		Ion.Extensions.Debug.BuilderExtensions.UseDebugUtils(app);
-
-		var options = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<MetricsConfig>>().Value;
-		Assert.True(options.Profiling);
-		Assert.Equal("legacy.json", options.TraceOutput);
-		Assert.True(app.Services.GetRequiredService<IMetrics>().IsProfiling);
-		Assert.IsType<TraceManagerAdapter>(app.Services.GetRequiredService<Ion.Extensions.Debug.ITraceManager>());
-	}
-#pragma warning restore CS0618
 }

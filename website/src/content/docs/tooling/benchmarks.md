@@ -60,8 +60,8 @@ times in one process and keeps the best, which is robust for A/B checks while op
 | `PipelineBuildBenchmarks` | Startup cost of building the host, binding systems and building the stage pipelines. |
 | `InliningBenchmarks` | Closure chain against a struct-generic (constrained call) chain prototype and direct calls, depth 8. |
 | `FullFrameBenchmarks` | One headless `GameLoop.Step`: events only, 8 systems (runtime and generated schedule), with the metrics module, with a frame profiler (stats only, and profiling every step), and inside a scene scope. |
-| `EventBenchmarks` | Emit and read cost of the event bus: the runtime `EventBus`, through `IEvents`, the generated bus, the obsolete adapters, and the typed-channel prototype it was designed from. |
-| `MetricsBenchmarks` | `MetricsScope` and the generated `Begin`/`End` bracket with profiling off and on, a counter increment, the once-per-frame stats write, the obsolete `ITraceTimer` adapter. |
+| `EventBenchmarks` | Emit and read cost of the event bus: the runtime `EventBus`, through `IEvents`, the generated bus, and the typed-channel prototype it was designed from. |
+| `MetricsBenchmarks` | `MetricsScope` and the generated `Begin`/`End` bracket with profiling off and on, a counter increment and the once-per-frame stats write. |
 | `SpriteBatchBenchmarks` | CPU cost of a 10k-sprite frame across 1 and 16 textures: the 2D renderer's `SpriteBatch` (Deferred, with the upload copy, Texture and BackToFront sorts) against the removed Veldrid batcher's per-sprite work. |
 | `Renderer3DBenchmarks` | The 3D renderer's CPU cost for 10k mesh renderers: submission, and extract plus queue (culling, sort keys, instancing, the shadow fit), without shadows and with two cameras. |
 | `Scene3DExtractionBenchmarks` | ECS 3D extraction of 10k mesh entities against the same submissions from flat arrays. |
@@ -124,7 +124,6 @@ From [2026-09-25-stage3-metrics](https://github.com/jimbuck/Ion/tree/main/docs/p
 | Generated `Begin`/`End` bracket, on | 73.9 ns |
 | `MetricsCounter.Increment` | 6.57 ns |
 | Once-per-frame stats write | 112.5 ns |
-| Legacy `ITraceTimer`, on | 147.7 ns |
 
 A disabled span is essentially free; an enabled one is dominated by two `Stopwatch.GetTimestamp()` reads, which are
 about 40 ns each on that VM (15 to 20 ns on bare metal). In the same run, a frame with 8 systems on the generated

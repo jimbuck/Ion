@@ -156,26 +156,21 @@ Interceptors need the .NET SDK 9.0.200 or later (Roslyn 4.12); with an older com
 - **Pre-bound registrations.** Each system is described at compile time (steps, scopes, orders, constraints, diagnostics) with delegates that bind its methods directly, so the runtime plans and binds it without reflection. This is what makes NativeAOT publishing reflection-free.
 - **A generated schedule** for each application (the registrations made on it before `Build()`/`Run()` in the same method) and each scene (its configure callback): one method per stage that calls every step directly, in plan order, with a `try/finally` per scope; systems and injected services are resolved once in its constructor. It is sorted by the same code as the runtime planner (`ScheduleSorter`, shared), so `PrintSchedule()` is identical either way.
 - **Registration summaries.** For every method that takes an application or scene builder (`UseIon()`, `UseNullGraphics()`, your own `UseMyGame(app)`), an assembly attribute lists what it registers, so an application compiled later sees through helpers in other assemblies. Registrations under an `if` are included and guarded.
-- **Diagnostics.** `ION001` to `ION013` become compiler errors and warnings with the runtime's messages, at the offending method (or the registration call).
+- **Diagnostics.** `ION001` to `ION009` and `ION011` to `ION013` become compiler errors and warnings with the runtime's messages, at the offending method (or the registration call).
 - **ECS queries.** Every `[Query]` method of a `partial` system becomes a chunk loop the schedule calls directly (see [ECS](#ecs)), with diagnostics `ION301` to `ION307`.
 
 ```csharp
 // Generated for the Render stage of a small game (abridged):
 public override void Render(global::Ion.GameTime dt)
 {
-    _s0.BeginRender(dt);                       // -1000 TraceTimerSystem.BeginRender
+    _b1(dt);                                    // -850 NullSpriteBatchSystem.Begin (internal: bound delegate)
     try
     {
-        _b1(dt);                                // -850 NullSpriteBatchSystem.Begin (internal: bound delegate)
-        try
-        {
-            _d7(dt);                            // -300 SpriteExtractionSystem.Extract
-            _s9.RenderScore(dt);                // 0 ScoreSystem.RenderScore
-            if (_g3) _d4(dt);                   // 900 NullWindowSystem.CheckClosed (registered under an if)
-        }
-        finally { _e1(dt); }
+        _d7(dt);                                // -300 SpriteExtractionSystem.Extract
+        _s9.RenderScore(dt);                    // 0 ScoreSystem.RenderScore
+        if (_g3) _d4(dt);                       // 900 NullWindowSystem.CheckClosed (registered under an if)
     }
-    finally { _s0.EndRender(dt); }
+    finally { _e1(dt); }
 }
 ```
 
@@ -229,8 +224,6 @@ public class BlockSystem(IEvents events)
 | `ION106` | Warning | A reader is stored in a `readonly` field or exposed as a property, so reads advance a copy and never move on. |
 
 Methods that emit or read an event type for their caller (such as `EmitChangeScene`, `Wait.For<T>()` or `IonTestHost.Collect<T>()`) are marked `[EmitsEvent]`/`[ReadsEvent]` so the generator counts their call sites; libraries compiled with the generator publish an `[assembly: EventUsage(...)]` summary of their event types.
-
-`IEventEmitter`, `IEventListener`, `IEventListenerFactory`, `EventEmitter` and `EventListener` still work as obsolete adapters over `IEvents` for one release.
 
 ## ECS
 
@@ -351,9 +344,7 @@ Plain `IEnumerator` coroutines still work, but the routine boxes every struct it
 
 ### Ion.Extensions.Metrics
 Frame profiling, engine counters and export (Metrics v2). `AddIon`/`UseIon` install it; on its own it is
-`AddMetrics(config)` (bound from `Ion:Metrics`) and `UseMetrics()`. See "Metrics" below. The 0.2 names
-(`Ion.Extensions.Debug`, `AddDebugUtils`, `UseDebugUtils`, `ITraceTimer<T>`, `ITraceManager`) are obsolete adapters over it
-for one release.
+`AddMetrics(config)` (bound from `Ion:Metrics`) and `UseMetrics()`. See "Metrics" below.
 
 ### Ion.Extensions.Graphics.Null
 A headless graphics backend with no window, GPU or SDL, for tests, servers and CI. `AddNullGraphics(config)` / `UseNullGraphics()` register everything the windowed stack does:
