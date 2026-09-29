@@ -54,7 +54,18 @@ public sealed class HttpSocketListener : IDisposable
 		Address = address;
 		_listener = new TcpListener(address, port);
 		_listener.Server.NoDelay = true;
-		_listener.Start(backlog: 64);
+		try
+		{
+			_listener.Start(backlog: 64);
+		}
+		catch (SocketException ex) when (ex.SocketErrorCode is SocketError.AccessDenied or SocketError.AddressAlreadyInUse)
+		{
+			// Windows answers AccessDenied (10013) for ports in an excluded range (Hyper-V, WSL and Docker reserve blocks).
+			_listener.Server.Dispose();
+			throw new InvalidOperationException($"{settings.Name} could not listen on {address}:{port}: the port is in use by another program or reserved by the OS "
+				+ "(on Windows, see 'netsh interface ipv4 show excludedportrange protocol=tcp'). Pick another port, or 0 for a free one.", ex);
+		}
+
 		Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
 		_acceptThread = new Thread(AcceptLoop) { IsBackground = true, Name = settings.Name + " accept" };
 		_acceptThread.Start();

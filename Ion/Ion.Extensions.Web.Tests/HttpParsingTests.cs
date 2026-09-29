@@ -139,4 +139,17 @@ public class HttpParsingTests
 		Assert.True(request.KeepAlive);
 		Assert.Equal(-1, request.ContentLength);
 	}
+
+	[Fact]
+	public void APortThatCannotBeBoundNamesTheListenerAndThePort()
+	{
+		using var taken = new TcpListener(System.Net.IPAddress.Loopback, 0);
+		taken.Start();
+		var port = ((System.Net.IPEndPoint)taken.LocalEndpoint).Port;
+
+		var error = Assert.Throws<InvalidOperationException>(() => new HttpSocketListener(System.Net.IPAddress.Loopback, port, new HttpListenerSettings { Name = "Ion web" }, static _ => { }));
+
+		Assert.StartsWith($"Ion web could not listen on 127.0.0.1:{port}", error.Message, StringComparison.Ordinal);
+		Assert.IsType<SocketException>(error.InnerException);
+	}
 }
