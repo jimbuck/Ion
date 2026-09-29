@@ -131,13 +131,15 @@ internal static class DiagnosticScenarios
 
 			""", "", "{|#0:app.UseSystem<Lonely>()|};"),
 
-		new("LegacyMiddleware", "ION010", """
-			public sealed class Legacy
+		new("NextParameter", "ION007", """
+			public sealed class Wrapper
 			{
 				[Update] public void {|#0:Wrap|}(GameTime dt, GameLoopDelegate next) => next(dt);
+				[Render] public GameLoopDelegate {|#1:Factory|}(GameLoopDelegate next) => next;
+				[Last] public void Valid(GameTime dt) { }
 			}
 
-			""", "builder.Services.AddSingleton<Legacy>();", "app.UseSystem<Legacy>();"),
+			""", "builder.Services.AddSingleton<Wrapper>();", "app.UseSystem<Wrapper>();"),
 
 		new("AmbiguousScope", "ION011", """
 			public sealed class Frame

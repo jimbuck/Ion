@@ -30,7 +30,7 @@ All generators target `netstandard2.0` on Roslyn 4.4, so they load in any compil
 
 The schedule and event generators work through **C# interceptors**: generated methods that replace specific calls in
 your code at compile time. The generator intercepts `UseSystem`, function steps (`app.Update(...)` and the other
-stages), legacy middleware (`app.UseUpdate(...)`), `UseScene`, `IonApplication.CreateBuilder` and `Build()`/`Run()`/
+stages), `UseScene`, `IonApplication.CreateBuilder` and `Build()`/`Run()`/
 `RunFrames()`, as well as the game's own `IEvents.Emit` and `Reader` calls.
 
 Interceptors need two things:

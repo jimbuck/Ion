@@ -8,9 +8,8 @@ using Microsoft.Extensions.Logging;
 namespace Ion;
 
 /// <summary>
-/// The registrations of one schedule (the application's root schedule, or one scene's): systems, function steps and
-/// legacy middleware, in registration order. It is a description only; <see cref="Plan(IServiceProvider?)"/> turns it into
-/// a validated, ordered <see cref="SchedulePlan"/> and <see cref="Build"/> binds that plan to instances as a runnable
+/// The registrations of one schedule (the application's root schedule, or one scene's): systems and function steps, in
+/// registration order. It is a description only; <see cref="Plan(IServiceProvider?)"/> turns it into a validated, ordered <see cref="SchedulePlan"/> and <see cref="Build"/> binds that plan to instances as a runnable
 /// <see cref="Ion.Schedule"/>.
 /// </summary>
 /// <remarks>
@@ -60,7 +59,7 @@ public sealed class ScheduleModel
 	/// the existing entry: modules add the systems of the modules they depend on (<c>UseEcsRendering3D</c> adds the ECS
 	/// and 3D renderer systems), so a system may be added more than once. It keeps its first registration index.
 	/// </remarks>
-	public SystemEntry AddSystem(Type serviceType, [DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type implementationType)
+	public SystemEntry AddSystem(Type serviceType, [DynamicallyAccessedMembers(SystemAccessibility.Members)] Type implementationType)
 	{
 		ArgumentNullException.ThrowIfNull(serviceType);
 		ArgumentNullException.ThrowIfNull(implementationType);
@@ -134,26 +133,6 @@ public sealed class ScheduleModel
 		ArgumentNullException.ThrowIfNull(serviceTypes);
 		ArgumentNullException.ThrowIfNull(bind);
 		return Add(new FunctionEntry(stage, order, name ?? DescribeFunction(function, serviceTypes), function, serviceTypes, bind) { After = after, Before = before }, site);
-	}
-
-	/// <summary>
-	/// Adds a legacy middleware (<c>next =&gt; dt =&gt; { ...; next(dt); }</c>). It wraps every step that sorts after it in
-	/// the stage, and building the schedule logs warning ION010.
-	/// </summary>
-	public MiddlewareEntry AddMiddleware(Stage stage, Func<GameLoopDelegate, GameLoopDelegate> middleware, int order = StageOrder.Default, string? name = null)
-	{
-		ArgumentNullException.ThrowIfNull(middleware);
-		return Add(new MiddlewareEntry(stage, order, name ?? DescribeDelegate(middleware), middleware));
-	}
-
-	/// <summary>
-	/// Adds a legacy middleware registered through a generated call site (see <see cref="AddMiddleware(Stage, Func{GameLoopDelegate, GameLoopDelegate}, int, string?)"/>).
-	/// </summary>
-	[EditorBrowsable(EditorBrowsableState.Never)]
-	public MiddlewareEntry AddMiddleware(Stage stage, Func<GameLoopDelegate, GameLoopDelegate> middleware, int order, string? name, string? site)
-	{
-		ArgumentNullException.ThrowIfNull(middleware);
-		return Add(new MiddlewareEntry(stage, order, name ?? DescribeDelegate(middleware), middleware), site);
 	}
 
 	/// <summary>
@@ -351,7 +330,7 @@ public abstract class ScheduleEntry
 /// <summary>A system registered with <c>UseSystem</c>.</summary>
 public sealed class SystemEntry : ScheduleEntry
 {
-	internal SystemEntry(Type serviceType, [DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type implementationType)
+	internal SystemEntry(Type serviceType, [DynamicallyAccessedMembers(SystemAccessibility.Members)] Type implementationType)
 	{
 		ServiceType = serviceType;
 		ImplementationType = implementationType;
@@ -371,7 +350,7 @@ public sealed class SystemEntry : ScheduleEntry
 	public Type ServiceType { get; }
 
 	/// <summary>The type whose methods are the system's steps.</summary>
-	[DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)]
+	[DynamicallyAccessedMembers(SystemAccessibility.Members)]
 	public Type ImplementationType { get; }
 
 	/// <inheritdoc/>
@@ -414,33 +393,6 @@ public sealed class FunctionEntry : ScheduleEntry
 
 	/// <summary>The <see cref="BeforeAttribute{T}"/> targets computed at compile time; null to read them from the delegate.</summary>
 	public IReadOnlyList<Type>? Before { get; internal init; }
-
-	/// <inheritdoc/>
-	public override string ToString() => Name;
-}
-
-/// <summary>A legacy middleware registered with <c>UseInit</c>, <c>UseUpdate</c>, ... (a delegate taking <c>next</c>).</summary>
-public sealed class MiddlewareEntry : ScheduleEntry
-{
-	internal MiddlewareEntry(Stage stage, int order, string name, Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		Stage = stage;
-		Order = order;
-		Name = name;
-		Middleware = middleware;
-	}
-
-	/// <summary>The stage the middleware runs in.</summary>
-	public Stage Stage { get; }
-
-	/// <summary>The middleware order.</summary>
-	public int Order { get; }
-
-	/// <summary>The printed name.</summary>
-	public string Name { get; }
-
-	/// <summary>The middleware factory, called once per build with the rest of the stage as <c>next</c>.</summary>
-	public Func<GameLoopDelegate, GameLoopDelegate> Middleware { get; }
 
 	/// <inheritdoc/>
 	public override string ToString() => Name;

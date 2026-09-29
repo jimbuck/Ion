@@ -165,14 +165,13 @@ public class FixedStepInputTests
 		private bool _wHeld;
 
 		[First]
-		public void First(GameTime dt, GameLoopDelegate next)
+		public void First(GameTime dt)
 		{
 			_stepsThisFrame = 0;
-			next(dt);
 		}
 
 		[FixedUpdate]
-		public void FixedUpdate(GameTime dt, GameLoopDelegate next)
+		public void FixedUpdate(GameTime dt)
 		{
 			_stepsThisFrame++;
 
@@ -188,12 +187,10 @@ public class FixedStepInputTests
 			FixedWheelTotal += input.WheelDelta;
 			if (input.WheelDelta != 0) FixedWheelDeltas.Add(input.WheelDelta);
 			FixedMouseTotal += input.MouseDelta;
-
-			next(dt);
 		}
 
 		[Update]
-		public void Update(GameTime dt, GameLoopDelegate next)
+		public void Update(GameTime dt)
 		{
 			if (input.Pressed(MouseButton.Left)) UpdatePressed++;
 			if (input.Released(MouseButton.Left)) UpdateReleased++;
@@ -205,15 +202,12 @@ public class FixedStepInputTests
 			UpdateWheelTotal += input.WheelDelta;
 			UpdateWheelDeltas.Add(input.WheelDelta);
 			UpdateMouseTotal += input.MouseDelta;
-
-			next(dt);
 		}
 
 		[Last]
-		public void Last(GameTime dt, GameLoopDelegate next)
+		public void Last(GameTime dt)
 		{
 			FixedStepsPerFrame.Add(_stepsThisFrame);
-			next(dt);
 		}
 	}
 }

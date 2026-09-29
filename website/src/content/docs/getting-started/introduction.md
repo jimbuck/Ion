@@ -32,7 +32,7 @@ in the rest of these docs.
 
 | Goal | What it means in practice |
 |---|---|
-| **Middleware and ECS** | Game code is plain classes ("systems") whose attributed methods are steps of the game loop's stages. Steps are ordered declaratively (`Order`, `[After<T>]`, `[Before<T>]`), and `[Begin]`/`[End]` scopes replace the old `next(dt)` middleware. An [Arch](https://github.com/genaray/Arch)-based ECS sits alongside, with generated queries. You can use either or both. |
+| **Systems and ECS** | Game code is plain classes ("systems") whose attributed methods are steps of the game loop's stages. Steps run and return, are ordered declaratively (`Order`, `[After<T>]`, `[Before<T>]`), and `[Begin]`/`[End]` scopes bracket the rest of a stage. An [Arch](https://github.com/genaray/Arch)-based ECS sits alongside, with generated queries. You can use either or both. |
 | **Performance** | No allocation per frame in the engine's hot paths (events, input, sprite batching, the 3D renderer, coroutines, UI). The schedule dispatches steps as direct calls. |
 | **Generated, not reflected** | Roslyn source generators compile the schedule, the event bus, ECS queries, network serializers and web routes into plain C#. Diagnostics (`ION001` and up) turn schedule mistakes into compiler errors. |
 | **Native AOT** | Games publish as a single NativeAOT executable per platform, with no runtime to install and no reflection on the hot path. |
@@ -42,7 +42,7 @@ in the rest of these docs.
 
 :::note[Still 0.x]
 Ion is pre-1.0 and its API still moves between releases. Obsolete APIs are kept as adapters for one release and flagged
-by the compiler (for example the legacy middleware form, reported as `ION010`). The
+by the compiler (for example `ITraceTimer`, replaced by `IMetrics`). The
 [changelog](/Ion/reference/changelog/) lists every breaking change.
 :::
 

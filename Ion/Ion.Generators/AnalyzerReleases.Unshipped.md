@@ -14,7 +14,6 @@ ION006 | Ion.Schedule | Error | Scoped service in the root schedule
 ION007 | Ion.Schedule | Error | Unsupported step signature
 ION008 | Ion.Schedule | Error | Unregistered step parameter
 ION009 | Ion.Schedule | Error | Unregistered system
-ION010 | Ion.Schedule | Warning | Legacy middleware step
 ION011 | Ion.Schedule | Error | Ambiguous scope
 ION012 | Ion.Schedule | Warning | Constraint on a system that is not in the schedule
 ION013 | Ion.Schedule | Warning | System without steps

@@ -13,13 +13,11 @@ public enum StepKind
 	Scope,
 	/// <summary>A function step (a delegate registered with <c>app.Update(...)</c> and friends).</summary>
 	Function,
-	/// <summary>A legacy middleware (a method or delegate taking <c>next</c>), wrapping every item after it.</summary>
-	Middleware,
 }
 
 /// <summary>
-/// A validated, ordered schedule: for every stage the flat list of items in run order. Scopes and middleware wrap every
-/// item that follows them in their stage, so the nesting is implied by the order (see <see cref="StepPlan.Depth"/>).
+/// A validated, ordered schedule: for every stage the flat list of items in run order. A scope wraps every item that
+/// follows it in their stage, so the nesting is implied by the order (see <see cref="StepPlan.Depth"/>).
 /// It holds types and methods, not instances; <see cref="Schedule"/> binds it.
 /// </summary>
 public sealed class SchedulePlan
@@ -56,8 +54,8 @@ public sealed class SchedulePlan
 
 	/// <summary>
 	/// The schedule as text: for each stage the items in run order with their order, <c>System.Method</c>, their
-	/// <c>[after ...; before ...]</c> constraints, and braces around the items each scope or middleware wraps (a scope's
-	/// closing line names its end method); then each nested schedule.
+	/// <c>[after ...; before ...]</c> constraints, and braces around the items each scope wraps (the closing line names
+	/// its end method); then each nested schedule.
 	/// </summary>
 	public string Print()
 	{
@@ -88,14 +86,14 @@ public sealed class SchedulePlan
 			var open = new Stack<StepPlan>();
 			foreach (var step in stage.Steps)
 			{
-				AppendLine(builder, step.Order, open.Count, step.Name + Suffix(step.Kind) + Constraints(step) + (step.Wraps ? " {" : ""));
+				AppendLine(builder, step.Order, open.Count, step.Name + (step.Kind == StepKind.Function ? " (function)" : "") + Constraints(step) + (step.Wraps ? " {" : ""));
 				if (step.Wraps) open.Push(step);
 			}
 
 			while (open.Count > 0)
 			{
 				var step = open.Pop();
-				AppendLine(builder, step.Kind == StepKind.Scope ? step.Order : null, open.Count, "} " + (step.EndName ?? step.Name));
+				AppendLine(builder, step.Order, open.Count, "} " + step.EndName);
 			}
 		}
 
@@ -114,13 +112,6 @@ public sealed class SchedulePlan
 		if (step.Before.Count > 0) parts.Add("before " + string.Join(", ", step.Before.Select(t => t.Name)));
 		return " [" + string.Join("; ", parts) + "]";
 	}
-
-	private static string Suffix(StepKind kind) => kind switch
-	{
-		StepKind.Function => " (function)",
-		StepKind.Middleware => " (middleware)",
-		_ => "",
-	};
 
 	private static void AppendLine(StringBuilder builder, int? order, int depth, string text)
 	{
@@ -156,7 +147,7 @@ public sealed class StagePlan
 }
 
 /// <summary>
-/// One item of a stage: a step, a scope, a function step or a legacy middleware. This is the unit the source generator
+/// One item of a stage: a step, a scope or a function step. This is the unit the source generator
 /// emits a call (or a <c>try/finally</c>) for.
 /// </summary>
 public sealed class StepPlan
@@ -184,13 +175,13 @@ public sealed class StepPlan
 	/// <summary>For a scope, the printed name of the end method.</summary>
 	public string? EndName { get; internal init; }
 
-	/// <summary>The system of a step, scope or middleware method; null for functions and middleware delegates.</summary>
+	/// <summary>The system of a step or scope; null for functions.</summary>
 	public SystemEntry? System { get; internal init; }
 
-	/// <summary>The step method, the scope's begin method, or the middleware method (null for generated systems, see <see cref="Generated"/>).</summary>
+	/// <summary>The step method or the scope's begin method (null for generated systems, see <see cref="Generated"/>).</summary>
 	public MethodInfo? Method { get; internal init; }
 
-	/// <summary>The name of the step method, the scope's begin method, or the middleware method; null for functions and middleware delegates.</summary>
+	/// <summary>The name of the step method or the scope's begin method; null for functions.</summary>
 	public string? MethodName { get; internal init; }
 
 	/// <summary>The compile-time description of the step, for systems registered by generated code.</summary>
@@ -217,9 +208,6 @@ public sealed class StepPlan
 	/// <summary>The function registration of a function step.</summary>
 	public FunctionEntry? Function { get; internal init; }
 
-	/// <summary>The middleware registration of a delegate middleware.</summary>
-	public MiddlewareEntry? Middleware { get; internal init; }
-
 	/// <summary>The <see cref="AfterAttribute{T}"/> targets.</summary>
 	public IReadOnlyList<Type> After { get; internal init; } = [];
 
@@ -232,11 +220,11 @@ public sealed class StepPlan
 	/// <summary>The declaration index of the method within its system (second tie breaker).</summary>
 	public int DeclarationIndex { get; internal init; }
 
-	/// <summary>The number of scopes and middleware wrapping this item.</summary>
+	/// <summary>The number of scopes wrapping this item.</summary>
 	public int Depth { get; internal set; }
 
-	/// <summary>Whether the item wraps every item after it (a scope or a middleware).</summary>
-	public bool Wraps => Kind is StepKind.Scope or StepKind.Middleware;
+	/// <summary>Whether the item wraps every item after it (a scope).</summary>
+	public bool Wraps => Kind == StepKind.Scope;
 
 	/// <inheritdoc/>
 	public override string ToString() => $"{Stage} {Order} {Name}";

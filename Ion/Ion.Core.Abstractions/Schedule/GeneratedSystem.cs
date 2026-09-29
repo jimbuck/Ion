@@ -11,8 +11,6 @@ public enum GeneratedStepKind
 	Step,
 	/// <summary>A <see cref="BeginAttribute"/>/<see cref="EndAttribute"/> pair.</summary>
 	Scope,
-	/// <summary>A legacy middleware method (<c>(GameTime dt, GameLoopDelegate next)</c> or <c>(GameLoopDelegate next)</c>).</summary>
-	Middleware,
 }
 
 /// <summary>
@@ -28,9 +26,9 @@ public sealed class GeneratedSystem
 	/// <param name="serviceType">The type the instance is resolved as.</param>
 	/// <param name="implementationType">The type whose methods are the steps.</param>
 	/// <param name="name">The printed name of the implementation type (its <see cref="System.Reflection.MemberInfo.Name"/>).</param>
-	/// <param name="steps">The steps, scopes and legacy middleware, in discovery order.</param>
-	/// <param name="diagnostics">The problems found in the system (ION001, ION003 to ION005, ION007, ION010, ION011, ION013), in discovery order.</param>
-	public GeneratedSystem(Type serviceType, [DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type implementationType, string name, GeneratedStep[] steps, ScheduleDiagnostic[] diagnostics)
+	/// <param name="steps">The steps and scopes, in discovery order.</param>
+	/// <param name="diagnostics">The problems found in the system (ION001, ION003 to ION005, ION007, ION011, ION013), in discovery order.</param>
+	public GeneratedSystem(Type serviceType, [DynamicallyAccessedMembers(SystemAccessibility.Members)] Type implementationType, string name, GeneratedStep[] steps, ScheduleDiagnostic[] diagnostics)
 	{
 		ArgumentNullException.ThrowIfNull(serviceType);
 		ArgumentNullException.ThrowIfNull(implementationType);
@@ -49,13 +47,13 @@ public sealed class GeneratedSystem
 	public Type ServiceType { get; }
 
 	/// <summary>The type whose methods are the steps.</summary>
-	[DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)]
+	[DynamicallyAccessedMembers(SystemAccessibility.Members)]
 	public Type ImplementationType { get; }
 
 	/// <summary>The printed name of the implementation type.</summary>
 	public string Name { get; }
 
-	/// <summary>The steps, scopes and legacy middleware, in discovery order.</summary>
+	/// <summary>The steps and scopes, in discovery order.</summary>
 	public IReadOnlyList<GeneratedStep> Steps { get; }
 
 	/// <summary>The problems found in the system, without the schedule name prefix.</summary>
@@ -78,7 +76,7 @@ public sealed class GeneratedSystem
 }
 
 /// <summary>
-/// One step, scope or legacy middleware of a <see cref="GeneratedSystem"/>.
+/// One step or scope of a <see cref="GeneratedSystem"/>.
 /// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class GeneratedStep
@@ -145,9 +143,6 @@ public sealed class GeneratedStep
 	/// <summary>For a scope: its <see cref="ScopeAttribute.ScopeName"/>.</summary>
 	public string? ScopeName { get; init; }
 
-	/// <summary>For a legacy middleware: binds the method as a middleware factory.</summary>
-	public Func<object?, IServiceProvider, Func<GameLoopDelegate, GameLoopDelegate>>? BindMiddleware { get; init; }
-
 	/// <inheritdoc/>
 	public override string ToString() => $"{Stage} {Order} {Method}";
 }
@@ -176,9 +171,6 @@ public static class StepAdapters
 
 	/// <summary>A function step with four injected services.</summary>
 	public static GameLoopDelegate FromFunction<T0, T1, T2, T3>(Action<GameTime, T0, T1, T2, T3> step, T0 s0, T1 s1, T2 s2, T3 s3) => new FunctionStep<T0, T1, T2, T3>(step, s0, s1, s2, s3).Invoke;
-
-	/// <summary>A legacy <c>(GameTime dt, GameLoopDelegate next)</c> middleware as a middleware factory.</summary>
-	public static Func<GameLoopDelegate, GameLoopDelegate> FromMiddleware(Action<GameTime, GameLoopDelegate> middleware) => next => new MiddlewareStep(middleware, next).Invoke;
 
 	[StackTraceHidden]
 	private sealed class ActionStep(Action step)
@@ -220,12 +212,5 @@ public static class StepAdapters
 	{
 		[StackTraceHidden]
 		public void Invoke(GameTime dt) => step(dt, s0, s1, s2, s3);
-	}
-
-	[StackTraceHidden]
-	private sealed class MiddlewareStep(Action<GameTime, GameLoopDelegate> middleware, GameLoopDelegate next)
-	{
-		[StackTraceHidden]
-		public void Invoke(GameTime dt) => middleware(dt, next);
 	}
 }

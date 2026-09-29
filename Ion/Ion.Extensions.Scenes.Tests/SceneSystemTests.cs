@@ -170,17 +170,15 @@ public class CallLog
 public class SceneLoggingSystem(CallLog log) : IDisposable
 {
 	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		log.Entries.Add("scene");
-		next(dt);
 	}
 
 	[Destroy]
-	public void Destroy(GameTime dt, GameLoopDelegate next)
+	public void Destroy(GameTime dt)
 	{
 		log.Entries.Add("scene-destroy");
-		next(dt);
 	}
 
 	public void Dispose() => log.Entries.Add("scene-disposed");
@@ -189,10 +187,9 @@ public class SceneLoggingSystem(CallLog log) : IDisposable
 public class AppLoggingSystem(CallLog log)
 {
 	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		log.Entries.Add("app");
-		next(dt);
 	}
 }
 
@@ -200,11 +197,11 @@ public class StageCounterSystem
 {
 	public int Init, First, FixedUpdate, Update, Render, Last, Destroy;
 
-	[Init] public void OnInit(GameTime dt, GameLoopDelegate next) { Init++; next(dt); }
-	[First] public void OnFirst(GameTime dt, GameLoopDelegate next) { First++; next(dt); }
-	[FixedUpdate] public void OnFixedUpdate(GameTime dt, GameLoopDelegate next) { FixedUpdate++; next(dt); }
-	[Update] public void OnUpdate(GameTime dt, GameLoopDelegate next) { Update++; next(dt); }
-	[Render] public void OnRender(GameTime dt, GameLoopDelegate next) { Render++; next(dt); }
-	[Last] public void OnLast(GameTime dt, GameLoopDelegate next) { Last++; next(dt); }
-	[Destroy] public void OnDestroy(GameTime dt, GameLoopDelegate next) { Destroy++; next(dt); }
+	[Init] public void OnInit(GameTime dt) => Init++;
+	[First] public void OnFirst(GameTime dt) => First++;
+	[FixedUpdate] public void OnFixedUpdate(GameTime dt) => FixedUpdate++;
+	[Update] public void OnUpdate(GameTime dt) => Update++;
+	[Render] public void OnRender(GameTime dt) => Render++;
+	[Last] public void OnLast(GameTime dt) => Last++;
+	[Destroy] public void OnDestroy(GameTime dt) => Destroy++;
 }

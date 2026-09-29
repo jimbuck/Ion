@@ -20,15 +20,14 @@ public sealed class ProbeSystem(IInputState input, ISpriteBatch spriteBatch, IAu
 	public int ExitOnFrame = -1;
 
 	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	public void Init(GameTime dt)
 	{
 		InitCount++;
 		_sound = assets.Load<ISoundEffect>("bonk.wav");
-		next(dt);
 	}
 
 	[FixedUpdate]
-	public void FixedUpdate(GameTime dt, GameLoopDelegate next)
+	public void FixedUpdate(GameTime dt)
 	{
 		FixedSteps++;
 		if (input.Pressed(MouseButton.Left))
@@ -36,12 +35,10 @@ public sealed class ProbeSystem(IInputState input, ISpriteBatch spriteBatch, IAu
 			FixedClicks++;
 			events.Emit(new ScoredEvent(10));
 		}
-
-		next(dt);
 	}
 
 	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		Frames++;
 		if (ThrowInUpdate) throw new InvalidOperationException("boom");
@@ -52,33 +49,30 @@ public sealed class ProbeSystem(IInputState input, ISpriteBatch spriteBatch, IAu
 		}
 
 		if (dt.Frame == ExitOnFrame) events.Emit<ExitGameEvent>();
-		next(dt);
 	}
 
 	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
+	public void Render(GameTime dt)
 	{
 		spriteBatch.DrawRect(Color.Red, new Vector2(1, 2), new Vector2(3, 4));
 		spriteBatch.DrawRect(Color.Blue, new Vector2(1, 2), new Vector2(3, 4));
-		next(dt);
 	}
 
 	[Destroy]
-	public void Destroy(GameTime dt, GameLoopDelegate next)
+	public void Destroy(GameTime dt)
 	{
 		DestroyCount++;
-		next(dt);
 	}
 }
 
 public sealed class OrderSystemA(List<string> log)
 {
-	[Update] public void Update(GameTime dt, GameLoopDelegate next) { log.Add("A"); next(dt); }
+	[Update] public void Update(GameTime dt) => log.Add("A");
 }
 
 public sealed class OrderSystemB(List<string> log)
 {
-	[Update] public void Update(GameTime dt, GameLoopDelegate next) { log.Add("B"); next(dt); }
+	[Update] public void Update(GameTime dt) => log.Add("B");
 }
 
 public class IonTestHostTests
@@ -226,7 +220,7 @@ public class IonTestHostTests
 		var log = new List<string>();
 		using var host = new IonTestHost()
 			.Configure(services => services.AddSingleton(log))
-			.ConfigureApp(app => app.UseUpdate(next => dt => { log.Add("app"); next(dt); }))
+			.ConfigureApp(app => app.Update(dt => log.Add("app")))
 			.WithSystem<OrderSystemB>()
 			.WithSystem(typeof(OrderSystemA));
 

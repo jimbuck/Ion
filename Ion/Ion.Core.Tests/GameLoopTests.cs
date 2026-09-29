@@ -134,10 +134,9 @@ public class GameLoopTests
 	public void MaxFpsAsksTheClockToSleepForTheRestOfTheFrame()
 	{
 		var clock = new ManualClock();
-		using var host = new LoopTestHost(clock, c => c.MaxFPS = 100, use: app => app.UseRender(next => dt =>
+		using var host = new LoopTestHost(clock, c => c.MaxFPS = 100, use: app => app.Render(dt =>
 		{
 			clock.Advance(4 * Ms); // The frame's work takes 4 ms.
-			next(dt);
 		}));
 		var loop = host.BuildLoop();
 
@@ -158,10 +157,9 @@ public class GameLoopTests
 	public void OverBudgetFramesDoNotSleep()
 	{
 		var clock = new ManualClock();
-		using var host = new LoopTestHost(clock, c => c.MaxFPS = 100, use: app => app.UseUpdate(next => dt =>
+		using var host = new LoopTestHost(clock, c => c.MaxFPS = 100, use: app => app.Update(dt =>
 		{
 			clock.Advance(15 * Ms);
-			next(dt);
 		}));
 		var loop = host.BuildLoop();
 
@@ -257,10 +255,9 @@ public class GameLoopTests
 	{
 		using var cts = new CancellationTokenSource();
 		var frames = 0;
-		using var host = new LoopTestHost(new FixedStepClock(TimeSpan.FromMilliseconds(16)), use: app => app.UseUpdate(next => dt =>
+		using var host = new LoopTestHost(new FixedStepClock(TimeSpan.FromMilliseconds(16)), use: app => app.Update(dt =>
 		{
 			if (++frames == 4) cts.Cancel();
-			next(dt);
 		}), systems: typeof(TestSystem));
 		var system = host.Get<TestSystem>();
 
@@ -274,10 +271,9 @@ public class GameLoopTests
 	public void StopEndsTheLoopAfterTheCurrentFrame()
 	{
 		GameLoop? loop = null;
-		using var host = new LoopTestHost(new ManualClock(), use: app => app.UseUpdate(next => dt =>
+		using var host = new LoopTestHost(new ManualClock(), use: app => app.Update(dt =>
 		{
 			if (dt.Frame == 2) loop!.Stop();
-			next(dt);
 		}), systems: typeof(TestSystem));
 		var system = host.Get<TestSystem>();
 		loop = host.BuildLoop();
@@ -293,10 +289,9 @@ public class GameLoopTests
 	{
 		GameLoop? loop = null;
 		Exception? reentry = null;
-		using var host = new LoopTestHost(new ManualClock(), use: app => app.UseInit(next => dt =>
+		using var host = new LoopTestHost(new ManualClock(), use: app => app.Init(dt =>
 		{
 			reentry = Record.Exception(() => loop!.RunFrames(1));
-			next(dt);
 		}));
 		loop = host.BuildLoop();
 

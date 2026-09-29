@@ -21,7 +21,7 @@ from its parts with the `IServiceCollection` registrations instead of `AddIon`/`
 
 - `UseScene(id, scene => ...)`: scenes with their own schedule, systems and function steps, switched with
   `events.EmitChangeScene(..., SceneTransition.Fade(0.4f))` and faded by `SceneFadeSystem`.
-- A singleton system (`builder.AddSystem<TestMiddleware>()`) used by a scene: the scene creates its own instance, from
+- A singleton system (`builder.AddSystem<SceneTimings>()`) used by a scene: the scene creates its own instance, from
   its scope, each time it loads.
 - Function steps: `game.Init(...)`, `game.First(...)`, `game.Update(...)`, `game.Render(...)` taking a lambda whose
   parameters after `GameTime` are services, resolved once.
@@ -72,7 +72,7 @@ builder.Services.AddScenes();
 builder.Services.AddSceneFade();
 builder.Services.AddCoroutines();
 // A singleton used by a scene: the scene still creates its own instance from its scope, once per load.
-builder.AddSystem<TestMiddleware>();
+builder.AddSystem<SceneTimings>();
 
 using var game = builder.Build();
 ```
@@ -181,7 +181,7 @@ public enum Scene
 game.UseScene(Scene.MainMenu, scene =>
 {
 	scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90)));
-	scene.UseSystem<TestMiddleware>();
+	scene.UseSystem<SceneTimings>();
 });
 
 game.UseScene(Scene.Gameplay, scene =>
@@ -193,7 +193,7 @@ game.UseScene(Scene.Gameplay, scene =>
 - Each scene has its own dependency injection scope and its own schedule, built with the same ordering rules as the
   root. The `SceneSystem` runs the active scene's schedule at `StageOrder.Scenes` (-500) in every stage.
 - `UseScene<TScene>` and `EmitChangeScene<TScene>` take any enum (`where TScene : struct, Enum`); an `int` id works too.
-- Scene systems are created from the scene's scope, so they may be scoped services. `TestMiddleware` is registered as a
+- Scene systems are created from the scene's scope, so they may be scoped services. `SceneTimings` is registered as a
   singleton (`AddSystem`), and the scene still creates its own instance each time it loads. Root systems must not be
   scoped (`ION006`).
 - The change is animated by a `SceneTransition`: the menu keeps running while `SceneFadeSystem` darkens the frame, the
@@ -203,7 +203,7 @@ game.UseScene(Scene.Gameplay, scene =>
 ## A scope around the scene's rendering
 
 ```csharp title="Program.cs"
-public partial class TestMiddleware
+public partial class SceneTimings
 {
 	private readonly Queue<float> _frameTimes = new();
 	private readonly Stopwatch _stopwatch = new();
@@ -228,7 +228,7 @@ public partial class TestMiddleware
 ```
 
 A `[Begin]`/`[End]` pair wraps every step and scope that sorts after the begin in that stage; the end runs in a
-`finally`. This replaces the old middleware pattern of code before and after `next(dt)`.
+`finally`.
 
 ## Coroutines
 

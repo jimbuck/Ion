@@ -113,7 +113,6 @@ internal sealed class RegistrationAnalyzer
 	{
 		"UseSystem" or "UseScene" or "Run" or "RunFrames" or "Build" or "BuildSchedule" => true,
 		"Init" or "First" or "FixedUpdate" or "Update" or "Render" or "Last" or "Destroy" => true,
-		"UseInit" or "UseFirst" or "UseFixedUpdate" or "UseUpdate" or "UseRender" or "UseLast" or "UseDestroy" => true,
 		_ => false,
 	};
 
@@ -122,8 +121,6 @@ internal sealed class RegistrationAnalyzer
 		None,
 		UseSystem,
 		Function,
-		Middleware,
-		DelegateServicesMiddleware,
 		UseScene,
 		Root,
 		BuilderMember,
@@ -147,12 +144,6 @@ internal sealed class RegistrationAnalyzer
 			return stage > 0 ? Api.Function : Api.None;
 		}
 
-		if (KnownSymbols.Is(type, _known.UseDelegateServiceExtensions))
-		{
-			stage = StageOfUse(definition.Name);
-			return stage > 0 ? Api.DelegateServicesMiddleware : Api.None;
-		}
-
 		if (KnownSymbols.Is(type, _known.ScenesBuilderExtensions))
 		{
 			return definition.Name == "UseScene" && definition.Parameters.Length == 3 ? Api.UseScene : Api.None;
@@ -161,16 +152,12 @@ internal sealed class RegistrationAnalyzer
 		if (KnownSymbols.Is(type, _known.IonApplicationInterface) || KnownSymbols.Is(type, _known.IonApplicationClass) || KnownSymbols.Is(type, _known.SceneBuilderInterface) || KnownSymbols.Is(type, _known.ScheduleBuilderInterface))
 		{
 			if (definition.IsStatic) return Api.None;
-			stage = StageOfUse(definition.Name);
-			if (stage > 0 && definition.Parameters.Length == 1) return Api.Middleware;
 			if (definition.Name is "Run" or "RunFrames" || (definition.Name is "Build" or "BuildSchedule" && KnownSymbols.Is(type, _known.IonApplicationClass) && definition.Parameters.Length == 0)) return Api.Root;
 			return Api.BuilderMember;
 		}
 
 		return Api.None;
 	}
-
-	private static int StageOfUse(string name) => name.StartsWith("Use", StringComparison.Ordinal) ? Array.IndexOf(KnownSymbols.StageNames, name.Substring(3)) + 1 : 0;
 
 	private InterceptedCall? Classify(InvocationExpressionSyntax invocation, IInvocationOperation operation, SemanticModel model, out string? notIntercepted)
 	{
@@ -233,26 +220,6 @@ internal sealed class RegistrationAnalyzer
 					Before = before,
 					Services = services,
 				};
-			}
-
-			case Api.Middleware:
-			{
-				if (!_canIntercept) return Unintercepted(out notIntercepted);
-				var (name, _, _) = DescribeFunction(Argument(operation, 0), [], lambdaServices: false);
-				return new InterceptedCall { Kind = CallKind.Middleware, Invocation = invocation, Operation = operation, Model = model, Stage = stage, Name = name };
-			}
-
-			case Api.DelegateServicesMiddleware:
-			{
-				var services = method.TypeArguments.ToList<ITypeSymbol>();
-				if (services.Any(t => !IsAccessible(t)))
-				{
-					notIntercepted = "a service type is not accessible to generated code";
-					return null;
-				}
-
-				if (!_canIntercept) return Unintercepted(out notIntercepted);
-				return new InterceptedCall { Kind = CallKind.DelegateServicesMiddleware, Invocation = invocation, Operation = operation, Model = model, Stage = stage, Name = "UseDelegateServiceExtensions.lambda", Services = services };
 			}
 
 			case Api.UseScene:
@@ -412,8 +379,6 @@ internal sealed class RegistrationAnalyzer
 				{
 					case CallKind.UseSystem:
 					case CallKind.Function:
-					case CallKind.Middleware:
-					case CallKind.DelegateServicesMiddleware:
 						ops.Add(call.ToOp(conditional));
 						continue;
 					case CallKind.UseScene:
@@ -446,8 +411,6 @@ internal sealed class RegistrationAnalyzer
 
 				case Api.UseSystem:
 				case Api.Function:
-				case Api.Middleware:
-				case Api.DelegateServicesMiddleware:
 				case Api.UseScene:
 					ops.Add(new RegistrationOp { Kind = OpKind.Unmatchable, Conditional = conditional, Location = location, Reason = "interceptors are not available" });
 					continue;
@@ -732,9 +695,6 @@ internal sealed class RegistrationAnalyzer
 				case OpKind.Function:
 					builder.Append($"F|{op.Site}|{Flag(op.Conditional)}|{op.Stage}|{op.Order.ToString(CultureInfo.InvariantCulture)}|{Name(op.Name)}|{TypeList(op.After)}|{TypeList(op.Before)}|{TypeList(op.Services)}");
 					break;
-				case OpKind.Middleware:
-					builder.Append($"D|{op.Site}|{Flag(op.Conditional)}|{op.Stage}|{op.Order.ToString(CultureInfo.InvariantCulture)}|{Name(op.Name)}");
-					break;
 				case OpKind.Call:
 					builder.Append($"C|{Flag(op.Conditional)}|{op.Target!.GetDocumentationCommentId()}|{op.ParameterIndex.ToString(CultureInfo.InvariantCulture)}");
 					break;
@@ -806,9 +766,6 @@ internal sealed class RegistrationAnalyzer
 					break;
 				case "F" when parts.Length == 9:
 					yield return new RegistrationOp { Kind = OpKind.Function, Site = parts[1], Conditional = parts[2] == "1", Stage = Int(parts[3]), Order = Int(parts[4]), Name = Name(parts[5]), After = TypeList(parts[6]), Before = TypeList(parts[7]), Services = TypeList(parts[8]) ?? [] };
-					break;
-				case "D" when parts.Length == 6:
-					yield return new RegistrationOp { Kind = OpKind.Middleware, Site = parts[1], Conditional = parts[2] == "1", Stage = Int(parts[3]), Order = Int(parts[4]), Name = Name(parts[5]) };
 					break;
 				case "C" when parts.Length == 4:
 					var conditional = parts[1] == "1";

@@ -199,23 +199,22 @@ public class FixedStepConsumerTests
 		public List<long> FixedStepIndices { get; } = [];
 		public List<int> FixedStepsPerFrame { get; } = [];
 
-		[Init] public void Init(GameTime dt, GameLoopDelegate next) { Stages.Add(context.Stage); next(dt); }
-		[First] public void First(GameTime dt, GameLoopDelegate next) { Stages.Add(context.Stage); _stepsThisFrame = 0; next(dt); }
+		[Init] public void Init(GameTime dt) => Stages.Add(context.Stage);
+		[First] public void First(GameTime dt) { Stages.Add(context.Stage); _stepsThisFrame = 0; }
 
 		[FixedUpdate]
-		public void FixedUpdate(GameTime dt, GameLoopDelegate next)
+		public void FixedUpdate(GameTime dt)
 		{
 			Stages.Add(context.Stage);
 			FixedStages.Add(context.Stage);
 			FixedStepIndices.Add(context.FixedStepCount);
 			_stepsThisFrame++;
-			next(dt);
 		}
 
-		[Update] public void Update(GameTime dt, GameLoopDelegate next) { Stages.Add(context.Stage); next(dt); }
-		[Render] public void Render(GameTime dt, GameLoopDelegate next) { Stages.Add(context.Stage); next(dt); }
-		[Last] public void Last(GameTime dt, GameLoopDelegate next) { Stages.Add(context.Stage); FixedStepsPerFrame.Add(_stepsThisFrame); next(dt); }
-		[Destroy] public void Destroy(GameTime dt, GameLoopDelegate next) { Stages.Add(context.Stage); next(dt); }
+		[Update] public void Update(GameTime dt) => Stages.Add(context.Stage);
+		[Render] public void Render(GameTime dt) => Stages.Add(context.Stage);
+		[Last] public void Last(GameTime dt) { Stages.Add(context.Stage); FixedStepsPerFrame.Add(_stepsThisFrame); }
+		[Destroy] public void Destroy(GameTime dt) => Stages.Add(context.Stage);
 	}
 
 	public sealed class EventConsumers(IEvents events)

@@ -7,11 +7,6 @@ namespace Ion;
 /// <c>void M(GameTime dt, TService1 s1, ...)</c> where every other parameter is a service resolved once when the schedule
 /// is built.
 /// </summary>
-/// <remarks>
-/// The legacy middleware forms <c>void M(GameTime dt, GameLoopDelegate next)</c> and
-/// <c>GameLoopDelegate M(GameLoopDelegate next)</c> still work for one release: they wrap every step that sorts after
-/// them in the stage, and building the schedule logs warning ION010.
-/// </remarks>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public abstract class StageAttribute : Attribute
 {
@@ -115,8 +110,8 @@ public abstract class ScopeAttribute(Stage stage) : Attribute
 /// <summary>
 /// Marks the method that opens a scope in <see cref="ScopeAttribute.Stage"/>. It is paired with the method marked
 /// <see cref="EndAttribute"/> for the same stage on the same system; the end method always runs (in a <c>finally</c>)
-/// after every step the scope wraps, even when one throws. Scopes express what middleware used to do around
-/// <c>next(dt)</c>: frame begin/end, sprite batch begin/end, profiling. A method can open scopes in several stages.
+/// after every step the scope wraps, even when one throws. Scopes are for work that brackets the rest of a stage: frame
+/// begin/end, sprite batch begin/end, profiling. A method can open scopes in several stages.
 /// </summary>
 /// <example><code>
 /// [Begin(Stage.Render, Order = -900)] public void BeginFrame(GameTime dt) { ... }

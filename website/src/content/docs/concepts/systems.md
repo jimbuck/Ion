@@ -222,8 +222,9 @@ public sealed class Profiling
 ### Coming from middleware
 
 Before 0.3, systems were middleware: `void M(GameTime dt, GameLoopDelegate next)` called `next(dt)` to run the rest of
-the stage. Those forms, and `app.UseUpdate(next => dt => ...)`, still work for one release: they are placed by their
-order and wrap every step after them, and building logs warning `ION010` with the suggested rewrite.
+the stage, and `app.UseUpdate(next => dt => ...)` added a delegate in the same shape. The schedule does not run those
+forms: a stage method that takes or returns a `GameLoopDelegate` is an unsupported signature (`ION007`), and the
+`UseInit` to `UseDestroy` delegate methods are gone. Port them like this:
 
 | Middleware (0.2) | Steps and scopes (0.3) |
 |---|---|

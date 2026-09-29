@@ -116,11 +116,11 @@ app.Render(Hud.Draw, order: 50);                                         // a st
 ```
 
 - **Order.** `[Update(Order = n)]` (every stage attribute has `Order`, default 0). Lower runs first; ties are broken by registration order, then declaration order. `[After<T>]` and `[Before<T>]` (on a method, or on the class for all its steps; several allowed) order a step relative to every step of system `T` in the same stage, and take precedence over `Order`.
-- **Scopes.** A `[Begin(stage)]`/`[End(stage)]` pair on one system wraps every step and scope that sorts after the begin in that stage; the end runs in a `finally`. Use `ScopeName` to pair several scopes of one system. This is what used to be code before and after `next(dt)` (frame begin/end, sprite batch begin/end, profiling).
+- **Scopes.** A `[Begin(stage)]`/`[End(stage)]` pair on one system wraps every step and scope that sorts after the begin in that stage; the end runs in a `finally`. Use `ScopeName` to pair several scopes of one system. Scopes are for work that brackets the rest of a stage: frame begin/end, sprite batch begin/end, profiling.
 - **Engine order bands.** Engine steps use `-1000..-500` (setup: trace, window, input, graphics frame, audio, sprite batch, coroutines, scenes) and `500..1000` (teardown: window close check, event stepping), so user steps at order 0 always run between them, whether they were registered before or after `UseIon()`. The values are in `StageOrder`.
 - **Function steps.** `app.Init(...)` to `app.Destroy(...)` (and `scene.Update(...)` etc.) take an `Action<GameTime>` or a delegate with up to four service parameters after `GameTime`; `order` and `name` are optional. A method group with services needs its service types spelled out: `app.Update<ILogger<Hud>>(Hud.Log)`.
 - **Scenes.** `UseScene(id, scene => scene.UseSystem<T>())` builds each scene's own schedule with the same rules; the `SceneSystem` runs it at order `StageOrder.Scenes` (-500) in every stage. Scene systems are created from the scene's scope, so they may be scoped, and a system registered as a singleton (`builder.AddSystem<T>()`) is created there too, once per load, with the scene's `World`; root systems must not be scoped (ION006). Any `int` is a valid scene id, 0 included.
-- **Validation.** `app.Build()` (and `Run`) plans the schedule and throws `IonScheduleException` listing every error: `ION001` unknown stage, `ION002` Before/After cycle (naming the steps), `ION003` Begin without End or the reverse, `ION004` a stage attribute on a non-public method (or a step added to a scene after it loaded), `ION005` async or `Task`-returning step, `ION006` scoped system or scoped step parameter in the root schedule, `ION007` unsupported signature, `ION008` unregistered parameter service, `ION009` unregistered system, `ION011` ambiguous scope, `ION015` a scene uses a system registered as a singleton instance. Warnings are logged under `Ion.Schedule`: `ION010` legacy middleware, `ION012` constraint on a system that is not in the schedule, `ION013` system without steps.
+- **Validation.** `app.Build()` (and `Run`) plans the schedule and throws `IonScheduleException` listing every error: `ION001` unknown stage, `ION002` Before/After cycle (naming the steps), `ION003` Begin without End or the reverse, `ION004` a stage attribute on a non-public method (or a step added to a scene after it loaded), `ION005` async or `Task`-returning step, `ION006` scoped system or scoped step parameter in the root schedule, `ION007` unsupported signature (including the pre-0.3 middleware forms that take a `GameLoopDelegate next`), `ION008` unregistered parameter service, `ION009` unregistered system, `ION011` ambiguous scope, `ION015` a scene uses a system registered as a singleton instance. Warnings are logged under `Ion.Schedule`: `ION012` constraint on a system that is not in the schedule, `ION013` system without steps.
 - **Printing.** `app.PrintSchedule()` returns every stage in run order with orders, `System.Method`, constraints and braces for scopes, followed by each scene's schedule; `--Ion:PrintSchedule=true` prints it at startup. This is the first thing to read when a system does not run when expected.
 
 ```text
@@ -135,8 +135,6 @@ app.Render(Hud.Draw, order: 50);                                         // a st
        950    EcsCommandsSystem.FlushRender
       -850  } NullSpriteBatchSystem.End
 ```
-
-**Legacy middleware.** Methods of the form `void M(GameTime dt, GameLoopDelegate next)` or `GameLoopDelegate M(GameLoopDelegate next)`, and `app.UseUpdate(next => dt => ...)` delegates (including the `UseUpdate<TService...>` overloads), keep working for one release as opaque middleware placed by their order: they wrap every step after them. Building logs `ION010` with the rewrite.
 
 ## Compile-time schedule (source generator)
 
@@ -153,7 +151,7 @@ app.Render(Hud.Draw, order: 50);                                         // a st
 
 Interceptors need the .NET SDK 9.0.200 or later (Roslyn 4.12); with an older compiler, or without the namespace, the generator reports `ION014` and the game runs on the runtime path.
 
-**What it does.** It intercepts `UseSystem`, function steps (`app.Update(...)`), legacy middleware (`app.UseUpdate(...)`), `UseScene` and `Build()`/`Run()`/`RunFrames()`, and emits:
+**What it does.** It intercepts `UseSystem`, function steps (`app.Update(...)`), `UseScene` and `Build()`/`Run()`/`RunFrames()`, and emits:
 
 - **Pre-bound registrations.** Each system is described at compile time (steps, scopes, orders, constraints, diagnostics) with delegates that bind its methods directly, so the runtime plans and binds it without reflection. This is what makes NativeAOT publishing reflection-free.
 - **A generated schedule** for each application (the registrations made on it before `Build()`/`Run()` in the same method) and each scene (its configure callback): one method per stage that calls every step directly, in plan order, with a `try/finally` per scope; systems and injected services are resolved once in its constructor. It is sorted by the same code as the runtime planner (`ScheduleSorter`, shared), so `PrintSchedule()` is identical either way.

@@ -21,9 +21,11 @@ The 0.3 work rebuilt most of the engine. Released versions stop at 0.2.5; the te
 - **Registration order no longer matters.** Engine steps use reserved order bands (`-1000..-500` and `500..1000`), see
   [Stage order](/Ion/reference/stage-order/).
 - **Validation at build.** `IonApplication.Build()` throws `IonScheduleException` listing every schedule error
-  (`ION001` to `ION013`, and `ION015`); see [Diagnostics](/Ion/reference/diagnostics/).
-- **Legacy middleware** (`GameLoopDelegate next`) keeps working for one release as opaque middleware, reported as
-  `ION010`.
+  (`ION001` to `ION009`, `ION011` to `ION013`, and `ION015`); see [Diagnostics](/Ion/reference/diagnostics/).
+- **Middleware is removed.** Stage methods that take a `GameLoopDelegate next` (or return a `GameLoopDelegate`) are
+  unsupported signatures (`ION007`), and the `UseInit` to `UseDestroy` delegate methods, with their
+  `Use{Stage}<TService...>` overloads, are gone. Use steps, function steps (`app.Update(...)`) and `[Begin]`/`[End]`
+  scopes.
 - **Setup on the builder.** Modules register on the builder (`builder.AddX()`) and pull in their dependencies;
   `UseSystem` of a system already in the schedule does nothing; `app.UseRendering3D()` comes from the `Ion` namespace
   and adds `UseIon()`.
@@ -103,7 +105,8 @@ The changes most likely to touch a 0.2 game, and where to read about them:
 
 | 0.2 code | Now | Read |
 |---|---|---|
-| `void M(GameTime dt, GameLoopDelegate next)` middleware | A plain step, or a `[Begin]`/`[End]` scope | [Systems](/Ion/concepts/systems/), `ION010` |
+| `void M(GameTime dt, GameLoopDelegate next)` middleware | A plain step, or a `[Begin]`/`[End]` scope | [Coming from middleware](/Ion/concepts/systems/#coming-from-middleware) |
+| `app.UseUpdate(next => dt => ...)` | A function step, `app.Update((GameTime dt, ...) => ...)` | [Function steps](/Ion/concepts/systems/#function-steps) |
 | `IEventEmitter`, `IEventListener` | `IEvents.Emit`, `EventReader<T>` | [Events](/Ion/concepts/events/) |
 | `AddDebugUtils`, `ITraceTimer<T>` | `AddMetrics`, `IMetrics` | [Metrics and tracing](/Ion/tooling/metrics-and-tracing/) |
 | `UseScene(Scene.X, ...)` from the scenes generator | `UseScene<TScene>` (library method) | [Scenes](/Ion/ecs/scenes/) |

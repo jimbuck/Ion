@@ -119,14 +119,14 @@ public class IonApplicationBuilder : IIonApplicationBuilder
 	/// Registers the system <typeparamref name="TSystem"/> as a singleton (unless it is already registered). Add it to the
 	/// schedule with <c>app.UseSystem&lt;TSystem&gt;()</c> once the application is built.
 	/// </summary>
-	public IonApplicationBuilder AddSystem<[DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] TSystem>() where TSystem : class =>
+	public IonApplicationBuilder AddSystem<[DynamicallyAccessedMembers(SystemAccessibility.Members)] TSystem>() where TSystem : class =>
 		AddSystem(typeof(TSystem));
 
 	/// <summary>
 	/// Registers the system <paramref name="systemType"/> as a singleton (unless it is already registered), like
 	/// <see cref="AddSystem{TSystem}"/>.
 	/// </summary>
-	public IonApplicationBuilder AddSystem([DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type systemType)
+	public IonApplicationBuilder AddSystem([DynamicallyAccessedMembers(SystemAccessibility.Members)] Type systemType)
 	{
 		ArgumentNullException.ThrowIfNull(systemType);
 		Services.TryAddSingleton(systemType);

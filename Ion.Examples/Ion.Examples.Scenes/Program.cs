@@ -33,7 +33,7 @@ builder.Services.AddScenes();
 builder.Services.AddSceneFade();
 builder.Services.AddCoroutines();
 // A singleton used by a scene: the scene still creates its own instance from its scope, once per load.
-builder.AddSystem<TestMiddleware>();
+builder.AddSystem<SceneTimings>();
 
 using var game = builder.Build();
 
@@ -97,7 +97,7 @@ game.Render((GameTime dt, IEvents events, IInputState input) =>
 game.UseScene(Scene.MainMenu, scene =>
 {
 	scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90)));
-	scene.UseSystem<TestMiddleware>();
+	scene.UseSystem<SceneTimings>();
 });
 
 game.UseScene(Scene.Gameplay, scene =>
@@ -146,15 +146,15 @@ namespace Ion.Examples.Scenes
 		Test,
 	}
 
-	public partial class TestMiddleware
+	public partial class SceneTimings
 	{
 		private readonly Queue<float> _frameTimes = new();
 		private readonly Stopwatch _stopwatch = new();
 		private uint _fixedUpdates;
 
-		public TestMiddleware()
+		public SceneTimings()
 		{
-			Console.WriteLine("TestMiddleware Constructor");
+			Console.WriteLine("SceneTimings Constructor");
 		}
 
 		[First]

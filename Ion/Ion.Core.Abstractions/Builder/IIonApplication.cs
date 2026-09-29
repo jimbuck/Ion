@@ -19,56 +19,6 @@ public interface IIonApplication : IScheduleBuilder
 	new IServiceProvider Services { get; }
 
 	/// <summary>
-	/// Adds a legacy middleware to the application's Init stage, at order 0. It wraps every step that sorts after it, and
-	/// building logs warning ION010: prefer a function step (<c>app.Init((GameTime dt, ...) =&gt; ...)</c>) or a system.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds a legacy middleware to the application's First stage, at order 0. It wraps every step that sorts after it, and
-	/// building logs warning ION010: prefer a function step (<c>app.First((GameTime dt, ...) =&gt; ...)</c>) or a system.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseFirst(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds a legacy middleware to the application's FixedUpdate stage, at order 0. It wraps every step that sorts after it, and
-	/// building logs warning ION010: prefer a function step (<c>app.FixedUpdate((GameTime dt, ...) =&gt; ...)</c>) or a system.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseFixedUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds a legacy middleware to the application's Update stage, at order 0. It wraps every step that sorts after it, and
-	/// building logs warning ION010: prefer a function step (<c>app.Update((GameTime dt, ...) =&gt; ...)</c>) or a system.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds a legacy middleware to the application's Render stage, at order 0. It wraps every step that sorts after it, and
-	/// building logs warning ION010: prefer a function step (<c>app.Render((GameTime dt, ...) =&gt; ...)</c>) or a system.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseRender(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds a legacy middleware to the application's Last stage, at order 0. It wraps every step that sorts after it, and
-	/// building logs warning ION010: prefer a function step (<c>app.Last((GameTime dt, ...) =&gt; ...)</c>) or a system.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseLast(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds a legacy middleware to the application's Destroy stage, at order 0. It wraps every step that sorts after it, and
-	/// building logs warning ION010: prefer a function step (<c>app.Destroy((GameTime dt, ...) =&gt; ...)</c>) or a system.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseDestroy(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-
-	/// <summary>
 	/// Plans the schedule (validating it) and returns it as text: every stage with its steps in run order, their orders and
 	/// the scopes that wrap them, then each scene's schedule. The same text is printed at startup with
 	/// <c>--Ion:PrintSchedule=true</c>.

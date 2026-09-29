@@ -34,15 +34,14 @@ public class NullWindowTests
 
 		using var app = TestApp.CreateNullGraphics(
 			new() { ["Ion:Window:Width"] = "320", ["Ion:Window:Height"] = "200" },
-			use: app => app.UseUpdate((GameLoopDelegate next, IEvents events) =>
+			use: app =>
 			{
-				var reader = events.Reader<WindowResizeEvent>();
-				return dt =>
+				var reader = app.Services.GetRequiredService<IEvents>().Reader<WindowResizeEvent>();
+				app.Update(dt =>
 				{
 					while (reader.TryRead(out var e)) resizes.Add(e);
-					next(dt);
-				};
-			}));
+				});
+			});
 
 		var loop = app.Build();
 		loop.Init(TestApp.FrameTime);
@@ -81,10 +80,9 @@ public class NullWindowTests
 	public async Task Close_EndsTheGameLoop()
 	{
 		var frames = 0;
-		using var app = TestApp.CreateNullGraphics(use: app => app.UseUpdate((GameLoopDelegate next, NullWindow window) => dt =>
+		using var app = TestApp.CreateNullGraphics(use: app => app.Update((GameTime dt, NullWindow window) =>
 		{
 			if (++frames == 3) window.Close();
-			next(dt);
 		}));
 
 		await Task.Run(app.Run);

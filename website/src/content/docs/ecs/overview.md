@@ -152,8 +152,8 @@ public sealed partial class BallCountSystem(World world)
 }
 ```
 
-Legacy middleware steps (`game.UseUpdate(next => dt => { ...; next(dt); })`) still run and can use the world through
-closures, but they produce warning ION010; prefer systems or function steps.
+A function step can use the world too: `game.Update((GameTime dt, World world) => ...)` resolves it once, like a system
+constructor would.
 
 ## Stage order
 

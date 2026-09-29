@@ -42,7 +42,7 @@ Turning off a compile-time check does not turn off the runtime check: a real sch
 
 ## Schedule (ION001 to ION015)
 
-The generator reports `ION001` to `ION013` at the offending method (or at the registration call) with the runtime's
+The generator reports `ION001` to `ION009` and `ION011` to `ION013` at the offending method (or at the registration call) with the runtime's
 message. `ION006`, `ION008` and `ION009` are reported at compile time only for types declared in the project that no
 service registration call in the project mentions. `ION015` is reported at run time only (it depends on how a service
 was registered, which the generator cannot always see).
@@ -58,7 +58,6 @@ was registered, which the generator cannot always see).
 | `ION007` | Error | Unsupported step signature |
 | `ION008` | Error | Unregistered step parameter |
 | `ION009` | Error | Unregistered system |
-| `ION010` | Warning | Legacy middleware step |
 | `ION011` | Error | Ambiguous scope |
 | `ION012` | Warning | Constraint on a system that is not in the schedule |
 | `ION013` | Warning | System without steps |
@@ -126,6 +125,20 @@ the scene's scope.
 parameters are services, and the return type is `void`. Scope methods take only `GameTime`. **Fix:** change the
 signature as the message says.
 
+The pre-0.3 middleware forms, `void M(GameTime dt, GameLoopDelegate next)` and `GameLoopDelegate M(GameLoopDelegate next)`,
+are reported here too: steps run and return, so there is no `next`. Keep the code before `next(dt)` in a step, and move
+the code after it into a later step or a `[Begin]`/`[End]` scope (see
+[Coming from middleware](/Ion/concepts/systems/#coming-from-middleware)):
+
+```csharp
+// Before (ION007)
+public void Update(GameTime dt, GameLoopDelegate next) { Before(); next(dt); After(); }
+
+// After
+[Begin(Stage.Update)] public void Before(GameTime dt) { }
+[End(Stage.Update)] public void After(GameTime dt) { }
+```
+
 ### ION008: Unregistered step parameter
 
 **Message:** `'{step}' injects 'IFoo', which is not registered in the service collection.`
@@ -139,24 +152,6 @@ remove the parameter.
 
 **Cause:** `UseSystem<X>()` without a registration. **Fix:** `builder.AddSystem<X>()`. If your project registers
 systems by scanning, set `dotnet_diagnostic.ION009.severity = none`; the runtime check still applies.
-
-### ION010: Legacy middleware step
-
-**Messages:** `'{step}' in {stage} uses the legacy middleware form (GameLoopDelegate next). Rewrite it as a leaf step ...`,
-or `'{name}' in {stage} is a legacy middleware delegate (next => dt => ...). Rewrite it as a function step ...`
-
-**Cause:** a method of the form `void M(GameTime dt, GameLoopDelegate next)` or `GameLoopDelegate M(GameLoopDelegate next)`,
-or an `app.UseUpdate(next => dt => ...)` delegate. They still work for one release as opaque middleware. **Fix:** make
-it a plain step without `next`, and move code that ran after `next(dt)` into a later step or a `[Begin]`/`[End]` scope.
-
-```csharp
-// Before (ION010)
-public void Update(GameTime dt, GameLoopDelegate next) { Before(); next(dt); After(); }
-
-// After
-[Begin(Stage.Update)] public void Before(GameTime dt) { }
-[End(Stage.Update)] public void After(GameTime dt) { }
-```
 
 ### ION011: Ambiguous scope
 

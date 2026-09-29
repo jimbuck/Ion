@@ -20,7 +20,7 @@ public class IonApplication : IIonApplication, IDisposable
 	public const string PrintScheduleKey = "Ion:PrintSchedule";
 
 	/// <summary>
-	/// The root schedule's registrations: systems, function steps and legacy middleware.
+	/// The root schedule's registrations: systems and function steps.
 	/// </summary>
 	public ScheduleModel Schedule { get; } = new("root", isRoot: true);
 
@@ -64,33 +64,6 @@ public class IonApplication : IIonApplication, IDisposable
 	public static IonApplicationBuilder CreateBuilder()
 	{
 		return CreateBuilder([]);
-	}
-
-	/// <inheritdoc/>
-	public IIonApplication UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Init, middleware);
-
-	/// <inheritdoc/>
-	public IIonApplication UseFirst(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.First, middleware);
-
-	/// <inheritdoc/>
-	public IIonApplication UseFixedUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.FixedUpdate, middleware);
-
-	/// <inheritdoc/>
-	public IIonApplication UseUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Update, middleware);
-
-	/// <inheritdoc/>
-	public IIonApplication UseRender(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Render, middleware);
-
-	/// <inheritdoc/>
-	public IIonApplication UseLast(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Last, middleware);
-
-	/// <inheritdoc/>
-	public IIonApplication UseDestroy(Func<GameLoopDelegate, GameLoopDelegate> middleware) => UseMiddleware(Stage.Destroy, middleware);
-
-	private IonApplication UseMiddleware(Stage stage, Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		Schedule.AddMiddleware(stage, middleware);
-		return this;
 	}
 
 	/// <summary>

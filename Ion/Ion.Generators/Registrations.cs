@@ -11,8 +11,6 @@ internal enum OpKind
 	System,
 	/// <summary>A function step registration made by an intercepted <c>app.Update(...)</c> (and friends).</summary>
 	Function,
-	/// <summary>A legacy middleware delegate registration made by an intercepted <c>UseUpdate(next => ...)</c> (and friends).</summary>
-	Middleware,
 	/// <summary>A call to a method of another assembly that receives the builder, expanded from that assembly's summary.</summary>
 	Call,
 	/// <summary>A call the generator cannot follow; it may register anything (the runtime checks).</summary>
@@ -26,7 +24,7 @@ internal sealed class RegistrationOp
 {
 	public OpKind Kind { get; init; }
 
-	/// <summary>The generated call site (<c>Assembly#n</c>) of a System, Function or Middleware op.</summary>
+	/// <summary>The generated call site (<c>Assembly#n</c>) of a System or Function op.</summary>
 	public string? Site { get; init; }
 
 	/// <summary>Whether the op depends on a branch (if, loop, callback, conditional operator).</summary>
@@ -76,7 +74,6 @@ internal sealed class RegistrationOp
 	{
 		OpKind.System => $"System {Implementation?.Name} @{Site}{(Conditional ? " (conditional)" : "")}",
 		OpKind.Function => $"Function {Name} @{Site}{(Conditional ? " (conditional)" : "")}",
-		OpKind.Middleware => $"Middleware {Name} @{Site}{(Conditional ? " (conditional)" : "")}",
 		OpKind.Call => $"Call {Target?.Name}",
 		_ => $"{Kind} {Reason}",
 	};
@@ -87,8 +84,6 @@ internal enum CallKind
 {
 	UseSystem,
 	Function,
-	Middleware,
-	DelegateServicesMiddleware,
 	UseScene,
 	Root,
 }
@@ -138,7 +133,7 @@ internal sealed class InterceptedCall
 			Service = System!.Service,
 			Implementation = System.Implementation,
 		},
-		CallKind.Function => new RegistrationOp
+		_ => new RegistrationOp
 		{
 			Kind = OpKind.Function,
 			Site = Site,
@@ -151,16 +146,6 @@ internal sealed class InterceptedCall
 			Before = Before,
 			Services = Services,
 			DelegateType = Method.Parameters[1].Type,
-		},
-		_ => new RegistrationOp
-		{
-			Kind = OpKind.Middleware,
-			Site = Site,
-			Conditional = conditional,
-			Location = Invocation.GetLocation(),
-			Stage = Stage,
-			Order = 0,
-			Name = Name,
 		},
 	};
 }

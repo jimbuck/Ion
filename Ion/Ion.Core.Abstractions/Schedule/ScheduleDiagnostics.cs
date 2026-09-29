@@ -35,9 +35,6 @@ public static class ScheduleDiagnosticCodes
 	/// <summary>Error: a system type passed to <c>UseSystem</c> is not registered in the service collection.</summary>
 	public const string UnregisteredSystem = "ION009";
 
-	/// <summary>Warning: a step uses the legacy middleware form (<c>GameLoopDelegate next</c>); rewrite it as a leaf step or a scope.</summary>
-	public const string LegacyMiddleware = "ION010";
-
 	/// <summary>Error: a system has two unnamed scopes in one stage, or a <c>[End]</c> order that differs from its <c>[Begin]</c>.</summary>
 	public const string AmbiguousScope = "ION011";
 

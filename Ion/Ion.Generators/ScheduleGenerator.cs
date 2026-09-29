@@ -6,8 +6,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Ion.Generators;
 
 /// <summary>
-/// The Ion schedule generator. It intercepts every <c>UseSystem</c>, function step (<c>app.Update(...)</c>), legacy
-/// middleware (<c>app.UseUpdate(...)</c>), <c>UseScene</c> and <c>Build()</c>/<c>Run()</c> call it can see, and emits:
+/// The Ion schedule generator. It intercepts every <c>UseSystem</c>, function step (<c>app.Update(...)</c>),
+/// <c>UseScene</c> and <c>Build()</c>/<c>Run()</c> call it can see, and emits:
 /// <list type="bullet">
 /// <item>pre-bound registrations: each system described at compile time (its steps, scopes, constraints and diagnostics)
 /// with delegates that bind its methods directly, so the runtime plans and binds it without reflection;</item>

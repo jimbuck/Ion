@@ -4,7 +4,7 @@ BenchmarkDotNet micro-benchmarks that measure the engine's own per-frame overhea
 
 | Class | What it measures |
 |---|---|
-| `PipelineBenchmarks` | Dispatch cost of the reflection-bound middleware chain for 1/8/32 systems vs a hand-built closure chain vs direct calls |
+| `PipelineBenchmarks` | Dispatch cost of one stage with 1/8/32 systems: the runtime schedule and the generated schedule vs a hand-built closure chain (the pre-0.3 shape) vs direct calls |
 | `PipelineBuildBenchmarks` | Startup cost of building the host, binding systems and building the seven stage pipelines |
 | `InliningBenchmarks` | Closure chain vs a struct-generic (constrained call) chain prototype vs direct calls, depth 8 |
 | `FullFrameBenchmarks` | One headless `GameLoop.Step` with events only, with 8 systems (runtime and generated schedule), with the metrics module, with a frame profiler (stats only, and profiling every step), and inside a scene scope |

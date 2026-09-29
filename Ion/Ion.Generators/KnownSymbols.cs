@@ -34,7 +34,6 @@ internal sealed class KnownSymbols
 	public INamedTypeSymbol? SceneUseSystemExtensions { get; private set; }
 	public INamedTypeSymbol? StageStepExtensions { get; private set; }
 	public INamedTypeSymbol? SceneStageStepExtensions { get; private set; }
-	public INamedTypeSymbol? UseDelegateServiceExtensions { get; private set; }
 	public INamedTypeSymbol? ScenesBuilderExtensions { get; private set; }
 	public INamedTypeSymbol? ScheduleRegistrationsAttribute { get; private set; }
 	public INamedTypeSymbol? ServiceCollection { get; private set; }
@@ -117,7 +116,6 @@ internal sealed class KnownSymbols
 		known.SceneUseSystemExtensions = Get("Ion.Extensions.Scenes.UseSystemExtensions");
 		known.StageStepExtensions = Get("Ion.StageStepExtensions");
 		known.SceneStageStepExtensions = Get("Ion.Extensions.Scenes.SceneStageStepExtensions");
-		known.UseDelegateServiceExtensions = Get("Ion.UseDelegateServiceExtensions");
 		known.ScenesBuilderExtensions = Get("Ion.Extensions.Scenes.BuilderExtensions");
 		known.ScheduleRegistrationsAttribute = Get("Ion.ScheduleRegistrationsAttribute");
 		known.ServiceCollection = Get("Microsoft.Extensions.DependencyInjection.IServiceCollection");

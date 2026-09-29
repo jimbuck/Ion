@@ -214,31 +214,6 @@ public class ScheduleTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
-	public void LegacyMiddlewareStillWorksAndIsReported()
-	{
-		var logger = new CapturingLoggerProvider();
-		using var host = Host(services: s => s.AddLogging(l => l.AddProvider(logger)), use: app =>
-		{
-			app.UseUpdate(next => dt =>
-			{
-				app.Services.GetRequiredService<CallLog>().Entries.Add("delegate-before");
-				next(dt);
-				app.Services.GetRequiredService<CallLog>().Entries.Add("delegate-after");
-			});
-		}, systems: [typeof(LegacyWrapper), typeof(OrderB)]);
-
-		var entries = RunUpdate(host);
-
-		// The legacy method (order 0, registered after the delegate) is nested in the delegate; both wrap OrderB's order 0 step.
-		Assert.Equal(["b-5", "delegate-before", "legacy-before", "b0", "legacy-after", "delegate-after"], entries);
-		Assert.Equal(2, logger.Messages.Count(m => m.Contains(ScheduleDiagnosticCodes.LegacyMiddleware)));
-		Assert.Contains(logger.Messages, m => m.Contains("LegacyWrapper.Update") && m.Contains("[Update] public void Update(GameTime dt)"));
-
-		var print = host.App.PrintSchedule();
-		Assert.Contains("LegacyWrapper.Update (middleware) {", print);
-	}
-
-	[Fact, Trait(CATEGORY, UNIT)]
 	public void WarningsAreLoggedOnceAndKeptOnThePlan()
 	{
 		var logger = new CapturingLoggerProvider();
@@ -525,17 +500,6 @@ public sealed class InjectedSteps
 public static class StaticSteps
 {
 	public static void Tick(GameTime dt, CallLog log) => log.Entries.Add("static-tick");
-}
-
-public sealed class LegacyWrapper(CallLog log)
-{
-	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
-	{
-		log.Entries.Add("legacy-before");
-		next(dt);
-		log.Entries.Add("legacy-after");
-	}
 }
 
 public sealed class NoSteps

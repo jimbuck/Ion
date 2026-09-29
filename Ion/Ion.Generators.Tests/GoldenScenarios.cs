@@ -89,37 +89,6 @@ internal static class GoldenScenarios
 				"builder.Services.AddSingleton<Frame>().AddSingleton<Batch>().AddSingleton<Sprites>();",
 				"app.UseSystem<Sprites>().UseSystem<Batch>().UseSystem<Frame>();")),
 
-		("LegacyMiddleware", Preamble + """
-			#pragma warning disable ION010
-			public sealed class Wrapper
-			{
-				[Update(Order = -5)]
-				public void Around(GameTime dt, GameLoopDelegate next)
-				{
-					Log.Calls.Add("around before");
-					next(dt);
-					Log.Calls.Add("around after");
-				}
-
-				[Render]
-				public GameLoopDelegate Factory(GameLoopDelegate next) => dt => { Log.Calls.Add("factory"); next(dt); };
-			}
-			#pragma warning restore ION010
-
-			public sealed class Leaf
-			{
-				[Update] public void Tick(GameTime dt) => Log.Calls.Add("leaf tick");
-				[Render] public void Draw(GameTime dt) => Log.Calls.Add("leaf draw");
-			}
-
-			""" + App(
-				"builder.Services.AddSingleton<Wrapper>().AddSingleton<Leaf>();",
-				"""
-				app.UseSystem<Wrapper>().UseSystem<Leaf>();
-					app.UseUpdate(next => dt => { Log.Calls.Add("delegate before"); next(dt); Log.Calls.Add("delegate after"); });
-					app.UseLast<ILoopContext>((next, context) => dt => { Log.Calls.Add("with services " + context.Stage); next(dt); });
-				""")),
-
 		("FunctionSteps", Preamble + """
 			public sealed class Counter
 			{

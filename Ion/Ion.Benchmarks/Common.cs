@@ -24,14 +24,14 @@ public sealed class CounterSystem
 }
 
 /// <summary>
-/// The same system in the legacy middleware form (<c>GameLoopDelegate next</c>), which the schedule still runs as opaque
-/// middleware (and warns about, ION010). This is the shape every system had before 0.3.
+/// A counter in the pre-0.3 middleware shape (<c>(GameTime dt, GameLoopDelegate next)</c>), for the hand-built closure
+/// chain that stands in for the pre-0.3 dispatch. It is not a system: the schedule does not run this form.
 /// </summary>
-public sealed class LegacyCounterSystem
+public sealed class ChainedCounter
 {
 	public int Update;
 
-	[Update] public void OnUpdate(GameTime dt, GameLoopDelegate next) { Update++; next(dt); }
+	public void OnUpdate(GameTime dt, GameLoopDelegate next) { Update++; next(dt); }
 }
 
 // Distinct system types so that DI resolves distinct singleton instances (mirrors a real game with many systems).

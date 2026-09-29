@@ -21,7 +21,6 @@ internal static class Diagnostics
 	public static readonly DiagnosticDescriptor InvalidSignature = Error("ION007", "Unsupported step signature");
 	public static readonly DiagnosticDescriptor UnresolvableParameter = Error("ION008", "Unregistered step parameter");
 	public static readonly DiagnosticDescriptor UnregisteredSystem = Error("ION009", "Unregistered system");
-	public static readonly DiagnosticDescriptor LegacyMiddleware = Warning("ION010", "Legacy middleware step");
 	public static readonly DiagnosticDescriptor AmbiguousScope = Error("ION011", "Ambiguous scope");
 	public static readonly DiagnosticDescriptor UnmatchedConstraint = Warning("ION012", "Constraint on a system that is not in the schedule");
 	public static readonly DiagnosticDescriptor SystemWithoutSteps = Warning("ION013", "System without steps");
@@ -73,7 +72,6 @@ internal static class Diagnostics
 		"ION007" => InvalidSignature,
 		"ION008" => UnresolvableParameter,
 		"ION009" => UnregisteredSystem,
-		"ION010" => LegacyMiddleware,
 		"ION011" => AmbiguousScope,
 		"ION012" => UnmatchedConstraint,
 		"ION013" => SystemWithoutSteps,

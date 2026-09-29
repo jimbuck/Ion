@@ -11,11 +11,11 @@ public class BinderTests
 
 		loop.RunFrames(2);
 
-		// Declaration order within a type is the pipeline order.
-		Assert.Equal(["init:wrapper", "init:void", "init:auto", "init:end", "destroy:auto"], system.Log.Where(e => !e.StartsWith("update")).ToArray());
-		Assert.Equal(2, system.Log.Count(e => e == "update:wrapper"));
+		// Declaration order within a type is the run order.
+		Assert.Equal(["init:void", "init:auto", "init:injected", "destroy:auto"], system.Log.Where(e => !e.StartsWith("update")).ToArray());
 		Assert.Equal(2, system.Log.Count(e => e == "update:void"));
 		Assert.Equal(2, system.Log.Count(e => e == "update:auto"));
+		Assert.Equal(2, system.Log.Count(e => e == "update:injected"));
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
@@ -26,7 +26,8 @@ public class BinderTests
 
 		var ex = Assert.Throws<IonScheduleException>(() => host.BuildLoop());
 
-		Assert.Equal([ScheduleDiagnosticCodes.InvalidSignature, ScheduleDiagnosticCodes.UnresolvableParameter], ex.Codes.ToArray());
+		// The pre-0.3 middleware forms (taking a GameLoopDelegate next) are unsupported signatures like any other.
+		Assert.Equal([ScheduleDiagnosticCodes.InvalidSignature, ScheduleDiagnosticCodes.InvalidSignature, ScheduleDiagnosticCodes.InvalidSignature, ScheduleDiagnosticCodes.UnresolvableParameter], ex.Codes.ToArray());
 		Assert.Equal(0, host.Get<BadSignatureSystem>().Calls);
 	}
 
@@ -66,25 +67,22 @@ public sealed class SignatureSystem
 	public List<string> Log { get; } = [];
 
 	[Init]
-	public GameLoopDelegate InitWrapper(GameLoopDelegate next) => dt => { Log.Add("init:wrapper"); next(dt); };
-
-	[Init]
-	public void InitVoid(GameTime dt, GameLoopDelegate next) { Log.Add("init:void"); next(dt); }
+	public void InitVoid(GameTime dt) => Log.Add("init:void");
 
 	[Init]
 	public void InitAuto() => Log.Add("init:auto");
 
 	[Init]
-	public GameLoopDelegate InitEnd(GameLoopDelegate next) => dt => { next(dt); Log.Add("init:end"); };
+	public void InitInjected(GameTime dt, IClock clock) => Log.Add("init:injected");
 
 	[Update]
-	public GameLoopDelegate UpdateWrapper(GameLoopDelegate next) => dt => { Log.Add("update:wrapper"); next(dt); };
-
-	[Update]
-	public void UpdateVoid(GameTime dt, GameLoopDelegate next) { Log.Add("update:void"); next(dt); }
+	public void UpdateVoid(GameTime dt) => Log.Add("update:void");
 
 	[Update]
 	public void UpdateAuto() => Log.Add("update:auto");
+
+	[Update]
+	public void UpdateInjected(GameTime dt, IClock clock) => Log.Add("update:injected");
 
 	[Destroy]
 	public void DestroyAuto() => Log.Add("destroy:auto");
@@ -99,6 +97,12 @@ public sealed class BadSignatureSystem
 
 	[Update]
 	public void WrongParameters(int value) => Calls += value;
+
+	[Update]
+	public void WithNext(GameTime dt, GameLoopDelegate next) { Calls++; next(dt); }
+
+	[Update]
+	public GameLoopDelegate Factory(GameLoopDelegate next) => dt => { Calls++; next(dt); };
 }
 
 public interface ICountingSystem

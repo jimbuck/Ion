@@ -13,8 +13,6 @@ internal enum SignatureKind
 	NoArguments,
 	GameTime,
 	Injected,
-	LegacyVoidNext,
-	LegacyFactory,
 	/// <summary>A [Query] method of a source type: the step runs its generated expansion (see <see cref="QueryEmitter"/>).</summary>
 	Query,
 }
@@ -23,10 +21,9 @@ internal enum ItemKind
 {
 	Step,
 	Scope,
-	Middleware,
 }
 
-/// <summary>A step, scope or legacy middleware of a system (the compile-time <c>StepPlan</c> of a system).</summary>
+/// <summary>A step or scope of a system (the compile-time <c>StepPlan</c> of a system).</summary>
 internal sealed class SystemStep
 {
 	public int Stage { get; init; }
@@ -47,12 +44,7 @@ internal sealed class SystemStep
 	/// <summary>For a [Query] method of a source type: the query (the step calls <see cref="QueryInfo.CompanionName"/>).</summary>
 	public QueryInfo? Query { get; init; }
 
-	public string KindCode => Kind switch
-	{
-		ItemKind.Scope => "B",
-		ItemKind.Middleware => "M",
-		_ => "S",
-	};
+	public string KindCode => Kind == ItemKind.Scope ? "B" : "S";
 }
 
 /// <summary>A problem found in a system, with the runtime's code, severity and message.</summary>
@@ -60,7 +52,7 @@ internal sealed record SystemDiagnostic(string Code, bool IsError, string Messag
 
 /// <summary>
 /// A system as the runtime planner would discover it by reflection (<c>SchedulePlanner.DiscoverSystem</c>): its steps,
-/// scopes and legacy middleware in discovery order, and its diagnostics in the order the runtime reports them.
+/// and scopes in discovery order, and its diagnostics in the order the runtime reports them.
 /// </summary>
 internal sealed class SystemInfo
 {
@@ -236,14 +228,6 @@ internal sealed class SystemAnalyzer(KnownSymbols known, QueryAnalyzer queries)
 						Error(info, "ION007", $"'{name}' in {stageName} has an unsupported signature: {reason}. Use void {method.Name}(GameTime dt) (extra parameters are injected services).", location);
 						continue;
 
-					case SignatureKind.LegacyVoidNext:
-					case SignatureKind.LegacyFactory:
-						Warning(info, "ION010",
-							$"'{name}' in {stageName} uses the legacy middleware form (GameLoopDelegate next). Rewrite it as a leaf step, [{stageName}] public void {method.Name}(GameTime dt), without next(dt); move code that ran after next(dt) into a later step (a higher Order or [After<T>]) or a [Begin]/[End] scope.", location);
-						info.Steps.Add(new SystemStep { Stage = stage, Kind = ItemKind.Middleware, Order = order, Method = method, Signature = signature, Name = stepName, DeclarationIndex = index, After = after, Before = before });
-						count++;
-						continue;
-
 					default:
 						info.Steps.Add(new SystemStep { Stage = stage, Kind = ItemKind.Step, Order = order, Method = method, Signature = signature, Name = stepName, DeclarationIndex = index, After = after, Before = before });
 						count++;
@@ -263,9 +247,9 @@ internal sealed class SystemAnalyzer(KnownSymbols known, QueryAnalyzer queries)
 					continue;
 				}
 
-				if (signature is SignatureKind.Invalid or SignatureKind.LegacyFactory or SignatureKind.LegacyVoidNext)
+				if (signature == SignatureKind.Invalid)
 				{
-					Error(info, "ION007", $"'{name}' ({which} {stageName}) has an unsupported signature: {reason ?? "scope methods cannot take next"}. Use void {method.Name}(GameTime dt).", location);
+					Error(info, "ION007", $"'{name}' ({which} {stageName}) has an unsupported signature: {reason}. Use void {method.Name}(GameTime dt).", location);
 					continue;
 				}
 
@@ -583,10 +567,6 @@ internal sealed class SystemAnalyzer(KnownSymbols known, QueryAnalyzer queries)
 			return SignatureKind.Invalid;
 		}
 
-		if (KnownSymbols.Is(returnType, known.GameLoopDelegate) && parameters.Length == 1 && KnownSymbols.Is(parameters[0].Type, known.GameLoopDelegate) && parameters[0].RefKind == RefKind.None) return SignatureKind.LegacyFactory;
-		if (returnType.SpecialType == SpecialType.System_Void && parameters.Length == 2 && KnownSymbols.Is(parameters[0].Type, known.GameTime) && KnownSymbols.Is(parameters[1].Type, known.GameLoopDelegate)
-			&& parameters[0].RefKind == RefKind.None && parameters[1].RefKind == RefKind.None) return SignatureKind.LegacyVoidNext;
-
 		if (returnType.SpecialType != SpecialType.System_Void)
 		{
 			reason = $"it returns {RuntimeName(returnType)}";
@@ -605,7 +585,7 @@ internal sealed class SystemAnalyzer(KnownSymbols known, QueryAnalyzer queries)
 
 			if (KnownSymbols.Is(type, known.GameLoopDelegate))
 			{
-				reason = $"parameter '{parameter.Name}' is a GameLoopDelegate outside the legacy forms (GameTime dt, GameLoopDelegate next) and (GameLoopDelegate next)";
+				reason = $"parameter '{parameter.Name}' is a GameLoopDelegate (steps run and return; there is no next)";
 				return SignatureKind.Invalid;
 			}
 

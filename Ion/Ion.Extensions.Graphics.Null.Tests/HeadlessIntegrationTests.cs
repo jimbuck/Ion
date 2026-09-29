@@ -12,28 +12,25 @@ public class DrawSomethingSystem(IAssetManager assets, ISpriteBatch spriteBatch,
 	public List<bool> SpacePressed { get; } = [];
 
 	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	public void Init(GameTime dt)
 	{
 		_texture = assets.Load<ITexture2D>("rgbt_2x2.png");
 		_font = assets.Load<IFontSet>("Bungee-Regular.ttf").CreateStyle(16);
 		_sound = assets.Load<ISoundEffect>("bonk.wav");
-		next(dt);
 	}
 
 	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		SpacePressed.Add(input.Pressed(Key.Space));
 		if (input.Pressed(Key.Space)) audio.Play(_sound, volume: 0.5f);
-		next(dt);
 	}
 
 	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next)
+	public void Render(GameTime dt)
 	{
 		spriteBatch.Draw(_texture, new Vector2(10, 10), new Vector2(_texture.Width, _texture.Height));
 		spriteBatch.DrawString(_font, "Score: 0", new Vector2(20, 20));
-		next(dt);
 	}
 }
 

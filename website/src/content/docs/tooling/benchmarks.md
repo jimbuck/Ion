@@ -56,7 +56,7 @@ times in one process and keeps the best, which is robust for A/B checks while op
 
 | Class | What it measures |
 |---|---|
-| `PipelineBenchmarks` | Dispatch cost of a stage with 1, 8 and 32 systems: direct calls, the runtime-bound schedule (leaf steps), legacy middleware, a hand-built closure chain, and the generated schedule. |
+| `PipelineBenchmarks` | Dispatch cost of a stage with 1, 8 and 32 systems: direct calls, the runtime-bound schedule (leaf steps), a hand-built closure chain (the pre-0.3 middleware shape), and the generated schedule. |
 | `PipelineBuildBenchmarks` | Startup cost of building the host, binding systems and building the stage pipelines. |
 | `InliningBenchmarks` | Closure chain against a struct-generic (constrained call) chain prototype and direct calls, depth 8. |
 | `FullFrameBenchmarks` | One headless `GameLoop.Step`: events only, 8 systems (runtime and generated schedule), with the metrics module, with a frame profiler (stats only, and profiling every step), and inside a scene scope. |
@@ -87,11 +87,11 @@ BenchmarkDotNet 0.15.8, .NET 10.0.12, Intel Xeon 2.1 GHz VM (4 cores), `--job sh
 
 ### Dispatch of one stage (`PipelineBenchmarks`)
 
-| Systems | Direct calls | Generated schedule | Runtime schedule (leaf steps) | Closure chain | Legacy middleware |
-|---:|---:|---:|---:|---:|---:|
-| 1 | 0.33 ns | 0.38 ns | 0.42 ns | 0.45 ns | 1.12 ns |
-| 8 | 3.50 ns | 4.34 ns | 8.15 ns | 15.11 ns | 18.01 ns |
-| 32 | 13.32 ns | 15.75 ns | 67.42 ns | 92.06 ns | 112.22 ns |
+| Systems | Direct calls | Generated schedule | Runtime schedule (leaf steps) | Closure chain |
+|---:|---:|---:|---:|---:|
+| 1 | 0.33 ns | 0.38 ns | 0.42 ns | 0.45 ns |
+| 8 | 3.50 ns | 4.34 ns | 8.15 ns | 15.11 ns |
+| 32 | 13.32 ns | 15.75 ns | 67.42 ns | 92.06 ns |
 
 At 32 systems the generated schedule is 1.18x the cost of a hand-written loop of direct calls, against about 5x for the
 runtime-bound schedule. Every row allocates 0 bytes.

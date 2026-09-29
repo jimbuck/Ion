@@ -18,7 +18,7 @@ internal sealed class ScheduleCandidate
 
 	public bool IsRoot { get; init; }
 
-	/// <summary>The System, Function and Middleware registrations, in registration order.</summary>
+	/// <summary>The System and Function registrations, in registration order.</summary>
 	public List<RegistrationOp> Entries { get; } = [];
 
 	/// <summary>The systems of the System entries.</summary>
@@ -42,7 +42,7 @@ internal sealed class ScheduleCandidate
 	public string Prefix => IsRoot ? "" : $"[{ScheduleName}] ";
 }
 
-/// <summary>One item of a stage of a <see cref="ScheduleCandidate"/>: a system step, scope or middleware, a function or a middleware delegate.</summary>
+/// <summary>One item of a stage of a <see cref="ScheduleCandidate"/>: a system step or scope, or a function.</summary>
 internal sealed class CandidateItem
 {
 	public int Entry { get; init; }
@@ -58,8 +58,6 @@ internal sealed class CandidateItem
 	public string Name { get; init; } = "";
 
 	public bool IsScope => KindCode == "B";
-
-	public bool Wraps => KindCode is "B" or "M" or "D";
 
 	public string Key => Entry.ToString(CultureInfo.InvariantCulture) + "|" + KindCode + "|" + (Step?.Name ?? "") + "|" + Declaration.ToString(CultureInfo.InvariantCulture);
 }
@@ -80,7 +78,6 @@ internal sealed class CandidatePlanner(SystemAnalyzer systems, Action<Diagnostic
 					AddSystem(candidate, op);
 					break;
 				case OpKind.Function:
-				case OpKind.Middleware:
 					candidate.Entries.Add(op);
 					break;
 				case OpKind.Unmatchable:
@@ -131,7 +128,7 @@ internal sealed class CandidatePlanner(SystemAnalyzer systems, Action<Diagnostic
 
 					break;
 
-				case OpKind.Function:
+				default:
 					candidate.Systems.Add(null);
 					items.Add(new CandidateItem
 					{
@@ -144,11 +141,6 @@ internal sealed class CandidatePlanner(SystemAnalyzer systems, Action<Diagnostic
 						Before = op.Before ?? [],
 						Name = op.Name ?? "function",
 					});
-					break;
-
-				default:
-					candidate.Systems.Add(null);
-					items.Add(new CandidateItem { Entry = e, Op = op, Stage = op.Stage, KindCode = "D", Order = op.Order, Name = op.Name ?? "function" });
 					break;
 			}
 		}

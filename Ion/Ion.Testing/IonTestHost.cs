@@ -147,7 +147,7 @@ public sealed class IonTestHost : IDisposable
 		return this;
 	}
 
-	private const DynamicallyAccessedMemberTypes SystemMembers = SystemMiddlewareBinder.MiddlewareAccessibility;
+	private const DynamicallyAccessedMemberTypes SystemMembers = SystemAccessibility.Members;
 
 	/// <summary>
 	/// The order of the Last step that polled the event collectors before 0.3. The collectors are now polled after every

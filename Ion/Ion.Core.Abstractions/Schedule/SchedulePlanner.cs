@@ -43,17 +43,6 @@ internal static class SchedulePlanner
 						Services = function.ServiceTypes,
 					});
 					break;
-
-				case MiddlewareEntry middleware:
-					context.CheckStage(middleware.Stage, middleware.Name);
-					context.Warning(ScheduleDiagnosticCodes.LegacyMiddleware,
-						$"'{middleware.Name}' in {middleware.Stage} is a legacy middleware delegate (next => dt => ...). Rewrite it as a function step, for example app.{middleware.Stage}((GameTime dt, IMyService service) => ...), and move code that ran after next(dt) into a later step or a [Begin]/[End] scope.");
-					items.Add(new StepPlan(middleware.Stage, StepKind.Middleware, middleware.Order, middleware.Name)
-					{
-						Middleware = middleware,
-						RegistrationIndex = middleware.Index,
-					});
-					break;
 			}
 		}
 
@@ -176,24 +165,6 @@ internal static class SchedulePlanner
 						context.Error(ScheduleDiagnosticCodes.InvalidSignature, $"'{name}' in {attribute.Stage} has an unsupported signature: {reason}. Use void {method.Name}(GameTime dt) (extra parameters are injected services).");
 						continue;
 
-					case SignatureKind.LegacyVoidNext:
-					case SignatureKind.LegacyFactory:
-						context.Warning(ScheduleDiagnosticCodes.LegacyMiddleware,
-							$"'{name}' in {attribute.Stage} uses the legacy middleware form (GameLoopDelegate next). Rewrite it as a leaf step, [{attribute.Stage}] public void {method.Name}(GameTime dt), without next(dt); move code that ran after next(dt) into a later step (a higher Order or [After<T>]) or a [Begin]/[End] scope.");
-						items.Add(new StepPlan(attribute.Stage, StepKind.Middleware, attribute.Order, name)
-						{
-							System = system,
-							Method = method,
-							MethodName = methodName,
-							NeedsInstance = !method.IsStatic,
-							After = after,
-							Before = before,
-							RegistrationIndex = system.Index,
-							DeclarationIndex = index,
-						});
-						count++;
-						continue;
-
 					default:
 						items.Add(new StepPlan(attribute.Stage, StepKind.Step, attribute.Order, name)
 						{
@@ -222,9 +193,9 @@ internal static class SchedulePlanner
 					continue;
 				}
 
-				if (signature is SignatureKind.Invalid or SignatureKind.LegacyFactory or SignatureKind.LegacyVoidNext)
+				if (signature == SignatureKind.Invalid)
 				{
-					context.Error(ScheduleDiagnosticCodes.InvalidSignature, $"'{name}' ({(attribute is BeginAttribute ? "Begin" : "End")} {attribute.Stage}) has an unsupported signature: {reason ?? "scope methods cannot take next"}. Use void {method.Name}(GameTime dt).");
+					context.Error(ScheduleDiagnosticCodes.InvalidSignature, $"'{name}' ({(attribute is BeginAttribute ? "Begin" : "End")} {attribute.Stage}) has an unsupported signature: {reason}. Use void {method.Name}(GameTime dt).");
 					continue;
 				}
 
@@ -309,12 +280,7 @@ internal static class SchedulePlanner
 		var type = generated.Name;
 		foreach (var step in generated.Steps)
 		{
-			var kind = step.Kind switch
-			{
-				GeneratedStepKind.Scope => StepKind.Scope,
-				GeneratedStepKind.Middleware => StepKind.Middleware,
-				_ => StepKind.Step,
-			};
+			var kind = step.Kind == GeneratedStepKind.Scope ? StepKind.Scope : StepKind.Step;
 
 			items.Add(new StepPlan(step.Stage, kind, step.Order, type + "." + step.Method)
 			{
@@ -334,7 +300,7 @@ internal static class SchedulePlanner
 		}
 	}
 
-	private static List<MethodInfo> GetMethodsInDeclarationOrder([DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type type)
+	private static List<MethodInfo> GetMethodsInDeclarationOrder([DynamicallyAccessedMembers(SystemAccessibility.Members)] Type type)
 	{
 		// Base type methods first, then metadata (declaration) order. NativeAOT has no metadata tokens; there reflection
 		// already returns methods in declaration order, so the index is the key (OrderBy is stable).
@@ -497,8 +463,6 @@ internal enum SignatureKind
 	NoArguments,
 	GameTime,
 	Injected,
-	LegacyVoidNext,
-	LegacyFactory,
 }
 
 internal static class StepSignature
@@ -516,9 +480,6 @@ internal static class StepSignature
 			reason = "it is generic";
 			return SignatureKind.Invalid;
 		}
-
-		if (returnType == typeof(GameLoopDelegate) && parameters.Length == 1 && parameters[0].ParameterType == typeof(GameLoopDelegate)) return SignatureKind.LegacyFactory;
-		if (returnType == typeof(void) && parameters.Length == 2 && parameters[0].ParameterType == typeof(GameTime) && parameters[1].ParameterType == typeof(GameLoopDelegate)) return SignatureKind.LegacyVoidNext;
 
 		if (returnType != typeof(void))
 		{
@@ -538,7 +499,7 @@ internal static class StepSignature
 
 			if (type == typeof(GameLoopDelegate))
 			{
-				reason = $"parameter '{parameter.Name}' is a GameLoopDelegate outside the legacy forms (GameTime dt, GameLoopDelegate next) and (GameLoopDelegate next)";
+				reason = $"parameter '{parameter.Name}' is a GameLoopDelegate (steps run and return; there is no next)";
 				return SignatureKind.Invalid;
 			}
 

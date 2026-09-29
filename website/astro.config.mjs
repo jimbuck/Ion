@@ -22,7 +22,7 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Ion',
-			description: 'A performant, agent-friendly 2D/3D game engine for .NET built on middleware and ECS.',
+			description: 'A performant, agent-friendly 2D/3D game engine for .NET built on systems and ECS.',
 			logo: { src: './src/assets/logo-lockup.svg', replacesTitle: true, alt: 'Ion' },
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/jimbuck/Ion' }],
 			editLink: { baseUrl: 'https://github.com/jimbuck/Ion/edit/main/website/' },

@@ -11,13 +11,13 @@ public static class UseSystemExtensions
 	/// Adds a system to the scene's schedule (see <c>UseSystem</c> on the application). It is resolved from the scene's
 	/// scope when the scene loads, so scoped systems get one instance per scene load.
 	/// </summary>
-	public static ISceneBuilder UseSystem<[DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] TSystem>(this ISceneBuilder scene)
+	public static ISceneBuilder UseSystem<[DynamicallyAccessedMembers(SystemAccessibility.Members)] TSystem>(this ISceneBuilder scene)
 	{
 		return UseSystem(scene, typeof(TSystem));
 	}
 
 	/// <inheritdoc cref="UseSystem{TSystem}(ISceneBuilder)"/>
-	public static ISceneBuilder UseSystem(this ISceneBuilder scene, [DynamicallyAccessedMembers(SystemMiddlewareBinder.MiddlewareAccessibility)] Type systemType)
+	public static ISceneBuilder UseSystem(this ISceneBuilder scene, [DynamicallyAccessedMembers(SystemAccessibility.Members)] Type systemType)
 	{
 		ArgumentNullException.ThrowIfNull(scene);
 		scene.Schedule.AddSystem(systemType, systemType);

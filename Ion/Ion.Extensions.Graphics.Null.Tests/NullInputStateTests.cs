@@ -147,10 +147,9 @@ public class NullInputStateTests
 	{
 		var observed = new List<(bool Pressed, bool Down, bool Released)>();
 
-		using var app = TestApp.CreateNullGraphics(use: app => app.UseUpdate((GameLoopDelegate next, IInputState input) => dt =>
+		using var app = TestApp.CreateNullGraphics(use: app => app.Update((GameTime dt, IInputState input) =>
 		{
 			observed.Add((input.Pressed(Key.Space), input.Down(Key.Space), input.Released(Key.Space)));
-			next(dt);
 		}));
 
 		var input = app.Services.GetRequiredService<NullInputState>();

@@ -7,7 +7,7 @@ namespace Ion;
 /// </summary>
 public static class UseSystemExtensions
 {
-	private const DynamicallyAccessedMemberTypes SystemAccessibility = SystemMiddlewareBinder.MiddlewareAccessibility;
+	private const DynamicallyAccessedMemberTypes Members = SystemAccessibility.Members;
 
 	/// <summary>
 	/// Adds a system to the application's schedule: every public method of <paramref name="systemType"/> with a stage
@@ -17,13 +17,13 @@ public static class UseSystemExtensions
 	/// that is already in the schedule does nothing (it keeps its first place), so modules can add the systems of the
 	/// modules they depend on.
 	/// </summary>
-	public static IIonApplication UseSystem(this IIonApplication app, [DynamicallyAccessedMembers(SystemAccessibility)] Type systemType)
+	public static IIonApplication UseSystem(this IIonApplication app, [DynamicallyAccessedMembers(Members)] Type systemType)
 	{
 		return UseSystem(app, systemType, systemType);
 	}
 
 	/// <inheritdoc cref="UseSystem(IIonApplication, Type)"/>
-	public static IIonApplication UseSystem<[DynamicallyAccessedMembers(SystemAccessibility)] TSystem>(this IIonApplication app)
+	public static IIonApplication UseSystem<[DynamicallyAccessedMembers(Members)] TSystem>(this IIonApplication app)
 	{
 		return UseSystem(app, typeof(TSystem), typeof(TSystem));
 	}
@@ -32,7 +32,7 @@ public static class UseSystemExtensions
 	/// Adds a system resolved as <typeparamref name="TService"/> whose steps are the methods of
 	/// <typeparamref name="TImplementation"/>.
 	/// </summary>
-	public static IIonApplication UseSystem<[DynamicallyAccessedMembers(SystemAccessibility)] TService, [DynamicallyAccessedMembers(SystemAccessibility)] TImplementation>(this IIonApplication app)
+	public static IIonApplication UseSystem<[DynamicallyAccessedMembers(Members)] TService, [DynamicallyAccessedMembers(Members)] TImplementation>(this IIonApplication app)
 	{
 		return UseSystem(app, typeof(TService), typeof(TImplementation));
 	}
@@ -41,7 +41,7 @@ public static class UseSystemExtensions
 	/// Adds a system resolved as <paramref name="serviceType"/> whose steps are the methods of
 	/// <paramref name="implementationType"/>.
 	/// </summary>
-	public static IIonApplication UseSystem(this IIonApplication app, [DynamicallyAccessedMembers(SystemAccessibility)] Type serviceType, [DynamicallyAccessedMembers(SystemAccessibility)] Type implementationType)
+	public static IIonApplication UseSystem(this IIonApplication app, [DynamicallyAccessedMembers(Members)] Type serviceType, [DynamicallyAccessedMembers(Members)] Type implementationType)
 	{
 		ArgumentNullException.ThrowIfNull(app);
 		app.Schedule.AddSystem(serviceType, implementationType);

@@ -479,10 +479,9 @@ public class CoroutineSystemTests
 	public void ManualUpdateAfterSystemInSameFrameIsIgnored()
 	{
 		ICoroutineRunner runner = null!;
-		using var app = Build(a => a.UseUpdate(next => dt =>
+		using var app = Build(a => a.Update(dt =>
 		{
 			runner.Update(dt);
-			next(dt);
 		}));
 		runner = app.Services.GetRequiredService<ICoroutineRunner>();
 		var log = new List<int>();
@@ -507,10 +506,9 @@ public class CoroutineSystemTests
 		builder.Services.AddCoroutines();
 		using var app = builder.Build();
 		app.UseEvents();
-		app.UseFirst(next => dt =>
+		app.First(dt =>
 		{
 			runner.Update(dt);
-			next(dt);
 		});
 		app.UseCoroutines();
 		runner = app.Services.GetRequiredService<ICoroutineRunner>();
@@ -546,10 +544,9 @@ public class CoroutineSystemTests
 
 		var fixedSteps = 0;
 		var emitter = app.Services.GetRequiredService<IEvents>();
-		app.UseFixedUpdate(next => dt =>
+		app.FixedUpdate(dt =>
 		{
 			if (++fixedSteps == emitOnFixedStep) emitter.Emit(new CoroutineRunnerTests.TestEvent(fixedSteps));
-			next(dt);
 		});
 
 		var runner = app.Services.GetRequiredService<ICoroutineRunner>();

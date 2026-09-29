@@ -4,7 +4,7 @@ namespace Ion;
 
 /// <summary>
 /// Emitted by the Ion source generator on every assembly it compiles: what a public method taking an application or
-/// scene builder registers on it (systems, function steps, middleware, calls to other such methods), with the generated
+/// scene builder registers on it (systems, function steps, calls to other such methods), with the generated
 /// call sites. The generator of an application that calls the method reads it to emit the whole schedule at compile time.
 /// </summary>
 /// <param name="method">The documentation comment id of the method, then <c>#</c> and the index of the builder parameter.</param>

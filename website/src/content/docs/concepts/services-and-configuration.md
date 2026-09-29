@@ -240,7 +240,7 @@ levels in `Logging:LogLevel` as usual. Useful categories:
 
 | Category | Logs |
 |---|---|
-| `Ion.Schedule` | Schedule warnings (`ION010`, `ION012`, `ION013`); at `Debug`, whether the generated schedule is used and why not. |
+| `Ion.Schedule` | Schedule warnings (`ION012`, `ION013`); at `Debug`, whether the generated schedule is used and why not. |
 | `Ion.Extensions.Graphics.*` | Backend selection, window and device creation. |
 | `Ion.Extensions.Assets.*` | Asset loads (at `Debug`) and hot reloads. |
 

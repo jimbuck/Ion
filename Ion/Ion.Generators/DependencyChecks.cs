@@ -53,7 +53,7 @@ internal sealed class DependencyChecks(KnownSymbols known, RegistrationAnalyzer 
 						}
 					}
 
-					foreach (var step in system.Steps.Where(s => s.Kind != ItemKind.Middleware))
+					foreach (var step in system.Steps)
 					{
 						CheckParameters(system.Name + "." + step.Method.Name, step.Method, step.Signature, location, system);
 						if (step.EndMethod is { } end) CheckParameters(system.Name + "." + step.Method.Name, end, step.EndSignature, location, system, system.Name + "." + end.Name);

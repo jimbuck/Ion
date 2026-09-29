@@ -79,7 +79,6 @@ declarative: add systems and steps, do not create entities or start work there (
 | `scene.Init(...)`, `scene.First(...)`, `scene.Update(...)`, `scene.Render(...)`, ... | Function steps with up to four service parameters, resolved from the scene's scope |
 | `scene.UseEcs()` | The ECS systems for the scene's world (commands, propagation, sprite animation) |
 | `scene.UseEcsRendering()`, `scene.UseEcsRendering3D()` | The 2D or 3D extraction for the scene's world, with `UseEcs()` |
-| `scene.UseInit(next => ...)`, `scene.UseUpdate(next => ...)`, ... | Legacy middleware (warning ION010) |
 | `SceneId`, `Configuration`, `Services` | The id, the app configuration and the scene's scoped services |
 
 Function steps are the quickest way to add small behaviour. The Scenes sample draws a colored square per scene:
@@ -320,12 +319,7 @@ so a host created with a longer frame time advances transitions by 0.1 s per fra
 ## The scene generator
 
 `Ion.Extensions.Scenes.Generators` is a small source generator that some projects reference as an analyzer (the Scenes
-and Breakout samples do). It adds:
-
-- a `[ScenesEnum]` marker attribute (namespace `Ion.Extensions.Scenes`) for scene enums, and
-- `UseInit<TService0, ...>` through `UseDestroy<...>` overloads on `ISceneBuilder` (one to eight services) that resolve
-  services from the scene's scope for legacy middleware (`scene.UseUpdate<ISpriteBatch>((next, sprites) => dt => ...)`).
-  These are middleware, so they get warning ION010; prefer systems and function steps.
+and Breakout samples do). It adds a `[ScenesEnum]` marker attribute (namespace `Ion.Extensions.Scenes`) for scene enums.
 
 The enum overloads it used to generate are now the generic `UseScene<TScene>` and `EmitChangeScene<TScene>` in the
 library, so the main Ion generator can compile scene registrations into the generated schedule. You do not need the

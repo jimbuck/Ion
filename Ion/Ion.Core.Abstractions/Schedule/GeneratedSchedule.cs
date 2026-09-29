@@ -187,14 +187,13 @@ public abstract class GeneratedScheduleFactory
 	/// <summary>The key of a planned item: <c>entry|kind|method|declaration</c> (see the generator).</summary>
 	private static string Key(StepPlan step, Dictionary<ScheduleEntry, int> candidateOf)
 	{
-		ScheduleEntry? entry = (ScheduleEntry?)step.System ?? (ScheduleEntry?)step.Function ?? step.Middleware;
+		ScheduleEntry? entry = (ScheduleEntry?)step.System ?? step.Function;
 		var c = entry is not null && candidateOf.TryGetValue(entry, out var index) ? index : -1;
 		var kind = step.Kind switch
 		{
-			StepKind.Step => "S",
 			StepKind.Scope => "B",
 			StepKind.Function => "F",
-			_ => step.System is null ? "D" : "M",
+			_ => "S",
 		};
 
 		return string.Create(CultureInfo.InvariantCulture, $"{c}|{kind}|{step.MethodName}|{step.DeclarationIndex}");
@@ -267,22 +266,11 @@ public sealed class GeneratedScheduleContext
 		return step.BindEnd!(step.EndIsStatic ? null : Instance(entry), Services);
 	}
 
-	/// <summary>A legacy middleware method of system registration <paramref name="entry"/>, bound through its <see cref="GeneratedSystem"/>.</summary>
-	public Func<GameLoopDelegate, GameLoopDelegate> StepMiddleware(int entry, Stage stage, string method, int declarationIndex)
-	{
-		if (Generated(entry) is not { } system) return null!;
-		var step = system.GetStep(stage, GeneratedStepKind.Middleware, method, declarationIndex);
-		return step.BindMiddleware!(step.IsStatic ? null : Instance(entry), Services);
-	}
-
 	/// <summary>The user delegate of function registration <paramref name="entry"/>; null when it did not run.</summary>
 	public TDelegate Function<TDelegate>(int entry) where TDelegate : Delegate => _entries[entry] is FunctionEntry function ? (TDelegate)function.Function : null!;
 
 	/// <summary>The bound per-frame delegate of function registration <paramref name="entry"/>; null when it did not run.</summary>
 	public GameLoopDelegate BoundFunction(int entry) => _entries[entry] is FunctionEntry function ? function.Bind(Services) : null!;
-
-	/// <summary>The factory of middleware registration <paramref name="entry"/>; null when it did not run.</summary>
-	public Func<GameLoopDelegate, GameLoopDelegate> Middleware(int entry) => _entries[entry] is MiddlewareEntry middleware ? middleware.Middleware : null!;
 
 	private GeneratedSystem? Generated(int entry) => _entries[entry] is SystemEntry system
 		? system.Generated ?? throw new InvalidOperationException($"System '{system}' was not registered by generated code.")
