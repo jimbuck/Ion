@@ -1,0 +1,68 @@
+<Project>
+  <!--
+    Build-time shader compilation. Import this file and list GLSL 4.5 (Vulkan dialect) sources as IonShader items:
+
+      <Import Project="path/to/Ion/Ion.Shaders/Ion.Shaders.targets" />
+      <ItemGroup>
+        <IonShader Include="Shaders/*.vert;Shaders/*.frag" />
+      </ItemGroup>
+
+    Each shader is compiled to SPIR-V with Shaderc and translated to GLSL ES 3.10 with SPIRV-Cross (which validates it for
+    the GLES backend), and both are embedded as resources named Shaders/<file>.spv and Shaders/<file>.es.glsl. Load them
+    with Ion.Extensions.Graphics.Rhi.EmbeddedShaders. Compilation errors fail the build with the file and line.
+
+    Properties: IonShaderGles (default true) also emits GLSL ES; IonShaderOptimize (default true) optimizes the SPIR-V.
+
+    Shaders may #include "file" (resolved relative to the shader). List included files as IonShaderInclude items so that
+    editing one recompiles the shaders: <IonShaderInclude Include="Shaders/*.glsl" />.
+  -->
+  <PropertyGroup>
+    <IonShaderGles Condition="'$(IonShaderGles)' == ''">true</IonShaderGles>
+    <IonShaderOptimize Condition="'$(IonShaderOptimize)' == ''">true</IonShaderOptimize>
+    <IonShadersProject>$(MSBuildThisFileDirectory)Ion.Shaders.csproj</IonShadersProject>
+    <IonShadersTool>$(MSBuildThisFileDirectory)bin/$(Configuration)/net10.0/Ion.Shaders.dll</IonShadersTool>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Build the compiler first (for this machine: no runtime identifier, no AOT), without referencing it. -->
+    <ProjectReference Include="$(IonShadersProject)"
+                      ReferenceOutputAssembly="false"
+                      Private="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained;TargetFramework" />
+  </ItemGroup>
+
+  <!-- IntermediateOutputPath is only defined by the SDK targets imported after this file, so resolve it in a target. -->
+  <Target Name="_IonShaderPaths">
+    <PropertyGroup>
+      <IonShaderOutDir Condition="'$(IonShaderOutDir)' == ''">$(ProjectDir)$(IntermediateOutputPath)IonShaders/</IonShaderOutDir>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="IonCompileShaders"
+          DependsOnTargets="_IonShaderPaths;ResolveProjectReferences"
+          BeforeTargets="AssignTargetPaths"
+          Condition="'@(IonShader)' != ''"
+          Inputs="@(IonShader);@(IonShaderInclude);$(IonShadersTool);$(MSBuildThisFileFullPath)"
+          Outputs="@(IonShader->'$(IonShaderOutDir)%(Filename)%(Extension).spv')">
+    <PropertyGroup>
+      <_IonShaderArgs>--out &quot;$(IonShaderOutDir)&quot;</_IonShaderArgs>
+      <_IonShaderArgs Condition="'$(IonShaderGles)' == 'true'">$(_IonShaderArgs) --gles</_IonShaderArgs>
+      <_IonShaderArgs Condition="'$(IonShaderOptimize)' != 'true'">$(_IonShaderArgs) --no-optimize</_IonShaderArgs>
+    </PropertyGroup>
+    <Exec Command="&quot;$(DOTNET_HOST_PATH)&quot; &quot;$(IonShadersTool)&quot; $(_IonShaderArgs) @(IonShader->'&quot;%(FullPath)&quot;', ' ')"
+          Condition="'$(DOTNET_HOST_PATH)' != ''" />
+    <Exec Command="dotnet &quot;$(IonShadersTool)&quot; $(_IonShaderArgs) @(IonShader->'&quot;%(FullPath)&quot;', ' ')"
+          Condition="'$(DOTNET_HOST_PATH)' == ''" />
+  </Target>
+
+  <Target Name="IonEmbedShaders" DependsOnTargets="_IonShaderPaths" AfterTargets="IonCompileShaders" BeforeTargets="AssignTargetPaths" Condition="'@(IonShader)' != ''">
+    <ItemGroup>
+      <_IonShaderOutput Include="@(IonShader->'$(IonShaderOutDir)%(Filename)%(Extension).spv')" />
+      <_IonShaderOutput Include="@(IonShader->'$(IonShaderOutDir)%(Filename)%(Extension).es.glsl')" Condition="'$(IonShaderGles)' == 'true'" />
+      <!-- WithCulture=false: ".es." in the file name must not be read as the Spanish culture (a satellite assembly). -->
+      <EmbeddedResource Include="@(_IonShaderOutput)" LogicalName="Shaders/%(Filename)%(Extension)" WithCulture="false" Type="Non-Resx" />
+      <FileWrites Include="@(_IonShaderOutput)" />
+    </ItemGroup>
+  </Target>
+</Project>

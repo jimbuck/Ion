@@ -263,7 +263,7 @@ public static class MemUtils
 	/// <param name="destination">The destination span.</param>
 	/// <param name="source">The source address to copy from.</param>
 	/// <returns>The number of bytes copied.</returns>
-	public static long Copy<T>(Span<T> destination, IntPtr source) where T : unmanaged => Copy(destination, GetSpan<T>(source, destination.Length));
+	public static long Copy<T>(Span<T> destination, IntPtr source) where T : unmanaged => Copy<T, T>(destination, GetSpan<T>(source, destination.Length));
 
 	/// <summary>
 	/// Copies all data from one <see cref="ReadOnlySpan{T}"/> to a <see cref="Span{T}"/>.

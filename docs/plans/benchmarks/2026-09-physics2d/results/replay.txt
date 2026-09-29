@@ -1,0 +1,9 @@
+# linux-x64, X64, AOT=True, Vector<float>.Count=4, 10000 steps
+2D (Box2D v3): 7DF39E42CA6D46A6
+3D (BepuPhysics v2, single-threaded): 0987708E02C11079
+# linux-arm64, Arm64, AOT=True, Vector<float>.Count=4, 10000 steps
+2D (Box2D v3): 5780ABC152A90013
+3D (BepuPhysics v2, single-threaded): 0987708E02C11079
+# linux-arm64, Arm64, AOT=True, Vector<float>.Count=4, 10000 steps
+2D (Box2D v3): 7DF39E42CA6D46A6
+3D (BepuPhysics v2, single-threaded): 0987708E02C11079

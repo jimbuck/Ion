@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    The remote inspection protocol is compiled out of Release builds unless the game opts in with
+    <IonRemote>true</IonRemote> (or -p:IonRemote=true at publish time). IonRemote sets the Ion.Remote.IsSupported feature
+    switch: with false, a trimmed or NativeAOT publish removes the server, its transports and every remote method provider,
+    and an untrimmed build keeps the code but never starts it (AddRemote registers nothing and says why on standard error).
+    Other configurations default to true; the server still only runs with Ion:Remote:Enabled (or the remote command line switch).
+  -->
+  <PropertyGroup>
+    <IonRemote Condition="'$(IonRemote)' == '' and '$(Configuration)' == 'Release'">false</IonRemote>
+    <IonRemote Condition="'$(IonRemote)' == ''">true</IonRemote>
+  </PropertyGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="Ion.Remote.IsSupported" Value="$(IonRemote)" Trim="true" />
+  </ItemGroup>
+</Project>

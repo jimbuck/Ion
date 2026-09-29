@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The UDP transport of the networking module on LiteNetLib (pure managed, reliability channels, MTU discovery). Only the
+    transport layer of LiteNetLib is used (NetManager, NetPeer): its reflection-based NetPacketProcessor and NetSerializer
+    are not, since Ion generates its own serializers. A separate package so the core module does not depend on it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Networking.LiteNetLib</RootNamespace>
+    <Description>Ion's UDP transport for the networking module on LiteNetLib: AddLiteNetLibTransport(), an INetworkTransport whose socket work runs on LiteNetLib's threads and whose packets reach the game thread through a pooled queue.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Networking.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="LiteNetLib" Version="2.1.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Extensions.Networking\Ion.Extensions.Networking.csproj" />
+  </ItemGroup>
+</Project>

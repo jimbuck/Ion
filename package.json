@@ -1,14 +1,65 @@
 {
 	"name": "ion-engine",
 	"version": "0.0.0",
-	"description": "Tasks for the Ion solution.",
+	"private": true,
+	"description": "Dev tasks for the Ion solution. Run `npm install` once, then `npm run <task>` from the repository root.",
 	"scripts": {
-		"open-trace": "npx perfetto-trace-viewer .\\Ion.Examples\\Ion.Examples.Breakout\\bin\\Release\\net8.0\\trace.json"
+		"setup": "dotnet restore Ion.sln && npm ci --prefix website",
+		"restore": "dotnet restore Ion.sln",
+		"clean": "dotnet clean Ion.sln -c Release && dotnet clean Ion.sln -c Debug",
+
+		"build": "dotnet build Ion.sln -c Release -p:NodeReuse=false",
+		"build:debug": "dotnet build Ion.sln -c Debug -p:NodeReuse=false",
+		"rebuild": "dotnet build Ion.sln -c Release -p:NodeReuse=false --no-incremental",
+
+		"test": "dotnet test Ion.sln -c Release",
+		"test:nobuild": "dotnet test Ion.sln -c Release --no-build",
+		"test:xvfb": "xvfb-run -a dotnet test Ion.sln -c Release",
+		"test:generators": "dotnet test Ion/Ion.Generators.Tests -c Release",
+		"test:templates": "cross-env ION_SLOW_TESTS=1 dotnet test Ion/Ion.Tools.Tests -c Release --filter TemplateTests",
+		"test:slow": "cross-env ION_SLOW_TESTS=1 dotnet test Ion.sln -c Release",
+		"goldens:update": "cross-env ION_UPDATE_GOLDEN=1 dotnet test Ion.sln -c Release",
+
+		"format": "dotnet format Ion.sln",
+		"format:check": "dotnet format Ion.sln --verify-no-changes",
+
+		"bench": "dotnet run -c Release --project Ion/Ion.Benchmarks --",
+
+		"ion": "dotnet run -c Release --project Ion/Ion.Tools --",
+		"mcp": "dotnet run -c Release --project Ion/Ion.Tools -- mcp",
+		"pack": "dotnet pack Ion.sln -c Release -o artifacts/packages",
+		"pack:tools": "dotnet pack Ion/Ion.Tools -c Release -o artifacts/packages",
+		"pack:templates": "dotnet pack templates/Ion.Templates.csproj -c Release -o artifacts/packages",
+		"install:tools": "npm run pack:tools && dotnet tool update -g Ion.Tools --add-source artifacts/packages",
+		"install:templates": "npm run pack:templates && dotnet new install Ion.Templates --add-source artifacts/packages --force",
+
+		"example:breakout": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Breakout --",
+		"example:breakout-ecs": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Breakout.ECS --",
+		"example:breakout-net": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Breakout.Net --",
+		"example:companion": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Companion --",
+		"example:menu": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Menu --",
+		"example:cubes": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Cubes --",
+		"example:model": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Model --",
+		"example:scenes": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Scenes --",
+		"example:sprites": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Sprites100k --",
+		"example:quad": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Quad --",
+
+		"docs": "npm run dev --prefix website",
+		"docs:install": "npm ci --prefix website",
+		"docs:build": "npm run build --prefix website",
+		"docs:preview": "npm run preview --prefix website",
+
+		"trace:open": "npx --yes perfetto-trace-viewer Ion.Examples/Ion.Examples.Breakout/bin/Release/net10.0/trace.json",
+
+		"ci": "npm run build && npm run test:nobuild && npm run docs:build"
+	},
+	"devDependencies": {
+		"cross-env": "^7.0.3"
 	},
 	"license": "ISC",
 	"-vs-binding": {
 		"ProjectOpened": [
-			"open-trace"
+			"trace:open"
 		]
 	}
 }

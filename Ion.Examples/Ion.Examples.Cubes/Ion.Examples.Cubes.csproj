@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    3D on the ECS module: a grid of 1,000 cube entities in two materials, instanced by mesh and material, a directional
+    light entity with shadows onto a ground plane, an orbiting camera entity and a 2D HUD drawn on top by the sprite batch.
+    Options: - -Cubes:Frames=N (exit after N frames), - -Cubes:Screenshot=cubes.png (with Frames: save the last frame),
+    - -Ion:Headless=true (no window; add - -Ion:Headless:Render=true to render offscreen).
+    Publishes with NativeAOT: dotnet publish -c Release -r linux-x64 -p:PublishAot=true
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <Platforms>AnyCPU</Platforms>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="appsettings.json" />
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <!-- The HUD font (SIL Open Font License), shared with the Breakout sample. -->
+    <Content Include="..\Ion.Examples.Breakout\Assets\Bungee-Regular.ttf" Link="Assets\Bungee-Regular.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations and expands its [Query] steps (reflection-free). -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
+  </ItemGroup>
+</Project>

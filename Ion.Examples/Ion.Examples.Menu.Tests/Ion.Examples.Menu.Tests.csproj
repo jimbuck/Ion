@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <!-- The remote module is compiled out of Release builds by default; the remote protocol test needs it. -->
+    <IonRemote>true</IonRemote>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\Ion\Ion.Core.Tests\TestConstants.cs" Link="TestConstants.cs" />
+    <Compile Include="..\Shared\SampleRenderingTest.cs" Link="SampleRenderingTest.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion.Testing\Ion.Testing.csproj" />
+    <ProjectReference Include="..\Ion.Examples.Menu\Ion.Examples.Menu.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Golden\*.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

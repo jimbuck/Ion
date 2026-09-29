@@ -1,0 +1,58 @@
+<Project>
+  <!--
+    Shared build settings for every project in the repository.
+    A project can still override any of these in its own csproj.
+  -->
+  <PropertyGroup>
+    <!-- The repository builds with the .NET 10 SDK (see global.json), so "latest" is C# 14. -->
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <!-- Warnings stay warnings; WarningLevel is left at the SDK default. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- The Ion schedule generator (Ion.Generators) emits its interceptors in Ion.Generated. Games get this from the Ion
+         package's build props; the engine, samples and tests set it here. Harmless where the generator is not referenced. -->
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Ion.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+
+  <!--
+    Classify the project by name so engine libraries get AOT settings by default.
+    Tests (*.Tests), benchmarks (*.Benchmarks), source generators (*.Generators,
+    *.InternalGenerators) and samples (Ion.Examples*) are excluded.
+    To opt a project out, set IsAotCompatible and EnableConfigurationBindingGenerator
+    to false in its csproj (project properties are evaluated after this file).
+  -->
+  <PropertyGroup Condition="'$(IonAotLibrary)' == ''">
+    <IonAotLibrary>true</IonAotLibrary>
+    <IonAotLibrary Condition="$(MSBuildProjectName.EndsWith('.Tests'))">false</IonAotLibrary>
+    <IonAotLibrary Condition="$(MSBuildProjectName.EndsWith('.Benchmarks'))">false</IonAotLibrary>
+    <IonAotLibrary Condition="$(MSBuildProjectName.EndsWith('Generators'))">false</IonAotLibrary>
+    <IonAotLibrary Condition="$(MSBuildProjectName.StartsWith('Ion.Examples'))">false</IonAotLibrary>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IonAotLibrary)' == 'true'">
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+  </PropertyGroup>
+
+  <!--
+    Publishing presets (Stage 7): dotnet publish <game> -p:IonTarget=<win-x64|win-arm64|osx-arm64|osx-x64|linux-x64|linux-arm64|r36s>.
+    Imported here, before the project body, so the runtime identifier inference and output paths see the preset.
+  -->
+  <Import Project="build\Ion.Publish.props" />
+
+  <!--
+    Metrics v2: span recording is a feature switch. Set <IonMetricsProfiling>false</IonMetricsProfiling> in a game's project
+    to compile it out: the schedule generator emits no profiler brackets, and a trimmed or NativeAOT publish substitutes
+    FrameProfiler.IsProfilingEnabled with false and removes every other recording site. The default keeps profiling
+    available in every build (Release included), off until Ion:Metrics:Profiling or a capture turns it on.
+  -->
+  <PropertyGroup>
+    <IonMetricsProfiling Condition="'$(IonMetricsProfiling)' == ''">true</IonMetricsProfiling>
+  </PropertyGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="Ion.Metrics.Profiling" Value="$(IonMetricsProfiling)" Trim="true" />
+    <CompilerVisibleProperty Include="IonMetricsProfiling" />
+  </ItemGroup>
+</Project>

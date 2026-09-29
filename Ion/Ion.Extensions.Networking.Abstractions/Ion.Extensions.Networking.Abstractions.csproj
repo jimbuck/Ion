@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The networking module's public surface without the runtime: [Replicated] and [NetworkMessage] attributes, NetworkId,
+    NetworkPeer, FixedString32/64/128, NetworkConfig, INetworkTransport, INetworkMessages and NetworkReader<T>,
+    INetworkWorld, INetworkSession, INetworkPrediction, IInterestPolicy, and the serialization primitives (NetWriter,
+    NetReader, NetSerializer<T>) and type registry the networking generator (Ion.Extensions.Networking.Generators) writes
+    into. A game library that declares replicated components or messages depends on this package only.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Ion.Extensions.Networking</RootNamespace>
+    <Description>Ion networking abstractions: [Replicated], [Predicted], [Interpolated] and [NetworkMessage] attributes, NetworkId, NetworkPeer, fixed-size strings, NetworkConfig, INetworkTransport, INetworkMessages/NetworkReader, INetworkWorld, INetworkSession, INetworkPrediction, IInterestPolicy and the generated-serializer primitives.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Networking" />
+    <InternalsVisibleTo Include="Ion.Extensions.Networking.Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Ecs.Abstractions\Ion.Extensions.Ecs.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

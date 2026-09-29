@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Keeps readable stack traces in NativeAOT builds (dotnet publish -c Release -r linux-x64 -p:PublishAot=true). -->
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(IonSource)' == ''">
+    <PackageReference Include="Ion" Version="$(IonVersion)" />
+    <PackageReference Include="Ion.Extensions.Ecs" Version="$(IonVersion)" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(IonSource)' != ''">
+    <ProjectReference Include="$(IonSource)/Ion/Ion/Ion.csproj" />
+    <ProjectReference Include="$(IonSource)/Ion/Ion.Extensions.Ecs/Ion.Extensions.Ecs.csproj" />
+    <ProjectReference Include="$(IonSource)/Ion/Ion.Generators/Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+  </ItemGroup>
+</Project>

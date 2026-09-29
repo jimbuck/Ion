@@ -3,7 +3,7 @@
 public static class BuilderExtensions
 {
 	/// <summary>
-	/// Adds the EventSystem to the application's middleware pipeline.
+	/// Adds the EventSystem to the application's schedule.
 	/// </summary>
 	/// <param name="app">The <see cref="IIonApplication"/> instance.</param>
 	/// <returns>The <see cref="IIonApplication"/> instance.</returns>

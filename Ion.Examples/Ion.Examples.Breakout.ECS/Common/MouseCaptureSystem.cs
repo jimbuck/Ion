@@ -7,16 +7,14 @@ namespace Ion.Examples.Breakout.ECS.Common;
 public class MouseCaptureSystem(IWindow window, IInputState input)
 {
 	[Init]
-	public void Init(GameTime dt, GameLoopDelegate next)
+	public void Init(GameTime dt)
 	{
 		window.Size = new Vector2((BreakoutConstants.COLS * BreakoutConstants.BLOCK_SIZE.X) + ((BreakoutConstants.COLS + 1) * BreakoutConstants.BLOCK_GAP), (BreakoutConstants.ROWS * BreakoutConstants.BLOCK_SIZE.Y) + ((BreakoutConstants.ROWS + 1) * BreakoutConstants.BLOCK_GAP) + BreakoutConstants.PLAYER_GAP + BreakoutConstants.PADDLE_SIZE.Y + BreakoutConstants.BOTTOM_GAP);
 		window.IsResizable = false;
-
-		next(dt);
 	}
 
 	[Last]
-	public void Update(GameTime dt, GameLoopDelegate next)
+	public void Update(GameTime dt)
 	{
 		var isMouseGrabbed = window.IsMouseGrabbed;
 
@@ -31,7 +29,5 @@ public class MouseCaptureSystem(IWindow window, IInputState input)
 			window.IsMouseGrabbed = true;
 			window.IsCursorVisible = false;
 		}
-
-		next(dt);
 	}
 }

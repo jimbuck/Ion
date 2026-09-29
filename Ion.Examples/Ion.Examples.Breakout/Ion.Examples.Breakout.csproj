@@ -1,11 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Configurations>Debug;Release;DebugGenerators</Configurations>
     <Platforms>AnyCPU</Platforms>
+    <!-- Keep the remote inspection protocol in Release builds too, so agents and the ion tool's end-to-end tests can
+         drive the sample with remote enabled. It still only runs when asked (Ion:Remote:Enabled). -->
+    <IonRemote>true</IonRemote>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="appsettings.json" />
@@ -28,7 +31,9 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-	  <ProjectReference Include="..\..\Ion\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+	  <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free) and summarizes its Use* helpers. -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" OutputItemType="Analyzer" />
     <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
   </ItemGroup>
   <ItemGroup>

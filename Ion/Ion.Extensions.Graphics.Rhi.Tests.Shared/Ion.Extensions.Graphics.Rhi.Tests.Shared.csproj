@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The RHI contract tests shared by the backend test projects (Ion.Extensions.Graphics.Vulkan.Tests and
+    Ion.Extensions.Graphics.GLES.Tests): abstract test classes written against the RHI only, the textured quad pixel
+    asserts and golden PNGs (one set of goldens for every backend), and the test support types. A backend's test project
+    derives one sealed class per contract and marks it with [RhiBackend(...)]; [RhiFact] skips a test when that backend
+    (or a display, for windowed tests) is missing.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+    <Platforms>AnyCPU</Platforms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IonAotLibrary>false</IonAotLibrary>
+    <IsAotCompatible>false</IsAotCompatible>
+    <RootNamespace>Ion.Extensions.Graphics.Rhi.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Ion.Core.Tests\TestConstants.cs" Link="TestConstants.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.9.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Testing\Ion.Testing.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Vulkan\Ion.Extensions.Graphics.Vulkan.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.GLES\Ion.Extensions.Graphics.GLES.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Headless\Ion.Extensions.Graphics.Headless.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Windowing.SilkNet\Ion.Extensions.Windowing.SilkNet.csproj" />
+    <!-- The textured quad and its build-time compiled shaders. -->
+    <ProjectReference Include="..\..\Ion.Examples\Ion.Examples.Quad\Ion.Examples.Quad.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Golden\*.png" CopyToOutputDirectory="PreserveNewest" LinkBase="Golden" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Contract test shaders (cube maps, depth sampling), compiled at build time like the engine's. -->
+    <IonShader Include="Shaders/*.vert;Shaders/*.frag" />
+  </ItemGroup>
+  <Import Project="..\Ion.Shaders\Ion.Shaders.targets" />
+</Project>

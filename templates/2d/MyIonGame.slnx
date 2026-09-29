@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MyIonGame/MyIonGame.csproj" />
+  <Project Path="MyIonGame.Tests/MyIonGame.Tests.csproj" />
+</Solution>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Ion game templates as a dotnet new template pack:
+      dotnet new install Ion.Templates
+      dotnet new ion-2d -n MyGame      (also ion-3d, ion-ecs; add the IonSource parameter to build against an Ion checkout)
+    The same templates are embedded in the ion tool (ion new 2d|3d|ecs).
+  -->
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageId>Ion.Templates</PackageId>
+    <Title>Ion game templates</Title>
+    <Description>Templates for Ion games: ion-2d (sprite batch, no ECS), ion-3d (immediate-mode 3D renderer) and ion-ecs (built-in ECS), each with a headless test, a snapshot test and a CLAUDE.md for coding agents.</Description>
+    <PackageTags>ion;game;templates;dotnet-new</PackageTags>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableConfigurationBindingGenerator>false</EnableConfigurationBindingGenerator>
+    <!-- A content-only package: no lib folder is intended. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="2d\**\*;3d\**\*;ecs\**\*" Exclude="**\bin\**;**\obj\**;**\.ion\**;**\*.actual.*;**\*.diff.png" />
+    <Compile Remove="**\*" />
+  </ItemGroup>
+</Project>

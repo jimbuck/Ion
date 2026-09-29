@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <!-- The remote module is compiled out of Release builds by default; the /rpc hosting tests need it. -->
+    <IonRemote>true</IonRemote>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Ion.Core.Tests\TestConstants.cs" Link="TestConstants.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The generator tests compile sources with the routing generator on this compiler. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Referenced for the generator tests (they run it in process) and built first for the Analyzer item below. -->
+    <ProjectReference Include="..\Ion.Extensions.Web.Generators\Ion.Extensions.Web.Generators.csproj" />
+    <ProjectReference Include="..\Ion.Testing\Ion.Testing.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Web\Ion.Extensions.Web.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Remote\Ion.Extensions.Remote.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The routing generator also runs on this project, so the end-to-end tests use a real generated route table. -->
+    <Analyzer Include="..\Ion.Extensions.Web.Generators\bin\$(Configuration)\netstandard2.0\Ion.Extensions.Web.Generators.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Golden\**\*.cs" />
+    <Compile Remove="Golden\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

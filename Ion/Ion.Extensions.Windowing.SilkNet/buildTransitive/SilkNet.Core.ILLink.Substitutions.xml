@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  NativeAOT substitution for Silk.NET.Core 2.23 (see Ion.Extensions.Windowing.SilkNet.targets and
+  docs/plans/spikes/2026-silknet-spike.md).
+
+  DefaultPathResolver.TryLocateNativeAssetFromDeps / TryLocateNativeAssetInRuntimesFolder (IL3000, IL3002 through
+  Microsoft.Extensions.DependencyModel): native library probing through deps.json and the NuGet runtimes/ folder, neither
+  of which exists in a NativeAOT publish. The publish copies the native libraries next to the executable, where the
+  base-directory resolver finds them first, so both return false without running.
+-->
+<linker>
+  <assembly fullname="Silk.NET.Core">
+    <type fullname="Silk.NET.Core.Loader.DefaultPathResolver">
+      <method signature="System.Boolean TryLocateNativeAssetFromDeps(System.String,System.String&amp;,System.String&amp;)" body="stub" value="false" />
+      <method signature="System.Boolean TryLocateNativeAssetInRuntimesFolder(System.String,System.String,System.String&amp;)" body="stub" value="false" />
+    </type>
+  </assembly>
+</linker>

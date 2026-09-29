@@ -1,0 +1,99 @@
+---
+title: Ion
+description: A performant, agent-friendly 2D/3D game engine for .NET, built on systems and ECS.
+template: splash
+hero:
+  title: Ion
+  tagline: A small, schedule-based game engine for .NET 10. Modules and systems set up like ASP.NET Core, an Arch-powered ECS, a compile-time generated game loop, and tooling that lets you and your coding agent run, inspect and test a live game.
+  image:
+    html: '<img src="/Ion/brand/ion-mark-animated.svg" alt="" width="272" height="272" />'
+  actions:
+    - text: Get started
+      link: /Ion/getting-started/introduction/
+      icon: right-arrow
+    - text: Your first game
+      link: /Ion/getting-started/first-game/
+      variant: secondary
+    - text: GitHub
+      link: https://github.com/jimbuck/Ion
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<div class="ion-section">
+<span class="ion-eyebrow">Quick start</span>
+## A whole game in one file
+
+<p class="lede">
+	`Program.cs` registers the modules and systems a game uses on the builder, adds them to the schedule on the
+	application, and runs it. Everything else is a plain class with stage attributes.
+</p>
+
+<div class="ion-quickstart">
+
+```csharp title="Program.cs"
+var builder = IonApplication.CreateBuilder(args);
+builder.AddEcsRendering3D().AddSystem<ModelSystem>();
+
+using var game = builder.Build();
+game.UseEcsRendering3D().UseSystem<ModelSystem>();
+game.Run();
+```
+
+<ol>
+	<li><strong>Add.</strong> `AddEcsRendering3D()` registers the 3D renderer, the ECS module and the engine core, and binds their options from `appsettings.json`. Modules pull in what they depend on.</li>
+	<li><strong>Use.</strong> `UseEcsRendering3D()` puts those modules' steps into the schedule; `UseSystem` adds your own.</li>
+	<li><strong>Run.</strong> The source generator compiles the schedule into direct calls, validates it, and the window opens. Pass `--headless` and the same file runs without a GPU, in CI or under test.</li>
+</ol>
+
+</div>
+</div>
+
+<div class="ion-section">
+<span class="ion-eyebrow">Why Ion</span>
+## Built for fast iteration and fast frames
+
+<CardGrid>
+	<Card title="Systems, not callbacks" icon="puzzle">
+		A system is a plain class. Each public method with a stage attribute (`[Init]`, `[FixedUpdate]`, `[Update]`, `[Render]`) is a step. Order is explicit, validated at startup, and the whole schedule can be printed.
+	</Card>
+	<Card title="Generated, not reflected" icon="rocket">
+		Roslyn generators compile the schedule, event bus, ECS queries, network serializers and web routes into direct calls, so games trim and publish with Native AOT.
+	</Card>
+	<Card title="2D and 3D rendering" icon="star">
+		A WebGPU-shaped RHI over Vulkan and OpenGL ES, a batched sprite renderer with text and cameras, and a PBR 3D renderer with glTF models, shadows and instancing.
+	</Card>
+	<Card title="Batteries included" icon="setting">
+		Audio, keyboard, mouse, gamepad and touch input, immediate-mode UI, Box2D and Bepu physics, scenes, coroutines, hot-reloading assets, metrics and Tracy tracing.
+	</Card>
+	<Card title="Agent-friendly" icon="laptop">
+		A JSON-RPC remote protocol, the `ion` CLI and an MCP server let a coding agent run, step, inspect, screenshot and test the game it is writing.
+	</Card>
+	<Card title="Testable by design" icon="approve-check">
+		`IonTestHost` runs your real `Program.cs` headless, frame by frame, with deterministic time, scripted input, state snapshots and golden files.
+	</Card>
+</CardGrid>
+
+<div class="ion-stats">
+	<div class="ion-stat"><b>7</b><span>stages in the game loop, from Init to Destroy</span></div>
+	<div class="ion-stat"><b>Native AOT</b><span>one-line publish presets for Windows, macOS, Linux and the R36S</span></div>
+	<div class="ion-stat"><b>10</b><span>samples in the repository, nine with a headless test project</span></div>
+	<div class="ion-stat"><b>0</b><span>reflection in the hot path: schedules, events and queries are generated</span></div>
+</div>
+</div>
+
+<div class="ion-section">
+<span class="ion-eyebrow">Learn</span>
+## Where to next
+
+<CardGrid>
+	<LinkCard title="Installation" href="/Ion/getting-started/installation/" description="The .NET 10 SDK, the ion tool and the project templates." />
+	<LinkCard title="Your first game" href="/Ion/getting-started/first-game/" description="A ship, a sprite, input and an event, then the same game headless and under test." />
+	<LinkCard title="Core concepts" href="/Ion/concepts/application/" description="The builder, stages, systems, events, services and the generated schedule." />
+	<LinkCard title="ECS and scenes" href="/Ion/ecs/overview/" description="Entities, generated queries, commands, transforms, scenes and coroutines." />
+	<LinkCard title="Examples" href="/Ion/examples/" description="A walkthrough of every sample in the repository." />
+	<LinkCard title="Reference" href="/Ion/reference/" description="Stage orders, diagnostics, configuration keys and the module map." />
+</CardGrid>
+</div>

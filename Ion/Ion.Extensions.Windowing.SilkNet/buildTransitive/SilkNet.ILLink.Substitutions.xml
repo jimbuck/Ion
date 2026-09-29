@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  NativeAOT substitution for Silk.NET.Windowing and Silk.NET.Input 2.23 (see Ion.Extensions.Windowing.SilkNet.targets and
+  docs/plans/spikes/2026-silknet-spike.md).
+
+  Window.TryAdd / InputWindowExtensions.TryAdd (IL2072, Activator.CreateInstance on an attribute's Type): the
+  reflection-based discovery of first-party platforms. Ion turns it off (ShouldLoadFirstPartyPlatforms(false)) and
+  registers GLFW or SDL explicitly, so both return false without running.
+-->
+<linker>
+  <assembly fullname="Silk.NET.Windowing.Common">
+    <type fullname="Silk.NET.Windowing.Window">
+      <method signature="System.Boolean TryAdd(System.String)" body="stub" value="false" />
+    </type>
+  </assembly>
+  <assembly fullname="Silk.NET.Input.Common">
+    <type fullname="Silk.NET.Input.InputWindowExtensions">
+      <method signature="System.Boolean TryAdd(System.String)" body="stub" value="false" />
+    </type>
+  </assembly>
+</linker>

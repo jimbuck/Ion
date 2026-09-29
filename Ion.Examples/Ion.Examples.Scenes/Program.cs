@@ -1,152 +1,141 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Diagnostics;
 
 using Microsoft.Extensions.DependencyInjection;
 
 using Ion;
-using Ion.Extensions.Debug;
+using Ion.Extensions.Metrics;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Scenes;
 using Ion.Extensions.Coroutines;
 
 using Ion.Examples.Scenes;
 
+// Run with --Ion:Headless=true to use the headless graphics backend (no GPU or window), --Ion:Headless:Render=true on top
+// to render offscreen, and --Ion:PrintSchedule=true to print every stage's steps (including each scene's) at startup.
+// Unlike the other samples, this one composes the engine from its parts (metrics, graphics, scenes, coroutines) instead of
+// AddIon/UseIon, with the IServiceCollection registrations.
 var builder = IonApplication.CreateBuilder(args);
+var headless = builder.Configuration.IsHeadless();
 
-builder.Services.AddDebugUtils(builder.Configuration);
-builder.Services.AddVeldridGraphics(builder.Configuration, graphics =>
+builder.Services.AddMetrics(builder.Configuration);
+if (headless)
 {
-	graphics.Output = GraphicsOutput.Window;
-	graphics.ClearColor = Color.CornflowerBlue;
-	graphics.PreferredBackend = GraphicsBackend.Vulkan;
-});
+	builder.Services.AddNullGraphics(builder.Configuration, graphics => graphics.ClearColor = Color.CornflowerBlue);
+	if (builder.Configuration.IsHeadlessRender()) builder.Services.AddHeadlessRendering(builder.Configuration);
+}
+else
+{
+	builder.Services.AddGraphics(builder.Configuration, graphics => graphics.ClearColor = Color.CornflowerBlue);
+}
+
 builder.Services.AddScenes();
+builder.Services.AddSceneFade();
 builder.Services.AddCoroutines();
+// A singleton used by a scene: the scene still creates its own instance from its scope, once per load.
+builder.AddSystem<SceneTimings>();
 
-builder.Services.AddSingleton<TestMiddleware>();
+using var game = builder.Build();
 
-var game = builder.Build();
-game.UseDebugUtils();
-game.UseEvents();
-game.UseVeldridGraphics();
-
-game.UseFirst((GameLoopDelegate next, IInputState input, ICoroutineRunner coroutine) =>
+// Function steps: services in the parameter list are resolved once when the schedule is built. They run at the default
+// order (0), after the engine's setup steps and the active scene, whatever the registration order.
+game.Init((GameTime dt, IEvents events, IWindow window) =>
 {
-	IEnumerator CountDown(int from)
-	{
-		while (from > 0)
-		{
-			Console.WriteLine("Countdown: " + from--);
-			yield return Wait.For(TimeSpan.FromSeconds(1));
-		}
+	window.IsResizable = true;
+	events.Emit(42);
+});
 
-		Console.WriteLine("Countdown done!");
+game.First((GameTime dt, IInputState input, ICoroutineRunner coroutine) =>
+{
+	if (input.Pressed(Key.Enter)) coroutine.Start(CountDown(5));
+});
+
+var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
+{
+	//Console.WriteLine($"Frame: {dt.Frame}!");
+});
+
+// F5 starts profiling, F6 stops it and writes the kept frames (Ion:Metrics:TraceOutput). F9 captures the next 120 frames.
+game.First((GameTime dt, IInputState input, IMetrics metrics) =>
+{
+	if (input.Pressed(Key.F5)) metrics.IsProfiling = true;
+	if (input.Pressed(Key.F6))
+	{
+		metrics.IsProfiling = false;
+		metrics.WriteTrace();
 	}
 
-	return dt =>
-	{
-		if (input.Pressed(Key.Enter))
-		{
-			coroutine.Start(CountDown(5));
-		}
-
-		coroutine.Update(dt);
-		
-		next(dt);
-	};
+	logFrameNumber(dt);
 });
 
-game.UseInit((GameLoopDelegate next, IEventEmitter eventEmitter, IWindow window) =>
-{
-	return dt => {
-		window.IsResizable = true;
+var gameplay = false;
+// A reader is created once, outside the step, so it remembers what it has read (ION103).
+var intEvents = game.Services.GetRequiredService<IEvents>().Reader<int>();
 
-		eventEmitter.Emit<int>(42);
-		next(dt);
-	};
+game.Update((GameTime dt, IEvents events, IInputState input) =>
+{
+	while (intEvents.TryRead(out var e)) Console.WriteLine($"Int event! {e}");
+
+	// Tab switches between the two scenes with a fade to black: the current scene keeps running while the screen darkens
+	// (0.2 s), the next one loads under the black frame and fades in (0.2 s). Pressing Tab again mid-fade turns it around.
+	if (input.Pressed(Key.Tab))
+	{
+		gameplay = !gameplay;
+		events.EmitChangeScene(gameplay ? Scene.Gameplay : Scene.MainMenu, SceneTransition.Fade(0.4f));
+	}
 });
 
-game.UseFirst((GameLoopDelegate next, IInputState input, ITraceManager traceManager) =>
+game.Render((GameTime dt, IEvents events, IInputState input) =>
 {
-	var logFrameNumber = Throttler.Wrap(TimeSpan.FromSeconds(0.5), (dt) =>
+	if (input.Down(Key.Escape))
 	{
-		//Console.WriteLine($"Frame: {dt.Frame}!");
-	});
-
-	return dt =>
-	{
-		if (input.Pressed(Key.F5)) traceManager.Start();
-		if (input.Pressed(Key.F6))
-		{
-			traceManager.Stop();
-			traceManager.OutputTrace();
-		}
-
-		logFrameNumber(dt);
-		next(dt);
-	};
-});
-
-game.UseUpdate((GameLoopDelegate next, IEventEmitter eventEmitter, IEventListener events) =>
-{
-	var flip = false;
-	var switchScene = Throttler.Wrap(TimeSpan.FromSeconds(3), (dt) => {
-		eventEmitter.EmitChangeScene(flip ? Scene.MainMenu : Scene.Gameplay);
-		flip = !flip;
-	});
-
-	return dt =>
-	{
-		if (events.On<int>(out var e)) Console.WriteLine($"Int event! {e.Data}");
-		next(dt);
-		//switchScene(dt);
-	};
-});
-
-game.UseRender((GameLoopDelegate next, IEventEmitter eventEmitter, IInputState input) =>
-{
-	return dt =>
-	{
-		//Console.WriteLine("Game Render");
-		next(dt);
-
-		if (input.Down(Key.Escape))
-		{
-			Console.WriteLine("Escape Pressed!");
-			eventEmitter.Emit<ExitGameEvent>();
-		}
-	};
+		Console.WriteLine("Escape Pressed!");
+		events.Emit<ExitGameEvent>();
+	}
 });
 
 game.UseScene(Scene.MainMenu, scene =>
 {
-	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	{
-		return dt =>
-		{
-			spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90));
-			next(dt);
-		};
-	});
-
-	scene.UseSystem<TestMiddleware>();
+	scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.ForestGreen, new RectangleF(10, 10, 90, 90)));
+	scene.UseSystem<SceneTimings>();
 });
 
 game.UseScene(Scene.Gameplay, scene =>
 {
-	scene.UseRender((GameLoopDelegate next, ISpriteBatch spriteBatch) =>
-	{
-		return dt =>
-		{
-			spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90));
-			next(dt);
-		};
-	});
+	scene.Render((GameTime dt, ISpriteBatch spriteBatch) => spriteBatch.DrawRect(Color.DarkRed, new RectangleF(10, 10, 90, 90)));
 });
 
-game.UseRender(next => dt => Console.WriteLine("NEVER GETTING CALLED!"));
+// The engine systems can be added after the game's own steps: engine steps use the reserved order bands.
+game.UseMetrics();
+game.UseEvents();
+if (headless)
+{
+	game.UseNullGraphics();
+	if (game.Configuration.IsHeadlessRender()) game.UseHeadlessRendering();
+}
+else
+{
+	game.UseGraphics();
+}
+
+// Steps the shared coroutine runner once per frame in the Update stage.
+game.UseCoroutines();
+
+// Draws the fade transitions (UseIon adds it for games that use the whole engine).
+game.UseSceneFade();
 
 game.Run();
+
+static IEnumerator CountDown(int from)
+{
+	while (from > 0)
+	{
+		Console.WriteLine("Countdown: " + from--);
+		yield return Wait.For(TimeSpan.FromSeconds(1));
+	}
+
+	Console.WriteLine("Countdown done!");
+}
 
 namespace Ion.Examples.Scenes
 {
@@ -157,48 +146,37 @@ namespace Ion.Examples.Scenes
 		Test,
 	}
 
-	public partial class TestMiddleware
+	public partial class SceneTimings
 	{
 		private readonly Queue<float> _frameTimes = new();
+		private readonly Stopwatch _stopwatch = new();
+		private uint _fixedUpdates;
 
-		public TestMiddleware()
+		public SceneTimings()
 		{
-			Console.WriteLine("TestMiddleware Constructor");
+			Console.WriteLine("SceneTimings Constructor");
 		}
 
 		[First]
-		public void CoolFirstMiddleware(GameTime dt, GameLoopDelegate next)
+		public void CoolFirst(GameTime dt)
 		{
 			//Console.WriteLine($"Class First {dt.Frame}");
-			next(dt);
 		}
 
 		[FixedUpdate]
-		public GameLoopDelegate FancyFixedUpdate(GameLoopDelegate next)
-		{
-			Console.WriteLine("Class Fixed Update SETUP");
-			uint count = 0;
-			return dt =>
-			{
-				count++;
-				//Console.WriteLine($"Class Fixed Update inside {count++}");
-				next(dt);
-			};
-		}
+		public void CountFixedUpdates(GameTime dt) => _fixedUpdates++;
 
-		[Render]
-		public GameLoopDelegate Render(GameLoopDelegate next)
-		{
-			var stopwatch = new Stopwatch();
+		// A scope around the rest of the scene's Render stage: EndRenderTimer runs after every scene render step, even if
+		// one throws.
+		[Begin(Stage.Render, Order = -100)]
+		public void StartRenderTimer(GameTime dt) => _stopwatch.Restart();
 
-			return dt =>
-			{
-				stopwatch.Restart();
-				next(dt);
-				stopwatch.Stop();
-				_frameTimes.Enqueue((float)stopwatch.Elapsed.TotalSeconds);
-				while (_frameTimes.Count > 60) _frameTimes.Dequeue();
-			};
+		[End(Stage.Render, Order = -100)]
+		public void EndRenderTimer(GameTime dt)
+		{
+			_stopwatch.Stop();
+			_frameTimes.Enqueue((float)_stopwatch.Elapsed.TotalSeconds);
+			while (_frameTimes.Count > 60) _frameTimes.Dequeue();
 		}
 	}
 

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#10141c">
+<title>Ion Companion Controller</title>
+<link rel="stylesheet" href="controller.css">
+</head>
+<body>
+<header>
+	<h1>Ion Companion</h1>
+	<p id="status" class="status">Connecting...</p>
+</header>
+<main>
+	<section class="score" aria-live="polite">
+		<div><span id="score">0</span><small>score</small></div>
+		<div><span id="misses">0</span><small>misses</small></div>
+	</section>
+	<section id="pad" class="pad" aria-label="Paddle control: touch and slide left or right">
+		<div id="knob" class="knob"></div>
+		<p>Touch and slide to move the paddle<br>(or use the arrow keys)</p>
+	</section>
+</main>
+<script src="controller.js"></script>
+</body>
+</html>

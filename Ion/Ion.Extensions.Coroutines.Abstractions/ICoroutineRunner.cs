@@ -12,7 +12,11 @@ namespace Ion
 		/// <summary>
 		/// Run a coroutine.
 		/// </summary>
-		/// <param name="routine">The routine to run.</param>
+		/// <param name="routine">
+		/// The routine to run. It may yield <c>null</c>, a <see cref="float"/> number of seconds, a <see cref="Wait"/>, an
+		/// <see cref="IWait"/> or a nested <see cref="IEnumerator"/>. An <see cref="IEnumerator{T}"/> of <see cref="Wait"/> is
+		/// read without boxing, so it allocates nothing per yield.
+		/// </param>
 		void Start(IEnumerator routine);
 
 		/// <summary>

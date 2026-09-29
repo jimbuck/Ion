@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Platforms>AnyCPU</Platforms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Ion.Core.Tests\TestConstants.cs" Link="TestConstants.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Testing\Ion.Testing.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Rendering2D\Ion.Extensions.Rendering2D.csproj" />
+    <!-- [RhiBackend]/[RhiFact]: the contract runs on every RHI backend. -->
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Rhi.Tests.Shared\Ion.Extensions.Graphics.Rhi.Tests.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Golden\*.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\Ion.Examples\Ion.Examples.Breakout.ECS\Assets\Bungee-Regular.ttf" Link="Assets\Bungee-Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

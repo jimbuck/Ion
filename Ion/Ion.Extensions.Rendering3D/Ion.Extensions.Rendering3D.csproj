@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The 3D renderer on Ion's RHI: immediate-mode submission (IRenderer3D / IMeshBatch), an engine-owned pipeline in the
+    Render stage (extract, prepare, queue and sort, render graph), unlit and metallic-roughness PBR materials, directional
+    shadows with PCF, a skybox, instancing by mesh and material, glTF 2.0 models, primitive meshes and cube maps. Written
+    against Ion.Extensions.Graphics.Abstractions only; any RHI backend (Vulkan, GLES, headless) runs it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Rendering3D</RootNamespace>
+    <Description>Ion's 3D renderer on the RHI: immediate-mode mesh submission, frustum culling, sorting and instanced batching, a render graph (shadow, depth prepass, opaque, skybox, transparent, 2D overlay), unlit and PBR materials, directional shadows, glTF 2.0 models, primitive meshes and cube maps.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleToSuffix Include=".Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <IonShader Include="Shaders/*.vert;Shaders/*.frag" />
+    <IonShaderInclude Include="Shaders/*.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Assets.Abstractions\Ion.Extensions.Assets.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Rendering2D\Ion.Extensions.Rendering2D.csproj" />
+  </ItemGroup>
+  <Import Project="..\Ion.Shaders\Ion.Shaders.targets" />
+</Project>

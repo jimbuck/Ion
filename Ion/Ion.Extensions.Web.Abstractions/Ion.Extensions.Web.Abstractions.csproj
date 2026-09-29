@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    What a game writes and what the routing generator emits against: [Http], [WebSocket], [FromBody] and [WebJson], the
+    request and response structs handlers receive, WebSocket messages, clients and push channels, IWebServer, and the
+    route table types (WebRoute, WebRouteTable, WebRoutes) with the binding helpers the generated code calls. No server.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Web</RootNamespace>
+    <Description>Ion web module abstractions: the [Http] and [WebSocket] endpoint attributes, WebRequest/WebResponse, WebSocket messages, clients and channels, IWebServer, and the generated route table types.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Web" />
+    <InternalsVisibleTo Include="Ion.Extensions.Web.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Http\Ion.Extensions.Http.csproj" />
+  </ItemGroup>
+</Project>

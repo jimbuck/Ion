@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><title>Ion</title><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5eead4"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs><style>
+.l{animation:ion-step 4.5s cubic-bezier(.4,0,.2,1) infinite}
+.l2{animation-delay:-1.5s}.l3{animation-delay:-3s}
+@keyframes ion-step{
+0%,26%{transform:translateX(-7px);stroke-opacity:.3;stroke-width:2.5px}
+33%,59%{transform:translateX(0);stroke-opacity:.6;stroke-width:3px}
+66%,90%{transform:translateX(7px);stroke-opacity:1;stroke-width:4px}
+96%{transform:translateX(11px);stroke-opacity:0;stroke-width:4px}
+97%{transform:translateX(-9px);stroke-opacity:0;stroke-width:2.5px}
+100%{transform:translateX(-7px);stroke-opacity:.3;stroke-width:2.5px}}
+@media (prefers-reduced-motion:reduce){.l{animation:none}}
+</style><path class="l l3" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.3" style="transform:translateX(-7px)"/><path class="l l2" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-width="3" stroke-linejoin="round" stroke-opacity="0.6" style="transform:translateX(0px)"/><path class="l l1" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-width="4" stroke-linejoin="round" stroke-opacity="1" style="transform:translateX(7px)"/></svg>

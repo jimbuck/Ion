@@ -1,0 +1,119 @@
+<Project>
+  <!--
+    Ion publishing presets, second half (the first is Ion.Publish.props): checks, the handheld default configuration and
+    the ArkOS SD card layout of the r36s preset. Imported by the repository's Directory.Build.targets.
+
+    r36s output, next to the publish folder (override the location with IonArkOSDir and the game's folder and script
+    name with IonArkOSName, the title in the README and script with IonArkOSTitle):
+
+      <publish dir>-arkos/
+        README.md                     what to copy where on the SD card
+        ports/<name>.sh               the launcher shown in the Ports menu
+        ports/<name>/<executable>     the NativeAOT binary, its native libraries, appsettings*.json and Assets/
+
+    Debug symbols (.dbg) and the unused GLFW library stay out of the layout.
+  -->
+
+  <PropertyGroup>
+    <_IonPublishIsExe Condition="'$(OutputType)' == 'Exe' or '$(OutputType)' == 'WinExe'">true</_IonPublishIsExe>
+  </PropertyGroup>
+
+  <Target Name="_IonValidatePublishTarget"
+          BeforeTargets="Restore;_CheckForInvalidConfigurationAndPlatform"
+          Condition="'$(IonTarget)' != '' and '$(IonPublishable)' == 'true'">
+    <Error Code="IONPUB001" Condition="'$(IonTargetRid)' == ''"
+           Text="Unknown IonTarget '$(IonTarget)'. The presets are win-x64, win-arm64, osx-arm64, osx-x64, linux-x64, linux-arm64 and r36s (docs/platforms/publishing.md)." />
+    <Error Code="IONPUB002" Condition="'$(_IonPublishIsExe)' != 'true'"
+           Text="IonTarget applies to executable projects; $(MSBuildProjectName) has OutputType '$(OutputType)'. Publish the game project, not a library or a solution." />
+  </Target>
+
+  <!-- A cross-compiled handheld build without a sysroot links against the build machine's glibc (too new for ArkOS). -->
+  <Target Name="_IonCheckArm64SysRoot" BeforeTargets="PrepareForPublish"
+          Condition="'$(IonArkOSLayout)' == 'true' and '$(IonCrossArm64)' == 'true' and '$(SysRoot)' == ''">
+    <Warning Code="IONPUB003"
+             Text="Cross-compiling for $(IonTarget) without IonArm64SysRoot: the executable needs this machine's glibc and may not start on ArkOS (glibc 2.30). See docs/platforms/r36s.md for the glibc 2.27 sysroot." />
+  </Target>
+
+  <!-- Writes a template with @TOKEN@ placeholders replaced: the ArkOS launcher, README and default configuration. -->
+  <UsingTask TaskName="IonWriteTemplate" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Template ParameterType="System.String" Required="true" />
+      <Destination ParameterType="System.String" Required="true" />
+      <Tokens ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var text = System.IO.File.ReadAllText(Template).Replace("\r\n", "\n");
+        foreach (var token in Tokens) text = text.Replace("@" + token.ItemSpec + "@", token.GetMetadata("Value"));
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Destination)));
+        System.IO.File.WriteAllText(Destination, text, new System.Text.UTF8Encoding(false));
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <!-- Box2D linked statically into the NativeAOT executable (Box2DStaticLink): its shared library is not needed next to it. -->
+  <Target Name="_IonDropStaticBox2D" AfterTargets="ComputeResolvedFilesToPublishList"
+          Condition="'$(IonTargetRid)' != '' and '$(PublishAot)' == 'true' and '$(Box2DStaticLink)' == 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)' == 'libbox2d' or '%(Filename)' == 'box2d'" />
+    </ItemGroup>
+  </Target>
+
+  <!-- The handheld's default configuration (appsettings.r36s.json), unless the game ships its own. -->
+  <Target Name="_IonAddHandheldConfig" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(IonArkOSLayout)' == 'true'">
+    <ItemGroup>
+      <_IonOwnHandheldConfig Include="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.RelativePath)' == 'appsettings.r36s.json'" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_IonHandheldConfig>$(IntermediateOutputPath)appsettings.r36s.json</_IonHandheldConfig>
+    </PropertyGroup>
+    <ItemGroup Condition="'@(_IonOwnHandheldConfig)' == ''">
+      <_IonConfigToken Include="PLATFORM" Value="$(IonDefaultWindowPlatform)" />
+      <_IonConfigToken Include="FULLSCREEN" Value="$(IonDefaultFullscreen)" />
+      <_IonConfigToken Include="WIDTH" Value="$(IonDefaultWidth)" />
+      <_IonConfigToken Include="HEIGHT" Value="$(IonDefaultHeight)" />
+      <_IonConfigToken Include="BACKEND" Value="$(IonDefaultGraphicsBackend)" />
+    </ItemGroup>
+    <IonWriteTemplate Condition="'@(_IonOwnHandheldConfig)' == ''" Template="$(MSBuildThisFileDirectory)arkos/appsettings.r36s.json" Destination="$(_IonHandheldConfig)" Tokens="@(_IonConfigToken)" />
+    <ItemGroup Condition="'@(_IonOwnHandheldConfig)' == ''">
+      <ResolvedFileToPublish Include="$(_IonHandheldConfig)" RelativePath="appsettings.r36s.json" CopyToPublishDirectory="PreserveNewest" />
+      <FileWrites Include="$(_IonHandheldConfig)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    The ArkOS SD card layout, built from the publish folder after Publish. It depends only on PublishDir, so it can also
+    be run on its own: dotnet msbuild <game> -t:IonArkOSLayout -p:IonTarget=r36s -p:PublishDir=<a publish folder>/
+  -->
+  <Target Name="IonArkOSLayout" AfterTargets="Publish" Condition="'$(IonArkOSLayout)' == 'true'">
+    <PropertyGroup>
+      <_IonPublishDirFull>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(PublishDir)'))))</_IonPublishDirFull>
+      <_IonPublishDirFull>$([MSBuild]::EnsureTrailingSlash('$(_IonPublishDirFull)'))</_IonPublishDirFull>
+      <IonArkOSDir Condition="'$(IonArkOSDir)' == ''">$(_IonPublishDirFull.TrimEnd('/').TrimEnd('\'))-arkos</IonArkOSDir>
+      <IonArkOSDir>$([MSBuild]::EnsureTrailingSlash('$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IonArkOSDir)'))))'))</IonArkOSDir>
+      <IonArkOSName Condition="'$(IonArkOSName)' == ''">$(AssemblyName)</IonArkOSName>
+      <IonArkOSTitle Condition="'$(IonArkOSTitle)' == ''">$(IonArkOSName)</IonArkOSTitle>
+      <_IonArkOSGameDir>$(IonArkOSDir)ports/$(IonArkOSName)/</_IonArkOSGameDir>
+      <_IonArkOSScript>$(IonArkOSDir)ports/$(IonArkOSName).sh</_IonArkOSScript>
+    </PropertyGroup>
+
+    <Error Code="IONPUB004" Condition="!Exists('$(_IonPublishDirFull)$(AssemblyName)')"
+           Text="The ArkOS layout needs the published executable '$(_IonPublishDirFull)$(AssemblyName)'. Publish with -p:IonTarget=r36s first." />
+
+    <ItemGroup>
+      <_IonArkOSFile Include="$(_IonPublishDirFull)**/*"
+                     Exclude="$(_IonPublishDirFull)**/*.dbg;$(_IonPublishDirFull)**/*.pdb;$(_IonPublishDirFull)libglfw.so.3" />
+      <_IonArkOSToken Include="NAME" Value="$(IonArkOSName)" />
+      <_IonArkOSToken Include="EXE" Value="$(AssemblyName)" />
+      <_IonArkOSToken Include="TITLE" Value="$(IonArkOSTitle)" />
+    </ItemGroup>
+
+    <RemoveDir Directories="$(_IonArkOSGameDir)" />
+    <Copy SourceFiles="@(_IonArkOSFile)" DestinationFiles="@(_IonArkOSFile->'$(_IonArkOSGameDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    <IonWriteTemplate Template="$(MSBuildThisFileDirectory)arkos/launcher.sh" Destination="$(_IonArkOSScript)" Tokens="@(_IonArkOSToken)" />
+    <IonWriteTemplate Template="$(MSBuildThisFileDirectory)arkos/README.md" Destination="$(IonArkOSDir)README.md" Tokens="@(_IonArkOSToken)" />
+    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="chmod +x &quot;$(_IonArkOSScript)&quot; &quot;$(_IonArkOSGameDir)$(AssemblyName)&quot;" />
+
+    <Message Importance="high" Text="$(MSBuildProjectName) -> $(IonArkOSDir) (ArkOS layout: copy ports/ to the SD card's ports folder)" />
+  </Target>
+</Project>

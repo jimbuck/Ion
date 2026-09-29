@@ -1,0 +1,23 @@
+<Project>
+  <!--
+    The Ion schedule generator (shipped in this package as an analyzer) emits C# interceptors in the Ion.Generated
+    namespace; the compiler only accepts interceptors in namespaces listed here.
+  -->
+  <PropertyGroup>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Ion.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+
+  <!--
+    Metrics v2: span recording is a feature switch. Set <IonMetricsProfiling>false</IonMetricsProfiling> in a game's project
+    to compile it out: the schedule generator emits no profiler brackets, and a trimmed or NativeAOT publish substitutes
+    FrameProfiler.IsProfilingEnabled with false and removes every other recording site. The default keeps profiling
+    available in every build (Release included), off until Ion:Metrics:Profiling or a capture turns it on.
+  -->
+  <PropertyGroup>
+    <IonMetricsProfiling Condition="'$(IonMetricsProfiling)' == ''">true</IonMetricsProfiling>
+  </PropertyGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="Ion.Metrics.Profiling" Value="$(IonMetricsProfiling)" Trim="true" />
+    <CompilerVisibleProperty Include="IonMetricsProfiling" />
+  </ItemGroup>
+</Project>

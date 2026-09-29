@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Windowing</RootNamespace>
+    <Description>Silk.NET windowing and input for Ion: a GLFW or SDL window created and pumped by Ion's game loop (never IWindow.Run), with keyboard, mouse, text and gamepad input fed into the shared InputTracker.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleToSuffix Include=".Tests" />
+    <InternalsVisibleTo Include="Ion.Extensions.Graphics.Vulkan.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      Silk.NET 2.23. The platforms are registered explicitly (GlfwWindowing/SdlWindowing.RegisterPlatform) with the
+      first-party reflection discovery turned off, so the IL2072 warnings of Window.TryAdd and InputWindowExtensions.TryAdd
+      are never reached (see docs/plans/spikes/2026-silknet-spike.md).
+    -->
+    <PackageReference Include="Silk.NET.Windowing.Common" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Windowing.Glfw" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Windowing.Sdl" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Input.Common" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Input.Glfw" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Input.Sdl" Version="2.23.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- NativeAOT substitutions for Silk.NET code Ion never runs; auto-imported by package consumers. -->
+    <None Include="buildTransitive\*" Pack="true" PackagePath="buildTransitive\" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

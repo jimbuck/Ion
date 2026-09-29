@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The 2D renderer on Ion's RHI: sprite batch v2 (ISpriteBatch), texture and font loaders, glyph atlas. Written against
+    Ion.Extensions.Graphics.Abstractions only; any RHI backend (Vulkan, GLES, headless) that registers IGraphicsFrame runs it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Rendering2D</RootNamespace>
+    <Description>Ion's 2D renderer on the RHI: an instanced sprite batch with a per-frame instance ring, sort modes, blend and sampler presets, cameras, scissor and render targets; ImageSharp texture loading with mips and hot reload; FontStashSharp text with cached layouts and a glyph atlas owned by the renderer.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleToSuffix Include=".Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <IonShader Include="Shaders/sprite.vert;Shaders/sprite.frag" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FontStashSharp" Version="1.3.9" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Assets.Abstractions\Ion.Extensions.Assets.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
+  </ItemGroup>
+  <Import Project="..\Ion.Shaders\Ion.Shaders.targets" />
+</Project>
