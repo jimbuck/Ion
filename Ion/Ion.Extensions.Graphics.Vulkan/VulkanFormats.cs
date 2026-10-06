@@ -66,6 +66,7 @@ internal static class VulkanFormats
 		if ((usage & BufferUsage.Vertex) != 0) flags |= BufferUsageFlags.VertexBufferBit;
 		if ((usage & BufferUsage.Uniform) != 0) flags |= BufferUsageFlags.UniformBufferBit;
 		if ((usage & BufferUsage.Storage) != 0) flags |= BufferUsageFlags.StorageBufferBit;
+		if ((usage & BufferUsage.Indirect) != 0) flags |= BufferUsageFlags.IndirectBufferBit;
 		return flags;
 	}
 
@@ -75,6 +76,7 @@ internal static class VulkanFormats
 		if ((usage & TextureUsage.CopySrc) != 0) flags |= ImageUsageFlags.TransferSrcBit;
 		if ((usage & TextureUsage.CopyDst) != 0) flags |= ImageUsageFlags.TransferDstBit;
 		if ((usage & TextureUsage.TextureBinding) != 0) flags |= ImageUsageFlags.SampledBit;
+		if ((usage & TextureUsage.StorageBinding) != 0) flags |= ImageUsageFlags.StorageBit;
 		if ((usage & TextureUsage.RenderAttachment) != 0)
 			flags |= format.IsDepth() ? ImageUsageFlags.DepthStencilAttachmentBit : ImageUsageFlags.ColorAttachmentBit;
 		return flags;
@@ -83,7 +85,8 @@ internal static class VulkanFormats
 	public static DescriptorType ToVk(this BindingType type) => type switch
 	{
 		BindingType.UniformBuffer => DescriptorType.UniformBuffer,
-		BindingType.StorageBuffer => DescriptorType.StorageBuffer,
+		BindingType.StorageBuffer or BindingType.ReadWriteStorageBuffer => DescriptorType.StorageBuffer,
+		BindingType.StorageTexture => DescriptorType.StorageImage,
 		BindingType.Sampler => DescriptorType.Sampler,
 		BindingType.Texture => DescriptorType.SampledImage,
 		_ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
@@ -94,6 +97,7 @@ internal static class VulkanFormats
 		ShaderStageFlags flags = 0;
 		if ((stage & ShaderStage.Vertex) != 0) flags |= ShaderStageFlags.VertexBit;
 		if ((stage & ShaderStage.Fragment) != 0) flags |= ShaderStageFlags.FragmentBit;
+		if ((stage & ShaderStage.Compute) != 0) flags |= ShaderStageFlags.ComputeBit;
 		return flags;
 	}
 

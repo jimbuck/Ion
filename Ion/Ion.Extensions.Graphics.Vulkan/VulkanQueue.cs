@@ -72,7 +72,7 @@ internal sealed unsafe class VulkanQueue(VulkanDevice device) : IQueue
 		if (region.ArrayLayer >= target.ArrayLayerCount) throw new ArgumentOutOfRangeException(nameof(region), region.ArrayLayer, $"The texture has {target.ArrayLayerCount} array layer(s).");
 		var cmd = _ensureUpload();
 		var range = new ImageSubresourceRange(target.Format.Aspect(), region.MipLevel, 1, region.ArrayLayer, 1);
-		var final = (target.Usage & TextureUsage.TextureBinding) != 0 ? ImageLayout.ShaderReadOnlyOptimal : ImageLayout.TransferDstOptimal;
+		var final = (target.Usage & (TextureUsage.TextureBinding | TextureUsage.StorageBinding)) != 0 ? target.ShaderLayout : ImageLayout.TransferDstOptimal;
 
 		// Layouts are tracked per image: before the first write to a mipmapped or layered image (a cube map), bring every
 		// level and layer to the final layout, so a write to one leaves the others in the tracked layout too.

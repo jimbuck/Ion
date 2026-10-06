@@ -20,6 +20,7 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 	private readonly Dictionary<(uint Handle, int Level), uint> _readFramebuffers = [];
 	private GlesPass? _pass;
 	private GlesRenderPipeline? _pipeline;
+	private GlesComputePipeline? _computePipeline;
 	private GlesBuffer? _indexBuffer;
 	private IndexFormat _indexFormat;
 	private ulong _indexOffset;
@@ -84,6 +85,15 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 				case GlesOp.CopyTextureToBuffer:
 					_copyTextureToBuffer((GlesTexture)command.A!, new TextureRegion(command.U0, command.U1, command.U2, command.U3, (uint)command.I0), (GlesBuffer)command.B!, command.X, (uint)command.Y);
 					break;
+				case GlesOp.BeginComputePass: _beginComputePass(); break;
+				case GlesOp.EndComputePass: _endComputePass(); break;
+				case GlesOp.SetComputePipeline:
+					_computePipeline = (GlesComputePipeline)command.A!;
+					Gl.UseProgram(_computePipeline.Program);
+					_samplersDirty = true;
+					break;
+				case GlesOp.Dispatch: _dispatch(command.U0, command.U1, command.U2, null, 0); break;
+				case GlesOp.DispatchIndirect: _dispatch(0, 0, 0, (GlesBuffer)command.A!, command.X); break;
 			}
 		}
 
@@ -224,11 +234,54 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 		_appliedBaseInstance = int.MinValue;
 	}
 
-	private GlesRenderPipeline _prepareDraw(long vertexShift, long instanceShift, uint firstInstance)
+	private void _beginComputePass()
 	{
-		if (_pass is null) throw new InvalidOperationException("Draws must be inside a render pass.");
-		var pipeline = _pipeline ?? throw new InvalidOperationException("Set a pipeline before drawing.");
+		// A compute pass starts with nothing bound, like a render pass; the program replaces the render pipeline's.
+		_computePipeline = null;
+		_pipeline = null;
+		Array.Clear(_groups);
+		_groupsDirty = 0;
+		_samplersDirty = true;
+	}
 
+	private void _endComputePass()
+	{
+		_computePipeline = null;
+		Array.Clear(_groups);
+		_groupsDirty = 0;
+		_samplersDirty = true;
+	}
+
+	/// <summary>
+	/// Dispatches (indirectly when <paramref name="indirect"/> is set), then makes its writes visible to every later
+	/// command with a full memory barrier: storage writes reach later dispatches, draws (vertex, index and uniform data,
+	/// storage reads), copies, indirect arguments and texture fetches, as WebGPU guarantees.
+	/// </summary>
+	private void _dispatch(uint x, uint y, uint z, GlesBuffer? indirect, ulong offset)
+	{
+		if (indirect is null && (x == 0 || y == 0 || z == 0)) return;
+		var pipeline = _computePipeline ?? throw new InvalidOperationException("Set a pipeline before dispatching.");
+		_applyBindGroups(pipeline.SamplerPairs, pipeline.HasBindingTable);
+		if (indirect is null)
+		{
+			Gl.DispatchCompute(x, y, z);
+		}
+		else
+		{
+			Gl.BindBuffer(GLEnum.DispatchIndirectBuffer, indirect.Handle);
+			Gl.DispatchComputeIndirect((nint)offset);
+			Gl.BindBuffer(GLEnum.DispatchIndirectBuffer, 0);
+		}
+
+		Gl.MemoryBarrier(MemoryBarrierMask.AllBarrierBits);
+	}
+
+	/// <summary>
+	/// Binds the resources of the bind groups set since the last draw or dispatch, and the sampler objects of the current
+	/// pipeline's texture units.
+	/// </summary>
+	private void _applyBindGroups(GlesSamplerPair[] samplerPairs, bool hasBindingTable)
+	{
 		if (_groupsDirty != 0)
 		{
 			for (var g = 0; g < _groups.Length; g++)
@@ -257,6 +310,12 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 						texture.AppliedMips = (view.BaseMip, view.MipCount);
 					}
 				}
+
+				foreach (var binding in group.Images)
+				{
+					var texture = binding.View.TextureImpl;
+					Gl.BindImageTexture((uint)GlesBindings.Slot((uint)g, binding.Binding), texture.Handle, (int)binding.View.BaseMip, false, 0, GLEnum.WriteOnly, texture.Gles.Internal);
+				}
 			}
 
 			_groupsDirty = 0;
@@ -264,10 +323,10 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 
 		if (_samplersDirty)
 		{
-			if (pipeline.HasBindingTable)
+			if (hasBindingTable)
 			{
 				// The sampler objects the shaders combined with each texture (from the flattening table).
-				foreach (var pair in pipeline.SamplerPairs)
+				foreach (var pair in samplerPairs)
 				{
 					var sampler = pair.SamplerGroup < _groups.Length ? _groups[pair.SamplerGroup]?.SamplerAt(pair.SamplerBinding) : null;
 					Gl.BindSampler((uint)pair.Unit, sampler?.Handle ?? 0);
@@ -285,8 +344,16 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 
 			_samplersDirty = false;
 		}
+	}
 
-		if (_vertexDirty || vertexShift != _appliedVertexShift || instanceShift != _appliedInstanceShift)
+	private GlesRenderPipeline _prepareDraw(long vertexShift, long instanceShift, uint firstInstance)
+	{
+		if (_pass is null) throw new InvalidOperationException("Draws must be inside a render pass.");
+		var pipeline = _pipeline ?? throw new InvalidOperationException("Set a pipeline before drawing.");
+		_applyBindGroups(pipeline.SamplerPairs, pipeline.HasBindingTable);
+
+		if (_vertexDirty
+ || vertexShift != _appliedVertexShift || instanceShift != _appliedInstanceShift)
 		{
 			_bindVertexBuffers(pipeline, vertexShift, instanceShift);
 			_vertexDirty = false;

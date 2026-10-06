@@ -37,8 +37,8 @@
     <None Include="Golden\*.png" CopyToOutputDirectory="PreserveNewest" LinkBase="Golden" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Contract test shaders (cube maps, depth sampling), compiled at build time like the engine's. -->
-    <IonShader Include="Shaders/*.vert;Shaders/*.frag" />
+    <!-- Contract test shaders (cube maps, depth sampling, compute), compiled at build time like the engine's. -->
+    <IonShader Include="Shaders/*.vert;Shaders/*.frag;Shaders/*.comp" />
   </ItemGroup>
   <Import Project="..\Ion.Shaders\Ion.Shaders.targets" />
 </Project>

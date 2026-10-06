@@ -2,7 +2,7 @@
 title: Assets
 description: Load textures, fonts, sounds, models and cube maps through IAssetManager, understand caching and scopes, and hot reload changed files.
 sidebar:
-  order: 7
+  order: 8
 ---
 
 The asset module (`Ion.Extensions.Assets`) loads files from your game's assets folder into typed, cached objects:

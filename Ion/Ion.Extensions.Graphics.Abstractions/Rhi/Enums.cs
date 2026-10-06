@@ -49,6 +49,14 @@ public static class TextureFormatExtensions
 	/// <summary>True when the format has a stencil aspect.</summary>
 	public static bool HasStencil(this TextureFormat format) => format == TextureFormat.Depth24PlusStencil8;
 
+	/// <summary>
+	/// True for the formats compute shaders can write as storage textures on every backend (the common subset of Vulkan's
+	/// required storage image formats and OpenGL ES 3.1's image formats): <see cref="TextureFormat.Rgba8Unorm"/>,
+	/// <see cref="TextureFormat.Rgba16Float"/>, <see cref="TextureFormat.R32Float"/> and <see cref="TextureFormat.Rgba32Float"/>.
+	/// </summary>
+	public static bool IsStorageFormat(this TextureFormat format) =>
+		format is TextureFormat.Rgba8Unorm or TextureFormat.Rgba16Float or TextureFormat.R32Float or TextureFormat.Rgba32Float;
+
 	/// <summary>True for the sRGB-encoded formats.</summary>
 	public static bool IsSrgb(this TextureFormat format) => format is TextureFormat.Rgba8UnormSrgb or TextureFormat.Bgra8UnormSrgb;
 
@@ -115,6 +123,8 @@ public enum BufferUsage
 	/// buffers instead.
 	/// </summary>
 	Storage = 1 << 7,
+	/// <summary>The arguments of <see cref="IComputePassEncoder.DispatchWorkgroupsIndirect"/> (three <c>uint</c> workgroup counts).</summary>
+	Indirect = 1 << 8,
 }
 
 /// <summary>
@@ -131,6 +141,11 @@ public enum TextureUsage
 	CopyDst = 1 << 1,
 	/// <summary>Sampled from shaders through a bind group.</summary>
 	TextureBinding = 1 << 2,
+	/// <summary>
+	/// Written by compute shaders as a storage texture (<see cref="BindingType.StorageTexture"/>). Only formats for which
+	/// <see cref="TextureFormatExtensions.IsStorageFormat"/> is true, single-sampled 2D textures.
+	/// </summary>
+	StorageBinding = 1 << 3,
 	/// <summary>Color or depth attachment of a render pass.</summary>
 	RenderAttachment = 1 << 4,
 }
@@ -149,6 +164,8 @@ public enum ShaderStage
 	Fragment = 1 << 1,
 	/// <summary>Both stages.</summary>
 	VertexFragment = Vertex | Fragment,
+	/// <summary>The compute stage (see <see cref="DeviceLimits.ComputeShaders"/>).</summary>
+	Compute = 1 << 2,
 }
 
 /// <summary>
@@ -164,6 +181,17 @@ public enum BindingType
 	Sampler,
 	/// <summary>A sampled 2D texture (GLES: a texture unit).</summary>
 	Texture,
+	/// <summary>
+	/// A storage buffer that shaders read and write (a <c>buffer</c> block without <c>readonly</c> in GLSL). Compute stage
+	/// only: OpenGL ES 3.1 guarantees no writable storage in the vertex and fragment stages.
+	/// </summary>
+	ReadWriteStorageBuffer,
+	/// <summary>
+	/// A write-only storage texture (<c>layout(rgba8) uniform writeonly image2D</c> in GLSL), compute stage only. The texture
+	/// needs <see cref="TextureUsage.StorageBinding"/> and the shader's format qualifier must match its format. GLES: an
+	/// image unit at the flattened slot.
+	/// </summary>
+	StorageTexture,
 }
 
 /// <summary>Texture coordinate addressing outside [0, 1].</summary>

@@ -18,6 +18,11 @@ internal enum GlesOp : byte
 	DrawIndexed,
 	CopyBufferToBuffer,
 	CopyTextureToBuffer,
+	BeginComputePass,
+	EndComputePass,
+	SetComputePipeline,
+	Dispatch,
+	DispatchIndirect,
 }
 
 /// <summary>One recorded command. A plain struct in a reused list: recording allocates nothing in steady state.</summary>
@@ -68,22 +73,29 @@ internal sealed class GlesPass
 
 /// <summary>
 /// The GLES <see cref="ICommandEncoder"/>, which is also the finished <see cref="ICommandBuffer"/> and, while a pass is
-/// open, the <see cref="IRenderPassEncoder"/>. Commands are recorded into a list and replayed by the
-/// <see cref="GlesExecutor"/> at submission. Encoders are pooled per frame slot.
+/// open, the <see cref="IRenderPassEncoder"/> or <see cref="IComputePassEncoder"/>. Commands are recorded into a list and
+/// replayed by the <see cref="GlesExecutor"/> at submission. Encoders are pooled per frame slot.
 /// </summary>
-internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, ICommandBuffer, IRenderPassEncoder
+internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, ICommandBuffer, IRenderPassEncoder, IComputePassEncoder
 {
 	private readonly List<GlesCommand> _commands = [];
 	private readonly List<GlesPass> _passes = [];
 	private int _nextPass;
 	private State _state = State.Submitted;
-	private bool _inPass;
+	private Pass _open;
 
 	private enum State
 	{
 		Recording,
 		Finished,
 		Submitted,
+	}
+
+	private enum Pass
+	{
+		None,
+		Render,
+		Compute,
 	}
 
 	public GlesDevice Device => device;
@@ -94,7 +106,7 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 	{
 		_commands.Clear();
 		_nextPass = 0;
-		_inPass = false;
+		_open = Pass.None;
 		_state = State.Recording;
 	}
 
@@ -109,7 +121,7 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 	public IRenderPassEncoder BeginRenderPass(in RenderPassDescriptor descriptor)
 	{
 		_ensureRecording();
-		if (_inPass) throw new InvalidOperationException("End the current render pass first.");
+		_ensureNoPass();
 		var colors = descriptor.ColorAttachments;
 		if (colors.Length > FramebufferKey.MaxColorAttachments) throw new ArgumentException($"At most {FramebufferKey.MaxColorAttachments} color attachments.", nameof(descriptor));
 		if (colors.Length == 0 && descriptor.DepthStencilAttachment is null) throw new ArgumentException("A render pass needs at least one attachment.", nameof(descriptor));
@@ -150,7 +162,17 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 
 		pass.Key = key;
 		_commands.Add(new GlesCommand { Op = GlesOp.BeginPass, A = pass });
-		_inPass = true;
+		_open = Pass.Render;
+		return this;
+	}
+
+	public IComputePassEncoder BeginComputePass(string? label = null)
+	{
+		_ensureRecording();
+		_ensureNoPass();
+		if (!device.Limits.ComputeShaders) throw new NotSupportedException("Compute passes need OpenGL ES 3.1.");
+		_commands.Add(new GlesCommand { Op = GlesOp.BeginComputePass });
+		_open = Pass.Compute;
 		return this;
 	}
 
@@ -192,7 +214,7 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 	public ICommandBuffer Finish()
 	{
 		_ensureRecording();
-		if (_inPass) throw new InvalidOperationException("End the render pass before finishing the encoder.");
+		if (_open != Pass.None) throw new InvalidOperationException("End the pass before finishing the encoder.");
 		_state = State.Finished;
 		return this;
 	}
@@ -202,10 +224,12 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 	public void SetPipeline(IRenderPipeline pipeline) =>
 		_pass(new GlesCommand { Op = GlesOp.SetPipeline, A = (GlesRenderPipeline)pipeline });
 
+	/// <summary>Both pass encoders: the executor keeps one set of bind groups, reset at every pass.</summary>
 	public void SetBindGroup(uint index, IBindGroup group)
 	{
+		if (_open == Pass.None) throw new InvalidOperationException("The pass has ended.");
 		if (index >= GlesBindings.MaxGroups) throw new ArgumentOutOfRangeException(nameof(index), index, $"At most {GlesBindings.MaxGroups} bind groups.");
-		_pass(new GlesCommand { Op = GlesOp.SetBindGroup, A = (GlesBindGroup)group, U0 = index });
+		_commands.Add(new GlesCommand { Op = GlesOp.SetBindGroup, A = (GlesBindGroup)group, U0 = index });
 	}
 
 	public void SetVertexBuffer(uint slot, IBuffer buffer, ulong offset = 0)
@@ -229,16 +253,48 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 	public void DrawIndexed(uint indexCount, uint instanceCount = 1, uint firstIndex = 0, int baseVertex = 0, uint firstInstance = 0) =>
 		_pass(new GlesCommand { Op = GlesOp.DrawIndexed, U0 = indexCount, U1 = instanceCount, U2 = firstIndex, I0 = baseVertex, U3 = firstInstance });
 
+	/// <summary>Both pass encoders: ends the open pass.</summary>
 	public void End()
 	{
-		if (!_inPass) throw new InvalidOperationException("The render pass has already ended.");
-		_commands.Add(new GlesCommand { Op = GlesOp.EndPass });
-		_inPass = false;
+		if (_open == Pass.None) throw new InvalidOperationException("The pass has already ended.");
+		_commands.Add(new GlesCommand { Op = _open == Pass.Render ? GlesOp.EndPass : GlesOp.EndComputePass });
+		_open = Pass.None;
+	}
+
+	// IComputePassEncoder.
+
+	public void SetPipeline(IComputePipeline pipeline) =>
+		_computePass(new GlesCommand { Op = GlesOp.SetComputePipeline, A = (GlesComputePipeline)pipeline });
+
+	public void DispatchWorkgroups(uint workgroupCountX, uint workgroupCountY = 1, uint workgroupCountZ = 1)
+	{
+		var max = device.Limits.MaxComputeWorkgroupsPerDimension;
+		if (workgroupCountX > max || workgroupCountY > max || workgroupCountZ > max)
+		{
+			throw new ArgumentOutOfRangeException(nameof(workgroupCountX), $"At most {max} workgroups per dimension (DeviceLimits.MaxComputeWorkgroupsPerDimension); got {workgroupCountX} x {workgroupCountY} x {workgroupCountZ}.");
+		}
+
+		_computePass(new GlesCommand { Op = GlesOp.Dispatch, U0 = workgroupCountX, U1 = workgroupCountY, U2 = workgroupCountZ });
+	}
+
+	public void DispatchWorkgroupsIndirect(IBuffer buffer, ulong offset = 0)
+	{
+		var b = (GlesBuffer)buffer;
+		if ((b.Usage & BufferUsage.Indirect) == 0) throw new ArgumentException("The buffer needs BufferUsage.Indirect.", nameof(buffer));
+		if (offset % 4 != 0) throw new ArgumentException("The offset must be a multiple of 4.", nameof(offset));
+		if (offset + 12 > b.Size) throw new ArgumentOutOfRangeException(nameof(offset), "The 12 bytes of dispatch arguments overflow the buffer.");
+		_computePass(new GlesCommand { Op = GlesOp.DispatchIndirect, A = b, X = offset });
 	}
 
 	private void _pass(in GlesCommand command)
 	{
-		if (!_inPass) throw new InvalidOperationException("The render pass has ended.");
+		if (_open != Pass.Render) throw new InvalidOperationException("The render pass has ended.");
+		_commands.Add(command);
+	}
+
+	private void _computePass(in GlesCommand command)
+	{
+		if (_open != Pass.Compute) throw new InvalidOperationException("The compute pass has ended.");
 		_commands.Add(command);
 	}
 
@@ -249,6 +305,8 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 
 	private void _ensureNoPass()
 	{
-		if (_inPass) throw new InvalidOperationException("End the render pass before recording copies.");
+		if (_open == Pass.Render) throw new InvalidOperationException("End the current render pass first.");
+		if (_open == Pass.Compute) throw new InvalidOperationException("End the current compute pass first.");
 	}
+
 }

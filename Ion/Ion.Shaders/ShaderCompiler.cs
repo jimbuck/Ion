@@ -129,7 +129,7 @@ public static unsafe class ShaderCompiler
 	/// only combined samplers; each combined sampler is named <c>texture_sampler</c>), depth is remapped from
 	/// WebGPU/Vulkan's [0, 1] clip range to GL's [-1, 1], clip-space y is negated (the backend renders upside down in GL
 	/// terms so that texture row 0 is the top row, as in WebGPU), (set, binding) pairs are flattened to binding points and
-	/// texture units with <see cref="GlesBindings"/> and listed in a flattening table appended as comments, and the
+	/// texture units (and storage blocks and images to their binding points and image units) with <see cref="GlesBindings"/> and listed in a flattening table appended as comments, and the
 	/// varyings between stages are named by location (<c>ion_var_N</c>) so that stages link by name on GLSL ES 3.00 too.
 	/// </summary>
 	/// <exception cref="ShaderCompilationException">SPIRV-Cross cannot translate the module.</exception>
@@ -197,7 +197,7 @@ public static unsafe class ShaderCompiler
 		CrossResources* resources;
 		Check(cross, context, cross.CompilerCreateShaderResources(compiler, &resources));
 
-		foreach (var (type, kind) in (ReadOnlySpan<(CrossResourceType, string)>)[(CrossResourceType.UniformBuffer, "ubo"), (CrossResourceType.StorageBuffer, "ssbo")])
+		foreach (var (type, kind) in (ReadOnlySpan<(CrossResourceType, string)>)[(CrossResourceType.UniformBuffer, "ubo"), (CrossResourceType.StorageBuffer, "ssbo"), (CrossResourceType.StorageImage, "image")])
 		{
 			CrossReflectedResource* list;
 			nuint count;
@@ -206,7 +206,8 @@ public static unsafe class ShaderCompiler
 			{
 				var set = cross.CompilerGetDecoration(compiler, list[i].Id, Decoration.DescriptorSet);
 				var binding = cross.CompilerGetDecoration(compiler, list[i].Id, Decoration.Binding);
-				var name = SilkMarshal.PtrToString((nint)cross.CompilerGetName(compiler, list[i].BaseTypeId));
+				// Blocks by their block name (what glGetUniformBlockIndex takes), images by their uniform name.
+				var name = type == CrossResourceType.StorageImage ? null : SilkMarshal.PtrToString((nint)cross.CompilerGetName(compiler, list[i].BaseTypeId));
 				if (string.IsNullOrEmpty(name)) name = SilkMarshal.PtrToString((nint)list[i].Name) ?? "block";
 				cross.CompilerSetDecoration(compiler, list[i].Id, Decoration.Binding, (uint)_slot(set, binding));
 				cross.CompilerUnsetDecoration(compiler, list[i].Id, Decoration.DescriptorSet);

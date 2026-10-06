@@ -1,0 +1,16 @@
+#version 450
+// Adds one to every value: dispatched several times in one pass, each dispatch must see the one before.
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 0) buffer Data
+{
+	uint values[];
+} uData;
+
+void main()
+{
+	uint i = gl_GlobalInvocationID.x;
+	if (i >= uint(uData.values.length())) return;
+	uData.values[i] += 1u;
+}

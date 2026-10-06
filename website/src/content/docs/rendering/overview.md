@@ -61,7 +61,8 @@ and maps cleanly onto OpenGL ES 3.1. If you know WebGPU, the names are familiar:
 | `IShaderModule` | A compiled shader stage (SPIR-V on Vulkan, GLSL ES on OpenGL ES) |
 | `IBindGroupLayout`, `IBindGroup`, `IPipelineLayout` | Resource binding, by group and binding number |
 | `IRenderPipeline` | Shaders, vertex layout, primitive, depth and blend state |
-| `ICommandEncoder`, `IRenderPassEncoder`, `ICommandBuffer` | Recording and submitting work |
+| `IComputePipeline` | A compute shader and its bind group layouts (see [Compute shaders](/Ion/rendering/compute/)) |
+| `ICommandEncoder`, `IRenderPassEncoder`, `IComputePassEncoder`, `ICommandBuffer` | Recording and submitting work |
 | `ISurface` | The window's presentable surface (a Vulkan swapchain, the GLES default framebuffer) |
 
 Two things differ from WebGPU on purpose:
@@ -82,8 +83,10 @@ Everything created from a device is used from the main thread (the game loop's t
 command recording.
 :::
 
-Most games never touch the RHI. When you do need it (a custom renderer, a post effect, a debug view), take
-`IGraphicsFrame` in a system. See [Shaders](/Ion/rendering/shaders/) for a complete example.
+Most games never touch the RHI. When you do need it (a custom renderer, a post effect, a debug view, GPU simulation),
+take `IGraphicsFrame` in a system. See [Shaders](/Ion/rendering/shaders/) for a complete example and
+[Compute shaders](/Ion/rendering/compute/) for work that runs outside a render pass.
+
 
 ## Registering rendering
 

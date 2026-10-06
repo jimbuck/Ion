@@ -14,6 +14,7 @@ namespace Ion.Extensions.Graphics.Vulkan;
 internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : ICommandEncoder, ICommandBuffer
 {
 	private readonly VulkanRenderPassEncoder _pass = new(device);
+	private readonly VulkanComputePassEncoder _compute = new(device);
 	private CommandBuffer _cmd;
 	private bool _recording;
 
@@ -36,7 +37,7 @@ internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : IComman
 	public IRenderPassEncoder BeginRenderPass(in RenderPassDescriptor descriptor)
 	{
 		_ensureRecording();
-		if (_pass.IsActive) throw new InvalidOperationException("End the current render pass first.");
+		_ensureNoPass();
 		var colors = descriptor.ColorAttachments;
 		if (colors.Length > RenderPassKey.MaxColorAttachments) throw new ArgumentException($"At most {RenderPassKey.MaxColorAttachments} color attachments.", nameof(descriptor));
 		if (colors.Length == 0 && descriptor.DepthStencilAttachment is null) throw new ArgumentException("A render pass needs at least one attachment.", nameof(descriptor));
@@ -58,7 +59,7 @@ internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : IComman
 			samples = VulkanFormats.ToVkSamples(texture.SampleCount);
 
 			var final = texture.IsSwapchainImage ? ImageLayout.PresentSrcKhr
-				: (texture.Usage & TextureUsage.TextureBinding) != 0 ? ImageLayout.ShaderReadOnlyOptimal
+				: (texture.Usage & (TextureUsage.TextureBinding | TextureUsage.StorageBinding)) != 0 ? texture.ShaderLayout
 				: ImageLayout.ColorAttachmentOptimal;
 			key[i] = new AttachmentKey(
 				texture.VkFormat,
@@ -128,9 +129,18 @@ internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : IComman
 		return _pass;
 	}
 
+	public IComputePassEncoder BeginComputePass(string? label = null)
+	{
+		_ensureRecording();
+		_ensureNoPass();
+		_compute.Begin(_cmd);
+		return _compute;
+	}
+
 	public void CopyBufferToBuffer(IBuffer source, ulong sourceOffset, IBuffer destination, ulong destinationOffset, ulong size)
 	{
 		_ensureRecording();
+		_ensureNoPass();
 		var vk = device.Vk;
 		GlobalBarrier(vk, _cmd, PipelineStageFlags.AllCommandsBit, AccessFlags.MemoryWriteBit, PipelineStageFlags.TransferBit, AccessFlags.TransferReadBit | AccessFlags.TransferWriteBit);
 		var region = new BufferCopy(sourceOffset, destinationOffset, size);
@@ -141,6 +151,7 @@ internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : IComman
 	public void CopyTextureToBuffer(ITexture source, TextureRegion region, IBuffer destination, ulong destinationOffset, uint bytesPerRow)
 	{
 		_ensureRecording();
+		_ensureNoPass();
 		var texture = (VulkanTexture)source;
 		if (texture.Dimension == TextureDimension.Cube) throw new NotSupportedException("A cube map cannot be a copy source.");
 		var bpp = (uint)texture.Format.BytesPerPixel();
@@ -178,7 +189,7 @@ internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : IComman
 	public ICommandBuffer Finish()
 	{
 		_ensureRecording();
-		if (_pass.IsActive) throw new InvalidOperationException("End the render pass before finishing the encoder.");
+		if (_pass.IsActive || _compute.IsActive) throw new InvalidOperationException("End the pass before finishing the encoder.");
 		VulkanDevice.Check(device.Vk.EndCommandBuffer(_cmd), "vkEndCommandBuffer");
 		_recording = false;
 		return this;
@@ -187,6 +198,12 @@ internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : IComman
 	private void _ensureRecording()
 	{
 		if (!_recording) throw new InvalidOperationException("The command encoder is finished; create a new one.");
+	}
+
+	private void _ensureNoPass()
+	{
+		if (_pass.IsActive) throw new InvalidOperationException("End the current render pass first.");
+		if (_compute.IsActive) throw new InvalidOperationException("End the current compute pass first.");
 	}
 
 	/// <summary>A full image layout transition (conservative: all commands before, all commands after).</summary>
@@ -315,6 +332,136 @@ internal sealed unsafe class VulkanRenderPassEncoder(VulkanDevice device) : IRen
 		}
 
 		_dirty = 0;
+	}
+}
+
+/// <summary>
+/// The Vulkan <see cref="IComputePassEncoder"/>, one per command encoder. Bind groups are applied lazily at dispatch time
+/// with the current pipeline's layout, as in the render pass encoder.
+/// </summary>
+/// <remarks>
+/// Synchronization is conservative, like the rest of the backend: the pass begins with a barrier that makes every earlier
+/// write visible to compute shaders and indirect reads, every dispatch after the first waits for the one before it, and the
+/// pass ends with a barrier that makes compute writes visible to every later command (draws reading vertex, index,
+/// uniform or storage data, copies and the host).
+/// </remarks>
+internal sealed unsafe class VulkanComputePassEncoder(VulkanDevice device) : IComputePassEncoder
+{
+	private const int MaxGroups = 4;
+	private const PipelineStageFlags ComputeStages = PipelineStageFlags.ComputeShaderBit | PipelineStageFlags.DrawIndirectBit;
+
+	private readonly VulkanBindGroup?[] _groups = new VulkanBindGroup?[MaxGroups];
+	private CommandBuffer _cmd;
+	private PipelineLayout _layout;
+	private uint _dirty;
+	private bool _dispatched;
+
+	public bool IsActive { get; private set; }
+
+	public void Begin(CommandBuffer cmd)
+	{
+		_cmd = cmd;
+		_layout = default;
+		_dirty = 0;
+		_dispatched = false;
+		Array.Clear(_groups);
+		IsActive = true;
+		VulkanCommandEncoder.GlobalBarrier(device.Vk, cmd, PipelineStageFlags.AllCommandsBit, AccessFlags.MemoryWriteBit, ComputeStages,
+			AccessFlags.ShaderReadBit | AccessFlags.ShaderWriteBit | AccessFlags.UniformReadBit | AccessFlags.IndirectCommandReadBit);
+	}
+
+	public void SetPipeline(IComputePipeline pipeline)
+	{
+		_ensureActive();
+		var p = (VulkanComputePipeline)pipeline;
+		device.Vk.CmdBindPipeline(_cmd, PipelineBindPoint.Compute, p.Handle);
+		if (_layout.Handle != p.Layout.Handle.Handle)
+		{
+			_layout = p.Layout.Handle;
+			_dirty = (1u << MaxGroups) - 1;
+		}
+	}
+
+	public void SetBindGroup(uint index, IBindGroup group)
+	{
+		_ensureActive();
+		if (index >= MaxGroups) throw new ArgumentOutOfRangeException(nameof(index), index, $"At most {MaxGroups} bind groups.");
+		_groups[index] = (VulkanBindGroup)group;
+		_dirty |= 1u << (int)index;
+	}
+
+	public void DispatchWorkgroups(uint workgroupCountX, uint workgroupCountY = 1, uint workgroupCountZ = 1)
+	{
+		_ensureActive();
+		var max = device.Limits.MaxComputeWorkgroupsPerDimension;
+		if (workgroupCountX > max || workgroupCountY > max || workgroupCountZ > max)
+		{
+			throw new ArgumentOutOfRangeException(nameof(workgroupCountX), $"At most {max} workgroups per dimension (DeviceLimits.MaxComputeWorkgroupsPerDimension); got {workgroupCountX} x {workgroupCountY} x {workgroupCountZ}.");
+		}
+
+		if (workgroupCountX == 0 || workgroupCountY == 0 || workgroupCountZ == 0) return;
+		_prepare();
+		device.Vk.CmdDispatch(_cmd, workgroupCountX, workgroupCountY, workgroupCountZ);
+	}
+
+	public void DispatchWorkgroupsIndirect(IBuffer buffer, ulong offset = 0)
+	{
+		_ensureActive();
+		var b = (VulkanBuffer)buffer;
+		if ((b.Usage & BufferUsage.Indirect) == 0) throw new ArgumentException("The buffer needs BufferUsage.Indirect.", nameof(buffer));
+		if (offset % 4 != 0) throw new ArgumentException("The offset must be a multiple of 4.", nameof(offset));
+		if (offset + 12 > b.Size) throw new ArgumentOutOfRangeException(nameof(offset), "The 12 bytes of dispatch arguments overflow the buffer.");
+		_prepare();
+		device.Vk.CmdDispatchIndirect(_cmd, b.Handle, offset);
+	}
+
+	public void End()
+	{
+		if (!IsActive) throw new InvalidOperationException("The compute pass has already ended.");
+		VulkanCommandEncoder.GlobalBarrier(device.Vk, _cmd, PipelineStageFlags.ComputeShaderBit, AccessFlags.ShaderWriteBit,
+			PipelineStageFlags.AllCommandsBit | PipelineStageFlags.HostBit, AccessFlags.MemoryReadBit | AccessFlags.MemoryWriteBit | AccessFlags.HostReadBit);
+		IsActive = false;
+	}
+
+	private void _prepare()
+	{
+		if (_layout.Handle == 0) throw new InvalidOperationException("Set a pipeline before dispatching.");
+
+		// Storage textures rest in GENERAL; bring the ones not there yet (new, or last used as a copy source).
+		for (var i = 0; i < MaxGroups; i++)
+		{
+			if (_groups[i] is not { } group) continue;
+			foreach (var texture in group.StorageTextures)
+			{
+				if (texture.Layout == ImageLayout.General) continue;
+				var range = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, texture.MipLevelCount, 0, texture.ArrayLayerCount);
+				VulkanCommandEncoder.Transition(device.Vk, _cmd, texture.Image, texture.Layout, ImageLayout.General, range);
+				texture.Layout = ImageLayout.General;
+			}
+		}
+
+		// Dispatches in one pass are ordered: each sees the writes of the one before.
+		if (_dispatched)
+		{
+			VulkanCommandEncoder.GlobalBarrier(device.Vk, _cmd, PipelineStageFlags.ComputeShaderBit, AccessFlags.ShaderWriteBit, ComputeStages,
+				AccessFlags.ShaderReadBit | AccessFlags.ShaderWriteBit | AccessFlags.IndirectCommandReadBit);
+		}
+
+		_dispatched = true;
+		if (_dirty == 0) return;
+		for (var i = 0; i < MaxGroups; i++)
+		{
+			if ((_dirty & (1u << i)) == 0 || _groups[i] is not { } group) continue;
+			var set = group.Handle;
+			device.Vk.CmdBindDescriptorSets(_cmd, PipelineBindPoint.Compute, _layout, (uint)i, 1, &set, 0, null);
+		}
+
+		_dirty = 0;
+	}
+
+	private void _ensureActive()
+	{
+		if (!IsActive) throw new InvalidOperationException("The compute pass has ended.");
 	}
 }
 

@@ -2,7 +2,7 @@
 title: 2D cameras
 description: Scroll, zoom and rotate a 2D view with Camera2D, convert between screen and world coordinates, and combine world and screen-space drawing.
 sidebar:
-  order: 8
+  order: 9
 ---
 
 By default the [sprite batch](/Ion/rendering/sprites/) draws in pixels: `(0, 0)` is the top-left of the window and one

@@ -91,6 +91,45 @@ public class ShaderPipelineTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
+	public void ComputeShadersTranslateWithStorageBlocksAndImagesInTheBindingTable()
+	{
+		const string source = """
+			#version 450
+			layout(local_size_x = 8, local_size_y = 8) in;
+			layout(set = 0, binding = 0) uniform Params { float gain; } uParams;
+			layout(set = 0, binding = 1) readonly buffer Input { float values[]; } uInput;
+			layout(set = 1, binding = 2, rgba8) uniform writeonly image2D uImage;
+			void main()
+			{
+				ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+				imageStore(uImage, p, vec4(uInput.values[p.x] * uParams.gain));
+			}
+			""";
+		var spirv = ShaderCompiler.CompileToSpirV(source, ShaderCompiler.KindOf("kernel.comp"), "kernel.comp");
+		var gles = ShaderCompiler.TranslateToGlslEs(spirv);
+		Assert.StartsWith("#version 310 es", gles);
+		Assert.Contains("local_size_x = 8", gles);
+
+		// The flattening table (parsed by the GLES backend with GlesBindings.ParseTable).
+		Assert.Contains("// ion:ubo Params set=0 binding=0 slot=0", gles);
+		Assert.Contains("// ion:ssbo Input set=0 binding=1 slot=1", gles);
+		Assert.Contains("// ion:image uImage set=1 binding=2 slot=10", gles);
+		// The image's binding qualifier is the flattened image unit.
+		Assert.Matches(@"layout\(binding = 10, rgba8\) uniform (highp |mediump )?writeonly (highp |mediump )?image2D uImage", gles);
+	}
+
+	[VulkanFact, Trait(CATEGORY, INTEGRATION)]
+	public void ComputeShadersEmbedWithTheirStage()
+	{
+		using var device = VulkanDevice.Create(new VulkanDeviceOptions());
+		var assembly = typeof(Rhi.Tests.ComputeContractTests).Assembly;
+		var descriptor = EmbeddedShaders.Descriptor(device, assembly, "scale.comp");
+		Assert.Equal(ShaderStage.Compute, descriptor.Stage);
+		Assert.Equal(0x07230203u, BitConverter.ToUInt32(descriptor.Code.Span));
+		Assert.Throws<ArgumentException>(() => EmbeddedShaders.Descriptor(device, assembly, "scale.compute"));
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
 	public void MissingShadersExplainHowToAddThem()
 	{
 		var ex = Assert.Throws<FileNotFoundException>(() => EmbeddedShaders.Load(QuadAssembly, "nope.vert", ShaderLanguage.SpirV));

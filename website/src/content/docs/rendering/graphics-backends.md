@@ -186,8 +186,8 @@ The feature levels:
 
 | `GlesFeatureLevel` | What changes |
 |---|---|
-| `Es30` | GLSL ES 3.00 (the 3.10 shaders are rewritten at load), slots assigned by name, no storage buffers, base vertex emulated |
-| `Es31` | Binding qualifiers in shaders, separate vertex formats and bindings, storage buffers. Base vertex emulated |
+| `Es30` | GLSL ES 3.00 (the 3.10 shaders are rewritten at load), slots assigned by name, no storage buffers, no compute, base vertex emulated |
+| `Es31` | Binding qualifiers in shaders, separate vertex formats and bindings, storage buffers, compute shaders. Base vertex emulated |
 | `Es32` | Adds native base vertex draws |
 
 To check on a desktop what an ES 3.0-only device will run:
@@ -207,9 +207,15 @@ the RHI types, and the built-in renderers follow them):
 - Do not rely on storage buffers in the vertex stage (`DeviceLimits.VertexStorageBuffers` is false on some GLES 3.1
   devices). Put per-instance data in a vertex buffer with `VertexStepMode.Instance`.
 - One blend state and write mask apply to every color target.
+- Check `DeviceLimits.ComputeShaders` before using compute: it is false at the ES 3.0 feature level. Keep compute
+  shaders' storage buffers and storage textures in group 0, bindings 0 to 3 (ES 3.1 guarantees only 4 of each in the
+  compute stage).
 
 `IGraphicsDevice.Limits` reports `MaxTextureDimension2D`, `MinUniformBufferOffsetAlignment`,
-`MaxUniformBufferBindingSize`, `MaxBindGroups` and `VertexStorageBuffers` for the running device.
+`MaxUniformBufferBindingSize`, `MaxBindGroups` and `VertexStorageBuffers` for the running device, and the compute limits
+(`ComputeShaders`, the workgroup sizes and counts, `MaxStorageBufferBindingSize`) described in
+[Compute shaders](/Ion/rendering/compute/#limits).
+
 
 ## Headless: null and offscreen
 

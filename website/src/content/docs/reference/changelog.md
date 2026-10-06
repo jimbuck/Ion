@@ -57,7 +57,8 @@ The 0.3 work rebuilt most of the engine. Released versions stop at 0.2.5; the te
 | Compile-time schedule | `Ion.Generators`: pre-bound registrations, a generated schedule with direct calls, registration summaries across assemblies, compile-time diagnostics, clean stack traces. |
 | Events v2 | Typed channels, a generated event bus with compile-time ids, `ION101` to `ION106`. |
 | Metrics v2 | Frame profiler ring, `FrameStats`, frame log (JSON Lines), Chrome traces, the `Ion` meter, overlay, Tracy. |
-| Silk.NET graphics | A WebGPU-shaped RHI, Vulkan and OpenGL ES backends, build-time shaders, headless rendering and golden images, NativeAOT substitutions. |
+| Silk.NET graphics | A WebGPU-shaped RHI, Vulkan and OpenGL ES backends, build-time shaders, [compute shaders](/Ion/rendering/compute/) (storage buffers and textures, indirect dispatch), headless rendering and golden images, NativeAOT substitutions. |
+
 | 2D renderer | An instanced sprite batch on the RHI, sort modes, render targets, cached text layouts. |
 | 3D | `Ion.Extensions.Rendering3D`: culling, batching, a render graph, PBR, shadows, glTF 2.0, cube maps. |
 | ECS | `Ion.Extensions.Ecs` on Arch 2.1: a world per scope, `Commands`, generated `[Query]` loops, transforms, sprite and 3D extraction, model spawning, serialization. |

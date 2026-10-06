@@ -18,10 +18,11 @@ public enum GlesFeatureLevel
 	/// <summary>
 	/// OpenGL ES 3.0: GLSL ES 3.00 (the 3.10 sources are rewritten at load: no binding or varying location qualifiers, so
 	/// slots are assigned by name from the flattening table), vertex attribute pointers re-specified per draw, no storage
-	/// buffers, base vertex emulated through vertex buffer offsets.
+	/// buffers, no compute, base vertex emulated through vertex buffer offsets.
+
 	/// </summary>
 	Es30,
-	/// <summary>OpenGL ES 3.1: binding qualifiers in shaders, separate vertex attribute formats and bindings, storage buffers. Base vertex emulated.</summary>
+	/// <summary>OpenGL ES 3.1: binding qualifiers in shaders, separate vertex attribute formats and bindings, storage buffers, compute shaders. Base vertex emulated.</summary>
 	Es31,
 	/// <summary>OpenGL ES 3.2: adds native base vertex draws.</summary>
 	Es32,
@@ -114,7 +115,9 @@ public sealed unsafe class GlesDevice : IGraphicsDevice
 		MaxUniformBufferBindings = Gl.GetInteger(GLEnum.MaxUniformBufferBindings);
 		MaxTextureUnits = Gl.GetInteger(GLEnum.MaxCombinedTextureImageUnits);
 		MaxStorageBufferBindings = FeatureLevel >= GlesFeatureLevel.Es31 ? Gl.GetInteger(GLEnum.MaxShaderStorageBufferBindings) : 0;
-		var vertexStorageBlocks = FeatureLevel >= GlesFeatureLevel.Es31 ? Gl.GetInteger(GLEnum.MaxVertexShaderStorageBlocks) : 0;
+		var compute = FeatureLevel >= GlesFeatureLevel.Es31;
+		var vertexStorageBlocks = compute ? Gl.GetInteger(GLEnum.MaxVertexShaderStorageBlocks) : 0;
+		MaxImageUnits = compute ? Gl.GetInteger(GLEnum.MaxImageUnits) : 0;
 		Limits = new DeviceLimits
 		{
 			MaxTextureDimension2D = (uint)Gl.GetInteger(GLEnum.MaxTextureSize),
@@ -122,6 +125,15 @@ public sealed unsafe class GlesDevice : IGraphicsDevice
 			MaxUniformBufferBindingSize = (ulong)Gl.GetInteger(GLEnum.MaxUniformBlockSize),
 			MaxBindGroups = (uint)Math.Clamp(MaxUniformBufferBindings / GlesBindings.BindingsPerGroup, 1, GlesBindings.MaxGroups),
 			VertexStorageBuffers = vertexStorageBlocks > 0,
+			ComputeShaders = compute,
+			MaxComputeWorkgroupSizeX = compute ? _indexed(GLEnum.MaxComputeWorkGroupSize, 0) : 0,
+			MaxComputeWorkgroupSizeY = compute ? _indexed(GLEnum.MaxComputeWorkGroupSize, 1) : 0,
+			MaxComputeWorkgroupSizeZ = compute ? _indexed(GLEnum.MaxComputeWorkGroupSize, 2) : 0,
+			MaxComputeInvocationsPerWorkgroup = compute ? (uint)Gl.GetInteger(GLEnum.MaxComputeWorkGroupInvocations) : 0,
+			MaxComputeWorkgroupsPerDimension = compute ? Math.Min(_indexed(GLEnum.MaxComputeWorkGroupCount, 0), Math.Min(_indexed(GLEnum.MaxComputeWorkGroupCount, 1), _indexed(GLEnum.MaxComputeWorkGroupCount, 2))) : 0,
+			MaxComputeWorkgroupStorageSize = compute ? (uint)Gl.GetInteger(GLEnum.MaxComputeSharedMemorySize) : 0,
+			MaxStorageBufferBindingSize = compute ? (ulong)(uint)Gl.GetInteger(GLEnum.MaxShaderStorageBlockSize) : 0,
+			MinStorageBufferOffsetAlignment = compute ? (ulong)Math.Max(1, Gl.GetInteger(GLEnum.ShaderStorageBufferOffsetAlignment)) : 1,
 		};
 
 		ColorBufferFloat = FeatureLevel >= GlesFeatureLevel.Es32 || Extensions.Contains("GL_EXT_color_buffer_float");
@@ -163,6 +175,9 @@ public sealed unsafe class GlesDevice : IGraphicsDevice
 
 	/// <summary><c>GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS</c> (0 below ES 3.1).</summary>
 	public int MaxStorageBufferBindings { get; }
+
+	/// <summary><c>GL_MAX_IMAGE_UNITS</c> (0 below ES 3.1): flattened storage texture slots must stay below it.</summary>
+	public int MaxImageUnits { get; }
 
 	/// <summary>Whether 32-bit float color formats are renderable.</summary>
 	public bool ColorBufferFloat { get; }
@@ -257,6 +272,9 @@ public sealed unsafe class GlesDevice : IGraphicsDevice
 	public IRenderPipeline CreateRenderPipeline(RenderPipelineDescriptor descriptor) => _checked(new GlesRenderPipeline(_current(), descriptor), "CreateRenderPipeline");
 
 	/// <inheritdoc/>
+	public IComputePipeline CreateComputePipeline(ComputePipelineDescriptor descriptor) => _checked(new GlesComputePipeline(_current(), descriptor), "CreateComputePipeline");
+
+	/// <inheritdoc/>
 	public ICommandEncoder CreateCommandEncoder(string? label = null)
 	{
 		ObjectDisposedException.ThrowIf(_disposed, this);
@@ -335,6 +353,12 @@ public sealed unsafe class GlesDevice : IGraphicsDevice
 		ObjectDisposedException.ThrowIf(_disposed, this);
 		Context.MakeCurrent();
 		return this;
+	}
+
+	private uint _indexed(GLEnum name, uint index)
+	{
+		Gl.GetInteger(name, index, out int value);
+		return (uint)Math.Max(0, value);
 	}
 
 	private T _checked<T>(T value, string where)

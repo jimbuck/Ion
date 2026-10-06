@@ -10,14 +10,14 @@ namespace Ion.Extensions.Graphics.Rhi;
 
 /// <summary>
 /// The binding-point scheme of the OpenGL ES backend: how WebGPU-style (group, binding) pairs become GLES uniform block
-/// binding points and texture units. Shared by the shader tool (which writes the numbers into the translated GLSL ES as
+/// binding points, texture units, storage block binding points and image units. Shared by the shader tool (which writes the numbers into the translated GLSL ES as
 /// <c>layout(binding = N)</c> and into a flattening table) and the GLES backend (which binds resources to them).
 /// </summary>
 /// <remarks>
 /// <para>
 /// The scheme is fixed, not packed per pipeline, so each shader stage can be translated on its own: every group owns
 /// <see cref="BindingsPerGroup"/> consecutive slots, and the slot of a resource is <c>group * 8 + binding</c> in the
-/// namespace of its kind (uniform blocks, texture units, storage blocks). A texture and the sampler it is used with are one
+/// namespace of its kind (uniform blocks, texture units, storage blocks, image units). A texture and the sampler it is used with are one
 /// combined sampler in GLSL ES; its texture unit is the texture's slot, and the sampler object bound to that unit is the
 /// sampler the shader combined it with (recorded in the flattening table).
 /// </para>
@@ -58,7 +58,10 @@ static class GlesBindings
 		return (int)(group * BindingsPerGroup + binding);
 	}
 
-	/// <summary>Formats a uniform block (or storage block, <paramref name="kind"/> <c>ssbo</c>) line of the flattening table.</summary>
+	/// <summary>
+	/// Formats a uniform block (or storage block, <paramref name="kind"/> <c>ssbo</c>, or storage image, <c>image</c>) line of
+	/// the flattening table.
+	/// </summary>
 	public static string FormatBlock(string kind, string name, uint group, uint binding) =>
 		string.Create(CultureInfo.InvariantCulture, $"{TablePrefix}{kind} {name} set={group} binding={binding} slot={Slot(group, binding)}");
 
@@ -85,6 +88,7 @@ static class GlesBindings
 				"ubo" => GlesBindingKind.UniformBlock,
 				"ssbo" => GlesBindingKind.StorageBlock,
 				"sampler" => GlesBindingKind.Sampler,
+				"image" => GlesBindingKind.Image,
 				_ => (GlesBindingKind?)null,
 			};
 			if (kind is null) continue;
@@ -128,6 +132,8 @@ enum GlesBindingKind
 	StorageBlock,
 	/// <summary>A combined image sampler (a texture binding and the sampler binding it is sampled with).</summary>
 	Sampler,
+	/// <summary>A storage image (a storage texture binding, bound to an image unit).</summary>
+	Image,
 }
 
 /// <summary>One line of the flattening table (see <see cref="GlesBindings"/>).</summary>

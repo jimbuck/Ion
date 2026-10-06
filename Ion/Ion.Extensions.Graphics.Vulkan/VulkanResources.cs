@@ -105,6 +105,12 @@ internal sealed unsafe class VulkanTexture : ITexture
 			}
 		}
 
+		if ((Usage & TextureUsage.StorageBinding) != 0)
+		{
+			if (!Format.IsStorageFormat()) throw new NotSupportedException($"{Format} cannot be a storage texture (use Rgba8Unorm, Rgba16Float, R32Float or Rgba32Float).");
+			if (Dimension != TextureDimension.D2 || SampleCount > 1) throw new NotSupportedException("Storage textures are single-sampled 2D textures.");
+		}
+
 		VkFormat = Format.IsDepth() ? device.PickDepthFormat(Format) : Format.ToVk();
 
 		var vk = device.Vk;
@@ -151,6 +157,12 @@ internal sealed unsafe class VulkanTexture : ITexture
 
 	/// <summary>The layout after every command recorded so far (tracked on the CPU in recording order).</summary>
 	public ImageLayout Layout { get; set; } = ImageLayout.Undefined;
+
+	/// <summary>
+	/// The layout the texture rests in for shaders: <c>GENERAL</c> for storage textures (so compute shaders write them and
+	/// every stage samples them without transitions), <c>SHADER_READ_ONLY_OPTIMAL</c> otherwise.
+	/// </summary>
+	public ImageLayout ShaderLayout => (Usage & TextureUsage.StorageBinding) != 0 ? ImageLayout.General : ImageLayout.ShaderReadOnlyOptimal;
 
 	/// <summary>True for swapchain images, which end every pass in <c>PRESENT_SRC_KHR</c>.</summary>
 	public bool IsSwapchainImage { get; }
@@ -212,6 +224,7 @@ internal sealed unsafe class VulkanTextureView : ITextureView
 		_owned = owned;
 		TextureImpl = texture;
 		var levels = descriptor.MipLevelCount == 0 ? texture.MipLevelCount - descriptor.BaseMipLevel : descriptor.MipLevelCount;
+		MipLevelCount = levels;
 		var info = new ImageViewCreateInfo
 		{
 			SType = StructureType.ImageViewCreateInfo,
@@ -227,6 +240,9 @@ internal sealed unsafe class VulkanTextureView : ITextureView
 	public readonly ImageView Handle;
 
 	public VulkanTexture TextureImpl { get; }
+
+	/// <summary>The number of mip levels viewed.</summary>
+	public uint MipLevelCount { get; }
 
 	public ITexture Texture => TextureImpl;
 
@@ -341,6 +357,14 @@ internal sealed unsafe class VulkanBindGroupLayout : IBindGroupLayout
 	{
 		_device = device;
 		Entries = descriptor.Entries.ToArray();
+		foreach (var entry in Entries)
+		{
+			if (entry.Type is BindingType.ReadWriteStorageBuffer or BindingType.StorageTexture && entry.Visibility != ShaderStage.Compute)
+			{
+				throw new NotSupportedException($"Binding {entry.Binding}: {entry.Type} bindings are visible to the compute stage only.");
+			}
+		}
+
 		var bindings = stackalloc DescriptorSetLayoutBinding[Math.Max(1, Entries.Count)];
 		for (var i = 0; i < Entries.Count; i++)
 		{
@@ -386,6 +410,7 @@ internal sealed unsafe class VulkanBindGroup : IBindGroup
 		Handle = device.AllocateDescriptorSet(layout.Handle, out _pool);
 
 		var entries = descriptor.Entries;
+		var storageTextures = new List<VulkanTexture>();
 		var writes = stackalloc WriteDescriptorSet[Math.Max(1, entries.Length)];
 		var buffers = stackalloc DescriptorBufferInfo[Math.Max(1, entries.Length)];
 		var images = stackalloc DescriptorImageInfo[Math.Max(1, entries.Length)];
@@ -404,8 +429,9 @@ internal sealed unsafe class VulkanBindGroup : IBindGroup
 
 			switch (type)
 			{
-				case BindingType.UniformBuffer or BindingType.StorageBuffer:
+				case BindingType.UniformBuffer or BindingType.StorageBuffer or BindingType.ReadWriteStorageBuffer:
 					var buffer = (VulkanBuffer)(entry.Buffer ?? throw new ArgumentException($"Binding {entry.Binding} needs a buffer."));
+					if (type != BindingType.UniformBuffer && (buffer.Usage & BufferUsage.Storage) == 0) throw new ArgumentException($"Binding {entry.Binding} is a storage buffer binding; the buffer needs BufferUsage.Storage.");
 					buffers[i] = new DescriptorBufferInfo(buffer.Handle, entry.Offset, entry.Size == 0 ? Vk.WholeSize : entry.Size);
 					writes[i].PBufferInfo = &buffers[i];
 					break;
@@ -416,16 +442,28 @@ internal sealed unsafe class VulkanBindGroup : IBindGroup
 					break;
 				case BindingType.Texture:
 					var view = (VulkanTextureView)(entry.TextureView ?? throw new ArgumentException($"Binding {entry.Binding} needs a texture view."));
-					images[i] = new DescriptorImageInfo { ImageView = view.Handle, ImageLayout = ImageLayout.ShaderReadOnlyOptimal };
+					images[i] = new DescriptorImageInfo { ImageView = view.Handle, ImageLayout = view.TextureImpl.ShaderLayout };
 					writes[i].PImageInfo = &images[i];
+					break;
+				case BindingType.StorageTexture:
+					var storage = (VulkanTextureView)(entry.TextureView ?? throw new ArgumentException($"Binding {entry.Binding} needs a texture view."));
+					if ((storage.TextureImpl.Usage & TextureUsage.StorageBinding) == 0) throw new ArgumentException($"Binding {entry.Binding} is a storage texture binding; the texture needs TextureUsage.StorageBinding.");
+					if (storage.MipLevelCount != 1) throw new ArgumentException($"Binding {entry.Binding}: a storage texture view must view one mip level.");
+					images[i] = new DescriptorImageInfo { ImageView = storage.Handle, ImageLayout = ImageLayout.General };
+					writes[i].PImageInfo = &images[i];
+					storageTextures.Add(storage.TextureImpl);
 					break;
 			}
 		}
 
 		device.Vk.UpdateDescriptorSets(device.Handle, (uint)entries.Length, writes, 0, null);
+		StorageTextures = [.. storageTextures];
 	}
 
 	public readonly DescriptorSet Handle;
+
+	/// <summary>The textures bound as storage textures, which a compute pass brings to <c>GENERAL</c> before a dispatch.</summary>
+	public VulkanTexture[] StorageTextures { get; }
 
 	public IBindGroupLayout Layout { get; }
 
@@ -628,6 +666,56 @@ internal sealed unsafe class VulkanRenderPipeline : IRenderPipeline
 		{
 			SilkMarshal.Free((nint)vertexEntry);
 			if (fragmentEntry is not null) SilkMarshal.Free((nint)fragmentEntry);
+		}
+	}
+
+	public readonly Pipeline Handle;
+
+	public VulkanPipelineLayout Layout { get; }
+
+	public void Dispose()
+	{
+		if (_disposed) return;
+		_disposed = true;
+		var device = _device;
+		var handle = Handle;
+		device.Defer(() => device.Vk.DestroyPipeline(device.Handle, handle, null));
+	}
+}
+
+internal sealed unsafe class VulkanComputePipeline : IComputePipeline
+{
+	private readonly VulkanDevice _device;
+	private bool _disposed;
+
+	public VulkanComputePipeline(VulkanDevice device, ComputePipelineDescriptor descriptor)
+	{
+		ArgumentNullException.ThrowIfNull(descriptor);
+		_device = device;
+		Layout = (VulkanPipelineLayout)descriptor.Layout;
+		var module = (VulkanShaderModule)descriptor.Compute.Module;
+		if (module.Stage != ShaderStage.Compute) throw new ArgumentException($"A compute pipeline needs a compute shader module, not {module.Stage}.", nameof(descriptor));
+
+		var entry = (byte*)SilkMarshal.StringToPtr(descriptor.Compute.EntryPoint);
+		try
+		{
+			var info = new ComputePipelineCreateInfo
+			{
+				SType = StructureType.ComputePipelineCreateInfo,
+				Stage = new PipelineShaderStageCreateInfo
+				{
+					SType = StructureType.PipelineShaderStageCreateInfo,
+					Stage = ShaderStageFlags.ComputeBit,
+					Module = module.Handle,
+					PName = entry,
+				},
+				Layout = Layout.Handle,
+			};
+			VulkanDevice.Check(device.Vk.CreateComputePipelines(device.Handle, default, 1, in info, null, out Handle), "vkCreateComputePipelines");
+		}
+		finally
+		{
+			SilkMarshal.Free((nint)entry);
 		}
 	}
 

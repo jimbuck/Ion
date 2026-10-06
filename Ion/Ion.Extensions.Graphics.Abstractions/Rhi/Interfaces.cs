@@ -24,6 +24,12 @@ namespace Ion.Extensions.Graphics.Rhi;
  *   sample them with samplerCube (textureCube plus sampler in the GLSL 4.5 source). Depth textures can be sampled, with
  *   a comparison sampler (sampler2DShadow after translation) for shadow maps. A depth-only pipeline (no fragment state)
  *   gets an empty fragment stage of the vertex stage's GLSL ES version.
+ * - Compute needs OpenGL ES 3.1 (DeviceLimits.ComputeShaders is false at the ES 3.0 feature level). Storage buffers and
+ *   storage textures flatten like the rest (storage block binding points and image units at group * 8 + binding), but
+ *   ES 3.1 guarantees only 4 storage buffer bindings and 4 image units in the compute stage, so portable compute shaders
+ *   keep their storage buffers and storage textures in group 0, bindings 0 to 3. The backend checks the device's limits
+ *   when it creates a pipeline. Every dispatch ends with a full glMemoryBarrier, so later dispatches, draws and copies see
+ *   its writes, as in WebGPU.
  */
 
 /// <summary>
@@ -94,6 +100,12 @@ public interface IGraphicsDevice : IDisposable
 
 	/// <summary>Creates a render pipeline. Pipelines are expensive: create them at load time, not per frame.</summary>
 	IRenderPipeline CreateRenderPipeline(RenderPipelineDescriptor descriptor);
+
+	/// <summary>
+	/// Creates a compute pipeline. Pipelines are expensive: create them at load time, not per frame.
+	/// </summary>
+	/// <exception cref="NotSupportedException">The device has no compute (<see cref="DeviceLimits.ComputeShaders"/> is false).</exception>
+	IComputePipeline CreateComputePipeline(ComputePipelineDescriptor descriptor);
 
 	/// <summary>Creates a command encoder for this frame. Record into it, <see cref="ICommandEncoder.Finish"/> it and submit the result.</summary>
 	ICommandEncoder CreateCommandEncoder(string? label = null);
@@ -248,11 +260,14 @@ public interface IPipelineLayout : IDisposable;
 /// <summary>A compiled render pipeline: shaders, vertex layout, primitive, depth and blend state.</summary>
 public interface IRenderPipeline : IDisposable;
 
+/// <summary>A compiled compute pipeline: one compute shader and the bind group layouts it uses.</summary>
+public interface IComputePipeline : IDisposable;
+
 /// <summary>A finished, submittable command buffer. Submit it once; it is recycled after its frame completes.</summary>
 public interface ICommandBuffer;
 
 /// <summary>
-/// Records commands: render passes and copies. Created per frame by <see cref="IGraphicsDevice.CreateCommandEncoder"/>,
+/// Records commands: render passes, compute passes and copies. Created per frame by <see cref="IGraphicsDevice.CreateCommandEncoder"/>,
 /// finished with <see cref="Finish"/>.
 /// </summary>
 public interface ICommandEncoder
@@ -262,6 +277,13 @@ public interface ICommandEncoder
 	/// other command on this encoder.
 	/// </summary>
 	IRenderPassEncoder BeginRenderPass(in RenderPassDescriptor descriptor);
+
+	/// <summary>
+	/// Begins a compute pass. Record dispatches into the returned encoder and call <see cref="IComputePassEncoder.End"/>
+	/// before any other command on this encoder.
+	/// </summary>
+	/// <exception cref="NotSupportedException">The device has no compute (<see cref="DeviceLimits.ComputeShaders"/> is false).</exception>
+	IComputePassEncoder BeginComputePass(string? label = null);
 
 	/// <summary>Copies <paramref name="size"/> bytes between buffers (<see cref="BufferUsage.CopySrc"/> to <see cref="BufferUsage.CopyDst"/>).</summary>
 	void CopyBufferToBuffer(IBuffer source, ulong sourceOffset, IBuffer destination, ulong destinationOffset, ulong size);
@@ -307,6 +329,57 @@ public interface IRenderPassEncoder
 
 	/// <summary>Ends the pass.</summary>
 	void End();
+}
+
+/// <summary>
+/// Records the dispatches of one compute pass.
+/// </summary>
+/// <remarks>
+/// Ordering is WebGPU's: every dispatch sees the writes of the dispatches, draws and copies recorded before it, and the
+/// commands after it see its writes (storage buffers read as vertex, index, uniform or storage buffers, indirect
+/// arguments, storage textures sampled or copied). The backends insert the barriers; nothing is synchronized by hand.
+/// </remarks>
+public interface IComputePassEncoder
+{
+	/// <summary>Sets the pipeline for the following dispatches.</summary>
+	void SetPipeline(IComputePipeline pipeline);
+
+	/// <summary>Binds <paramref name="group"/> at group index <paramref name="index"/> (<c>layout(set = index)</c>).</summary>
+	void SetBindGroup(uint index, IBindGroup group);
+
+	/// <summary>
+	/// Runs the pipeline over a grid of workgroups. Each count is at most
+	/// <see cref="DeviceLimits.MaxComputeWorkgroupsPerDimension"/>; a zero count dispatches nothing.
+	/// </summary>
+	void DispatchWorkgroups(uint workgroupCountX, uint workgroupCountY = 1, uint workgroupCountZ = 1);
+
+	/// <summary>
+	/// Runs the pipeline over a grid whose workgroup counts the GPU reads from <paramref name="buffer"/> at
+	/// <paramref name="offset"/> (a <see cref="DispatchIndirectArgs"/>; the buffer needs <see cref="BufferUsage.Indirect"/>,
+	/// the offset a multiple of 4). A compute pass may write the arguments for a later dispatch.
+	/// </summary>
+	void DispatchWorkgroupsIndirect(IBuffer buffer, ulong offset = 0);
+
+	/// <summary>Ends the pass.</summary>
+	void End();
+}
+
+/// <summary>
+/// Extension methods for <see cref="IComputePassEncoder"/>.
+/// </summary>
+public static class ComputePassEncoderExtensions
+{
+	/// <summary>
+	/// Dispatches enough workgroups of <paramref name="workgroupSize"/> invocations (the shader's <c>local_size_x</c>) to
+	/// cover <paramref name="count"/> items in one dimension: <c>ceil(count / workgroupSize)</c>. The shader must skip the
+	/// invocations past the end (<c>if (gl_GlobalInvocationID.x &gt;= count) return;</c>).
+	/// </summary>
+	public static void DispatchFor(this IComputePassEncoder pass, uint count, uint workgroupSize)
+	{
+		ArgumentNullException.ThrowIfNull(pass);
+		ArgumentOutOfRangeException.ThrowIfZero(workgroupSize);
+		pass.DispatchWorkgroups((count + workgroupSize - 1) / workgroupSize);
+	}
 }
 
 /// <summary>

@@ -51,7 +51,7 @@ export default defineConfig({
 			sidebar: [
 				section('Getting started', 'getting-started'),
 				section('Core concepts', 'concepts'),
-				nested('Rendering', 'rendering', ['overview', 'graphics-backends', 'windowing', 'sprites', 'text', 'shaders', 'assets', 'cameras-2d'], [['3D rendering', '3d']]),
+				nested('Rendering', 'rendering', ['overview', 'graphics-backends', 'windowing', 'sprites', 'text', 'shaders', 'compute', 'assets', 'cameras-2d'], [['3D rendering', '3d']]),
 				section('ECS and scenes', 'ecs'),
 				nested('Audio, input and UI', 'interaction', ['audio'], [['Input', 'input'], ['UI', 'ui']]),
 				section('Physics', 'physics'),

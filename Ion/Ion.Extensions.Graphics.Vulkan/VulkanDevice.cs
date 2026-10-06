@@ -117,6 +117,16 @@ public sealed unsafe class VulkanDevice : IGraphicsDevice
 			MaxUniformBufferBindingSize = props.Limits.MaxUniformBufferRange,
 			MaxBindGroups = Math.Min(props.Limits.MaxBoundDescriptorSets, 4u),
 			VertexStorageBuffers = true,
+			// Vulkan requires compute on every graphics queue family (the one this device uses).
+			ComputeShaders = true,
+			MaxComputeWorkgroupSizeX = props.Limits.MaxComputeWorkGroupSize[0],
+			MaxComputeWorkgroupSizeY = props.Limits.MaxComputeWorkGroupSize[1],
+			MaxComputeWorkgroupSizeZ = props.Limits.MaxComputeWorkGroupSize[2],
+			MaxComputeInvocationsPerWorkgroup = props.Limits.MaxComputeWorkGroupInvocations,
+			MaxComputeWorkgroupsPerDimension = Math.Min(props.Limits.MaxComputeWorkGroupCount[0], Math.Min(props.Limits.MaxComputeWorkGroupCount[1], props.Limits.MaxComputeWorkGroupCount[2])),
+			MaxComputeWorkgroupStorageSize = props.Limits.MaxComputeSharedMemorySize,
+			MaxStorageBufferBindingSize = props.Limits.MaxStorageBufferRange,
+			MinStorageBufferOffsetAlignment = props.Limits.MinStorageBufferOffsetAlignment,
 		};
 		ApiVersion = props.ApiVersion;
 
@@ -345,6 +355,9 @@ public sealed unsafe class VulkanDevice : IGraphicsDevice
 	public IRenderPipeline CreateRenderPipeline(RenderPipelineDescriptor descriptor) => new VulkanRenderPipeline(this, descriptor);
 
 	/// <inheritdoc/>
+	public IComputePipeline CreateComputePipeline(ComputePipelineDescriptor descriptor) => new VulkanComputePipeline(this, descriptor);
+
+	/// <inheritdoc/>
 	public ICommandEncoder CreateCommandEncoder(string? label = null) => CurrentFrame.RentEncoder();
 
 	/// <inheritdoc/>
@@ -464,13 +477,14 @@ public sealed unsafe class VulkanDevice : IGraphicsDevice
 			new(DescriptorType.StorageBuffer, sets),
 			new(DescriptorType.Sampler, sets * 2),
 			new(DescriptorType.SampledImage, sets * 2),
+			new(DescriptorType.StorageImage, sets),
 		};
 		var info = new DescriptorPoolCreateInfo
 		{
 			SType = StructureType.DescriptorPoolCreateInfo,
 			Flags = DescriptorPoolCreateFlags.FreeDescriptorSetBit,
 			MaxSets = sets,
-			PoolSizeCount = 4,
+			PoolSizeCount = 5,
 			PPoolSizes = sizes,
 		};
 		Check(Vk.CreateDescriptorPool(Handle, in info, null, out var pool), "vkCreateDescriptorPool");

@@ -74,13 +74,18 @@ public class GlesBindingSchemeTests
 	{
 		var source = "#version 310 es\nvoid main() { }\n// a comment\n"
 			+ GlesBindings.FormatBlock("ubo", "Camera", 1, 2) + "\n"
-			+ GlesBindings.FormatSampler("uAtlas_uPoint", 2, 0, 2, 1) + "\n";
+			+ GlesBindings.FormatSampler("uAtlas_uPoint", 2, 0, 2, 1) + "\n"
+			+ GlesBindings.FormatBlock("ssbo", "Particles", 0, 3) + "\n"
+			+ GlesBindings.FormatBlock("image", "uOutput", 0, 1) + "\n";
 		var table = GlesBindings.ParseTable(source);
 		Assert.Equal(
 		[
 			new GlesBindingEntry(GlesBindingKind.UniformBlock, "Camera", 1, 2, 10),
 			new GlesBindingEntry(GlesBindingKind.Sampler, "uAtlas_uPoint", 2, 0, 16, 2, 1),
+			new GlesBindingEntry(GlesBindingKind.StorageBlock, "Particles", 0, 3, 3),
+			new GlesBindingEntry(GlesBindingKind.Image, "uOutput", 0, 1, 1),
 		], table);
+
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
@@ -205,7 +210,17 @@ public class GlesDeviceTests
 			Assert.False(es30.VertexAttribBinding);
 			Assert.False(es30.NativeBaseVertex);
 			Assert.Throws<NotSupportedException>(() => es30.CreateBuffer(new BufferDescriptor(16, BufferUsage.Storage)));
+
+			// No compute at ES 3.0: the limits say so, and compute pipelines, passes and storage textures throw.
+			Assert.False(es30.Limits.ComputeShaders);
+			Assert.Equal(0u, es30.Limits.MaxComputeWorkgroupsPerDimension);
+			Assert.Throws<NotSupportedException>(() => es30.CreateShaderModule(new ShaderModuleDescriptor("#version 310 es\nlayout(local_size_x = 1) in;\nvoid main() { }\n"u8.ToArray(), ShaderStage.Compute, ShaderLanguage.GlslEs)));
+			Assert.Throws<NotSupportedException>(() => es30.CreateTexture(new TextureDescriptor(4, 4, TextureFormat.Rgba8Unorm, TextureUsage.StorageBinding)));
+			var encoder = es30.CreateCommandEncoder();
+			Assert.Throws<NotSupportedException>(() => encoder.BeginComputePass());
+			es30.Queue.Submit(encoder.Finish());
 		}
+
 
 		using (var es31 = (GlesDevice)log.CreateDevice(GraphicsBackend.OpenGLES, glesLevel: GlesFeatureLevel.Es31))
 		{

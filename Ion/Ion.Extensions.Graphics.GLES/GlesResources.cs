@@ -105,6 +105,13 @@ internal sealed class GlesTexture : ITexture
 			}
 		}
 
+		if ((Usage & TextureUsage.StorageBinding) != 0)
+		{
+			if (!device.Limits.ComputeShaders) throw new NotSupportedException("Storage textures need OpenGL ES 3.1 (compute).");
+			if (!Format.IsStorageFormat()) throw new NotSupportedException($"{Format} cannot be a storage texture (use Rgba8Unorm, Rgba16Float, R32Float or Rgba32Float).");
+			if (Dimension != TextureDimension.D2 || SampleCount > 1) throw new NotSupportedException("Storage textures are single-sampled 2D textures.");
+		}
+
 		if ((Usage & TextureUsage.RenderAttachment) != 0 && Format.IsFloat())
 		{
 			var renderable = Format is TextureFormat.R16Float or TextureFormat.Rgba16Float ? device.ColorBufferHalfFloat : device.ColorBufferFloat;
@@ -256,7 +263,8 @@ internal sealed partial class GlesShaderModule : IShaderModule
 	public GlesShaderModule(GlesDevice device, in ShaderModuleDescriptor descriptor)
 	{
 		if (descriptor.Language != ShaderLanguage.GlslEs) throw new NotSupportedException($"The GLES backend takes GLSL ES shader modules, not {descriptor.Language}.");
-		if (descriptor.Stage is not (ShaderStage.Vertex or ShaderStage.Fragment)) throw new ArgumentException("A shader module is a vertex or a fragment stage.", nameof(descriptor));
+		if (descriptor.Stage is not (ShaderStage.Vertex or ShaderStage.Fragment or ShaderStage.Compute)) throw new ArgumentException("A shader module is a vertex, fragment or compute stage.", nameof(descriptor));
+		if (descriptor.Stage == ShaderStage.Compute && !device.Limits.ComputeShaders) throw new NotSupportedException("Compute shaders need OpenGL ES 3.1.");
 		_device = device;
 		Stage = descriptor.Stage;
 		Label = descriptor.Label;
@@ -282,7 +290,12 @@ internal sealed partial class GlesShaderModule : IShaderModule
 
 	internal static uint Compile(GL gl, string source, ShaderStage stage, string? label)
 	{
-		var shader = gl.CreateShader(stage == ShaderStage.Vertex ? GLEnum.VertexShader : GLEnum.FragmentShader);
+		var shader = gl.CreateShader(stage switch
+		{
+			ShaderStage.Vertex => GLEnum.VertexShader,
+			ShaderStage.Compute => GLEnum.ComputeShader,
+			_ => GLEnum.FragmentShader,
+		});
 		gl.ShaderSource(shader, source);
 		gl.CompileShader(shader);
 		if (gl.GetShader(shader, GLEnum.CompileStatus) == 0)
@@ -334,9 +347,21 @@ internal sealed partial class GlesShaderModule : IShaderModule
 	}
 }
 
-internal sealed class GlesBindGroupLayout(in BindGroupLayoutDescriptor descriptor) : IBindGroupLayout
+internal sealed class GlesBindGroupLayout : IBindGroupLayout
 {
-	public IReadOnlyList<BindGroupLayoutEntry> Entries { get; } = descriptor.Entries.ToArray();
+	public GlesBindGroupLayout(in BindGroupLayoutDescriptor descriptor)
+	{
+		Entries = descriptor.Entries.ToArray();
+		foreach (var entry in Entries)
+		{
+			if (entry.Type is BindingType.ReadWriteStorageBuffer or BindingType.StorageTexture && entry.Visibility != ShaderStage.Compute)
+			{
+				throw new NotSupportedException($"Binding {entry.Binding}: {entry.Type} bindings are visible to the compute stage only.");
+			}
+		}
+	}
+
+	public IReadOnlyList<BindGroupLayoutEntry> Entries { get; }
 
 	public BindingType TypeOf(uint binding)
 	{
@@ -366,22 +391,40 @@ internal sealed class GlesBindGroup : IBindGroup
 		var uniforms = new List<GlesBufferBinding>();
 		var storage = new List<GlesBufferBinding>();
 		var textures = new List<GlesTextureBinding>();
+		var images = new List<GlesTextureBinding>();
 		var samplers = new List<(uint Binding, GlesSampler Sampler)>();
 		foreach (var entry in descriptor.Entries)
 		{
 			if (entry.Binding >= GlesBindings.BindingsPerGroup) throw new ArgumentOutOfRangeException(nameof(descriptor), entry.Binding, $"The GLES backend supports binding numbers 0 to {GlesBindings.BindingsPerGroup - 1}.");
-			switch (layout.TypeOf(entry.Binding))
+			var type = layout.TypeOf(entry.Binding);
+			switch (type)
 			{
 				case BindingType.UniformBuffer:
 				case BindingType.StorageBuffer:
+				case BindingType.ReadWriteStorageBuffer:
 					var buffer = (GlesBuffer)(entry.Buffer ?? throw new ArgumentException($"Binding {entry.Binding} needs a buffer."));
 					var size = entry.Size == 0 ? buffer.Size - entry.Offset : entry.Size;
-					if (entry.Offset % device.Limits.MinUniformBufferOffsetAlignment != 0 && layout.TypeOf(entry.Binding) == BindingType.UniformBuffer)
+					if (type == BindingType.UniformBuffer && entry.Offset % device.Limits.MinUniformBufferOffsetAlignment != 0)
 					{
 						throw new ArgumentException($"Uniform buffer offset {entry.Offset} of binding {entry.Binding} is not a multiple of MinUniformBufferOffsetAlignment ({device.Limits.MinUniformBufferOffsetAlignment}).");
 					}
 
-					(layout.TypeOf(entry.Binding) == BindingType.UniformBuffer ? uniforms : storage).Add(new GlesBufferBinding(entry.Binding, buffer, entry.Offset, size));
+					if (type != BindingType.UniformBuffer)
+					{
+						if ((buffer.Usage & BufferUsage.Storage) == 0) throw new ArgumentException($"Binding {entry.Binding} is a storage buffer binding; the buffer needs BufferUsage.Storage.");
+						if (entry.Offset % device.Limits.MinStorageBufferOffsetAlignment != 0)
+						{
+							throw new ArgumentException($"Storage buffer offset {entry.Offset} of binding {entry.Binding} is not a multiple of MinStorageBufferOffsetAlignment ({device.Limits.MinStorageBufferOffsetAlignment}).");
+						}
+					}
+
+					(type == BindingType.UniformBuffer ? uniforms : storage).Add(new GlesBufferBinding(entry.Binding, buffer, entry.Offset, size));
+					break;
+				case BindingType.StorageTexture:
+					var image = (GlesTextureView)(entry.TextureView ?? throw new ArgumentException($"Binding {entry.Binding} needs a texture view."));
+					if ((image.TextureImpl.Usage & TextureUsage.StorageBinding) == 0) throw new ArgumentException($"Binding {entry.Binding} is a storage texture binding; the texture needs TextureUsage.StorageBinding.");
+					if (image.MipCount != 1) throw new ArgumentException($"Binding {entry.Binding}: a storage texture view must view one mip level.");
+					images.Add(new GlesTextureBinding(entry.Binding, image));
 					break;
 				case BindingType.Sampler:
 					samplers.Add((entry.Binding, (GlesSampler)(entry.Sampler ?? throw new ArgumentException($"Binding {entry.Binding} needs a sampler."))));
@@ -395,6 +438,7 @@ internal sealed class GlesBindGroup : IBindGroup
 		Uniforms = [.. uniforms];
 		Storage = [.. storage];
 		Textures = [.. textures];
+		Images = [.. images];
 		Samplers = [.. samplers];
 	}
 
@@ -405,6 +449,9 @@ internal sealed class GlesBindGroup : IBindGroup
 	public GlesBufferBinding[] Storage { get; }
 
 	public GlesTextureBinding[] Textures { get; }
+
+	/// <summary>The storage textures (bound to image units).</summary>
+	public GlesTextureBinding[] Images { get; }
 
 	public (uint Binding, GlesSampler Sampler)[] Samplers { get; }
 
@@ -426,6 +473,78 @@ internal sealed class GlesPipelineLayout(in PipelineLayoutDescriptor descriptor)
 	public IBindGroupLayout[] BindGroupLayouts { get; } = descriptor.BindGroupLayouts.ToArray();
 
 	public void Dispose() { }
+}
+
+/// <summary>
+/// A compute program (OpenGL ES 3.1). The binding qualifiers written by <c>Ion.Shaders</c> place every resource at its
+/// flattened slot; the pipeline checks the slots against the device's limits and keeps the sampler pairs, as a render
+/// pipeline does.
+/// </summary>
+internal sealed class GlesComputePipeline : IComputePipeline
+{
+	private readonly GlesDevice _device;
+	private bool _disposed;
+
+	public GlesComputePipeline(GlesDevice device, ComputePipelineDescriptor descriptor)
+	{
+		ArgumentNullException.ThrowIfNull(descriptor);
+		if (!device.Limits.ComputeShaders) throw new NotSupportedException("Compute pipelines need OpenGL ES 3.1.");
+		_device = device;
+		Label = descriptor.Label;
+		var module = (GlesShaderModule)descriptor.Compute.Module;
+		if (module.Stage != ShaderStage.Compute) throw new ArgumentException($"A compute pipeline needs a compute shader module, not {module.Stage}.", nameof(descriptor));
+		if (descriptor.Compute.EntryPoint != "main") throw new NotSupportedException("GLSL ES shaders have a single entry point, main.");
+
+		var gl = device.Gl;
+		Program = gl.CreateProgram();
+		gl.AttachShader(Program, module.Handle);
+		gl.LinkProgram(Program);
+		var linked = gl.GetProgram(Program, GLEnum.LinkStatus) != 0;
+		gl.DetachShader(Program, module.Handle);
+		if (!linked)
+		{
+			var log = gl.GetProgramInfoLog(Program);
+			gl.DeleteProgram(Program);
+			throw new InvalidOperationException($"Compute pipeline {Label ?? "(unnamed)"}: the GLSL ES program failed to link: {log}");
+		}
+
+		var pairs = new List<GlesSamplerPair>();
+		foreach (var entry in module.Bindings)
+		{
+			var (limit, what, unit) = entry.Kind switch
+			{
+				GlesBindingKind.UniformBlock => (device.MaxUniformBufferBindings, "uniform block", "binding point"),
+				GlesBindingKind.StorageBlock => (device.MaxStorageBufferBindings, "storage block", "binding point"),
+				GlesBindingKind.Image => (device.MaxImageUnits, "storage texture", "image unit"),
+				_ => (device.MaxTextureUnits, "sampler", "texture unit"),
+			};
+			if (entry.Slot >= limit)
+			{
+				gl.DeleteProgram(Program);
+				throw new NotSupportedException($"Compute pipeline {Label}: {what} {entry.Name} (set {entry.Group}, binding {entry.Binding}) flattens to {unit} {entry.Slot}, but the device has {limit}. Keep storage buffers and storage textures in group 0, bindings 0 to 3, for OpenGL ES 3.1 devices.");
+			}
+
+			if (entry.Kind == GlesBindingKind.Sampler && !pairs.Exists(p => p.Unit == entry.Slot)) pairs.Add(new GlesSamplerPair(entry.Slot, entry.SamplerGroup, entry.SamplerBinding));
+		}
+
+		SamplerPairs = [.. pairs];
+		HasBindingTable = module.Bindings.Count > 0;
+	}
+
+	public readonly uint Program;
+	public readonly GlesSamplerPair[] SamplerPairs;
+	public readonly bool HasBindingTable;
+
+	public string? Label { get; }
+
+	public void Dispose()
+	{
+		if (_disposed) return;
+		_disposed = true;
+		var device = _device;
+		var program = Program;
+		device.Defer(() => device.Gl.DeleteProgram(program));
+	}
 }
 
 /// <summary>A texture unit and the sampler binding whose sampler object is bound to it.</summary>

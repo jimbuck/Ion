@@ -31,7 +31,7 @@ Import `Ion.Shaders.targets` and list your shaders as `IonShader` items:
   </PropertyGroup>
 
   <ItemGroup>
-    <IonShader Include="Shaders/*.vert;Shaders/*.frag" />
+    <IonShader Include="Shaders/*.vert;Shaders/*.frag;Shaders/*.comp" />
     <!-- Included files: listed so that editing one recompiles the shaders. -->
     <IonShaderInclude Include="Shaders/*.glsl" />
   </ItemGroup>
@@ -63,8 +63,8 @@ changed.
 | `IonShaderOptimize` | `true` | Optimize the SPIR-V (Shaderc's performance level). Debug info is always generated |
 | `IonShaderOutDir` | `obj/.../IonShaders/` | Where the compiled files are written before embedding |
 
-The stage comes from the file extension: `.vert` (vertex) and `.frag` (fragment). The compiler also accepts `.comp`, but
-the RHI has no compute pipelines, so compute shaders cannot be used yet.
+The stage comes from the file extension: `.vert` (vertex), `.frag` (fragment) and `.comp` (compute). Compute shaders
+are covered in [Compute shaders](/Ion/rendering/compute/).
 
 ### Build errors
 
@@ -138,7 +138,7 @@ What the translation does for you:
 - Separate `texture2D` and `sampler` bindings become one `sampler2D` (named `texture_sampler`), whose sampler object is
   the one the shader used with it.
 - `(set, binding)` pairs become `layout(binding = N)` with `N = set * 8 + binding`, and a comment table lists each
-  uniform block and combined sampler with its slot.
+  uniform block, storage block, combined sampler and storage image with its slot.
 - Clip-space y is negated and depth is remapped, so the same geometry lands in the same place on both backends (the GLES
   backend flips once when presenting).
 - Varyings are renamed by location (`ion_var_N`) so stages link by name even on GLSL ES 3.00.
@@ -157,7 +157,7 @@ using Ion.Extensions.Graphics.Rhi;
 
 var assembly = typeof(MyRenderer).Assembly;
 
-// A descriptor in the device's language (SPIR-V or GLSL ES), stage from the extension (.vert or .frag):
+// A descriptor in the device's language (SPIR-V or GLSL ES), stage from the extension (.vert, .frag or .comp):
 var vertex = device.CreateShaderModule(EmbeddedShaders.Descriptor(device, assembly, "textured_quad.vert"));
 var fragment = device.CreateShaderModule(EmbeddedShaders.Descriptor(device, assembly, "textured_quad.frag"));
 
@@ -371,7 +371,9 @@ fails, the error lists every path tried.
 
 ## See also
 
+- [Compute shaders](/Ion/rendering/compute/)
 - [Graphics backends](/Ion/rendering/graphics-backends/): the portability rules in context
+
 - [Rendering overview](/Ion/rendering/overview/): the RHI types
 - [Meshes and materials](/Ion/rendering/3d/meshes-and-materials/)
 - [Quad example](/Ion/examples/quad/)

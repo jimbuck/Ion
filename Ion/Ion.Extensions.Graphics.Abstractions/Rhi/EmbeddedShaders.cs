@@ -27,7 +27,7 @@ public static class EmbeddedShaders
 
 	/// <summary>
 	/// A shader module descriptor for <paramref name="fileName"/> in <paramref name="device"/>'s shader language, with the
-	/// stage taken from the extension (<c>.vert</c> or <c>.frag</c>).
+	/// stage taken from the extension (<c>.vert</c>, <c>.frag</c> or <c>.comp</c>).
 	/// </summary>
 	public static ShaderModuleDescriptor Descriptor(IGraphicsDevice device, Assembly assembly, string fileName)
 	{
@@ -36,7 +36,8 @@ public static class EmbeddedShaders
 		{
 			".vert" => ShaderStage.Vertex,
 			".frag" => ShaderStage.Fragment,
-			_ => throw new ArgumentException($"Cannot tell the stage of '{fileName}' (use .vert or .frag).", nameof(fileName)),
+			".comp" => ShaderStage.Compute,
+			_ => throw new ArgumentException($"Cannot tell the stage of '{fileName}' (use .vert, .frag or .comp).", nameof(fileName)),
 		};
 		return new ShaderModuleDescriptor(Load(assembly, fileName, device.ShaderLanguage), stage, device.ShaderLanguage, fileName);
 	}

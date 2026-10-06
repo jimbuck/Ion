@@ -63,7 +63,7 @@ public readonly record struct SamplerDescriptor
 /// compiled at run time.
 /// </summary>
 /// <param name="Code">SPIR-V words (as bytes) for Vulkan, or GLSL ES 3.10 source (UTF-8) for GLES.</param>
-/// <param name="Stage">The stage the module is for (<see cref="ShaderStage.Vertex"/> or <see cref="ShaderStage.Fragment"/>).</param>
+/// <param name="Stage">The stage the module is for (<see cref="ShaderStage.Vertex"/>, <see cref="ShaderStage.Fragment"/> or <see cref="ShaderStage.Compute"/>).</param>
 /// <param name="Language">The language of <paramref name="Code"/>.</param>
 /// <param name="Label">A debug label.</param>
 public readonly record struct ShaderModuleDescriptor(ReadOnlyMemory<byte> Code, ShaderStage Stage, ShaderLanguage Language = ShaderLanguage.SpirV, string? Label = null);
@@ -199,6 +199,29 @@ public sealed record RenderPipelineDescriptor
 	public string? Label { get; init; }
 }
 
+/// <summary>The compute stage of a compute pipeline.</summary>
+/// <param name="Module">A <see cref="ShaderStage.Compute"/> module (a <c>.comp</c> shader).</param>
+/// <param name="EntryPoint">The entry point (GLSL: <c>main</c>).</param>
+public readonly record struct ComputeState(IShaderModule Module, string EntryPoint = "main");
+
+/// <summary>Describes a compute pipeline for <see cref="IGraphicsDevice.CreateComputePipeline"/>.</summary>
+public sealed record ComputePipelineDescriptor
+{
+	/// <summary>The pipeline layout (the bind group layouts it uses).</summary>
+	public required IPipelineLayout Layout { get; init; }
+	/// <summary>The compute stage.</summary>
+	public required ComputeState Compute { get; init; }
+	/// <summary>A debug label.</summary>
+	public string? Label { get; init; }
+}
+
+/// <summary>
+/// The arguments of <see cref="IComputePassEncoder.DispatchWorkgroupsIndirect"/> as laid out in an
+/// <see cref="BufferUsage.Indirect"/> buffer: three <c>uint</c> workgroup counts, 12 bytes (the layout of
+/// <c>VkDispatchIndirectCommand</c>, WebGPU's indirect dispatch and <c>glDispatchComputeIndirect</c>).
+/// </summary>
+public readonly record struct DispatchIndirectArgs(uint WorkgroupCountX, uint WorkgroupCountY = 1, uint WorkgroupCountZ = 1);
+
 /// <summary>One color attachment of a render pass.</summary>
 /// <param name="View">The view rendered into.</param>
 /// <param name="LoadOp">Clear or keep the previous contents.</param>
@@ -263,4 +286,28 @@ public readonly record struct DeviceLimits
 	public uint MaxBindGroups { get; init; }
 	/// <summary>Whether storage buffers may be read in the vertex stage (false on some GLES 3.1 devices).</summary>
 	public bool VertexStorageBuffers { get; init; }
+
+	/// <summary>
+	/// Whether the device runs compute shaders (<see cref="IGraphicsDevice.CreateComputePipeline"/>,
+	/// <see cref="ICommandEncoder.BeginComputePass"/>). True on Vulkan and on OpenGL ES 3.1 and later; false at the
+	/// OpenGL ES 3.0 feature level, where both throw <see cref="NotSupportedException"/>.
+	/// </summary>
+	public bool ComputeShaders { get; init; }
+
+	/// <summary>The largest workgroup size in x (<c>local_size_x</c>); at least 128 where compute is supported.</summary>
+	public uint MaxComputeWorkgroupSizeX { get; init; }
+	/// <summary>The largest workgroup size in y (<c>local_size_y</c>); at least 128 where compute is supported.</summary>
+	public uint MaxComputeWorkgroupSizeY { get; init; }
+	/// <summary>The largest workgroup size in z (<c>local_size_z</c>); at least 64 where compute is supported.</summary>
+	public uint MaxComputeWorkgroupSizeZ { get; init; }
+	/// <summary>The most invocations in one workgroup (x * y * z); at least 128 where compute is supported.</summary>
+	public uint MaxComputeInvocationsPerWorkgroup { get; init; }
+	/// <summary>The most workgroups in each dimension of one dispatch; at least 65535 where compute is supported.</summary>
+	public uint MaxComputeWorkgroupsPerDimension { get; init; }
+	/// <summary>The bytes of <c>shared</c> memory one workgroup may use; at least 16384 where compute is supported.</summary>
+	public uint MaxComputeWorkgroupStorageSize { get; init; }
+	/// <summary>The largest storage buffer binding in bytes (0 where storage buffers are not supported).</summary>
+	public ulong MaxStorageBufferBindingSize { get; init; }
+	/// <summary>The alignment of storage buffer binding offsets.</summary>
+	public ulong MinStorageBufferOffsetAlignment { get; init; }
 }
