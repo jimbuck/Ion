@@ -23,7 +23,6 @@ public sealed class VulkanTextureContractTests : TextureContractTests;
 public sealed class VulkanComputeContractTests : ComputeContractTests;
 
 /// <summary>The shared windowed RHI contract on Vulkan (a swapchain on a GLFW or SDL window).</summary>
-
 [RhiBackend(GraphicsBackend.Vulkan)]
 [Collection(WindowedContractTests.Collection)]
 public sealed class VulkanWindowedContractTests : WindowedContractTests;

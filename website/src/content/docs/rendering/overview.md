@@ -87,7 +87,6 @@ Most games never touch the RHI. When you do need it (a custom renderer, a post e
 take `IGraphicsFrame` in a system. See [Shaders](/Ion/rendering/shaders/) for a complete example and
 [Compute shaders](/Ion/rendering/compute/) for work that runs outside a render pass.
 
-
 ## Registering rendering
 
 For a 2D game, `AddIon()` and `UseIon()` register and add everything: the window, the RHI backend, the sprite batch,

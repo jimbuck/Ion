@@ -216,7 +216,6 @@ the RHI types, and the built-in renderers follow them):
 (`ComputeShaders`, the workgroup sizes and counts, `MaxStorageBufferBindingSize`) described in
 [Compute shaders](/Ion/rendering/compute/#limits).
 
-
 ## Headless: null and offscreen
 
 Two headless setups share one switch, `Ion:Headless=true` (or `--headless` on the command line):

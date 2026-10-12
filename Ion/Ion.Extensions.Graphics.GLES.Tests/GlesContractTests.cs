@@ -69,7 +69,6 @@ public sealed class GlesEs31ComputeContractTests : ComputeContractTests
 }
 
 /// <summary>The shared windowed RHI contract on OpenGL ES (the window's GL ES context, an offscreen target blitted at present).</summary>
-
 [RhiBackend(GraphicsBackend.OpenGLES)]
 [Collection(WindowedContractTests.Collection)]
 public sealed class GlesWindowedContractTests : WindowedContractTests;
@@ -86,7 +85,6 @@ public sealed class ComputeCollection
 }
 
 /// <summary>Windowed tests share the process-wide Silk.NET platform registration, so they never run in parallel.</summary>
-
 [CollectionDefinition(WindowedContractTests.Collection, DisableParallelization = true)]
 public sealed class WindowedCollection;
 

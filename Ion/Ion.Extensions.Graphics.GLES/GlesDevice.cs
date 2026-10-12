@@ -19,7 +19,6 @@ public enum GlesFeatureLevel
 	/// OpenGL ES 3.0: GLSL ES 3.00 (the 3.10 sources are rewritten at load: no binding or varying location qualifiers, so
 	/// slots are assigned by name from the flattening table), vertex attribute pointers re-specified per draw, no storage
 	/// buffers, no compute, base vertex emulated through vertex buffer offsets.
-
 	/// </summary>
 	Es30,
 	/// <summary>OpenGL ES 3.1: binding qualifiers in shaders, separate vertex attribute formats and bindings, storage buffers, compute shaders. Base vertex emulated.</summary>

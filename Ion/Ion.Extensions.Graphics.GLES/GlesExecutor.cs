@@ -352,8 +352,7 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 		var pipeline = _pipeline ?? throw new InvalidOperationException("Set a pipeline before drawing.");
 		_applyBindGroups(pipeline.SamplerPairs, pipeline.HasBindingTable);
 
-		if (_vertexDirty
- || vertexShift != _appliedVertexShift || instanceShift != _appliedInstanceShift)
+		if (_vertexDirty || vertexShift != _appliedVertexShift || instanceShift != _appliedInstanceShift)
 		{
 			_bindVertexBuffers(pipeline, vertexShift, instanceShift);
 			_vertexDirty = false;

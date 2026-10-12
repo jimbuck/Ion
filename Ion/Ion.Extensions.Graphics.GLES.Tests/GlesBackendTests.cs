@@ -85,7 +85,6 @@ public class GlesBindingSchemeTests
 			new GlesBindingEntry(GlesBindingKind.StorageBlock, "Particles", 0, 3, 3),
 			new GlesBindingEntry(GlesBindingKind.Image, "uOutput", 0, 1, 1),
 		], table);
-
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
@@ -220,7 +219,6 @@ public class GlesDeviceTests
 			Assert.Throws<NotSupportedException>(() => encoder.BeginComputePass());
 			es30.Queue.Submit(encoder.Finish());
 		}
-
 
 		using (var es31 = (GlesDevice)log.CreateDevice(GraphicsBackend.OpenGLES, glesLevel: GlesFeatureLevel.Es31))
 		{

@@ -373,7 +373,6 @@ fails, the error lists every path tried.
 
 - [Compute shaders](/Ion/rendering/compute/)
 - [Graphics backends](/Ion/rendering/graphics-backends/): the portability rules in context
-
 - [Rendering overview](/Ion/rendering/overview/): the RHI types
 - [Meshes and materials](/Ion/rendering/3d/meshes-and-materials/)
 - [Quad example](/Ion/examples/quad/)
