@@ -200,6 +200,7 @@ device's limits fails when you create it, with a message naming the binding.
 
 ## See also
 
+- [GPU particles](/Ion/examples/particles/): a complete sample
 - [Shaders](/Ion/rendering/shaders/): writing and compiling shaders
 - [Graphics backends](/Ion/rendering/graphics-backends/): feature levels and portability rules
 - [Rendering overview](/Ion/rendering/overview/): the RHI types
