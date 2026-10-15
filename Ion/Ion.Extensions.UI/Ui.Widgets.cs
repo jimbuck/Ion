@@ -214,9 +214,25 @@ public sealed partial class Ui
 		value ??= string.Empty;
 		var id = _id(key, file, line);
 		ref var node = ref _add(UiNodeKind.TextInput, id, style, key ?? label, NodeFlags.Focusable | NodeFlags.Blocks);
+		var changed = _editText(ref node, ref value, maxLength);
+		node.Text = label;
+		node.Value = value;
+		node.Number = maxLength;
+		node.TextSize = MeasureText(label);
+		node.LabelWidth = _theme.LabelWidth > 0 ? _theme.LabelWidth : node.TextSize.X;
+		node.Measured = new Vector2(node.LabelWidth + _gap + _theme.InputWidth, MathF.Max(_theme.ControlHeight, node.TextSize.Y + 8));
+		return changed;
+	}
+
+	/// <summary>
+	/// Keeps a text field's buffer and the game's string in step: the buffer takes an outside change of
+	/// <paramref name="value"/> (when not being edited), a pending <see cref="IUiTree.SetValue"/>, and gives back its edits
+	/// as a new string. Returns whether <paramref name="value"/> changed.
+	/// </summary>
+	private bool _editText(ref UiNode node, ref string value, int maxLength)
+	{
 		var state = node.State;
 		var old = value;
-
 		if (state.Buffer is null || state.Buffer.Length < maxLength || (!state.Edited && !ReferenceEquals(state.Text, value)))
 		{
 			state.SetText(value, maxLength);
@@ -243,12 +259,6 @@ public sealed partial class Ui
 		state.Edited = false;
 		state.HasPending = false;
 		state.PendingString = null;
-		node.Text = label;
-		node.Value = value;
-		node.Number = maxLength;
-		node.TextSize = MeasureText(label);
-		node.LabelWidth = _theme.LabelWidth > 0 ? _theme.LabelWidth : node.TextSize.X;
-		node.Measured = new Vector2(node.LabelWidth + _gap + _theme.InputWidth, MathF.Max(_theme.ControlHeight, node.TextSize.Y + 8));
 		return !ReferenceEquals(old, value) && !string.Equals(old, value, StringComparison.Ordinal);
 	}
 

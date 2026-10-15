@@ -107,6 +107,16 @@ internal sealed class UiNodeState(uint id)
 	public float[]? ComposedWidths;
 	public object? ComposedFont;
 
+	// Text areas: line breaks are text, the lines shown, the first line shown, the x kept by vertical moves, the last
+	// caret and text the scroll followed, and the wrapped layout.
+	public bool Multiline;
+	public int VisibleLines = 1;
+	public int ScrollLine;
+	public float DesiredX = float.NaN;
+	public int FollowCaret = -1;
+	public string? FollowSource;
+	public TextAreaLayout? Area;
+
 	public bool HasSelection => Anchor >= 0 && Anchor != Caret;
 
 	public int SelectionStart => HasSelection ? Math.Min(Anchor, Caret) : Caret;
@@ -213,7 +223,7 @@ internal sealed class UiNodeState(uint id)
 		DeleteSelection();
 		foreach (var c in text)
 		{
-			if (char.IsControl(c) || Length >= Buffer.Length) continue;
+			if ((char.IsControl(c) && !(Multiline && c == '\n')) || Length >= Buffer.Length) continue;
 			Array.Copy(Buffer, Caret, Buffer, Caret + 1, Length - Caret);
 			Buffer[Caret++] = c;
 			Length++;

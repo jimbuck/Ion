@@ -36,6 +36,7 @@ public sealed class HudSystem(Ui ui)
 | `Toggle(text, ref value, key, style)` | `Toggle` | true when `value` changed |
 | `Slider(text, ref value, min, max, step, key, style)` | `Slider` | true when `value` changed |
 | `TextInput(label, ref value, maxLength, key, style)` | `TextInput` | true when `value` changed |
+| `TextArea(label, ref value, maxLength, lines, key, style)` | `TextArea` | true when `value` changed |
 | `List(label, items, ref selected, key, style)` | `List` with `ListItem` children | true when `selected` changed |
 | `Spacer(size)` | `Spacer` | nothing |
 
@@ -284,6 +285,32 @@ There is no multi-line editing. On devices
 without a keyboard (gamepads, the R36S) there is no on-screen keyboard; `TextInput` is reachable but can only be typed
 into through `IUiTree` or injected text input (`ScriptedInput`, the remote `input.send`).
 :::
+
+## TextArea
+
+A multi-line text field with a caption, `lines` lines tall. It edits like `TextInput`, with selection, the clipboard
+and input method compositions, and adds:
+
+- **Wrapping.** Text wraps at the field's width, after the last space that fits; a word longer than a line is cut.
+  `\n` in the value always starts a new line.
+- **Enter** inserts a line break. Escape, Tab, a click elsewhere, or gamepad A or B stop editing.
+- **Up and Down** move to the line above or below, keeping the caret's x across several moves. Past the first or last
+  line they go to the start or end of the text. With Shift they select.
+- **Home and End** go to the start and end of the caret's line; with Ctrl, of the whole text.
+- **Scrolling.** The field scrolls a line at a time to keep the caret in view, and the mouse wheel over it scrolls it.
+- **Paste** keeps line breaks (`\r\n` and `\r` become `\n`).
+
+```csharp
+if (ui.TextArea("Message", ref _message, maxLength: 500, lines: 6)) _draftSaved = false;
+```
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `maxLength` | `1024` | Maximum characters, line breaks included |
+| `lines` | `4` | Lines shown; the field's height is that many lines of the theme's font plus padding |
+
+The value's lines are separated by `\n`. Wrapping uses each character's width measured on its own (cached), so the
+layout costs one pass over the text per edit. Fonts with kerning may draw a line a pixel or so narrower than measured.
 
 ## List
 

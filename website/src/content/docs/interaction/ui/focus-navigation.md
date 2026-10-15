@@ -58,6 +58,7 @@ builder.AddUi(options => options.Gamepad = 0);
 | `Toggle` | Flips the value. |
 | `ListItem` | Selects the item. |
 | `TextInput` | Starts editing (the caret goes to the end; a click puts it at the pointer). |
+| `TextArea` | The same. While editing, Up and Down move between its lines instead of moving the focus; Tab leaves it. |
 | `Slider` | Nothing; use Left/Right. |
 
 If nothing has the focus, the first move or activate press focuses the first focusable widget instead.

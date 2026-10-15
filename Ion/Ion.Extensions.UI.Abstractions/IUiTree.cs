@@ -29,6 +29,8 @@ public enum UiNodeKind : byte
 	ListItem,
 	/// <summary>Empty space (<c>Ui.Spacer</c>).</summary>
 	Spacer,
+	/// <summary>A multi-line text field (<c>Ui.TextArea</c>). <see cref="UiNodeInfo.Value"/> is the text, lines separated by line feeds (<c>\n</c>).</summary>
+	TextArea,
 }
 
 /// <summary>

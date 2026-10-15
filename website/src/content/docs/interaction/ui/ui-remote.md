@@ -46,7 +46,7 @@ Each node is a `UiNodeInfo`:
 | Field | Meaning |
 |---|---|
 | `Path` | The node's path (below). |
-| `Kind` | `UiNodeKind`: `Panel`, `Row`, `Column`, `ScrollView`, `Label`, `Button`, `Toggle`, `Slider`, `TextInput`, `List`, `ListItem`, `Spacer`. |
+| `Kind` | `UiNodeKind`: `Panel`, `Row`, `Column`, `ScrollView`, `Label`, `Button`, `Toggle`, `Slider`, `TextInput`, `List`, `ListItem`, `Spacer`, `TextArea`. |
 | `Text` | The caption or text shown, or null. |
 | `Rect` | The layout rectangle in window pixels (`UiRect`: `X`, `Y`, `Width`, `Height`, plus `Right`, `Bottom`, `CenterX`, `CenterY`, `Contains`). Not clipped. |
 | `Enabled` | False inside a `Disabled` scope. |
@@ -59,7 +59,7 @@ Each node is a `UiNodeInfo`:
 |---|---|
 | `Toggle` | `true` or `false` |
 | `Slider` | The number, invariant culture, up to three decimals (`0.35`) |
-| `TextInput` | The text |
+| `TextInput`, `TextArea` | The text (a text area's lines separated by `\n`) |
 | `List` | The selected item's text |
 | `ListItem` | `true` when selected |
 | `ScrollView` | The scroll offset in pixels |
@@ -101,10 +101,10 @@ input would be:
 
 | Command | Applies to | Effect |
 |---|---|---|
-| `Click(path)` | `Button`, `Toggle`, `ListItem`, `TextInput` | A button's call returns true, a toggle flips, an item is selected, a text input starts editing. Also moves the focus. |
-| `SetValue(path, value)` | `Toggle` (`true`/`false`), `Slider` (a number, clamped and snapped), `TextInput` (text, cut to its maximum length), `List` (an item's text or its index) | The value is written through the widget's `ref` parameter. |
+| `Click(path)` | `Button`, `Toggle`, `ListItem`, `TextInput`, `TextArea` | A button's call returns true, a toggle flips, an item is selected, a text input starts editing. Also moves the focus. |
+| `SetValue(path, value)` | `Toggle` (`true`/`false`), `Slider` (a number, clamped and snapped), `TextInput` and `TextArea` (text, cut to their maximum length), `List` (an item's text or its index) | The value is written through the widget's `ref` parameter. |
 | `Focus(path)` | Any focusable node | Moves the focus (and scrolls it into view). |
-| `Type(path, text)` | `TextInput` | Focuses it, starts editing and inserts the text at the caret. |
+| `Type(path, text)` | `TextInput`, `TextArea` | Focuses it, starts editing and inserts the text at the caret. |
 | `Back()` | | The frame reports `Ui.BackPressed`, or a text field being edited stops editing. |
 
 Timing: a command queued between frames N and N+1 is applied at the start of N+1's Update; the tree published at the
@@ -216,7 +216,7 @@ registered when the remote module is compiled out of a Release build. The servic
 | `ui.back` | mutate | | `{queued, frame}` |
 
 Kinds are lower case with underscores in JSON: `panel`, `row`, `column`, `scroll_view`, `label`, `button`, `toggle`,
-`slider`, `text_input`, `list`, `list_item`, `spacer`. `ui.tree` is watchable: subscribe to it over WebSocket to get a
+`slider`, `text_input`, `text_area`, `list`, `list_item`, `spacer`. `ui.tree` is watchable: subscribe to it over WebSocket to get a
 new tree as the UI changes. Numbers and booleans passed to `ui.set_value` are converted with the invariant culture.
 
 A command that cannot apply fails with error -32004 and a message that says why: no node has that path in the current

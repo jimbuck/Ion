@@ -190,6 +190,10 @@ public sealed partial class Ui
 					break;
 				}
 
+			case UiNodeKind.TextArea:
+				_drawTextArea(batch, ref node, textColor);
+				break;
+
 			case UiNodeKind.ListItem:
 				{
 					if (node.Is(NodeFlags.On)) batch.DrawRect(theme.ListItemSelected, rect);

@@ -173,6 +173,7 @@ public sealed partial class Ui
 		_inFrame = false;
 		_layout();
 		_endInput();
+		_followAreaCaret();
 		_reportTextInputArea();
 		_tree.Publish();
 		_evictStates();
@@ -339,6 +340,7 @@ public sealed partial class Ui
 		UiNodeKind.Toggle => "toggle",
 		UiNodeKind.Slider => "slider",
 		UiNodeKind.TextInput => "input",
+		UiNodeKind.TextArea => "textarea",
 		UiNodeKind.List => "list",
 		UiNodeKind.ListItem => "item",
 		_ => "spacer",

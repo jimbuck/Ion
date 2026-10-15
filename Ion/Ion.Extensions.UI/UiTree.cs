@@ -97,12 +97,12 @@ internal sealed class UiTree(Ui ui) : IUiTree
 		lock (_sync) return _nodes.AsSpan(0, _count).ToArray();
 	}
 
-	public bool Click(string path) => _enqueue(UiCommandKind.Click, path, null, static n => n.Kind is UiNodeKind.Button or UiNodeKind.Toggle or UiNodeKind.ListItem or UiNodeKind.TextInput);
+	public bool Click(string path) => _enqueue(UiCommandKind.Click, path, null, static n => n.Kind is UiNodeKind.Button or UiNodeKind.Toggle or UiNodeKind.ListItem or UiNodeKind.TextInput or UiNodeKind.TextArea);
 
 	public bool SetValue(string path, string value)
 	{
 		ArgumentNullException.ThrowIfNull(value);
-		return _enqueue(UiCommandKind.SetValue, path, value, static n => n.Kind is UiNodeKind.Toggle or UiNodeKind.Slider or UiNodeKind.TextInput or UiNodeKind.List);
+		return _enqueue(UiCommandKind.SetValue, path, value, static n => n.Kind is UiNodeKind.Toggle or UiNodeKind.Slider or UiNodeKind.TextInput or UiNodeKind.TextArea or UiNodeKind.List);
 	}
 
 	public bool Focus(string path) => _enqueue(UiCommandKind.Focus, path, null, static n => n.Focusable);
@@ -110,7 +110,7 @@ internal sealed class UiTree(Ui ui) : IUiTree
 	public bool Type(string path, string text)
 	{
 		ArgumentNullException.ThrowIfNull(text);
-		return _enqueue(UiCommandKind.Type, path, text, static n => n.Kind == UiNodeKind.TextInput);
+		return _enqueue(UiCommandKind.Type, path, text, static n => n.Kind is UiNodeKind.TextInput or UiNodeKind.TextArea);
 	}
 
 	public void Back()

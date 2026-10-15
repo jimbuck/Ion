@@ -74,7 +74,7 @@ public sealed partial class Ui
 			if (hit >= 0)
 			{
 				_setFocus(_hotId, scroll: false);
-				if (_prev[hit].Kind == UiNodeKind.TextInput) _pressText(hit);
+				if (_prev[hit].Kind is UiNodeKind.TextInput or UiNodeKind.TextArea) _pressText(hit);
 			}
 			else
 			{
@@ -86,7 +86,7 @@ public sealed partial class Ui
 		if (_dragSelecting)
 		{
 			var editing = _prevIndex(_editingId);
-			if (editing >= 0 && input.Down(MouseButton.Left)) _prev[editing].State.MoveCaret(_textIndexAt(editing, _pointer.X), extend: true);
+			if (editing >= 0 && input.Down(MouseButton.Left)) _prev[editing].State.MoveCaret(_textIndexAt(editing, _pointer), extend: true);
 			else _dragSelecting = false;
 		}
 
@@ -148,6 +148,14 @@ public sealed partial class Ui
 		{
 			ref var node = ref _prev[i];
 			if (!node.Is(NodeFlags.Visible) || !_contains(node.Rect, point) || !_contains(node.Clip, point)) continue;
+			if (node.Kind == UiNodeKind.TextArea)
+			{
+				// A text area scrolls its own lines, a line per wheel notch.
+				var notches = (int)MathF.Round(wheel);
+				_areaScroll(node, notches == 0 ? -Math.Sign(wheel) : -notches);
+				return;
+			}
+
 			for (var j = i; j > 0; j = _prev[j].Parent)
 			{
 				if (!_prev[j].Is(NodeFlags.Clips)) continue;
@@ -228,11 +236,47 @@ public sealed partial class Ui
 		bool Command(Key key) => input.Pressed(key, command) || (commandHeld && input.Pressed(key));
 
 		// The clipboard and select all (Ctrl, or Cmd on macOS); typed text is ignored while a command key is held.
+		var editing = _prevIndex(_editingId);
+		var multiline = state.Multiline && editing >= 0;
 		if (Command(Key.A)) state.SelectAll();
 		else if (Command(Key.C)) _copy(state, cut: false);
 		else if (Command(Key.X)) _copy(state, cut: true);
 		else if (Command(Key.V)) _paste(state);
 		else if (!commandHeld && !input.Text.IsEmpty) state.Insert(input.Text);
+		if (input.Pressed(Key.Enter) || input.Pressed(Key.KeypadEnter) || input.Text.Length > 0) state.DesiredX = float.NaN;
+
+		// A text area: Enter starts a line; Up and Down move between lines; Home and End go to a line's ends (with Ctrl, the text's).
+		if (multiline)
+		{
+			if (input.Pressed(Key.Enter) || input.Pressed(Key.KeypadEnter)) state.Insert("\n");
+			var (areaPressed, areaHeld) = _navigation(editing: true);
+			var areaFire = _repeat(areaPressed, areaHeld, dt);
+			var extend = (input.Modifiers & ModifierKeys.Shift) != 0 || _pressedWith(ModifierKeys.Shift) || input.Pressed(Key.Up, ModifierKeys.Shift) || input.Pressed(Key.Down, ModifierKeys.Shift);
+			var toText = commandHeld || _pressedWith(ModifierKeys.Control);
+			switch (areaFire)
+			{
+				case Nav.Up or Nav.Down:
+					_areaMoveVertical(editing, areaFire == Nav.Down, extend);
+					break;
+				case Nav.Home or Nav.End when !toText:
+					_areaLineEdge(editing, areaFire == Nav.End, extend);
+					state.DesiredX = float.NaN;
+					break;
+				case Nav.Next or Nav.Previous:
+					_editingId = 0;
+					_moveLinear(editing, areaFire == Nav.Next);
+					return;
+				case Nav.None:
+					break;
+				default:
+					state.DesiredX = float.NaN;
+					_editKey(state, areaFire, extend, toText);
+					break;
+			}
+
+			if (input.Pressed(Key.Escape) || _gamepadPressed(GamepadButton.A) || _gamepadPressed(GamepadButton.B)) _editingId = 0;
+			return;
+		}
 
 		var (pressed, held) = _navigation(editing: true);
 		var fire = _repeat(pressed, held, dt);
@@ -241,23 +285,8 @@ public sealed partial class Ui
 		var word = commandHeld || _pressedWith(ModifierKeys.Control);
 		switch (fire)
 		{
-			case Nav.Left:
-				if (!shift && state.HasSelection) state.MoveCaret(state.SelectionStart, extend: false);
-				else state.MoveCaret(word ? state.WordStart(state.Caret) : state.Caret - 1, shift);
-				break;
-			case Nav.Right:
-				if (!shift && state.HasSelection) state.MoveCaret(state.SelectionEnd, extend: false);
-				else state.MoveCaret(word ? state.WordEnd(state.Caret) : state.Caret + 1, shift);
-				break;
-			case Nav.Home: state.MoveCaret(0, shift); break;
-			case Nav.End: state.MoveCaret(state.Length, shift); break;
-			case Nav.Backspace:
-				if (word && !state.HasSelection) state.Select(state.WordStart(state.Caret), state.Caret);
-				state.Backspace();
-				break;
-			case Nav.Delete:
-				if (word && !state.HasSelection) state.Select(state.Caret, state.WordEnd(state.Caret));
-				state.Delete();
+			case Nav.Left or Nav.Right or Nav.Home or Nav.End or Nav.Backspace or Nav.Delete:
+				_editKey(state, fire, shift, word);
 				break;
 			case Nav.Up or Nav.Down:
 				{
@@ -306,7 +335,7 @@ public sealed partial class Ui
 		}
 
 		ref var node = ref _nodes[index];
-		var (caretX, textY, height) = _caretGeometry(ref node);
+		var (caretX, textY, height) = node.Kind == UiNodeKind.TextArea ? _areaCaretGeometry(ref node) : _caretGeometry(ref node);
 		_textInput.SetTextInputArea(caretX, textY, 2, height);
 		_reportedArea = true;
 	}
@@ -334,6 +363,32 @@ public sealed partial class Ui
 		return (fieldX + TextInputPadding + offset, y, height);
 	}
 
+	/// <summary>The caret and deletion keys of a text field: Left, Right, Home, End (of the text), Backspace and Delete, with Shift (<paramref name="extend"/>) and Ctrl (<paramref name="word"/>).</summary>
+	private static void _editKey(UiNodeState state, Nav key, bool extend, bool word)
+	{
+		switch (key)
+		{
+			case Nav.Left:
+				if (!extend && state.HasSelection) state.MoveCaret(state.SelectionStart, extend: false);
+				else state.MoveCaret(word ? state.WordStart(state.Caret) : state.Caret - 1, extend);
+				break;
+			case Nav.Right:
+				if (!extend && state.HasSelection) state.MoveCaret(state.SelectionEnd, extend: false);
+				else state.MoveCaret(word ? state.WordEnd(state.Caret) : state.Caret + 1, extend);
+				break;
+			case Nav.Home: state.MoveCaret(0, extend); break;
+			case Nav.End: state.MoveCaret(state.Length, extend); break;
+			case Nav.Backspace:
+				if (word && !state.HasSelection) state.Select(state.WordStart(state.Caret), state.Caret);
+				state.Backspace();
+				break;
+			case Nav.Delete:
+				if (word && !state.HasSelection) state.Select(state.Caret, state.WordEnd(state.Caret));
+				state.Delete();
+				break;
+		}
+	}
+
 	/// <summary>Whether a text editing key went down this frame with <paramref name="modifiers"/> reported on its event.</summary>
 	private bool _pressedWith(ModifierKeys modifiers)
 	{
@@ -351,7 +406,8 @@ public sealed partial class Ui
 		var state = _prev[index].State;
 		var wasEditing = _editingId == state.Id;
 		if (!wasEditing) _startEditing(state);
-		var at = _textIndexAt(index, _pointer.X);
+		var at = _textIndexAt(index, _pointer);
+		state.DesiredX = float.NaN;
 		var repeat = _lastClickId == state.Id && _time - _lastClickTime <= _options.DoubleClickSeconds;
 		_clickCount = repeat ? _clickCount + 1 : 1;
 		_lastClickId = state.Id;
@@ -373,12 +429,13 @@ public sealed partial class Ui
 		}
 	}
 
-	/// <summary>The caret position nearest to <paramref name="x"/> in the text input at <paramref name="index"/> (of the previous layout).</summary>
-	private int _textIndexAt(int index, float x)
+	/// <summary>The caret position nearest to <paramref name="point"/> in the text input or area at <paramref name="index"/> (of the previous layout).</summary>
+	private int _textIndexAt(int index, Vector2 point)
 	{
 		ref var node = ref _prev[index];
+		if (node.Kind == UiNodeKind.TextArea) return _areaIndexAt(index, point);
 		var widths = _prefixWidths(node.State);
-		var local = x - (node.Rect.X + node.LabelWidth + _theme.Gap + TextInputPadding);
+		var local = point.X - (node.Rect.X + node.LabelWidth + _theme.Gap + TextInputPadding);
 		var best = 0;
 		for (var i = 1; i < widths.Length && i <= node.State.Length; i++)
 		{
@@ -399,9 +456,12 @@ public sealed partial class Ui
 	{
 		var text = Clipboard.GetText();
 		if (string.IsNullOrEmpty(text)) return;
-		// A single-line field: each line break or tab becomes one space (other control characters are dropped by Insert).
-		var line = text.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
-		state.Insert(line);
+		// A text area keeps line breaks (as \n); a single-line field turns each into a space. Tabs become spaces, other
+		// control characters are dropped by Insert.
+		var separator = state.Multiline ? "\n" : " ";
+		var cleaned = text.Replace("\r\n", separator, StringComparison.Ordinal).Replace("\r", separator, StringComparison.Ordinal).Replace('\t', ' ');
+		if (!state.Multiline) cleaned = cleaned.Replace('\n', ' ');
+		state.Insert(cleaned);
 	}
 
 	private (Nav Pressed, Nav Held) _navigation(bool editing)
@@ -641,7 +701,7 @@ public sealed partial class Ui
 			case UiNodeKind.Button or UiNodeKind.Toggle or UiNodeKind.ListItem:
 				_click(node.Id);
 				break;
-			case UiNodeKind.TextInput:
+			case UiNodeKind.TextInput or UiNodeKind.TextArea:
 				_startEditing(node.State);
 				break;
 		}
@@ -703,7 +763,7 @@ public sealed partial class Ui
 						state.PendingFloat = number;
 						state.HasPending = true;
 						break;
-					case UiNodeKind.TextInput or UiNodeKind.List:
+					case UiNodeKind.TextInput or UiNodeKind.TextArea or UiNodeKind.List:
 						state.PendingString = value ?? string.Empty;
 						state.HasPending = true;
 						break;

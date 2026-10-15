@@ -120,6 +120,7 @@ public sealed class UiRemoteMethods(IServiceProvider services) : IRemoteMethodPr
 		UiNodeKind.Toggle => "toggle",
 		UiNodeKind.Slider => "slider",
 		UiNodeKind.TextInput => "text_input",
+		UiNodeKind.TextArea => "text_area",
 		UiNodeKind.List => "list",
 		UiNodeKind.ListItem => "list_item",
 		UiNodeKind.Spacer => "spacer",
