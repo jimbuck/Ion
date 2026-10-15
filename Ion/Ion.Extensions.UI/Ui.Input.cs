@@ -39,6 +39,12 @@ public sealed partial class Ui
 	private uint _lastClickId;
 	private int _clickCount;
 	private bool _dragSelecting;
+	private bool _wasComposing;
+	private bool _reportedArea;
+	private readonly ITextInputHost? _textInput;
+
+	/// <summary>The input method's composition shown in the field being edited (empty when none).</summary>
+	internal string Composition => _editingId != 0 ? _input.Composition : string.Empty;
 
 	/// <summary>The caret and selection of the text input being edited (all -1 when none is).</summary>
 	internal (int Caret, int Start, int End) EditingSelection =>
@@ -206,6 +212,17 @@ public sealed partial class Ui
 			return;
 		}
 
+		// While an input method composes, keys belong to it (Enter commits, Escape cancels, arrows move in the composition),
+		// also on the frame its composition ends. Only its committed text reaches the field.
+		var composing = input.Composition.Length > 0;
+		var imeKeys = composing || _wasComposing;
+		_wasComposing = composing;
+		if (imeKeys)
+		{
+			if (!input.Text.IsEmpty) state.Insert(input.Text);
+			return;
+		}
+
 		const ModifierKeys command = ModifierKeys.Control | ModifierKeys.Gui;
 		var commandHeld = (input.Modifiers & command) != 0;
 		bool Command(Key key) => input.Pressed(key, command) || (commandHeld && input.Pressed(key));
@@ -263,6 +280,58 @@ public sealed partial class Ui
 		{
 			_editingId = 0;
 		}
+	}
+
+	/// <summary>
+	/// Tells the text input host where the caret of the field being edited is (window coordinates, after this frame's
+	/// layout), so the input method's windows follow it; clears it once editing stops.
+	/// </summary>
+	private void _reportTextInputArea()
+	{
+		if (_textInput is null) return;
+		var index = -1;
+		if (_editingId != 0)
+		{
+			for (var i = 1; i < _count; i++)
+			{
+				if (_nodes[i].Id == _editingId) { index = i; break; }
+			}
+		}
+
+		if (index < 0)
+		{
+			if (_reportedArea) _textInput.ClearTextInputArea();
+			_reportedArea = false;
+			return;
+		}
+
+		ref var node = ref _nodes[index];
+		var (caretX, textY, height) = _caretGeometry(ref node);
+		_textInput.SetTextInputArea(caretX, textY, 2, height);
+		_reportedArea = true;
+	}
+
+	/// <summary>Where the caret of a text input is drawn: its x, the text's top and the line height (composition included).</summary>
+	private (float X, float Y, float Height) _caretGeometry(ref UiNode node)
+	{
+		var state = node.State;
+		var rect = node.Rect;
+		var fieldX = rect.X + node.LabelWidth + _theme.Gap;
+		var height = MeasureText(null).Y;
+		var y = rect.Y + rect.Height * 0.5f - height * 0.5f;
+		float offset;
+		if (_input.Composition.Length > 0)
+		{
+			var widths = _composedWidths(state, _input.Composition);
+			offset = widths[Math.Clamp(state.Caret + _input.CompositionCursor, 0, widths.Length - 1)];
+		}
+		else
+		{
+			var widths = _prefixWidths(state);
+			offset = widths[Math.Clamp(state.Caret, 0, widths.Length - 1)];
+		}
+
+		return (fieldX + TextInputPadding + offset, y, height);
 	}
 
 	/// <summary>Whether a text editing key went down this frame with <paramref name="modifiers"/> reported on its event.</summary>

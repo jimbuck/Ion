@@ -13,12 +13,12 @@ internal sealed class UiHarness
 {
 	public const float FrameSeconds = 1f / 60f;
 
-	public UiHarness(float width = 800, float height = 600, UiOptions? options = null)
+	public UiHarness(float width = 800, float height = 600, UiOptions? options = null, ITextInputHost? textInput = null)
 	{
 		Viewport = new Vector2(width, height);
 		Input = new NullInputState();
 		Font = new NullFontSet("test", []).CreateStyle(16);
-		Ui = new Ui(Input, options);
+		Ui = new Ui(Input, options, textInput: textInput);
 		Ui.Theme = UiTheme.Default with { Font = Font };
 	}
 

@@ -95,6 +95,17 @@ public sealed class NullInputState : TrackedInputState
 	public void Scroll(float delta) => _queue(InputEvent.ForWheel(delta));
 
 	/// <summary>
+	/// Queues an input method composition for the next frame (what an IME reports while Chinese, Japanese or Korean text is
+	/// being composed): <paramref name="text"/> with its cursor at <paramref name="cursor"/> (the end when omitted), or an
+	/// empty text to end it. Commit the result with <see cref="Type"/>.
+	/// </summary>
+	public void Compose(string text, int? cursor = null)
+	{
+		ArgumentNullException.ThrowIfNull(text);
+		_queue(InputEvent.ForComposition(text, cursor ?? text.Length));
+	}
+
+	/// <summary>
 	/// Queues <paramref name="text"/> as text input for the next frame: it becomes <see cref="TrackedInputState.Text"/>
 	/// (text queued before one frame is concatenated). Only text: no key events are generated.
 	/// </summary>

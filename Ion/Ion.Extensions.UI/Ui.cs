@@ -68,13 +68,15 @@ public sealed partial class Ui
 	/// <summary>
 	/// Creates a UI context reading <paramref name="input"/>. The UI module registers one per application (<c>AddUi</c>);
 	/// tests and tools may create their own and drive <see cref="BeginFrame"/>, <see cref="EndFrame"/> and <see cref="Draw"/>.
-	/// Text inputs copy and paste through <paramref name="clipboard"/> (a <see cref="MemoryClipboard"/> when null).
+	/// Text inputs copy and paste through <paramref name="clipboard"/> (a <see cref="MemoryClipboard"/> when null) and tell
+	/// <paramref name="textInput"/> where the caret is while one is edited, for the input method's windows.
 	/// </summary>
-	public Ui(IInputState input, UiOptions? options = null, ILogger<Ui>? logger = null, IClipboard? clipboard = null)
+	public Ui(IInputState input, UiOptions? options = null, ILogger<Ui>? logger = null, IClipboard? clipboard = null, ITextInputHost? textInput = null)
 	{
 		ArgumentNullException.ThrowIfNull(input);
 		_input = input;
 		Clipboard = clipboard ?? new MemoryClipboard();
+		_textInput = textInput;
 		_options = options ?? new UiOptions();
 		_logger = logger;
 		_theme = _options.Theme ?? UiTheme.Default;
@@ -171,6 +173,7 @@ public sealed partial class Ui
 		_inFrame = false;
 		_layout();
 		_endInput();
+		_reportTextInputArea();
 		_tree.Publish();
 		_evictStates();
 	}

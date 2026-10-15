@@ -34,7 +34,7 @@ namespace Ion.Extensions.Windowing;
 /// <see cref="SdlTouchSource"/>); GLFW has no touch input.
 /// </para>
 /// </remarks>
-public sealed class SilkInputState : TrackedInputState, IClipboard, IDisposable
+public sealed class SilkInputState : TrackedInputState, IClipboard, ITextInputHost, IDisposable
 {
 	private const int KeyCount = (int)Key.LastKey + 1;
 
@@ -49,6 +49,8 @@ public sealed class SilkInputState : TrackedInputState, IClipboard, IDisposable
 	private readonly Lock _touchLock = new();
 	private readonly List<InputEvent> _touchQueue = new(32);
 	private SdlTouchSource? _touch;
+	private SdlTextInput? _textInput;
+	private (int X, int Y, int Width, int Height) _textArea = (int.MinValue, 0, 0, 0);
 
 	/// <summary>Creates the input state; it attaches to the window when the window is created.</summary>
 	public SilkInputState(SilkWindow window, IEvents events, InputTracker tracker) : base(tracker)
@@ -81,6 +83,8 @@ public sealed class SilkInputState : TrackedInputState, IClipboard, IDisposable
 		if (_window.Platform == WindowPlatform.Sdl)
 		{
 			_touch = new SdlTouchSource(Silk.NET.SDL.SdlProvider.SDL.Value, () => _window.Size, EnqueueTouch);
+			// Input method compositions (GLFW has none: on Windows the system draws them, see SetTextInputArea).
+			_textInput = new SdlTextInput(Silk.NET.SDL.SdlProvider.SDL.Value, EnqueueTouch);
 		}
 	}
 
@@ -124,12 +128,40 @@ public sealed class SilkInputState : TrackedInputState, IClipboard, IDisposable
 		_window.CursorStateChanged -= _applyCursor;
 		_touch?.Dispose();
 		_touch = null;
+		_textInput?.Dispose();
+		_textInput = null;
 		_input?.Dispose();
 		_input = null;
 	}
 
 	/// <summary>Queues an event as if it came from a device (for tests and tools).</summary>
 	internal void Enqueue(in InputEvent e) => _queue.Add(e);
+
+	/// <summary>
+	/// Places the input method's windows at the caret (window coordinates): SDL's candidate window through
+	/// <c>SDL_SetTextInputRect</c> (starting text input if it was stopped), or on Windows with GLFW the system's
+	/// composition and candidate windows through IMM32. Only changes reach the platform.
+	/// </summary>
+	public void SetTextInputArea(float x, float y, float width, float height)
+	{
+		var area = ((int)MathF.Round(x), (int)MathF.Round(y), (int)MathF.Ceiling(width), (int)MathF.Ceiling(height));
+		if (area == _textArea) return;
+		_textArea = area;
+		if (_textInput is { } sdl)
+		{
+			sdl.SetArea(area.Item1, area.Item2, area.Item3, area.Item4);
+		}
+		else if (_window.NativeHandles is { Kind: NativeWindowKind.Win32, Window: var hwnd })
+		{
+			// IMM32 takes client pixels; GLFW window coordinates differ from them on scaled displays.
+			var size = _window.Size;
+			var scale = size.X > 0 ? _window.FramebufferSize.X / size.X : 1f;
+			Win32Ime.SetArea(hwnd, (int)(area.Item1 * scale), (int)(area.Item2 * scale), (int)(area.Item4 * scale));
+		}
+	}
+
+	/// <summary>Forgets the caret area (the next <see cref="SetTextInputArea"/> reaches the platform again).</summary>
+	public void ClearTextInputArea() => _textArea = (int.MinValue, 0, 0, 0);
 
 	/// <summary>Queues a touch event; thread-safe (SDL may deliver touches on another thread).</summary>
 	internal void EnqueueTouch(InputEvent e)

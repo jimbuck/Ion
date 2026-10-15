@@ -121,10 +121,29 @@ The [UI module](/Ion/interaction/ui/widgets/)'s `TextInput` widget does all of t
 and the clipboard. The clipboard itself is the `IClipboard` service (`GetText`, `SetText`): the desktop clipboard on
 Silk.NET windows, a `MemoryClipboard` headless.
 
-:::note[IME]
-Composed characters arrive in `Text` once the operating system commits them. Ion does not display the composition
-string while it is being typed, and has no API for the IME candidate window position.
-:::
+### Input methods (IME)
+
+Chinese, Japanese and Korean text is typed through an input method. The player composes, for example typing "nihon"
+and picking 日本 from the candidates, and only the result is committed. Ion reports both stages:
+
+| Member | Meaning |
+|---|---|
+| `IInputState.Composition` | The text being composed and not committed yet, or empty. A level state: it stays until the input method changes or ends it, and losing focus cancels it |
+| `IInputState.CompositionCursor` | The input method's cursor within `Composition` |
+| `IInputState.Text` | The committed text, as for any typing |
+| `ITextInputHost.SetTextInputArea(x, y, width, height)` | Tells the platform where the caret is (window coordinates), so the input method's candidate window opens next to it. `ClearTextInputArea()` when editing stops |
+
+While `Composition` is not empty, keys belong to the input method: Enter commits, Escape cancels, and Backspace and the
+arrows edit the composition. Ignore them in your own text handling, also on the frame the composition ends. The UI
+module's `TextInput` does all of this: it draws the composition underlined at the caret without changing the value,
+and reports the caret every frame.
+
+| Platform | Composition | Candidate window |
+|---|---|---|
+| SDL windows (`--Ion:Window:Platform=Sdl`, Android, iOS) | Reported (`SDL_TEXTEDITING`; about ten CJK characters at most, the commit is not cut) | Placed at the caret (`SDL_SetTextInputRect`) |
+| GLFW windows on Windows (the desktop default) | Drawn by Windows itself at the caret (GLFW reports none) | Placed at the caret (IMM32) |
+| GLFW windows on Linux and macOS | Drawn by the system where it chooses | Not placed |
+| Headless | Scripted with `NullInputState.Compose(text, cursor)` | Recorded by `RecordingTextInputHost` |
 
 ## Mouse position and buttons
 

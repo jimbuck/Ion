@@ -274,9 +274,13 @@ if (ui.TextInput("Search", ref _query, maxLength: 32)) Filter(_query);
 While a field is being edited, `ui.IsEditingText` is true and Escape or B stop editing instead of setting
 `BackPressed`. Check `IsEditingText` before reacting to keys in your game code.
 
+While an input method composes (Chinese, Japanese, Korean), the composition is drawn underlined at the caret and
+the field's value changes only when it is committed. The caret is reported to the platform so the candidate window
+opens next to it. See [Input methods](/Ion/interaction/input/keyboard-and-mouse/#input-methods-ime) for what each
+platform supports.
+
 :::caution[Editing limits]
-There is no multi-line editing and no display of IME composition: text composed with an IME is inserted when the
-operating system commits it. On devices
+There is no multi-line editing. On devices
 without a keyboard (gamepads, the R36S) there is no on-screen keyboard; `TextInput` is reachable but can only be typed
 into through `IUiTree` or injected text input (`ScriptedInput`, the remote `input.send`).
 :::

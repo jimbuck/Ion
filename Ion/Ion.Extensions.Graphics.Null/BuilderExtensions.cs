@@ -53,6 +53,8 @@ public static class BuilderExtensions
 			.AddSingleton(static sp => new NullInputState(sp.GetRequiredService<InputTracker>()))
 			.AddSingleton<IInputState>(sp => sp.GetRequiredService<NullInputState>())
 			.AddSingleton<IClipboard, MemoryClipboard>()
+			.AddSingleton<RecordingTextInputHost>()
+			.AddSingleton<ITextInputHost>(sp => sp.GetRequiredService<RecordingTextInputHost>())
 			.AddSingleton<NullSpriteBatch>()
 			.AddSingleton<ISpriteBatch>(sp => sp.GetRequiredService<NullSpriteBatch>())
 

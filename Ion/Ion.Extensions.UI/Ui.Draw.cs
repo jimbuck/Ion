@@ -156,6 +156,21 @@ public sealed partial class Ui
 					var textHeight = MeasureText(null).Y;
 					var textY = centerY - textHeight * 0.5f;
 					var state = node.State;
+					var composition = node.Id == _editingId ? _input.Composition : string.Empty;
+					if (composition.Length > 0)
+					{
+						// The composition, underlined, at the caret; the field's value is unchanged until it is committed.
+						var composed = _composedText(state, composition);
+						var widths = _composedWidths(state, composition);
+						var start = Math.Min(state.Caret, widths.Length - 1);
+						var end = Math.Min(state.Caret + composition.Length, widths.Length - 1);
+						_text(batch, composed, new Vector2(field.X + TextInputPadding, textY), textColor, 1f);
+						batch.DrawRect(textColor, new RectangleF(field.X + TextInputPadding + widths[start], textY + textHeight - 2, widths[end] - widths[start], 1));
+						var (caretX, _, _) = _caretGeometry(ref node);
+						batch.DrawRect(theme.Accent, new RectangleF(caretX, textY, 2, textHeight));
+						break;
+					}
+
 					if (node.Id == _editingId && state.HasSelection)
 					{
 						var widths = _prefixWidths(state);
@@ -209,6 +224,32 @@ public sealed partial class Ui
 			var y = rect.Y + (rect.Height - length) * (state.Scroll / state.ScrollMax);
 			batch.DrawRect(_theme.ScrollBar, new RectangleF(rect.X + rect.Width - width - 2, y, width, length));
 		}
+	}
+
+	/// <summary>The field's text with <paramref name="composition"/> inserted at the caret (rebuilt only when either changes).</summary>
+	private static string _composedText(UiNodeState state, string composition)
+	{
+		var text = state.Buffer is null ? default : state.Buffer.AsSpan(0, state.Length);
+		if (state.Composed is { } cached && ReferenceEquals(state.ComposedComposition, composition) && state.ComposedCaret == state.Caret && state.ComposedFor is { } source && text.SequenceEqual(source)) return cached;
+		var caret = Math.Clamp(state.Caret, 0, text.Length);
+		state.Composed = string.Concat(text[..caret], composition, text[caret..]);
+		state.ComposedFor = new string(text);
+		state.ComposedComposition = composition;
+		state.ComposedCaret = state.Caret;
+		state.ComposedWidths = null;
+		return state.Composed;
+	}
+
+	/// <summary>The caret offsets of <see cref="_composedText"/> (measured again only when it changes).</summary>
+	private float[] _composedWidths(UiNodeState state, string composition)
+	{
+		var composed = _composedText(state, composition);
+		if (state.ComposedWidths is { } cached && ReferenceEquals(state.ComposedFont, _theme.Font)) return cached;
+		var widths = new float[composed.Length + 1];
+		for (var i = 1; i <= composed.Length; i++) widths[i] = MeasureText(composed[..i]).X;
+		state.ComposedWidths = widths;
+		state.ComposedFont = _theme.Font;
+		return widths;
 	}
 
 	/// <summary>The padding between a text input's field edge and its text.</summary>

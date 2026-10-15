@@ -99,6 +99,14 @@ internal sealed class UiNodeState(uint id)
 	public string? WidthsSource;
 	public object? WidthsFont;
 
+	// The text shown while an input method composes: the text with the composition at the caret, and its widths.
+	public string? Composed;
+	public string? ComposedFor;
+	public string? ComposedComposition;
+	public int ComposedCaret = -1;
+	public float[]? ComposedWidths;
+	public object? ComposedFont;
+
 	public bool HasSelection => Anchor >= 0 && Anchor != Caret;
 
 	public int SelectionStart => HasSelection ? Math.Min(Anchor, Caret) : Caret;

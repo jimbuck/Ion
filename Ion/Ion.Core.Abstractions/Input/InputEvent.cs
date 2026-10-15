@@ -46,6 +46,15 @@ public interface IInputEventSink
 	void OnTouch(int id, TouchPhase phase, Vector2 position)
 	{
 	}
+
+	/// <summary>
+	/// The input method's composition changed: <paramref name="text"/> is being composed (not committed yet), with the
+	/// composition's own cursor at <paramref name="cursor"/>; an empty text ends the composition. The committed text
+	/// arrives as <see cref="OnText"/>. The default implementation ignores it, for sinks written before composition existed.
+	/// </summary>
+	void OnComposition(string text, int cursor)
+	{
+	}
 }
 
 /// <summary>
@@ -109,6 +118,8 @@ public enum InputEventKind : byte
 	ReleaseAll,
 	/// <summary><see cref="IInputEventSink.OnTouch"/>.</summary>
 	Touch,
+	/// <summary><see cref="IInputEventSink.OnComposition"/>.</summary>
+	Composition,
 }
 
 /// <summary>
@@ -121,6 +132,7 @@ public enum InputEventKind : byte
 /// <param name="Repeat">Whether a key down is an auto-repeat.</param>
 /// <param name="Modifiers">The modifiers held with a key event.</param>
 /// <param name="Value">The mouse or touch position, the wheel delta (in X) or the axis value (in X).</param>
+/// <param name="Text">The composition text, for composition events (whose <paramref name="Code"/> is the composition cursor).</param>
 public readonly record struct InputEvent(
 	InputEventKind Kind,
 	int Code = 0,
@@ -128,8 +140,12 @@ public readonly record struct InputEvent(
 	bool Down = false,
 	bool Repeat = false,
 	ModifierKeys Modifiers = ModifierKeys.None,
-	Vector2 Value = default)
+	Vector2 Value = default,
+	string? Text = null)
 {
+	/// <summary>An input method composition (an empty <paramref name="text"/> ends it).</summary>
+	public static InputEvent ForComposition(string text, int cursor) => new(InputEventKind.Composition, Math.Clamp(cursor, 0, (text ?? string.Empty).Length), Text: text ?? string.Empty);
+
 	/// <summary>A key event.</summary>
 	public static InputEvent ForKey(Key key, bool down, bool repeat = false, ModifierKeys modifiers = ModifierKeys.None) => new(InputEventKind.Key, (int)key, Down: down, Repeat: repeat, Modifiers: modifiers);
 
@@ -175,6 +191,7 @@ public readonly record struct InputEvent(
 			case InputEventKind.GamepadAxis: sink.OnGamepadAxis(Index, (GamepadAxis)Code, Value.X); break;
 			case InputEventKind.ReleaseAll: sink.ReleaseAll(); break;
 			case InputEventKind.Touch: sink.OnTouch(Index, (TouchPhase)Code, Value); break;
+			case InputEventKind.Composition: sink.OnComposition(Text ?? string.Empty, Code); break;
 		}
 	}
 }

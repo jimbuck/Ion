@@ -39,6 +39,12 @@ public abstract class TrackedInputState : IInputState
 	public ModifierKeys Modifiers => Tracker.Modifiers;
 
 	/// <inheritdoc/>
+	public string Composition => Tracker.Composition;
+
+	/// <inheritdoc/>
+	public int CompositionCursor => Tracker.CompositionCursor;
+
+	/// <inheritdoc/>
 	public IReadOnlyList<IGamepadState> Gamepads => Tracker.Gamepads;
 
 	/// <inheritdoc/>

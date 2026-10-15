@@ -415,6 +415,25 @@ public sealed class InputTracker : IInputEventSink
 	}
 
 	/// <summary>
+	/// The input method's composition: the text being composed and not committed yet (Chinese, Japanese, Korean input), or
+	/// empty when none is. A level state, kept from frame to frame until the input method changes or ends it; the
+	/// committed text arrives in <see cref="Text"/>.
+	/// </summary>
+	public string Composition { get; private set; } = string.Empty;
+
+	/// <summary>The position of the input method's cursor within <see cref="Composition"/>.</summary>
+	public int CompositionCursor { get; private set; }
+
+	/// <summary>Sets <see cref="Composition"/> (an empty <paramref name="text"/> ends it).</summary>
+	public void OnComposition(string text, int cursor)
+	{
+		if (_ignored) return;
+		Composition = text ?? string.Empty;
+		CompositionCursor = Math.Clamp(cursor, 0, Composition.Length);
+		Recorder?.OnComposition(Composition, CompositionCursor);
+	}
+
+	/// <summary>
 	/// Connects or disconnects the gamepad in slot <paramref name="index"/>. Disconnecting releases its buttons (without
 	/// edges) and zeroes its axes.
 	/// </summary>
@@ -474,6 +493,9 @@ public sealed class InputTracker : IInputEventSink
 
 		_keysDown.Reset();
 		_buttonsDown = 0;
+		// Losing focus cancels a composition (the input method does not commit it to this window).
+		Composition = string.Empty;
+		CompositionCursor = 0;
 
 		for (var i = 0; i < _touchCount; i++)
 		{

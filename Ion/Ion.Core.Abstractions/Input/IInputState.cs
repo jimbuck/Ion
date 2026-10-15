@@ -58,6 +58,15 @@ public interface IInputState
 	/// <summary>The modifiers held now, derived from the held modifier keys.</summary>
 	ModifierKeys Modifiers { get; }
 
+	/// <summary>
+	/// The input method's composition (Chinese, Japanese, Korean input): the text being composed and not committed yet, or
+	/// empty. Committed text arrives in <see cref="Text"/>. Text fields show it at the caret, underlined.
+	/// </summary>
+	string Composition => string.Empty;
+
+	/// <summary>The position of the input method's cursor within <see cref="Composition"/>.</summary>
+	int CompositionCursor => 0;
+
 	/// <summary>The connected gamepads, by ascending slot index.</summary>
 	IReadOnlyList<IGamepadState> Gamepads { get; }
 

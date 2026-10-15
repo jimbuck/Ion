@@ -77,6 +77,10 @@ public static class InputRecordingFormat
 				writer.Write(e.Value.X);
 				writer.Write(e.Value.Y);
 				break;
+			case InputEventKind.Composition:
+				writer.Write7BitEncodedInt(e.Code);
+				writer.Write(e.Text ?? string.Empty);
+				break;
 			default:
 				throw new ArgumentOutOfRangeException(nameof(e), e.Kind, "Unknown input event kind.");
 		}
@@ -115,6 +119,9 @@ public static class InputRecordingFormat
 				var touchId = reader.Read7BitEncodedInt();
 				var phase = reader.ReadByte();
 				return new InputEvent(kind, phase, touchId, Value: new Vector2(reader.ReadSingle(), reader.ReadSingle()));
+			case InputEventKind.Composition:
+				var cursor = reader.Read7BitEncodedInt();
+				return InputEvent.ForComposition(reader.ReadString(), cursor);
 			default:
 				throw new InvalidDataException($"Unknown input event kind {(byte)kind} in the input recording.");
 		}
@@ -198,6 +205,9 @@ public sealed class InputRecorder : IInputRecorder, IInputTrackerHook, IDisposab
 
 	/// <inheritdoc/>
 	public void OnTouch(int id, TouchPhase phase, Vector2 position) => _add(InputEvent.ForTouch(id, phase, position));
+
+	/// <inheritdoc/>
+	public void OnComposition(string text, int cursor) => _add(InputEvent.ForComposition(text, cursor));
 
 	/// <summary>
 	/// Writes the events of the current frame so far and flushes the stream.
