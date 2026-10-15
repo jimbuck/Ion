@@ -235,13 +235,18 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 	/// <summary>Opens a tick: increments <see cref="Tick"/> (FixedUpdate begin).</summary>
 	internal void BeginTick()
 	{
-		if (!IsActive) return;
+		// A resimulated tick already has its number (Prediction.ResimulatedTick).
+		if (!IsActive || Prediction.IsResimulating) return;
 		Tick++;
 	}
 
 	/// <summary>Closes a tick: the server captures every live world (FixedUpdate end, after every fixed step of the root and the scenes).</summary>
 	internal void Capture()
 	{
+		// A client records its predictions as the tick ends, as the server captures it, so every fixed step's effect is in
+		// the value compared with the snapshot.
+		if (IsClient) Prediction.RecordTick();
+		if (Prediction.IsResimulating) return;
 		foreach (var world in Worlds.LiveWorlds) world.Capture();
 	}
 

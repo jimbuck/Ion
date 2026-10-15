@@ -354,6 +354,29 @@ public class GameLoop
 	}
 
 	/// <summary>
+	/// Runs the FixedUpdate stage once more, for a tick that already ran: what rollback networking calls, from First, to
+	/// resimulate the ticks after a server correction. <see cref="ILoopContext.IsResimulating"/> is true meanwhile and
+	/// <see cref="ILoopContext.Stage"/> is FixedUpdate; the fixed step count, the clock and the event frame do not move.
+	/// </summary>
+	[StackTraceHidden]
+	public void ResimulateFixedStep()
+	{
+		var context = _context;
+		var stage = context.Stage;
+		context.Stage = GameLoopStage.FixedUpdate;
+		context.IsResimulating = true;
+		try
+		{
+			FixedUpdate(FixedGameTime);
+		}
+		finally
+		{
+			context.IsResimulating = false;
+			context.Stage = stage;
+		}
+	}
+
+	/// <summary>
 	/// Runs one untimed pass of every per-frame stage with the given time: First, FixedUpdate (once), Update, Render
 	/// and Last. Render and Last are skipped once the loop has been asked to stop. No clock, accumulator or pacing is
 	/// involved, which makes it the cheapest way to drive systems from tests and benchmarks.

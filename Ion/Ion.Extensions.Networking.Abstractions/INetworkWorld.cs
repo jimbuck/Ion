@@ -68,6 +68,9 @@ public struct NetworkStats
 
 	/// <summary>Prediction corrections (a predicted value differed from the server's) and client tick resynchronizations.</summary>
 	public long Corrections, Resyncs;
+
+	/// <summary>Ticks resimulated with the whole fixed schedule after corrections (<see cref="RollbackMode.FixedSchedule"/>).</summary>
+	public long ResimulatedTicks;
 }
 
 /// <summary>
@@ -279,4 +282,13 @@ public interface INetworkPrediction
 	/// (client). False before any input was received.
 	/// </summary>
 	bool TryGetInput<TInput>(NetworkPeer peer, out TInput input) where TInput : unmanaged;
+
+	/// <summary>
+	/// True while the client resimulates the ticks after a correction (<see cref="RollbackMode.FixedSchedule"/>): the
+	/// fixed steps run again for <see cref="ResimulatedTick"/>, and <see cref="TryGetInput{TInput}"/> gives that tick's input.
+	/// </summary>
+	bool IsResimulating => false;
+
+	/// <summary>The tick being resimulated (while <see cref="IsResimulating"/>).</summary>
+	uint ResimulatedTick => 0;
 }

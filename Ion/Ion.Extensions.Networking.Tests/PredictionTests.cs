@@ -87,6 +87,80 @@ public class PredictionTests
 		Assert.Equal(serverValue, client.World.Get<Avatar>(mirror).Position);
 	}
 
+	/// <summary>
+	/// A fixed system outside the prediction step: a conveyor that carries every avatar right by a quarter unit a tick, on
+	/// the server and (predicting) on the client. After a server teleport forces a correction, <paramref name="mode"/>
+	/// decides whether the ticks after it replay the conveyor too.
+	/// </summary>
+	private static (long CorrectionsLater, Vector2 Server, Vector2 Client, long Resimulated) Conveyor(RollbackMode mode)
+	{
+		using var net = new NetHarness();
+		var server = net.Server(Lag);
+		var client = net.Client(server, c =>
+		{
+			Lag(c);
+			c.Rollback = mode;
+		});
+		net.StepUntil(() => client.Session.IsActive, 60);
+		client.Session.Prediction.Resimulator = client.Fixed;
+		var input = new Vector2(1, 0);
+		server.Session.Prediction.Register<Avatar, MoveInput>(Move);
+		client.Session.Prediction.Register<Avatar, MoveInput>(Move, () => new MoveInput(input));
+		var entity = TestWorlds.CreateAvatar(server.World, server.Net.Allocate(client.Session.LocalPeer));
+
+		var running = true;
+		void Belt(NetPeer peer)
+		{
+			if (running) peer.World.Query(new QueryDescription().WithAll<Avatar>(), (ref Avatar avatar) => avatar.Position += new Vector2(0.25f, 0));
+		}
+
+		var teleport = false;
+		server.FixedStep = peer =>
+		{
+			Belt(peer);
+			if (!teleport) return;
+			peer.World.Get<Avatar>(entity).Position = new Vector2(500, 500);
+			teleport = false;
+		};
+		client.FixedStep = Belt;
+		net.Step(60);
+
+		teleport = true;
+		net.Step(60);
+		var corrections = client.Session.Stats.Corrections;
+		net.Step(60);
+		var later = client.Session.Stats.Corrections - corrections;
+
+		// Everything stops, so the client's lead (it predicts ahead of the server) runs out and the two can be compared.
+		input = Vector2.Zero;
+		running = false;
+		net.Step(60);
+
+		var id = server.World.Get<NetworkId>(entity);
+		Assert.True(client.Net.TryGetEntity(id, out var mirror));
+		return (later, server.World.Get<Avatar>(entity).Position, client.World.Get<Avatar>(mirror).Position, client.Session.Prediction.ResimulatedTicks);
+	}
+
+	[Fact]
+	public void WithTheWholeFixedScheduleReplayedAFixedSystemOutsideThePredictionStepStaysInStep()
+	{
+		var (later, server, client, resimulated) = Conveyor(RollbackMode.FixedSchedule);
+		// The correction resimulated the conveyor's ticks too: no further corrections, and the client is exactly the server.
+		Assert.True(resimulated > 0);
+		Assert.Equal(0, later);
+		Assert.Equal(server, client);
+	}
+
+	[Fact]
+	public void ReplayingOnlyThePredictionStepsLeavesAFixedSystemOutsideThemBehind()
+	{
+		// The gap RollbackMode.FixedSchedule closes: each correction replays the move but not the conveyor, so the next
+		// snapshot disagrees again and the client keeps being corrected.
+		var (later, _, _, resimulated) = Conveyor(RollbackMode.PredictionSteps);
+		Assert.Equal(0, resimulated);
+		Assert.True(later > 10, $"{later} corrections in the last second");
+	}
+
 	[Fact]
 	public void LostInputsAreCoveredByTheRedundantCopies()
 	{

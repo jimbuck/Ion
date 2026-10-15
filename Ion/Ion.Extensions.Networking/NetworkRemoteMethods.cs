@@ -60,6 +60,7 @@ internal sealed class NetworkRemoteMethods(NetworkSession session) : IRemoteMeth
 				["rewinds"] = stats.Rewinds,
 				["rewindsRejected"] = stats.RewindsRejected,
 				["corrections"] = stats.Corrections,
+				["resimulated_ticks"] = stats.ResimulatedTicks,
 				["resyncs"] = stats.Resyncs,
 			},
 		};

@@ -41,7 +41,7 @@ public static class NetworkingBuilderExtensions
 		{
 			var config = sp.GetRequiredService<IOptions<NetworkConfig>>().Value;
 			var game = sp.GetService<IOptions<GameConfig>>()?.Value;
-			return new NetworkSession(
+			var session = new NetworkSession(
 				config,
 				config.Mode == NetworkMode.Offline ? null : sp.GetService<INetworkTransport>(),
 				sp.GetRequiredService<World>(),
@@ -51,6 +51,9 @@ public static class NetworkingBuilderExtensions
 				game?.Title ?? "Ion",
 				sp.GetService<ILoggerFactory>()?.CreateLogger("Ion.Networking"),
 				sp.GetService<IMetrics>());
+			// The whole fixed schedule for RollbackMode.FixedSchedule: the game loop's, once it exists.
+			if (sp.GetService<ILoopContext>() is GameLoopContext loop) session.Prediction.Resimulator = () => loop.Loop?.ResimulateFixedStep();
+			return session;
 		});
 		services.TryAddSingleton<INetworkSession>(static sp => sp.GetRequiredService<NetworkSession>());
 		services.TryAddSingleton<INetworkMessages>(static sp => sp.GetRequiredService<NetworkSession>());

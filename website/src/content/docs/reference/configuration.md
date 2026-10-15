@@ -291,6 +291,7 @@ Bound to `NetworkConfig`; `AddNetworking(network => ...)` runs after binding.
 | `Ion:Network:Connect` | string | `127.0.0.1` | The server a client connects to. |
 | `Ion:Network:TickRate` | double | `0` (`Ion:FixedUpdateRate`) | Simulation ticks per second; compared in the handshake. |
 | `Ion:Network:SnapshotHistory` | int | `128` | Ticks the snapshot ring keeps. |
+| `Ion:Network:Rollback` | enum | `PredictionSteps` | What a client replays after a correction: the registered prediction steps, or the whole `FixedSchedule`. |
 | `Ion:Network:SendRate` | double | `0` (every tick) | Snapshots per second per client. |
 | `Ion:Network:MaxPeers` | int | `16` | The most clients (at most 254). |
 | `Ion:Network:GameId` | string | empty (`Ion:Title`) | A game identifier compared in the handshake. |

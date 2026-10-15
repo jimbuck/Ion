@@ -29,6 +29,21 @@ public sealed class NetworkPrediction : INetworkPrediction
 	public int Count => _bindings.Count;
 
 	/// <inheritdoc/>
+	public bool IsResimulating { get; private set; }
+
+	/// <inheritdoc/>
+	public uint ResimulatedTick { get; private set; }
+
+	/// <summary>
+	/// Runs the whole fixed schedule once for a tick being resimulated (<see cref="RollbackMode.FixedSchedule"/>): the game
+	/// loop's <c>ResimulateFixedStep</c>, wired by the module. Without it a client falls back to replaying the prediction steps.
+	/// </summary>
+	internal Action? Resimulator { get; set; }
+
+	/// <summary>The number of ticks resimulated so far (with <see cref="RollbackMode.FixedSchedule"/>).</summary>
+	internal long ResimulatedTicks { get; private set; }
+
+	/// <inheritdoc/>
 	[SendsNetworkMessage(1)]
 	[ReadsNetworkMessage(1)]
 	public void Register<TComponent, TInput>(PredictionStep<TComponent, TInput> step, Func<TInput>? sample = null)
@@ -66,6 +81,17 @@ public sealed class NetworkPrediction : INetworkPrediction
 		if (!_session.IsActive || _bindings.Count == 0) return;
 		var tick = _session.Tick;
 		var worlds = _session.Worlds.LiveWorlds;
+		if (IsResimulating)
+		{
+			// The stored input of the tick, applied again (nothing is sampled or sent).
+			foreach (var binding in _bindings)
+			{
+				foreach (var world in worlds) binding.ClientReplay(world, ResimulatedTick, delta);
+			}
+
+			return;
+		}
+
 		foreach (var binding in _bindings)
 		{
 			if (_session.IsServer)
@@ -85,6 +111,10 @@ public sealed class NetworkPrediction : INetworkPrediction
 	{
 		if (!_session.IsClient || !_session.IsActive || _bindings.Count == 0) return;
 		var delta = (float)(1.0 / _session.TickRate);
+		// With the fixed schedule, a correction only resets the corrected values here; the ticks after it are resimulated below.
+		var schedule = _session.Config.Rollback == RollbackMode.FixedSchedule && Resimulator is not null;
+		var current = _session.Tick;
+		var earliest = 0u;
 		foreach (var world in _session.Worlds.LiveWorlds)
 		{
 			var serverTick = world.LastReceivedServerTick;
@@ -92,7 +122,54 @@ public sealed class NetworkPrediction : INetworkPrediction
 			world.ReconciledTick = serverTick;
 			var frame = world.Frame(serverTick);
 			if (frame is null) continue;
-			foreach (var binding in _bindings) binding.Reconcile(world, frame, serverTick, _session.Tick, delta);
+			var corrected = false;
+			foreach (var binding in _bindings) corrected |= binding.Reconcile(world, frame, serverTick, current, delta, replay: !schedule);
+			if (corrected && (earliest == 0 || serverTick < earliest)) earliest = serverTick;
+		}
+
+		if (!schedule || earliest == 0 || earliest >= current) return;
+		Resimulate(earliest, current);
+	}
+
+	/// <summary>Client, at the end of a tick (and of a resimulated one): records the predicted values of the local entities.</summary>
+	internal void RecordTick()
+	{
+		if (!_session.IsActive || _bindings.Count == 0) return;
+		var tick = IsResimulating ? ResimulatedTick : _session.Tick;
+		if (tick == 0) return;
+		foreach (var binding in _bindings)
+		{
+			foreach (var world in _session.Worlds.LiveWorlds) binding.RecordTick(world, tick);
+		}
+	}
+
+	/// <summary>
+	/// Rewinds every predicted value to tick <paramref name="from"/> (the corrected ones hold the server's value of it, the
+	/// others their recorded prediction) and runs the whole fixed schedule for each tick after it up to
+	/// <paramref name="to"/>, with the stored inputs.
+	/// </summary>
+	private void Resimulate(uint from, uint to)
+	{
+		foreach (var world in _session.Worlds.LiveWorlds)
+		{
+			foreach (var binding in _bindings) binding.Rewind(world, from);
+		}
+
+		IsResimulating = true;
+		try
+		{
+			for (var tick = from + 1; tick <= to; tick++)
+			{
+				ResimulatedTick = tick;
+				Resimulator!();
+				ResimulatedTicks++;
+				_session.MutableStats.ResimulatedTicks++;
+			}
+		}
+		finally
+		{
+			IsResimulating = false;
+			ResimulatedTick = 0;
 		}
 	}
 
@@ -130,7 +207,17 @@ public sealed class NetworkPrediction : INetworkPrediction
 		/// <summary>Client: applies the input of the tick to the local entities in <paramref name="world"/> and records the predictions.</summary>
 		public abstract void ClientApply(NetworkWorld world, uint tick, float delta);
 
-		public abstract void Reconcile(NetworkWorld world, SnapshotFrame frame, uint serverTick, uint currentTick, float delta);
+		/// <summary>Client: corrects mispredicted values to the server's at <paramref name="serverTick"/>, replaying the stored inputs after it when <paramref name="replay"/>. Returns whether anything was corrected.</summary>
+		public abstract bool Reconcile(NetworkWorld world, SnapshotFrame frame, uint serverTick, uint currentTick, float delta, bool replay);
+
+		/// <summary>Client: sets the local entities' values back to tick <paramref name="tick"/> (the server's for those corrected at it, else their prediction).</summary>
+		public abstract void Rewind(NetworkWorld world, uint tick);
+
+		/// <summary>Client, resimulating: applies the stored input of <paramref name="tick"/> to the local entities and records the predictions.</summary>
+		public abstract void ClientReplay(NetworkWorld world, uint tick, float delta);
+
+		/// <summary>Client: records the local entities' values as their prediction for <paramref name="tick"/> (the end of the tick).</summary>
+		public abstract void RecordTick(NetworkWorld world, uint tick);
 
 		public abstract void Clear();
 
@@ -177,7 +264,7 @@ public sealed class NetworkPrediction : INetworkPrediction
 		{
 			if (_owner._session.IsClient)
 			{
-				var tick = _owner._session.Tick;
+				var tick = _owner.IsResimulating ? _owner.ResimulatedTick : _owner._session.Tick;
 				var index = (int)(tick % (uint)_history);
 				input = _inputs[index];
 				return _inputTicks[index] == tick && tick != 0;
@@ -245,6 +332,49 @@ public sealed class NetworkPrediction : INetworkPrediction
 			return true;
 		}
 
+		public override void ClientReplay(NetworkWorld network, uint tick, float delta)
+		{
+			if (_inputTicks[(int)(tick % (uint)_history)] != tick) return;
+			ClientApply(network, tick, delta);
+		}
+
+		public override void RecordTick(NetworkWorld network, uint tick)
+		{
+			// Only once a step has predicted the entity: entities this client never stepped are left to the snapshots.
+			if (_inputTicks[(int)(tick % (uint)_history)] != tick) return;
+			var local = _owner._session.LocalPeer.Id;
+			foreach (ref var chunk in network.World.Query(in Owned))
+			{
+				var ids = chunk.GetSpan<NetworkId>();
+				var values = chunk.GetSpan<TComponent>();
+				for (var i = 0; i < chunk.Count; i++)
+				{
+					if (ids[i].OwnerPeer != local || ids[i].World != network.Index) continue;
+					Record(ids[i], tick, values[i]);
+				}
+			}
+		}
+
+		public override void Rewind(NetworkWorld network, uint tick)
+		{
+			var local = _owner._session.LocalPeer.Id;
+			var index = (int)(tick % (uint)_history);
+			foreach (ref var chunk in network.World.Query(in Owned))
+			{
+				var ids = chunk.GetSpan<NetworkId>();
+				var values = chunk.GetSpan<TComponent>();
+				for (var i = 0; i < chunk.Count; i++)
+				{
+					var id = ids[i];
+					if (id.OwnerPeer != local || id.World != network.Index) continue;
+					if (!_predicted.TryGetValue(Key(id), out var predicted) || predicted.Id != id.Id) continue;
+					// Corrected at this tick: the value is already the server's; else the prediction recorded for it.
+					if (predicted.CorrectedAt == tick) continue;
+					if (predicted.Ticks[index] == tick) values[i] = predicted.Values[index];
+				}
+			}
+		}
+
 		public override void ClientApply(NetworkWorld network, uint tick, float delta)
 		{
 			var input = _inputs[(int)(tick % (uint)_history)];
@@ -280,8 +410,9 @@ public sealed class NetworkPrediction : INetworkPrediction
 			predicted.Ticks[index] = tick;
 		}
 
-		public override void Reconcile(NetworkWorld network, SnapshotFrame frame, uint serverTick, uint currentTick, float delta)
+		public override bool Reconcile(NetworkWorld network, SnapshotFrame frame, uint serverTick, uint currentTick, float delta, bool replay)
 		{
+			var corrected = false;
 			var column = (ReplicatedColumn<TComponent>)frame.Columns[_component.Ordinal];
 			var serializer = _component.Serializer;
 			var local = _owner._session.LocalPeer.Id;
@@ -304,18 +435,26 @@ public sealed class NetworkPrediction : INetworkPrediction
 
 					// Mispredicted (or never predicted): take the server's value and replay the stored inputs after it.
 					if (hasPrediction) _owner._session.MutableStats.Corrections++;
+					corrected = true;
 					var value = authoritative;
-					for (var tick = serverTick + 1; tick <= currentTick; tick++)
+					Record(id, serverTick, value);
+					_predicted[Key(id)].CorrectedAt = serverTick;
+					if (replay)
 					{
-						var inputIndex = (int)(tick % (uint)_history);
-						if (_inputTicks[inputIndex] != tick) continue;
-						_step(ref value, _inputs[inputIndex], delta);
-						Record(id, tick, value);
+						for (var tick = serverTick + 1; tick <= currentTick; tick++)
+						{
+							var inputIndex = (int)(tick % (uint)_history);
+							if (_inputTicks[inputIndex] != tick) continue;
+							_step(ref value, _inputs[inputIndex], delta);
+							Record(id, tick, value);
+						}
 					}
 
 					values[i] = value;
 				}
 			}
+
+			return corrected;
 		}
 
 		public override void Clear()
@@ -341,6 +480,7 @@ public sealed class NetworkPrediction : INetworkPrediction
 			public readonly uint Id = id;
 			public readonly TComponent[] Values = new TComponent[history];
 			public readonly uint[] Ticks = new uint[history];
+			public uint CorrectedAt;
 		}
 
 		private sealed class PeerInputs(int history)

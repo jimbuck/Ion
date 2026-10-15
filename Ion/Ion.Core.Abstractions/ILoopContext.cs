@@ -47,4 +47,11 @@ public interface ILoopContext
 	/// between steps it is the index of the last step that ran (zero before the first).
 	/// </summary>
 	long FixedStepCount { get; }
+
+	/// <summary>
+	/// True while a FixedUpdate step runs again for a tick that already ran: rollback networking resimulating after a
+	/// server correction (<c>NetworkConfig.Rollback</c>). Steps with effects that must not happen twice (sounds, particles,
+	/// spawning, emitting events that already fired) skip their work while it is true.
+	/// </summary>
+	bool IsResimulating => false;
 }

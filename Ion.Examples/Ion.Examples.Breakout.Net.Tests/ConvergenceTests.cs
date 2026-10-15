@@ -287,6 +287,24 @@ public class ConvergenceTests(ITestOutputHelper output)
 		Play(session, frames: 900, convergeWithin: 30);
 	}
 
+	[Fact, Trait(CATEGORY, INTEGRATION)]
+	public void ServerAndClientConvergeWithTheWholeFixedScheduleResimulated()
+	{
+		// The same lossy, laggy loopback with RollbackMode.FixedSchedule: corrections resimulate the game loop's FixedUpdate.
+		using var session = Loopback(
+			"--Ion:Network:Rollback=FixedSchedule",
+			"--Ion:Network:Simulate:Latency=00:00:00.040",
+			"--Ion:Network:Simulate:Jitter=00:00:00.010",
+			"--Ion:Network:Simulate:Loss=0.05",
+			"--Ion:Network:Simulate:Reorder=0.05",
+			"--Ion:Network:Simulate:Seed=7");
+		Play(session, frames: 900, convergeWithin: 30);
+		Assert.Equal(RollbackMode.FixedSchedule, session.Client.Get<NetworkSession>().Config.Rollback);
+		var stats = session.Client.Get<NetworkSession>().Stats;
+		// The lossy link causes corrections, and each resimulated the ticks after it.
+		Assert.True(stats.ResimulatedTicks > 0, $"{stats.Corrections} corrections, {stats.ResimulatedTicks} ticks resimulated");
+	}
+
 	[Fact, Trait(CATEGORY, E2E)]
 	public void ServerAndClientConvergeOverUdpOnLocalhost()
 	{

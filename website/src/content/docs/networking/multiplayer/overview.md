@@ -272,8 +272,9 @@ column, so unchanged entities cost almost nothing.
   write your own.
 - **Networked worlds outside scenes.** [Scene worlds](/Ion/networking/multiplayer/scene-worlds/) are replicated
   besides the root world, but a server cannot yet host several rooms or matches at once outside the scene system.
-- Whole-schedule rollback and resimulation (only registered prediction steps are replayed), clock-rate nudging (drift is
-  corrected by resynchronizing), NAT punch-through, and bandwidth-aware snapshot prioritization.
+- Clock-rate nudging (drift is corrected by resynchronizing), NAT punch-through, and bandwidth-aware snapshot
+  prioritization. Rollback rewinds only the predicted components (see
+  [What is replayed](/Ion/networking/multiplayer/prediction/#what-is-replayed)).
 :::
 
 ## See also

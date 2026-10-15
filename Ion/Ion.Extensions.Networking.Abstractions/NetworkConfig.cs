@@ -46,6 +46,13 @@ public sealed class NetworkConfig
 	/// </summary>
 	public double TickRate { get; set; }
 
+	/// <summary>
+	/// What a client replays after a server correction of its prediction (<see cref="RollbackMode.PredictionSteps"/> by
+	/// default). <see cref="RollbackMode.FixedSchedule"/> resimulates every FixedUpdate step, so fixed systems other than the
+	/// registered prediction steps stay in step with the server too.
+	/// </summary>
+	public RollbackMode Rollback { get; set; } = RollbackMode.PredictionSteps;
+
 	/// <summary>The number of ticks the snapshot ring keeps (128 by default): the reach of delta baselines, interpolation and lag compensation.</summary>
 	public int SnapshotHistory { get; set; } = 128;
 
@@ -121,4 +128,22 @@ public sealed class NetworkSimulation
 
 	/// <summary>Whether anything is simulated.</summary>
 	public bool IsActive => Latency > TimeSpan.Zero || Jitter > TimeSpan.Zero || Loss > 0 || Reorder > 0;
+}
+
+/// <summary>What a client replays after the server corrects its prediction (<see cref="NetworkConfig.Rollback"/>).</summary>
+public enum RollbackMode
+{
+	/// <summary>
+	/// Only the registered prediction steps, on the corrected values: cheap, and exact when nothing else in FixedUpdate
+	/// changes the predicted components. A fixed system that does (friction, a conveyor, a clamp) is left out of the
+	/// replayed ticks, so the client keeps being corrected.
+	/// </summary>
+	PredictionSteps,
+
+	/// <summary>
+	/// The whole FixedUpdate stage, once per tick after the correction, with the stored inputs: every fixed system's effect
+	/// on the predicted components is replayed. Costs a full fixed step per replayed tick. Steps with effects that must not
+	/// happen twice check <c>ILoopContext.IsResimulating</c>.
+	/// </summary>
+	FixedSchedule,
 }

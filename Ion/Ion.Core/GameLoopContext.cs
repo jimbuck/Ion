@@ -15,6 +15,9 @@ public sealed class GameLoopContext : ILoopContext
 	/// <inheritdoc/>
 	public long FixedStepCount { get; internal set; }
 
+	/// <inheritdoc/>
+	public bool IsResimulating { get; internal set; }
+
 	/// <summary>
 	/// The game loop that writes this context (the last one created over it), or null before one is built. Tools such as
 	/// the remote protocol use it to read the running schedule and to stop the loop.

@@ -103,14 +103,54 @@ step.
 
 When a snapshot for server tick `T` arrives, the client looks at each entity it owns that has the predicted component:
 
-1. If it recorded a prediction for tick `T` and it equals the server's value bit for bit, nothing happens.
-2. Otherwise it takes the server's value, then **replays** every stored input from `T + 1` to the current tick through
-   the step, recording the new predicted values, and writes the result. A mismatch counts as a correction
+1. If it recorded a prediction for tick `T` and it equals the server's value bit for bit, nothing happens. The
+   prediction for a tick is the value at the **end** of that tick, after every fixed step, which is what the server
+   captures.
+2. Otherwise it takes the server's value and replays the ticks from `T + 1` to the current one, as
+   `Ion:Network:Rollback` says (below), and writes the result. A mismatch counts as a correction
    (`NetworkStats.Corrections`, metric `net_corrections`).
 
-Only the registered steps are replayed, not the whole fixed schedule. That keeps reconciliation cheap and
-allocation-free, but it means a predicted component must be fully determined by its step: if another system also
-changes it (collisions, knockback), the server's result will differ and the client will be corrected every time.
+### What is replayed
+
+| `NetworkConfig.Rollback` | Replays | For |
+|---|---|---|
+| `PredictionSteps` (default) | The registered steps only, on the corrected values | Predicted components that only their step changes. Cheap and allocation-free |
+| `FixedSchedule` | The whole FixedUpdate stage, once per tick, with the stored inputs | Predicted components other fixed systems also change (friction, a conveyor, clamping to bounds) |
+
+With `PredictionSteps`, a fixed system that also changes a predicted component is left out of the replayed ticks. The
+next snapshot then disagrees, the client is corrected again, and it never settles. `NetworkStats.Corrections` climbing
+steadily while nothing unusual happens is the sign. Either move that logic into the step, or switch to `FixedSchedule`:
+
+```json title="appsettings.json"
+{ "Ion": { "Network": { "Rollback": "FixedSchedule" } } }
+```
+
+With `FixedSchedule`, a correction:
+
+1. Rewinds the client's predicted values to tick `T`: the server's value for those it corrected, the recorded
+   prediction for the others.
+2. Runs the game loop's FixedUpdate stage once for each tick from `T + 1` to the current one
+   (`GameLoop.ResimulateFixedStep`). Every fixed step runs: yours, the scenes', physics.
+   `INetworkPrediction.ResimulatedTick` is the tick, the prediction step applies the stored input of it, and
+   `TryGetInput` returns that input. The network tick, the snapshot capture and the clock do not move.
+3. Counts the ticks in `NetworkStats.ResimulatedTicks`.
+
+While a tick is resimulated, `ILoopContext.IsResimulating` (and `INetworkPrediction.IsResimulating`) is true. Skip
+effects that already happened when the tick first ran: sounds, particles, spawning, and events other systems react to.
+
+```csharp
+[FixedUpdate]
+public void Land(GameTime dt)
+{
+    if (_landed && !_loop.IsResimulating) _audio.Play(_thud);   // once, not once per resimulation
+}
+```
+
+What is not rewound: state outside the predicted components. That covers the physics engine's own state (only the
+transforms and velocities your components hold come back), locals of your systems, and other replicated components. A
+system that keeps its own state across ticks must store it in a predicted component to be resimulated correctly. Each
+resimulated tick costs a whole fixed step, so a correction right after a long stall can cost several steps in one
+frame.
 
 ```text
 client tick:    100  101  102  103  104  105
@@ -209,8 +249,9 @@ arm64 client) can produce tiny differences that show up as occasional correction
 
 `PredictionTests` in `Ion.Extensions.Networking.Tests` cover the owner predicting immediately and matching the server
 exactly, a server override being reconciled by replaying the stored inputs, lost inputs being covered by the redundant
-copies, and registration checks. The Breakout Net convergence tests check that the predicted paddle lands where the
-server puts it. See
+copies, registration checks, and a conveyor (a fixed system outside the step) that stays in step after a correction
+with `FixedSchedule` and keeps the client corrected with `PredictionSteps`. The Breakout Net convergence tests check
+that the predicted paddle lands where the server puts it, also with the whole fixed schedule resimulated. See
 [Transports](/Ion/networking/multiplayer/transports/) for the loopback setup.
 
 ## See also
