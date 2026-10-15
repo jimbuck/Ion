@@ -1031,6 +1031,9 @@ public sealed class NetworkWorld : INetworkWorld
 			}
 		}
 
+		// Services that keep their own copy of the entities (physics bodies) follow the rewind, so the action's queries see the past.
+		var listeners = _session.RewindListeners;
+		foreach (var listener in listeners) listener.Rewound(_world);
 		try
 		{
 			action(_world);
@@ -1046,6 +1049,8 @@ public sealed class NetworkWorld : INetworkWorld
 					scratch.Columns[c].Remove(slot);
 				}
 			}
+
+			foreach (var listener in listeners) listener.Restored(_world);
 		}
 	}
 }

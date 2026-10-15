@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using Ion.Extensions.Metrics;
+using Ion.Extensions.Ecs;
 
 namespace Ion.Extensions.Networking;
 
@@ -229,6 +230,17 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 			foreach (var world in Worlds.LiveWorlds) world.ApplyLatest();
 		}
 	}
+
+	/// <summary>Where the services that follow lag compensation rewinds come from (the module wires the DI ones).</summary>
+	internal Func<IEnumerable<IWorldRewindListener>>? RewindListenerSource { get; set; }
+
+	private IWorldRewindListener[]? _rewindListeners;
+
+	/// <summary>The services told when a world is rewound for lag compensation and restored (physics bodies follow).</summary>
+	internal IWorldRewindListener[] RewindListeners => _rewindListeners ??= RewindListenerSource is { } source ? [.. source()] : [];
+
+	/// <summary>Adds a rewind listener (tests and hosts without DI).</summary>
+	internal void AddRewindListener(IWorldRewindListener listener) => _rewindListeners = [.. RewindListeners, listener];
 
 	// Ticks -------------------------------------------------------------------------------------------------------------------
 

@@ -1451,6 +1451,44 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 		lock (WorldTableGate) B2.DestroyWorld(_id);
 	}
 
+	internal bool IsDisposed => _disposed;
+
+	internal World Ecs => _ecs;
+
+	private readonly List<(B2.BodyId Body, B2.Transform Pose)> _rewoundBodies = [];
+
+	/// <summary>
+	/// Moves every body whose entity's <see cref="Transform2D"/> is not where the body is (a world rewound by lag
+	/// compensation) to that transform, without stepping, so queries see the rewound poses;
+	/// <see cref="RestoreRewoundBodies"/> moves them back. Velocities, contacts and sleep are left alone.
+	/// </summary>
+	public void MatchBodiesToTransforms()
+	{
+		ObjectDisposedException.ThrowIf(_disposed, this);
+		RestoreRewoundBodies();
+		for (var slot = 1; slot < _bodyHighWater; slot++)
+		{
+			ref var body = ref _bodies[slot];
+			if (!body.Alive || !_ecs.IsAlive(body.Entity) || !_ecs.TryGet<Transform2D>(body.Entity, out var local)) continue;
+			var transform = _ecs.Has<Parent>(body.Entity) ? WorldOf(body.Entity, local) : local;
+			if (transform.Position == body.Position && transform.Rotation == body.Rotation) continue;
+			_rewoundBodies.Add((body.Body, B2.BodyGetTransform(body.Body)));
+			B2.BodySetTransform(body.Body, ToB2(transform.Position * _toPhysics), B2.MakeRot(transform.Rotation));
+		}
+	}
+
+	/// <summary>Moves the bodies <see cref="MatchBodiesToTransforms"/> moved back to their poses.</summary>
+	public void RestoreRewoundBodies()
+	{
+		for (var i = _rewoundBodies.Count - 1; i >= 0; i--)
+		{
+			var (body, pose) = _rewoundBodies[i];
+			B2.BodySetTransform(body, pose.p, pose.q);
+		}
+
+		_rewoundBodies.Clear();
+	}
+
 	private struct BodySlot
 	{
 		public bool Alive;

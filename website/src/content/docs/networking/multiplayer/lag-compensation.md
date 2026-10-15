@@ -155,12 +155,33 @@ Details:
 - The action is an `Action<World>`; a lambda that captures locals allocates a closure. For per-frame use in hot paths,
   prefer `TryGetAtTick` reads.
 
-:::caution[Physics engines are not rewound]
-`WithWorldAtTick` rewrites ECS components. A physics engine's own bodies (Box2D in the 2D physics module, the 3D
-physics backend) keep their current positions, so a physics raycast inside the action still sees the present. Test
-against the rewound component values yourself, as in the example above, or keep a simple hit shape per entity for lag
-compensated queries. See [Physics queries and events](/Ion/physics/queries-and-events/).
-:::
+### Physics queries
+
+The physics engines keep bodies of their own (Box2D in the 2D module, BepuPhysics in the 3D one), which the components
+do not move by themselves. `WithWorldAtTick` therefore tells every `IWorldRewindListener` service after rewinding the
+components, and again after restoring them. The 2D and 3D physics modules register one, so inside the action **every
+body is where its entity was at the tick**, and physics queries (`RayCast`, the overlap and shape casts) see that pose:
+
+```csharp
+// The server checks a shot: a ray from the shooter, against the targets where the shooter saw them.
+if (network.TryGetRewindTick(peer, shot.SeenTick, out var tick))
+{
+    network.WithWorldAtTick(tick, _ =>
+    {
+        if (physics.RayCast(shot.Origin, shot.Direction * range, out var hit, mask: Layers.Players)) Damage(hit.Entity);
+    });
+}
+```
+
+- Each body whose entity's rewound `Transform2D` or `Transform` differs from its current pose is moved there, with its
+  broadphase bounds updated, without stepping the simulation. Parented bodies use their rewound world pose. Afterwards
+  each is put back exactly where it was.
+- Only poses move. Velocities, contacts and sleeping are left alone, and the next physics step continues from the
+  present.
+- The transforms must be replicated (`[assembly: ReplicateComponent(typeof(Transform2D))]`, or `Transform` in 3D) to be
+  rewound at all.
+- Anything else that keeps its own copy of entity state (a spatial grid, a navigation mesh) can follow rewinds the
+  same way: implement `IWorldRewindListener` (`Rewound(world)`, `Restored(world)`) and register it as a singleton.
 
 ## Tuning and fairness
 
@@ -176,6 +197,9 @@ compensated queries. See [Physics queries and events](/Ion/physics/queries-and-e
 `PredictionTests.LagCompensationRewindsWithinTheLimitAndRestores` checks that a claim five ticks back is plausible and
 reads the old position, that `WithWorldAtTick` shows it and restores the present afterwards, that claims beyond
 `MaxRewindTicks` or in the future are refused, and that `WithWorldAtTick` clamps an older tick.
+`LagCompensationPhysicsTests` run a networked server with the 2D and with the 3D physics module and a target that
+slides every tick: a ray cast inside `WithWorldAtTick` hits where the target was 20 ticks earlier, misses there
+outside it, and hits the present position afterwards, from which the physics steps on.
 
 ## See also
 

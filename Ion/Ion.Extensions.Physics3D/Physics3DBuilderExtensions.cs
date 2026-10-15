@@ -38,6 +38,7 @@ public static class Physics3DBuilderExtensions
 		if (configure is not null) services.Configure(configure);
 
 		services.TryAddSingleton(static sp => new Physics3DWorlds(sp, sp.GetRequiredService<IOptions<Physics3DConfig>>().Value));
+		services.TryAddEnumerable(ServiceDescriptor.Singleton<IWorldRewindListener, Physics3DWorlds>(static sp => sp.GetRequiredService<Physics3DWorlds>()));
 		services.TryAddScoped(static sp => new Physics3DScope(sp.GetRequiredService<Physics3DWorlds>(), sp));
 		services.TryAddTransient(static sp => sp.GetRequiredService<Physics3DWorlds>().WorldFor(sp));
 		services.TryAddTransient<IPhysicsWorld3D>(static sp => sp.GetRequiredService<PhysicsWorld3D>());
@@ -105,8 +106,9 @@ public static class Physics3DComponents
 }
 
 /// <summary>The 3D physics worlds of an application: the root one and one per service scope (each scene).</summary>
-public sealed class Physics3DWorlds : IDisposable
+public sealed class Physics3DWorlds : IWorldRewindListener, IDisposable
 {
+	private readonly List<PhysicsWorld3D> _worlds = [];
 	private readonly IServiceProvider _root;
 	private readonly Physics3DConfig _config;
 	private PhysicsWorld3D? _rootWorld;
@@ -136,7 +138,33 @@ public sealed class Physics3DWorlds : IDisposable
 	internal PhysicsWorld3D Create(IServiceProvider services)
 	{
 		ObjectDisposedException.ThrowIf(_disposed, this);
-		return new PhysicsWorld3D(services.GetRequiredService<World>(), services.GetService<IEvents>(), _config);
+		var world = new PhysicsWorld3D(services.GetRequiredService<World>(), services.GetService<IEvents>(), _config);
+		lock (_worlds)
+		{
+			_worlds.RemoveAll(static w => w.IsDisposed);
+			_worlds.Add(world);
+		}
+
+		return world;
+	}
+
+	/// <summary>Lag compensation rewound <paramref name="world"/>'s components: its physics world's bodies follow, for the queries.</summary>
+	public void Rewound(World world) => Of(world)?.MatchBodiesToTransforms();
+
+	/// <summary>The rewind ended: the bodies go back.</summary>
+	public void Restored(World world) => Of(world)?.RestoreRewoundBodies();
+
+	private PhysicsWorld3D? Of(World world)
+	{
+		lock (_worlds)
+		{
+			foreach (var physics in _worlds)
+			{
+				if (!physics.IsDisposed && ReferenceEquals(physics.Ecs, world)) return physics;
+			}
+		}
+
+		return null;
 	}
 
 	/// <summary>Disposes the root world.</summary>

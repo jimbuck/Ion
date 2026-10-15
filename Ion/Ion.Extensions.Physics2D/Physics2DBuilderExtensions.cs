@@ -36,6 +36,7 @@ public static class Physics2DBuilderExtensions
 		if (configure is not null) services.Configure(configure);
 
 		services.TryAddSingleton(static sp => new Physics2DWorlds(sp, sp.GetRequiredService<IOptions<Physics2DConfig>>().Value));
+		services.TryAddEnumerable(ServiceDescriptor.Singleton<IWorldRewindListener, Physics2DWorlds>(static sp => sp.GetRequiredService<Physics2DWorlds>()));
 		services.TryAddScoped(static sp => new Physics2DScope(sp.GetRequiredService<Physics2DWorlds>(), sp));
 		services.TryAddTransient(static sp => sp.GetRequiredService<Physics2DWorlds>().WorldFor(sp));
 		services.TryAddTransient<IPhysicsWorld2D>(static sp => sp.GetRequiredService<PhysicsWorld2D>());
@@ -106,10 +107,11 @@ public static class Physics2DComponents
 /// The 2D physics worlds of an application: the root one (for the root provider) and one per service scope (each scene),
 /// each created on first use for the ECS world of the same scope and disposed with it.
 /// </summary>
-public sealed class Physics2DWorlds : IDisposable
+public sealed class Physics2DWorlds : IWorldRewindListener, IDisposable
 {
 	private readonly IServiceProvider _root;
 	private readonly Physics2DConfig _config;
+	private readonly List<PhysicsWorld2D> _worlds = [];
 	private PhysicsWorld2D? _rootWorld;
 	private bool _disposed;
 
@@ -137,7 +139,33 @@ public sealed class Physics2DWorlds : IDisposable
 	internal PhysicsWorld2D Create(IServiceProvider services)
 	{
 		ObjectDisposedException.ThrowIf(_disposed, this);
-		return new PhysicsWorld2D(services.GetRequiredService<World>(), services.GetService<IEvents>(), _config);
+		var world = new PhysicsWorld2D(services.GetRequiredService<World>(), services.GetService<IEvents>(), _config);
+		lock (_worlds)
+		{
+			_worlds.RemoveAll(static w => w.IsDisposed);
+			_worlds.Add(world);
+		}
+
+		return world;
+	}
+
+	/// <summary>Lag compensation rewound <paramref name="world"/>'s components: its physics world's bodies follow, for the queries.</summary>
+	public void Rewound(World world) => Of(world)?.MatchBodiesToTransforms();
+
+	/// <summary>The rewind ended: the bodies go back.</summary>
+	public void Restored(World world) => Of(world)?.RestoreRewoundBodies();
+
+	private PhysicsWorld2D? Of(World world)
+	{
+		lock (_worlds)
+		{
+			foreach (var physics in _worlds)
+			{
+				if (!physics.IsDisposed && ReferenceEquals(physics.Ecs, world)) return physics;
+			}
+		}
+
+		return null;
 	}
 
 	/// <summary>Disposes the root world.</summary>

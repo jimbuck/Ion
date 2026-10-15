@@ -53,6 +53,8 @@ public static class NetworkingBuilderExtensions
 				sp.GetService<IMetrics>());
 			// The whole fixed schedule for RollbackMode.FixedSchedule: the game loop's, once it exists.
 			if (sp.GetService<ILoopContext>() is GameLoopContext loop) session.Prediction.Resimulator = () => loop.Loop?.ResimulateFixedStep();
+			// Physics and the like follow lag compensation rewinds (resolved on the first rewind).
+			session.RewindListenerSource = () => sp.GetServices<IWorldRewindListener>();
 			return session;
 		});
 		services.TryAddSingleton<INetworkSession>(static sp => sp.GetRequiredService<NetworkSession>());

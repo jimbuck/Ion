@@ -72,6 +72,69 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 	private readonly BodyActivityDescription _activity;
 
 	internal BodySlot[] Slots = new BodySlot[64];
+
+	internal World Ecs => _ecs;
+
+	internal bool IsDisposed => _disposed;
+
+	private readonly List<(int Slot, RigidPose Pose)> _rewoundBodies = [];
+
+	/// <summary>
+	/// Moves every body (and static) whose entity's <see cref="Transform"/> is not where the body is (a world rewound by
+	/// lag compensation) to that transform, with its bounds updated but without stepping, so queries see the rewound poses;
+	/// <see cref="RestoreRewoundBodies"/> moves them back. Velocities and sleep are left alone.
+	/// </summary>
+	public void MatchBodiesToTransforms()
+	{
+		RestoreRewoundBodies();
+		for (var slot = 1; slot < Slots.Length; slot++)
+		{
+			ref var body = ref Slots[slot];
+			if (!body.Alive || !_ecs.IsAlive(body.Entity) || !_ecs.TryGet<Transform>(body.Entity, out var local)) continue;
+			var transform = _ecs.Has<Parent>(body.Entity) ? WorldOf(body.Entity, local) : local;
+			if (transform.Position == body.Position && transform.Rotation == body.Rotation) continue;
+			var pose = BodyPose(transform.Position, transform.Rotation, body.Center);
+			if (body.IsStatic)
+			{
+				var description = _sim.Statics.GetDescription(body.Static);
+				_rewoundBodies.Add((slot, description.Pose));
+				description.Pose = pose;
+				_sim.Statics.ApplyDescription(body.Static, description);
+			}
+			else
+			{
+				var reference = _sim.Bodies[body.Body];
+				_rewoundBodies.Add((slot, reference.Pose));
+				reference.Pose = pose;
+				reference.UpdateBounds();
+			}
+		}
+	}
+
+	/// <summary>Moves the bodies <see cref="MatchBodiesToTransforms"/> moved back to their poses.</summary>
+	public void RestoreRewoundBodies()
+	{
+		for (var i = _rewoundBodies.Count - 1; i >= 0; i--)
+		{
+			var (slot, pose) = _rewoundBodies[i];
+			ref var body = ref Slots[slot];
+			if (!body.Alive) continue;
+			if (body.IsStatic)
+			{
+				var description = _sim.Statics.GetDescription(body.Static);
+				description.Pose = pose;
+				_sim.Statics.ApplyDescription(body.Static, description);
+			}
+			else
+			{
+				var reference = _sim.Bodies[body.Body];
+				reference.Pose = pose;
+				reference.UpdateBounds();
+			}
+		}
+
+		_rewoundBodies.Clear();
+	}
 	private int _highWater = 1;
 	private int[] _free = new int[16];
 	private int _freeCount;

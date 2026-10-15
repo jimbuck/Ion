@@ -31,6 +31,8 @@
     <ProjectReference Include="..\Ion.Extensions.Networking\Ion.Extensions.Networking.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Networking.LiteNetLib\Ion.Extensions.Networking.LiteNetLib.csproj" />
     <ProjectReference Include="..\Ion.Extensions.Networking.WebSockets\Ion.Extensions.Networking.WebSockets.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics3D\Ion.Extensions.Physics3D.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
