@@ -15,6 +15,6 @@
     <InternalsVisibleTo Include="Ion.Tools.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="4.1.2" />
   </ItemGroup>
 </Project>
