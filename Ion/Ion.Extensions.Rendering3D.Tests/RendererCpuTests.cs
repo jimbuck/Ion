@@ -240,7 +240,7 @@ public class RendererCpuTests
 	[Fact, Trait(CATEGORY, UNIT)]
 	public void ShadowCastersAreBatchedByMeshAndBlendedObjectsDoNotCast()
 	{
-		using var renderer = NewRenderer();
+		using var renderer = NewRenderer(new Rendering3DOptions { ShadowCascades = 1 });
 		var cube = renderer.CreateMesh(MeshPrimitives.Cube());
 		var sphere = renderer.CreateMesh(MeshPrimitives.Sphere());
 		var red = renderer.CreateMaterial(new PbrMaterial(Color.Red));

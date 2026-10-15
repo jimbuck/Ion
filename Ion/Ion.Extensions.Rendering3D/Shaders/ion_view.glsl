@@ -3,6 +3,7 @@
 // convention), which GLSL reads as their transposes, so `matrix * vec4(p, 1.0)` applies them as the engine does.
 
 #define ION_MAX_LIGHTS 8
+#define ION_MAX_CASCADES 4
 #define ION_LIGHT_POINT 0.0
 #define ION_LIGHT_SPOT 1.0
 #define ION_LIGHT_DIRECTIONAL 2.0
@@ -25,13 +26,20 @@ layout(set = 0, binding = 0) uniform View
 	mat4 uView;
 	mat4 uProjection;
 	mat4 uInverseViewProjection;
-	// World to shadow map: xy the texture coordinates (row 0 at the top), z the depth to compare.
-	mat4 uShadowMatrix;
+	// World to shadow map, per cascade: xy the texture coordinates in the atlas (row 0 at the top), z the depth to compare.
+	mat4 uShadowMatrices[ION_MAX_CASCADES];
+	// Per cascade: x the depth bias, y the normal offset in world units, z the view depth where it starts blending into
+	// the next cascade.
+	vec4 uCascadeParams[ION_MAX_CASCADES];
+	// The view depth where each cascade ends.
+	vec4 uCascadeSplits;
+	// The view depth of the camera the cascades are fitted to: dot(xyz, worldPosition) + w.
+	vec4 uShadowDepth;
 	// xyz: camera position, w: time in seconds.
 	vec4 uCameraPosition;
 	// rgb: linear ambient color times intensity, w: environment map intensity (0: no environment map).
 	vec4 uAmbient;
-	// x: 1 when the shadow map is valid, y: depth bias, z: normal offset in world units, w: 1 / shadow map size.
+	// x: the number of shadow cascades (0: no shadow map), y: 1 to tint the cascades, w: 1 / shadow map size.
 	vec4 uShadowParams;
 	// xyz: the direction the main directional light travels, w: 1 when there is one.
 	vec4 uLightDirection;
@@ -47,6 +55,9 @@ layout(set = 0, binding = 0) uniform View
 
 layout(set = 0, binding = 1) uniform texture2D uShadowMap;
 layout(set = 0, binding = 2) uniform samplerShadow uShadowSampler;
+// The first cascade's matrix (the whole shadow of a single cascade), for shaders written before cascades.
+#define uShadowMatrix uShadowMatrices[0]
+
 layout(set = 0, binding = 3) uniform textureCube uEnvironment;
 layout(set = 0, binding = 4) uniform sampler uEnvironmentSampler;
 

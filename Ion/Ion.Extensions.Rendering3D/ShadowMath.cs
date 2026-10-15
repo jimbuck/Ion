@@ -16,6 +16,9 @@ public readonly record struct DirectionalShadow(Matrix4x4 ViewProjection, Matrix
 /// <summary>Shadow map fitting for directional lights.</summary>
 public static class ShadowMath
 {
+	/// <summary>The most cascades a directional shadow has.</summary>
+	public const int MaxCascades = 4;
+
 	/// <summary>
 	/// Maps clip space to shadow map coordinates: x and y from [-1, 1] to [0, 1] with y flipped (row 0 of a texture is
 	/// the top, clip y points up), depth unchanged ([0, 1] in the RHI's clip space).
@@ -33,13 +36,46 @@ public static class ShadowMath
 	/// shadow edges do not shimmer as the camera moves. The depth range reaches back to every caster in
 	/// <paramref name="casterBounds"/> (world space) so objects outside the view still cast into it.
 	/// </summary>
-	public static DirectionalShadow Fit(in Camera camera, in Matrix4x4 cameraView, float aspectRatio, Vector3 lightDirection, float shadowDistance, int shadowMapSize, ReadOnlySpan<Aabb> casterBounds)
+	public static DirectionalShadow Fit(in Camera camera, in Matrix4x4 cameraView, float aspectRatio, Vector3 lightDirection, float shadowDistance, int shadowMapSize, ReadOnlySpan<Aabb> casterBounds) =>
+		FitSlice(camera, cameraView, aspectRatio, lightDirection, camera.EffectiveNear, ShadowFar(camera, shadowDistance), shadowMapSize, casterBounds);
+
+	/// <summary>Where shadows end for <paramref name="camera"/>: the shadow distance, within the camera's near and far planes.</summary>
+	public static float ShadowFar(in Camera camera, float shadowDistance) =>
+		MathF.Min(camera.EffectiveFar, MathF.Max(camera.EffectiveNear * 2, shadowDistance));
+
+	/// <summary>
+	/// The far distance of each cascade between <paramref name="near"/> and <paramref name="far"/> (the last is
+	/// <paramref name="far"/>): <paramref name="lambda"/> mixes even splits (0) and logarithmic ones (1, the "practical"
+	/// split scheme).
+	/// </summary>
+	public static void ComputeSplits(float near, float far, float lambda, Span<float> splits)
+	{
+		var n = splits.Length;
+		near = MathF.Max(near, 1e-3f);
+		lambda = Math.Clamp(lambda, 0f, 1f);
+		for (var i = 1; i <= n; i++)
+		{
+			var f = (float)i / n;
+			var uniform = near + (far - near) * f;
+			var logarithmic = near * MathF.Pow(far / near, f);
+			splits[i - 1] = uniform + (logarithmic - uniform) * lambda;
+		}
+
+		splits[^1] = far;
+	}
+
+	/// <summary>
+	/// Fits a shadow projection like <see cref="Fit"/> around the slice of the camera's frustum between the distances
+	/// <paramref name="sliceNear"/> and <paramref name="sliceFar"/> (one cascade).
+	/// </summary>
+	public static DirectionalShadow FitSlice(in Camera camera, in Matrix4x4 cameraView, float aspectRatio, Vector3 lightDirection, float sliceNear, float sliceFar, int shadowMapSize, ReadOnlySpan<Aabb> casterBounds)
 	{
 		var direction = lightDirection.LengthSquared() > 1e-12f ? Vector3.Normalize(lightDirection) : -Vector3.UnitY;
 
-		// The camera frustum slice [near, min(far, shadow distance)] and its bounding sphere.
+		// The camera frustum slice and its bounding sphere.
 		var slice = camera;
-		slice.Far = MathF.Min(camera.EffectiveFar, MathF.Max(camera.EffectiveNear * 2, shadowDistance));
+		slice.Near = MathF.Max(sliceNear, 1e-3f);
+		slice.Far = MathF.Max(sliceFar, slice.Near * 1.001f);
 		var sliceViewProjection = cameraView * slice.GetProjectionMatrix(aspectRatio);
 		Span<Vector3> corners = stackalloc Vector3[8];
 		Frustum.GetCorners(sliceViewProjection, corners);

@@ -45,7 +45,8 @@ public sealed partial class Renderer3D
 	/// <summary>Seconds since start, written into the view uniforms (<c>uCameraPosition.w</c>) for animated materials.</summary>
 	public float Time { get; set; }
 
-	private int ViewSlots => _views.Length + 1;
+	/// <summary>Uniform slots per frame: one per camera, then one per shadow cascade.</summary>
+	private int ViewSlots => _views.Length + ShadowMath.MaxCascades;
 
 	/// <summary>
 	/// Creates the GPU resources on the frame's device: shaders, layouts, samplers, default textures, the shadow map, the
@@ -145,7 +146,7 @@ public sealed partial class Renderer3D
 
 		_viewBuffer = device.CreateBuffer(new BufferDescriptor((ulong)(device.FramesInFlight * ViewSlots * ViewUniforms.SlotSize), BufferUsage.Uniform | BufferUsage.CopyDst, "Ion 3D views"));
 		_viewGroups = new IBindGroup?[device.FramesInFlight * _views.Length];
-		_shadowGroups = new IBindGroup?[device.FramesInFlight];
+		_shadowGroups = new IBindGroup?[device.FramesInFlight * ShadowMath.MaxCascades];
 		_instanceBuffers = new IBuffer?[device.FramesInFlight];
 
 		foreach (var mesh in _meshes)
@@ -222,9 +223,12 @@ public sealed partial class Renderer3D
 
 		if (_shadowActive)
 		{
-			_uniforms = default;
-			_uniforms.ViewProjection = _shadow.ViewProjection;
-			device.Queue.WriteBuffer(_viewBuffer!, ViewOffset(slot, _views.Length), in _uniforms);
+			for (var c = 0; c < _cascadeCount; c++)
+			{
+				_uniforms = default;
+				_uniforms.ViewProjection = _cascades[c].ViewProjection;
+				device.Queue.WriteBuffer(_viewBuffer!, ViewOffset(slot, _views.Length + c), in _uniforms);
+			}
 		}
 
 		// Materials drawn this frame: uniforms and bind groups.
@@ -328,7 +332,6 @@ public sealed partial class Renderer3D
 		u.View = view.View;
 		u.Projection = view.Projection;
 		Matrix4x4.Invert(view.ViewProjection, out u.InverseViewProjection);
-		u.ShadowMatrix = _shadow.ShadowMatrix;
 		u.CameraPosition = new Vector4(view.Position, Time);
 
 		var environmentTexture = _boundEnvironment > 0 ? GetTexture(new TextureHandle(_boundEnvironment)) : null;
@@ -337,10 +340,19 @@ public sealed partial class Renderer3D
 
 		if (_shadowActive)
 		{
+			// Per cascade: the bias in its own texels and depth range, the normal offset of its texel size.
 			var light = _directional.Items[_mainLight].Light;
 			var texels = light.ShadowBias > 0 ? light.ShadowBias : 1.5f;
-			var depthBias = texels * _shadow.TexelSize / MathF.Max(_shadow.DepthRange, 1e-3f);
-			u.ShadowParams = new Vector4(1, depthBias, _shadow.TexelSize, 1f / _shadowMap!.Width);
+			for (var c = 0; c < _cascadeCount; c++)
+			{
+				ref readonly var cascade = ref _cascades[c];
+				u.ShadowMatrices[c] = cascade.ShadowMatrix;
+				u.CascadeParams[c] = new Vector4(texels * cascade.TexelSize / MathF.Max(cascade.DepthRange, 1e-3f), cascade.TexelSize, _cascadeBlendStarts[c], 0);
+			}
+
+			u.CascadeSplits = new Vector4(_cascadeSplits[0], _cascadeSplits[1], _cascadeSplits[2], _cascadeSplits[3]);
+			u.ShadowDepth = _shadowDepth;
+			u.ShadowParams = new Vector4(_cascadeCount, Options.ShowShadowCascades ? 1 : 0, 0, 1f / _shadowMap!.Width);
 		}
 		else
 		{
@@ -423,14 +435,15 @@ public sealed partial class Renderer3D
 		return group;
 	}
 
-	internal IBindGroup ShadowGroup()
+	/// <summary>The view group of one shadow cascade's depth pass: its light view-projection and the joint palette.</summary>
+	internal IBindGroup ShadowGroup(int cascade)
 	{
 		var device = Device!;
-		var index = device.FrameIndex;
+		var index = device.FrameIndex * ShadowMath.MaxCascades + cascade;
 		if (_shadowGroups[index] is { } group) return group;
 		group = device.CreateBindGroup(new BindGroupDescriptor(_shadowViewLayout!,
 		[
-			BindGroupEntry.ForBuffer(0, _viewBuffer!, ViewOffset(device.FrameIndex, _views.Length), ViewUniforms.SlotSize),
+			BindGroupEntry.ForBuffer(0, _viewBuffer!, ViewOffset(device.FrameIndex, _views.Length + cascade), ViewUniforms.SlotSize),
 			BindGroupEntry.ForTexture(5, _jointTexture!.DefaultView),
 			BindGroupEntry.ForSampler(6, _jointSampler!),
 		], "Ion 3D shadow view"));

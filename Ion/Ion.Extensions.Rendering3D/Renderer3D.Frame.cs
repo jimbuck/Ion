@@ -31,7 +31,14 @@ public sealed partial class Renderer3D
 	private readonly int[] _targetsSeen = new int[64];
 	private RenderGraph _graph;
 	private readonly PassSet _passes;
-	private DirectionalShadow _shadow;
+	private readonly DirectionalShadow[] _cascades = new DirectionalShadow[ShadowMath.MaxCascades];
+	private readonly float[] _cascadeSplits = new float[ShadowMath.MaxCascades];
+	private readonly float[] _cascadeBlendStarts = new float[ShadowMath.MaxCascades];
+	private readonly int[] _cascadeBatchStarts = new int[ShadowMath.MaxCascades + 1];
+	private readonly (uint X, uint Y, uint Size)[] _cascadeTiles = new (uint, uint, uint)[ShadowMath.MaxCascades];
+	private int _cascadeCount;
+	private Vector4 _shadowDepth;
+	private bool[] _castersDrawn = new bool[1024];
 	private bool _shadowActive;
 	private int _mainLight = -1;
 	private int _shadowCasterCount;
@@ -60,11 +67,27 @@ public sealed partial class Renderer3D
 	/// <summary>The world-space bounds of the last frame's objects, in submission order.</summary>
 	internal ReadOnlySpan<Aabb> WorldBounds => _worldBounds.AsSpan(0, _objects.Count);
 
-	/// <summary>The shadow batches of the last frame.</summary>
+	/// <summary>The shadow batches of the last frame, every cascade's in cascade order.</summary>
 	internal ReadOnlySpan<Batch> ShadowBatches => _shadowBatches.Span;
 
-	/// <summary>The directional shadow of the last frame (valid when <see cref="ShadowActive"/>).</summary>
-	public DirectionalShadow Shadow => _shadow;
+	/// <summary>The shadow batches of one cascade of the last frame.</summary>
+	internal ReadOnlySpan<Batch> CascadeBatches(int cascade) =>
+		_shadowBatches.Span[_cascadeBatchStarts[cascade].._cascadeBatchStarts[cascade + 1]];
+
+	/// <summary>Where a cascade's tile is in the shadow map, in texels.</summary>
+	internal (uint X, uint Y, uint Size) CascadeTile(int cascade) => _cascadeTiles[cascade];
+
+	/// <summary>The first cascade of the last frame's directional shadow (valid when <see cref="ShadowActive"/>).</summary>
+	public DirectionalShadow Shadow => _cascades[0];
+
+	/// <summary>
+	/// The cascades of the last frame's directional shadow, nearest first (empty without a shadow). Their shadow matrices
+	/// map into their own tiles of the shadow map.
+	/// </summary>
+	public ReadOnlySpan<DirectionalShadow> ShadowCascades => _shadowActive ? _cascades.AsSpan(0, _cascadeCount) : [];
+
+	/// <summary>The view depth (from the camera the shadow is fitted to) where each cascade of the last frame ends.</summary>
+	public ReadOnlySpan<float> ShadowCascadeSplits => _shadowActive ? _cascadeSplits.AsSpan(0, _cascadeCount) : [];
 
 	/// <summary>Whether the last frame rendered a shadow map.</summary>
 	public bool ShadowActive => _shadowActive;
@@ -288,12 +311,62 @@ public sealed partial class Renderer3D
 
 		if (casters == 0) return;
 
-		var fitView = _views[_frameViewIndex >= 0 ? _frameViewIndex : 0];
-		var cameraView = fitView.View;
-		_shadow = ShadowMath.Fit(fitView.Camera, cameraView, fitView.ViewportWidth / fitView.ViewportHeight, main.Direction,
-			Options.ShadowDistance, Math.Max(16, Options.ShadowMapSize), _casterBounds.AsSpan(0, casters));
+		FitCascades(main.Direction, casters);
 		_shadowActive = true;
 		_shadowCasterCount = casters;
+	}
+
+	/// <summary>
+	/// Splits the shadow camera's frustum up to the shadow distance into the cascades and fits each one into its tile of
+	/// the shadow map (the whole map for one cascade, a 2x2 atlas otherwise). Each cascade's slice starts where the
+	/// previous one starts blending, so the blend region is covered by both.
+	/// </summary>
+	private void FitCascades(Vector3 lightDirection, int casters)
+	{
+		var fitView = _views[_frameViewIndex >= 0 ? _frameViewIndex : 0];
+		var camera = fitView.Camera;
+		var aspect = fitView.ViewportWidth / fitView.ViewportHeight;
+		var count = Math.Clamp(Options.ShadowCascades, 1, ShadowMath.MaxCascades);
+		var near = camera.EffectiveNear;
+		var far = ShadowMath.ShadowFar(camera, Options.ShadowDistance);
+		var splits = _cascadeSplits.AsSpan(0, count);
+		if (Options.ShadowCascadeSplits is { Length: > 0 } fractions)
+		{
+			for (var i = 0; i < count; i++)
+			{
+				var fraction = i < fractions.Length ? fractions[i] : 1f;
+				splits[i] = Math.Clamp(near + (far - near) * Math.Clamp(fraction, 0f, 1f), i > 0 ? splits[i - 1] : near, far);
+			}
+
+			splits[^1] = far;
+		}
+		else
+		{
+			ShadowMath.ComputeSplits(near, far, Options.ShadowSplitLambda, splits);
+		}
+
+		var mapSize = (uint)Math.Clamp(Options.ShadowMapSize, 16, 8192);
+		var tileSize = count == 1 ? mapSize : mapSize / 2;
+		var blend = Math.Clamp(Options.ShadowCascadeBlend, 0f, 1f);
+		var start = near;
+		for (var c = 0; c < count; c++)
+		{
+			var end = splits[c];
+			_cascadeBlendStarts[c] = blend > 0 ? end - (end - start) * blend : end;
+			var sliceNear = c == 0 ? near : _cascadeBlendStarts[c - 1];
+			var shadow = ShadowMath.FitSlice(camera, fitView.View, aspect, lightDirection, sliceNear, end, (int)tileSize, _casterBounds.AsSpan(0, casters));
+
+			// The tile: texture coordinates scaled into its quarter of the atlas.
+			var (tx, ty) = count == 1 ? (0u, 0u) : ((uint)c % 2, (uint)c / 2);
+			_cascadeTiles[c] = (tx * tileSize, ty * tileSize, tileSize);
+			if (count > 1) shadow = shadow with { ShadowMatrix = shadow.ShadowMatrix * Matrix4x4.CreateScale(0.5f, 0.5f, 1f) * Matrix4x4.CreateTranslation(tx * 0.5f, ty * 0.5f, 0f) };
+			_cascades[c] = shadow;
+			start = end;
+		}
+
+		_cascadeCount = count;
+		// View depth from the fitted camera: the distance along its forward axis.
+		_shadowDepth = new Vector4(fitView.Forward, -Vector3.Dot(fitView.Forward, fitView.Position));
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -313,7 +386,7 @@ public sealed partial class Renderer3D
 		_instances.Clear();
 		_shadowBatches.Clear();
 		var objectCount = _objects.Count;
-		_instances.EnsureCapacity(objectCount * (_viewCount + (_shadowActive ? 1 : 0)));
+		_instances.EnsureCapacity(objectCount * (_viewCount + (_shadowActive ? _cascadeCount : 0)));
 		if (_keys.Length < objectCount)
 		{
 			_keys = new ulong[Math.Max(objectCount, _keys.Length * 2)];
@@ -327,13 +400,30 @@ public sealed partial class Renderer3D
 
 	private void QueueShadow()
 	{
-		// Casters inside the light's frustum, grouped by mesh (the depth-only pipeline ignores materials).
-		var lightFrustum = Frustum.FromMatrix(_shadow.ViewProjection);
+		if (_castersDrawn.Length < _shadowCasterCount) _castersDrawn = new bool[Math.Max(_shadowCasterCount, _castersDrawn.Length * 2)];
+		_castersDrawn.AsSpan(0, _shadowCasterCount).Clear();
+		for (var cascade = 0; cascade < _cascadeCount; cascade++)
+		{
+			_cascadeBatchStarts[cascade] = _shadowBatches.Count;
+			QueueCascade(cascade);
+		}
+
+		_cascadeBatchStarts[_cascadeCount] = _shadowBatches.Count;
+		var drawn = 0;
+		foreach (var d in _castersDrawn.AsSpan(0, _shadowCasterCount)) if (d) drawn++;
+		_shadowCasterCount = drawn;
+	}
+
+	private void QueueCascade(int cascade)
+	{
+		// Casters inside the cascade's light frustum, grouped by mesh (the depth-only pipeline ignores materials).
+		var lightFrustum = Frustum.FromMatrix(_cascades[cascade].ViewProjection);
 		var count = 0;
 		for (var c = 0; c < _shadowCasterCount; c++)
 		{
 			var i = _casters[c];
 			if (!lightFrustum.Intersects(_casterBounds[c])) continue;
+			_castersDrawn[c] = true;
 			ref readonly var caster = ref _objects.Items[i];
 			_keys[count] = (caster.Skin >= 0 ? 1UL << 63 : 0) | (ulong)(uint)caster.Mesh << 32 | (uint)i;
 			count++;
@@ -364,8 +454,6 @@ public sealed partial class Renderer3D
 			InstanceData.Write(ref _instances.Add(), o.World, 0, skinned ? _skins.Items[o.Skin].Palette : 0);
 			_shadowBatches.Items[_shadowBatches.Count - 1].InstanceCount++;
 		}
-
-		_shadowCasterCount = count;
 	}
 
 	private void QueueView(ViewData view)

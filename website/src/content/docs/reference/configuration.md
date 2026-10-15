@@ -139,6 +139,11 @@ Bound to `Rendering3DOptions`; `AddRendering3D(options => ...)` runs after bindi
 | `Ion:Rendering3D:Shadows` | bool | `true` | The first shadow-casting directional light renders a shadow map. |
 | `Ion:Rendering3D:ShadowMapSize` | int | `2048` | The shadow map's width and height in texels. |
 | `Ion:Rendering3D:ShadowDistance` | float | `40` | How far from the camera shadows reach, in world units. |
+| `Ion:Rendering3D:ShadowCascades` | int | `4` | Shadow cascades, 1 to 4. |
+| `Ion:Rendering3D:ShadowCascadeSplits` | float[] | none | Where each cascade ends, as fractions of the shadow distance. |
+| `Ion:Rendering3D:ShadowSplitLambda` | float | `0.75` | Automatic splits: 0 even, 1 logarithmic. |
+| `Ion:Rendering3D:ShadowCascadeBlend` | float | `0.1` | The fraction of each cascade blended into the next. |
+| `Ion:Rendering3D:ShowShadowCascades` | bool | `false` | Tint what each cascade covers. |
 | `Ion:Rendering3D:DepthPrepass` | bool | `false` | Draw opaque objects into the depth buffer first, so the opaque pass shades each pixel once. |
 | `Ion:Rendering3D:MaxCameras` | int | `8` | The most cameras rendered in one frame. |
 

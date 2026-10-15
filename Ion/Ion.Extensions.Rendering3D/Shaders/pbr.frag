@@ -161,5 +161,6 @@ void main()
 	vec3 emissive = uEmissive.rgb * ionSrgbToLinear(texture(sampler2D(uEmissiveTexture, uMaterialSampler), vUv0).rgb);
 	color += emissive;
 
+	color *= ionShadowCascadeTint(vWorldPosition);
 	outColor = ionOutput(color, uFlags.x > 1.5 ? baseColor.a : 1.0);
 }

@@ -117,16 +117,42 @@ The main directional light renders a shadow map when:
 | Option (`Ion:Rendering3D:...`) | Default | Effect |
 |---|---|---|
 | `Shadows` | `true` | Turn shadows off entirely |
-| `ShadowMapSize` | `2048` | Resolution in texels. Higher is sharper and costs more memory and fill rate |
+| `ShadowMapSize` | `2048` | Resolution of the whole shadow map in texels. With more than one cascade each gets a quarter (1024 by default). Higher is sharper and costs more memory and fill rate |
 | `ShadowDistance` | `40` | How far from the camera shadows reach, in world units |
+| `ShadowCascades` | `4` | Cascades, 1 to 4 (see below) |
+| `ShadowCascadeSplits` | none | Where each cascade ends, as fractions of `ShadowDistance` (for example `[0.1, 0.25, 0.5]`; the last cascade always ends at 1) |
+| `ShadowSplitLambda` | `0.75` | Without explicit splits: 0 spaces the cascades evenly, 1 logarithmically, in between a mix |
+| `ShadowCascadeBlend` | `0.1` | The fraction of each cascade over which it fades into the next (the last fades out to no shadow). 0 switches sharply |
+| `ShowShadowCascades` | `false` | Tint what each cascade covers: red, green, blue, yellow from near to far |
 
-How the shadow map is fitted: the renderer takes the first frame camera's view frustum up to `ShadowDistance`, covers
-its bounding sphere with an orthographic projection along the light, and snaps it to whole shadow map texels, so shadow
-edges do not shimmer as the camera moves. The depth range is extended back to every caster whose footprint overlaps
-the area, so objects outside the view still cast shadows into it.
+### Cascades
+
+One shadow map stretched over the whole shadow distance is either blurry (a long distance) or short. Cascaded shadow
+maps split the camera's view, from its near plane to `ShadowDistance`, into up to four slices. Each slice gets its own
+part of the shadow map: a 2x2 atlas of `ShadowMapSize / 2` tiles, or the whole map with one cascade. The nearest slice
+is short, so its texels are small and the shadows at the camera's feet are sharp. The farthest is long, so shadows
+still reach far.
+
+![Four cascades tinted, from red at the camera to yellow far down an avenue](../../examples/images/shadows_tinted_640x360.png)
+
+How each cascade is fitted: the renderer takes its slice of the first frame camera's view frustum and covers the
+slice's bounding sphere with an orthographic projection along the light. It snaps the projection to whole texels of the
+tile, so shadow edges do not shimmer as the camera moves. The depth range is extended back to every caster whose
+footprint overlaps the area, so objects outside the view still cast shadows into it. Each cascade has its own depth
+bias and normal offset, scaled to its texel size.
+
+A fragment takes the cascade its distance from that camera falls in. Over the last `ShadowCascadeBlend` of a cascade
+it mixes in the next one, so the change of resolution does not show as a line. For that, each slice starts where the
+previous one starts blending.
 
 Sampling uses a comparison sampler with 3x3 taps, each a hardware 2x2 PCF, plus a normal offset and the depth bias, for
-soft-edged shadows without acne.
+soft-edged shadows without acne. The taps stay inside the cascade's tile.
+
+Every cascade draws the casters it covers, so four cascades cost up to four times the shadow draw calls of one. On a
+low-end GPU, `ShadowCascades = 1` or 2 with a shorter `ShadowDistance` is cheaper. `ShowShadowCascades` (or
+`renderer.Options` at run time, as the [Shadows sample](/Ion/examples/shadows/) does with its keys) helps place the
+splits. The cascades of the last frame are in `Renderer3D.ShadowCascades`, and where they end in
+`ShadowCascadeSplits`.
 
 Per object, `MeshRenderer.CastShadows` and `ReceiveShadows` control participation:
 
@@ -140,15 +166,16 @@ renderer.Submit(new MeshRenderer(_orb, _glow) { CastShadows = false, ReceiveShad
 
 | Symptom | Fix |
 |---|---|
-| Blurry, blocky shadows | Lower `ShadowDistance` (the map covers less area) or raise `ShadowMapSize` |
-| Shadows vanish in the distance | Raise `ShadowDistance` |
+| Blurry, blocky shadows near the camera | Use more cascades, raise `ShadowSplitLambda` towards 1 (a shorter first cascade), lower `ShadowDistance` or raise `ShadowMapSize` |
+| Shadows vanish in the distance | Raise `ShadowDistance` (more cascades keep the near ones sharp) |
+| A visible line where the resolution changes | Raise `ShadowCascadeBlend` |
 | Speckled self-shadowing ("acne") | Raise `DirectionalLight.ShadowBias` (texels, default 1.5) |
 | Shadows detached from their casters ("peter-panning") | Lower `ShadowBias` |
 
 The samples pick `ShadowDistance` to fit their scenes: 20 for the Model sample, 60 for the Cubes sample.
 
 :::note[Shadow limits]
-One shadowed directional light with one cascade. Point and spot lights cast no shadows. Blended (`AlphaMode.Blend`)
+One shadowed directional light, with up to four cascades. Point and spot lights cast no shadows. Blended (`AlphaMode.Blend`)
 objects cast no shadow, and masked objects cast the shadow of their full, unmasked shape.
 :::
 

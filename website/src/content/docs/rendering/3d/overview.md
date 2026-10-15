@@ -64,6 +64,7 @@ builder.AddRendering3D(options =>
 | `Shadows` | `true` | Whether the main directional light renders a shadow map |
 | `ShadowMapSize` | `2048` | Shadow map width and height in texels |
 | `ShadowDistance` | `40` | How far from the camera shadows reach, in world units |
+| `ShadowCascades` | `4` | Shadow cascades, 1 to 4 (see [Cascades](/Ion/rendering/3d/lighting-and-shadows/#cascades)) |
 | `DepthPrepass` | `false` | Draw opaque objects into the depth buffer first, so the opaque pass shades each pixel once. Pays off with expensive materials and heavy overdraw; costs a second vertex pass |
 | `MaxCameras` | `8` | The most cameras rendered in one frame (the uniform ring is sized for this many) |
 
@@ -153,7 +154,7 @@ When the Render stage closes (the `End` of the renderer's scope at `StageOrder.R
    - Light lists: the first shadow-casting directional light is the main light (with the shadow map; the first
      directional light when none casts); the other directional lights and the
      point and spot lights whose range touches the view fill up to 8 local lights per camera.
-   - The shadow projection is fitted to the camera's view up to `ShadowDistance` and snapped to whole shadow map
+   - The view up to `ShadowDistance` is split into cascades; each cascade's projection is fitted to its slice and snapped to whole shadow map
      texels, so shadows do not shimmer as the camera moves.
 3. **Queue and sort.** Per camera: layer test, frustum test, then a 64-bit sort key per visible object.
    - Opaque and masked objects: binned by pipeline, material and mesh, **front to back** inside a bin (early depth
@@ -350,8 +351,8 @@ frames can be compared with golden images. See [Testing](/Ion/tooling/testing/) 
 
 What the 3D renderer does not do yet:
 
-- One shadow-casting directional light with one cascade. No point or spot light shadows, no shadows from blended
-  objects; masked objects cast opaque shadows.
+- One shadow-casting directional light, with up to four cascades. No point or spot light shadows, no shadows from
+  blended objects; masked objects cast opaque shadows.
 - No MSAA, HDR targets, tone mapping or post-processing stack (the render graph can host them as custom passes).
 - No GPU culling and no LOD.
 - Image-based lighting uses box-filtered mips of the skybox, not prefiltered specular or an irradiance map.

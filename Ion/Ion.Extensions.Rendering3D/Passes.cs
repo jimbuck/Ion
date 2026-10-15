@@ -128,7 +128,10 @@ internal sealed class PassSet
 	}
 }
 
-/// <summary>The directional light's shadow map: every caster batch, depth only.</summary>
+/// <summary>
+/// The directional light's shadow map, depth only: each cascade's caster batches into its tile (the whole map for one
+/// cascade, a quarter for more), cleared once.
+/// </summary>
 internal sealed class ShadowPass(Renderer3D renderer) : RenderGraphPass("Shadow", Orders.Shadow)
 {
 	public RenderGraphTexture Target;
@@ -139,8 +142,16 @@ internal sealed class ShadowPass(Renderer3D renderer) : RenderGraphPass("Shadow"
 	{
 		var target = context.GetTexture(Target);
 		var pass = context.Encoder.BeginRenderPass(new RenderPassDescriptor([], new RenderPassDepthStencilAttachment(target.DefaultView, LoadOp.Clear, StoreOp.Store, 1f), "Ion 3D shadow"));
-		pass.SetBindGroup(0, renderer.ShadowGroup());
-		PassSet.DrawDepthBatches(renderer, pass, renderer.ShadowBatches, renderer.PassInstances, opaqueOnly: false, shadow: true);
+		var cascades = renderer.ShadowCascades.Length;
+		for (var c = 0; c < cascades; c++)
+		{
+			var (x, y, size) = renderer.CascadeTile(c);
+			pass.SetViewport(x, y, size, size);
+			pass.SetScissorRect(x, y, size, size);
+			pass.SetBindGroup(0, renderer.ShadowGroup(c));
+			PassSet.DrawDepthBatches(renderer, pass, renderer.CascadeBatches(c), renderer.PassInstances, opaqueOnly: false, shadow: true);
+		}
+
 		pass.End();
 	}
 }

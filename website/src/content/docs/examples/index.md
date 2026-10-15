@@ -1,12 +1,12 @@
 ---
 title: Examples
-description: The thirteen sample games in Ion.Examples, what each one demonstrates, and how to run, test and publish them.
+description: The fourteen sample games in Ion.Examples, what each one demonstrates, and how to run, test and publish them.
 sidebar:
   order: 0
   label: Overview
 ---
 
-The repository's [`Ion.Examples`](https://github.com/jimbuck/Ion/tree/main/Ion.Examples) folder holds thirteen sample games.
+The repository's [`Ion.Examples`](https://github.com/jimbuck/Ion/tree/main/Ion.Examples) folder holds fourteen sample games.
 Each is a small, complete program on the current API, with its setup inline in `Program.cs`, and most have a test
 project that runs that same `Program.cs` headless (`IonTestHost.UseEntryPoint<Program>()`). Read them in the order
 below to go from a single class to ECS, physics, networking and 3D.
@@ -28,6 +28,7 @@ below to go from a single class to ECS, physics, networking and 3D.
 | [GPU particles](/Ion/examples/particles/) | Compute shaders: 65,536 particles simulated in a storage buffer and drawn from it as instanced quads. | RHI compute (Vulkan, GLES 3.1) | Particles read back after 30 frames on Vulkan and GLES; the no-compute fallback |
 | [Marbles](/Ion/examples/marbles/) | 3D physics: marbles rolling on a terrain mesh that is both drawn and collided against (a triangle-mesh collider). | Physics3D, Rendering3D, ECS rendering 3D | Every marble above the mesh after 600 frames; rendered on Vulkan and GLES |
 | [Puppet](/Ion/examples/puppet/) | Skinned meshes and animation: a glTF character idling, cross-fading between clips and walking. | Rendering3D (skinning), ECS rendering 3D | Clips and cross-fades on schedule; rendered on Vulkan and GLES |
+| [Shadows](/Ion/examples/shadows/) | Cascaded shadow maps: an avenue of pillars shadowed from the camera's feet to 150 units away. | Rendering3D (shadows), ECS rendering 3D | Near and far shadows on Vulkan and GLES, against a short shadow distance |
 
 ![Breakout ECS with the physics debug drawing on](./images/breakout-physics-debug.png)
 
@@ -41,7 +42,7 @@ dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS
 
 The root `package.json` has a Release shortcut for each one (`npm install` once first): `npm run example:breakout`,
 `example:breakout-ecs`, `example:breakout-net`, `example:companion`, `example:menu`, `example:cubes`, `example:model`,
-`example:scenes`, `example:sprites`, `example:quad`, `example:particles`, `example:marbles` and `example:puppet`. Arguments follow `--`, as with `dotnet run`:
+`example:scenes`, `example:sprites`, `example:quad`, `example:particles`, `example:marbles`, `example:puppet` and `example:shadows`. Arguments follow `--`, as with `dotnet run`:
 
 ```bash
 npm run example:breakout-ecs -- --headless --Ion:Run:Frames=600

@@ -458,6 +458,75 @@ public abstract class Renderer3DContractTests
 	}
 
 	[RhiFact, Trait(CATEGORY, INTEGRATION)]
+	public void CascadesShadowTheGroundNearAndFarAndTheTintShowsWhichIsWhich()
+	{
+		// A camera low over a long white ground, looking down it; the sun straight down. Two boxes the camera does not see
+		// (another layer) cast square shadows, one near and one 60 units away: both land in the picture, in different
+		// cascades.
+		var camera = new Camera { Near = 0.5f, Far = 200f, CullingMask = 0b01 };
+		var eye = Transform.LookAt(new Vector3(0, 6, 0), new Vector3(0, 0, -30));
+		Vector3 nearSpot = new(0, 0, -9), farSpot = new(0, 0, -60);
+		Scene3DScript Scene()
+		{
+			MeshHandle plane = default, box = default;
+			MaterialHandle white = default;
+			return new Scene3DScript
+			{
+				Init = (r, _) =>
+				{
+					plane = r.CreateMesh(MeshPrimitives.Plane(400));
+					box = r.CreateMesh(MeshPrimitives.Cube(1));
+					white = r.CreateMaterial(new PbrMaterial(Color.White, roughness: 0.9f));
+					r.SetEnvironment(new SceneEnvironment { AmbientColor = Color.White, AmbientIntensity = 0.05f });
+				},
+				Render = (r, _) =>
+				{
+					r.SetCamera(camera, eye);
+					r.AddLight(new DirectionalLight(Color.White, 2f), -Vector3.UnitY);
+					r.Draw(plane, white, Matrix4x4.Identity);
+					r.Submit(new MeshRenderer(box, white) { LayerMask = 0b10 }, Matrix4x4.CreateScale(2.5f) * Matrix4x4.CreateTranslation(nearSpot + new Vector3(0, 3, 0)));
+					r.Submit(new MeshRenderer(box, white) { LayerMask = 0b10 }, Matrix4x4.CreateScale(8f) * Matrix4x4.CreateTranslation(farSpot + new Vector3(0, 6, 0)));
+				},
+			};
+		}
+
+		// Where a ground point lands in the 64x64 picture.
+		var viewProjection = Camera.GetViewMatrix(eye.ToMatrix()) * camera.GetProjectionMatrix(1f);
+		(int X, int Y) Pixel(Vector3 world)
+		{
+			var clip = Vector4.Transform(new Vector4(world, 1), viewProjection);
+			return ((int)((clip.X / clip.W * 0.5f + 0.5f) * Size), (int)((0.5f - clip.Y / clip.W * 0.5f) * Size));
+		}
+
+		var shot = Render(Scene(), options: o => o.ShadowDistance = 100f, inspect: host =>
+		{
+			var renderer = host.Get<Renderer3D>();
+			Assert.Equal(4, renderer.ShadowCascades.Length);
+			Assert.Equal(3, renderer.LastFrameStatistics.ShadowCasters);   // the boxes and the ground
+		});
+
+		foreach (var spot in new[] { nearSpot, farSpot })
+		{
+			var (x, y) = Pixel(spot);
+			var (lx, ly) = Pixel(spot + new Vector3(spot == nearSpot ? 4 : 12, 0, 0));
+			var shadowed = shot.GetPixel(x, y);
+			var lit = shot.GetPixel(lx, ly);
+			Assert.True(shadowed.R < 90, $"the ground under the box at {spot} is {shadowed} at ({x}, {y})");
+			Assert.True(lit.R > 180, $"the ground beside the box at {spot} is {lit} at ({lx}, {ly})");
+		}
+
+		// With the tint on and splits at 20, 40 and 70 units, the near ground is red (the first cascade) and the far ground
+		// blue (the third).
+		var tinted = Render(Scene(), options: o => { o.ShadowDistance = 100f; o.ShadowCascadeSplits = [0.2f, 0.4f, 0.7f]; o.ShowShadowCascades = true; });
+		var (nx, ny) = Pixel(nearSpot + new Vector3(4, 0, 0));
+		var near = tinted.GetPixel(nx, ny);
+		Assert.True(near.R > near.G + 30 && near.R > near.B + 30, $"the near ground is {near}");
+		var (fx, fy) = Pixel(farSpot + new Vector3(12, 0, 0));
+		var far = tinted.GetPixel(fx, fy);
+		Assert.True(far.B > far.R + 30 && far.B > far.G + 30, $"the far ground is {far}");
+	}
+
+	[RhiFact, Trait(CATEGORY, INTEGRATION)]
 	public void TheSampleModelLoadsAndRendersWithItsTextures()
 	{
 		IModel model = null!;

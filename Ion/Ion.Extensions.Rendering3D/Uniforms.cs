@@ -32,8 +32,22 @@ internal struct LightUniforms
 	private LightUniform _element;
 }
 
+/// <summary>The world-to-shadow-map matrices of the cascades.</summary>
+[InlineArray(ShadowMath.MaxCascades)]
+internal struct CascadeMatrices
+{
+	private Matrix4x4 _element;
+}
+
+/// <summary>Per cascade: x the depth bias, y the normal offset in world units, z the view depth where it starts blending into the next.</summary>
+[InlineArray(ShadowMath.MaxCascades)]
+internal struct CascadeParameters
+{
+	private Vector4 _element;
+}
+
 /// <summary>
-/// The view uniform block (group 0, binding 0; std140, 944 bytes, slots of <see cref="SlotSize"/>): mirrors <c>View</c>
+/// The view uniform block (group 0, binding 0; std140, 1,232 bytes, slots of <see cref="SlotSize"/>): mirrors <c>View</c>
 /// in <c>ion_view.glsl</c>.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
@@ -43,13 +57,20 @@ internal struct ViewUniforms
 	public const int MaxLights = 8;
 
 	/// <summary>The stride of one view's block in the uniform ring (a multiple of every device's offset alignment).</summary>
-	public const int SlotSize = 1024;
+	public const int SlotSize = 2048;
 
 	public Matrix4x4 ViewProjection;
 	public Matrix4x4 View;
 	public Matrix4x4 Projection;
 	public Matrix4x4 InverseViewProjection;
-	public Matrix4x4 ShadowMatrix;
+	public CascadeMatrices ShadowMatrices;
+	public CascadeParameters CascadeParams;
+
+	/// <summary>The view depth where each cascade ends.</summary>
+	public Vector4 CascadeSplits;
+
+	/// <summary>The view depth the cascades are chosen by (the camera the shadow is fitted to): dot(xyz, p) + w.</summary>
+	public Vector4 ShadowDepth;
 	public Vector4 CameraPosition;
 	public Vector4 Ambient;
 	public Vector4 ShadowParams;

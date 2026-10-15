@@ -33,8 +33,10 @@ public class CubesTests
 		Assert.Equal(1001, stats.Submitted);
 		Assert.Equal(1, stats.Views);
 		Assert.InRange(stats.Visible, 900, 1001);
-		// Opaque: ground plus one instanced batch per cube material; shadow: one batch per mesh.
-		Assert.Equal(5, stats.Batches);
+		// Opaque: ground plus one instanced batch per cube material (3); shadow: one batch per mesh (2) in each of the four
+		// cascades that covers it.
+		Assert.Equal(4, renderer.ShadowCascades.Length);
+		Assert.InRange(stats.Batches, 3 + 2, 3 + 2 * 4);
 		Assert.Equal(1001, stats.ShadowCasters);
 		Assert.Equal(1, stats.Lights);
 
@@ -58,8 +60,9 @@ public class CubesTests
 		var shot = SampleRendering.Capture(Game(), Width, Height, frames: 30, inspect: host =>
 		{
 			var stats = host.Get<IRenderer3D>().LastFrameStatistics;
-			Assert.Equal(5, stats.Batches);
-			Assert.Equal(5, stats.DrawCalls);
+			// Three opaque batches and one or two per shadow cascade, one draw call each.
+			Assert.InRange(stats.Batches, 3 + 4, 3 + 2 * 4);
+			Assert.Equal(stats.Batches, stats.DrawCalls);
 			// The metrics frame stats include the 3D draw calls and the HUD's sprite draw calls.
 			Assert.True(host.LastFrame.DrawCalls > stats.DrawCalls);
 		}, backend: backend);
