@@ -151,8 +151,10 @@ public class SecurityTests
 		using var game = new WebGame(new Dictionary<string, string?> { ["Ion:Web:MaxConnections"] = "2" });
 		using var a = new System.Net.Sockets.TcpClient("127.0.0.1", game.Port);
 		using var b = new System.Net.Sockets.TcpClient("127.0.0.1", game.Port);
-		// Let the accept thread take both.
-		Thread.Sleep(300);
+		// Wait until the accept thread took both (a fixed sleep was too short on a loaded machine).
+		var watch = System.Diagnostics.Stopwatch.StartNew();
+		while (game.Server.ConnectionCount < 2 && watch.Elapsed < TimeSpan.FromSeconds(10)) Thread.Sleep(5);
+		Assert.Equal(2, game.Server.ConnectionCount);
 		var third = game.Raw("GET /number HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
 		Assert.StartsWith("HTTP/1.1 503", third, StringComparison.Ordinal);
 	}

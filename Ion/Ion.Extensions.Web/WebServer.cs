@@ -76,6 +76,9 @@ public sealed class WebServer : IWebServer, IDisposable
 	/// <inheritdoc/>
 	public int Port => _listener?.Port ?? 0;
 
+	/// <summary>The open connections (HTTP keep-alive and WebSocket), at most <see cref="WebOptions.MaxConnections"/>.</summary>
+	public int ConnectionCount => _listener?.ConnectionCount ?? 0;
+
 	/// <summary>The bound address, or null when not running.</summary>
 	public IPAddress? Address => _listener?.Address;
 
