@@ -310,4 +310,17 @@ public readonly record struct DeviceLimits
 	public ulong MaxStorageBufferBindingSize { get; init; }
 	/// <summary>The alignment of storage buffer binding offsets.</summary>
 	public ulong MinStorageBufferOffsetAlignment { get; init; }
+
+	/// <summary>
+	/// The highest sample count (1, 2, 4 or 8) color and depth render attachments can both have
+	/// (<see cref="TextureDescriptor.SampleCount"/>, <see cref="RenderPipelineDescriptor.SampleCount"/>); 1 without
+	/// multisampling. Resolve a multisampled texture with <see cref="ICommandEncoder.ResolveTexture"/>.
+	/// </summary>
+	public uint MaxSampleCount { get; init; }
+
+	/// <summary>
+	/// Whether <see cref="TextureFormat.Rgba16Float"/> can be rendered to (and sampled with filtering): always on Vulkan,
+	/// on OpenGL ES with <c>EXT_color_buffer_half_float</c> or <c>EXT_color_buffer_float</c> (core in ES 3.2).
+	/// </summary>
+	public bool HdrRenderTargets { get; init; }
 }

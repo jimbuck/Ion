@@ -18,6 +18,7 @@ internal enum GlesOp : byte
 	DrawIndexed,
 	CopyBufferToBuffer,
 	CopyTextureToBuffer,
+	ResolveTexture,
 	BeginComputePass,
 	EndComputePass,
 	SetComputePipeline,
@@ -209,6 +210,16 @@ internal sealed class GlesCommandEncoder(GlesDevice device) : ICommandEncoder, I
 			I0 = (int)region.MipLevel,
 			Y = bytesPerRow,
 		});
+	}
+
+	public void ResolveTexture(ITexture source, ITexture destination)
+	{
+		_ensureRecording();
+		_ensureNoPass();
+		var src = (GlesTexture)source;
+		var dst = (GlesTexture)destination;
+		ResolveChecks.Validate(src, dst);
+		_commands.Add(new GlesCommand { Op = GlesOp.ResolveTexture, A = src, B = dst });
 	}
 
 	public ICommandBuffer Finish()

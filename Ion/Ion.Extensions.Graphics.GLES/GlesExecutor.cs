@@ -85,6 +85,7 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 				case GlesOp.CopyTextureToBuffer:
 					_copyTextureToBuffer((GlesTexture)command.A!, new TextureRegion(command.U0, command.U1, command.U2, command.U3, (uint)command.I0), (GlesBuffer)command.B!, command.X, (uint)command.Y);
 					break;
+				case GlesOp.ResolveTexture: _resolve((GlesTexture)command.A!, (GlesTexture)command.B!); break;
 				case GlesOp.BeginComputePass: _beginComputePass(); break;
 				case GlesOp.EndComputePass: _endComputePass(); break;
 				case GlesOp.SetComputePipeline:
@@ -517,6 +518,20 @@ internal sealed unsafe class GlesExecutor(GlesDevice device)
 				else MemoryMarshal.Write(row[((x * channelCount + c) * 4)..], value);
 			}
 		}
+	}
+
+	/// <summary>Resolves a multisampled renderbuffer into a texture: a blit between two one-attachment framebuffers.</summary>
+	private void _resolve(GlesTexture source, GlesTexture destination)
+	{
+		var read = device.GetFramebuffer(new FramebufferKey { ColorCount = 1, Color0 = source.DefaultView is GlesTextureView s ? s.Attachment : default });
+		var draw = device.GetFramebuffer(new FramebufferKey { ColorCount = 1, Color0 = destination.DefaultView is GlesTextureView d ? d.Attachment : default });
+		Gl.BindFramebuffer(GLEnum.ReadFramebuffer, read);
+		Gl.BindFramebuffer(GLEnum.DrawFramebuffer, draw);
+		Gl.Disable(GLEnum.ScissorTest);
+		Gl.BlitFramebuffer(0, 0, (int)source.Width, (int)source.Height, 0, 0, (int)destination.Width, (int)destination.Height, (uint)GLEnum.ColorBufferBit, GLEnum.Nearest);
+		Gl.BindFramebuffer(GLEnum.ReadFramebuffer, 0);
+		Gl.BindFramebuffer(GLEnum.DrawFramebuffer, 0);
+		_pass = null;
 	}
 
 	private uint _readFramebuffer(GlesTexture texture, int level)

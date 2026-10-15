@@ -294,6 +294,15 @@ public interface ICommandEncoder
 	/// </summary>
 	void CopyTextureToBuffer(ITexture source, TextureRegion region, IBuffer destination, ulong destinationOffset, uint bytesPerRow);
 
+	/// <summary>
+	/// Resolves (averages the samples of) a multisampled color texture into a single-sampled one of the same size and
+	/// format, outside any pass. Both must be render attachments (<see cref="TextureUsage.RenderAttachment"/>); the
+	/// destination is then sampled or drawn into like any texture. Vulkan: <c>vkCmdResolveImage</c>; OpenGL ES: a
+	/// framebuffer blit.
+	/// </summary>
+	/// <exception cref="ArgumentException">The source is not multisampled, the destination is, or their sizes or formats differ.</exception>
+	void ResolveTexture(ITexture source, ITexture destination);
+
 	/// <summary>Finishes recording. The encoder cannot be used afterwards.</summary>
 	ICommandBuffer Finish();
 }
@@ -409,4 +418,21 @@ public interface ISurface
 
 	/// <summary>Presents the acquired texture. Submits pending work first.</summary>
 	void Present();
+}
+
+/// <summary>The checks every backend makes in <see cref="ICommandEncoder.ResolveTexture"/>.</summary>
+public static class ResolveChecks
+{
+	/// <summary>Throws when <paramref name="source"/> cannot be resolved into <paramref name="destination"/>.</summary>
+	/// <exception cref="ArgumentException">The source is not multisampled, the destination is, either is not a color render attachment, or their sizes or formats differ.</exception>
+	public static void Validate(ITexture source, ITexture destination)
+	{
+		ArgumentNullException.ThrowIfNull(source);
+		ArgumentNullException.ThrowIfNull(destination);
+		if (source.SampleCount <= 1) throw new ArgumentException("The resolve source must be multisampled.", nameof(source));
+		if (destination.SampleCount != 1) throw new ArgumentException("The resolve destination must be single-sampled.", nameof(destination));
+		if (source.Format.IsDepth() || source.Format != destination.Format) throw new ArgumentException($"A resolve needs two color textures of one format ({source.Format} into {destination.Format}).", nameof(destination));
+		if (source.Width != destination.Width || source.Height != destination.Height) throw new ArgumentException($"A resolve needs textures of one size ({source.Width}x{source.Height} into {destination.Width}x{destination.Height}).", nameof(destination));
+		if ((source.Usage & TextureUsage.RenderAttachment) == 0 || (destination.Usage & TextureUsage.RenderAttachment) == 0) throw new ArgumentException("Both textures of a resolve must be render attachments.", nameof(destination));
+	}
 }

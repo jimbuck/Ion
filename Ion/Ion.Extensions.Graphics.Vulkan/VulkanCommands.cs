@@ -186,6 +186,35 @@ internal sealed unsafe class VulkanCommandEncoder(VulkanDevice device) : IComman
 		GlobalBarrier(vk, _cmd, PipelineStageFlags.TransferBit, AccessFlags.TransferWriteBit, PipelineStageFlags.HostBit | PipelineStageFlags.AllCommandsBit, AccessFlags.HostReadBit | AccessFlags.MemoryReadBit | AccessFlags.MemoryWriteBit);
 	}
 
+	public void ResolveTexture(ITexture source, ITexture destination)
+	{
+		_ensureRecording();
+		_ensureNoPass();
+		var src = (VulkanTexture)source;
+		var dst = (VulkanTexture)destination;
+		ResolveChecks.Validate(src, dst);
+
+		var vk = device.Vk;
+		var range = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, 1, 0, 1);
+		Transition(vk, _cmd, src.Image, src.Layout, ImageLayout.TransferSrcOptimal, range);
+		// The destination is overwritten whole: its contents need not be kept.
+		Transition(vk, _cmd, dst.Image, ImageLayout.Undefined, ImageLayout.TransferDstOptimal, range);
+		var region = new ImageResolve
+		{
+			SrcSubresource = new ImageSubresourceLayers(ImageAspectFlags.ColorBit, 0, 0, 1),
+			DstSubresource = new ImageSubresourceLayers(ImageAspectFlags.ColorBit, 0, 0, 1),
+			Extent = new Extent3D(src.Width, src.Height, 1),
+		};
+		vk.CmdResolveImage(_cmd, src.Image, ImageLayout.TransferSrcOptimal, dst.Image, ImageLayout.TransferDstOptimal, 1, in region);
+		src.Layout = ImageLayout.TransferSrcOptimal;
+
+		var final = dst.IsSwapchainImage ? ImageLayout.PresentSrcKhr
+			: (dst.Usage & (TextureUsage.TextureBinding | TextureUsage.StorageBinding)) != 0 ? dst.ShaderLayout
+			: ImageLayout.ColorAttachmentOptimal;
+		Transition(vk, _cmd, dst.Image, ImageLayout.TransferDstOptimal, final, range);
+		dst.Layout = final;
+	}
+
 	public ICommandBuffer Finish()
 	{
 		_ensureRecording();

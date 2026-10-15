@@ -203,6 +203,10 @@ internal static class VulkanFormats
 		_ => PresentModeKHR.FifoKhr,
 	};
 
+	/// <summary>The highest of 1, 2, 4 and 8 in <paramref name="flags"/>.</summary>
+	public static uint MaxSamples(SampleCountFlags flags) =>
+		(flags & SampleCountFlags.Count8Bit) != 0 ? 8u : (flags & SampleCountFlags.Count4Bit) != 0 ? 4u : (flags & SampleCountFlags.Count2Bit) != 0 ? 2u : 1u;
+
 	public static SampleCountFlags ToVkSamples(uint count) => count switch
 	{
 		2 => SampleCountFlags.Count2Bit,

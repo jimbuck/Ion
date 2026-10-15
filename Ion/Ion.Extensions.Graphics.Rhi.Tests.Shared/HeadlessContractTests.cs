@@ -381,6 +381,75 @@ public abstract class HeadlessContractTests
 		Assert.Equal(TextureFormat.Depth32Float, frame.DepthFormat);
 		Assert.Equal((24u, 16u), (frame.Width, frame.Height));
 	}
+	[RhiFact, Trait(CATEGORY, INTEGRATION)]
+	public void AMultisampledDrawResolvesToSmoothEdges()
+	{
+		// A red triangle over half of a 16x16 target, drawn with 4 samples and resolved: pixels inside are red, outside
+		// black, and along the diagonal edge partly red. Drawn with 1 sample, every pixel is one or the other.
+		var log = new ValidationLog();
+		Screenshot smooth, hard;
+		using (var device = CreateDevice(log))
+		{
+			Assert.True(device.Limits.MaxSampleCount >= 4, $"max {device.Limits.MaxSampleCount} samples");
+			var assembly = typeof(HeadlessContractTests).Assembly;
+			using var vertex = device.CreateShaderModule(EmbeddedShaders.Descriptor(device, assembly, "half_triangle.vert"));
+			using var fragment = device.CreateShaderModule(EmbeddedShaders.Descriptor(device, assembly, "red.frag"));
+			using var layout = device.CreatePipelineLayout(new PipelineLayoutDescriptor([]));
+			IRenderPipeline Pipeline(uint samples) => device.CreateRenderPipeline(new RenderPipelineDescriptor
+			{
+				Layout = layout,
+				Vertex = new VertexState(vertex, []),
+				Fragment = new FragmentState(fragment, [new ColorTargetState(TextureFormat.Rgba8Unorm)]),
+				Primitive = new PrimitiveState { CullMode = CullMode.None },
+				SampleCount = samples,
+			});
+
+			using var resolved = device.CreateTexture(new TextureDescriptor(16, 16, TextureFormat.Rgba8Unorm, TextureUsage.RenderAttachment | TextureUsage.CopySrc));
+			using (var multisampled = device.CreateTexture(new TextureDescriptor(16, 16, TextureFormat.Rgba8Unorm, TextureUsage.RenderAttachment, SampleCount: 4)))
+			using (var pipeline = Pipeline(4))
+			{
+				var encoder = device.CreateCommandEncoder();
+				var pass = encoder.BeginRenderPass(new RenderPassDescriptor([new RenderPassColorAttachment(multisampled.DefaultView, LoadOp.Clear, StoreOp.Store, Black)]));
+				pass.SetPipeline(pipeline);
+				pass.Draw(3);
+				pass.End();
+				encoder.ResolveTexture(multisampled, resolved);
+				device.Queue.Submit(encoder.Finish());
+				smooth = Readback.Read(device, resolved);
+
+				// Resolving into a multisampled texture, or between sizes, is refused.
+				var refused = device.CreateCommandEncoder();
+				Assert.Throws<ArgumentException>(() => refused.ResolveTexture(resolved, multisampled));
+				using var small = device.CreateTexture(new TextureDescriptor(8, 8, TextureFormat.Rgba8Unorm, TextureUsage.RenderAttachment));
+				Assert.Throws<ArgumentException>(() => refused.ResolveTexture(multisampled, small));
+				device.Queue.Submit(refused.Finish());
+			}
+
+			using (var pipeline = Pipeline(1))
+			{
+				var encoder = device.CreateCommandEncoder();
+				var pass = encoder.BeginRenderPass(new RenderPassDescriptor([new RenderPassColorAttachment(resolved.DefaultView, LoadOp.Clear, StoreOp.Store, Black)]));
+				pass.SetPipeline(pipeline);
+				pass.Draw(3);
+				pass.End();
+				device.Queue.Submit(encoder.Finish());
+				hard = Readback.Read(device, resolved);
+			}
+		}
+
+		log.AssertClean();
+		static int Partial(Screenshot shot)
+		{
+			var count = 0;
+			for (var y = 0; y < shot.Height; y++) for (var x = 0; x < shot.Width; x++) if (shot.GetPixel(x, y).R is > 20 and < 235) count++;
+			return count;
+		}
+
+		QuadAssert.AssertPixel(smooth, 2, 13, new Rgba8(255, 0, 0, 255));
+		QuadAssert.AssertPixel(smooth, 13, 2, new Rgba8(0, 0, 0, 255));
+		Assert.True(Partial(smooth) >= 8, $"{Partial(smooth)} partly covered pixels with 4 samples");
+		Assert.Equal(0, Partial(hard));
+	}
 }
 
 /// <summary>Runs the quad sample's own <c>Program.cs</c> for a few frames and captures the last one.</summary>
@@ -426,4 +495,5 @@ public static class QuadSample
 			loop.Shutdown();
 		}
 	}
+
 }

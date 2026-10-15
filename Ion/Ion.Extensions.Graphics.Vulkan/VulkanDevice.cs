@@ -127,6 +127,9 @@ public sealed unsafe class VulkanDevice : IGraphicsDevice
 			MaxComputeWorkgroupStorageSize = props.Limits.MaxComputeSharedMemorySize,
 			MaxStorageBufferBindingSize = props.Limits.MaxStorageBufferRange,
 			MinStorageBufferOffsetAlignment = props.Limits.MinStorageBufferOffsetAlignment,
+			MaxSampleCount = VulkanFormats.MaxSamples(props.Limits.FramebufferColorSampleCounts & props.Limits.FramebufferDepthSampleCounts),
+			// R16G16B16A16_SFLOAT is a mandatory color attachment and filterable format.
+			HdrRenderTargets = true,
 		};
 		ApiVersion = props.ApiVersion;
 

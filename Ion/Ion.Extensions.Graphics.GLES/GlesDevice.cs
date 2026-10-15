@@ -137,6 +137,13 @@ public sealed unsafe class GlesDevice : IGraphicsDevice
 
 		ColorBufferFloat = FeatureLevel >= GlesFeatureLevel.Es32 || Extensions.Contains("GL_EXT_color_buffer_float");
 		ColorBufferHalfFloat = ColorBufferFloat || Extensions.Contains("GL_EXT_color_buffer_half_float");
+		// GL_MAX_SAMPLES covers color and depth renderbuffers (ES 3.0 guarantees 4); the RHI's counts are powers of two.
+		var maxSamples = Math.Max(1, Gl.GetInteger(GLEnum.MaxSamples));
+		Limits = Limits with
+		{
+			MaxSampleCount = maxSamples >= 8 ? 8u : maxSamples >= 4 ? 4u : maxSamples >= 2 ? 2u : 1u,
+			HdrRenderTargets = ColorBufferHalfFloat,
+		};
 
 		// WebGPU does not dither; GL enables it by default.
 		Gl.Disable(GLEnum.Dither);

@@ -125,7 +125,9 @@ internal sealed unsafe class VulkanTexture : ITexture
 			ArrayLayers = ArrayLayerCount,
 			Samples = VulkanFormats.ToVkSamples(SampleCount),
 			Tiling = ImageTiling.Optimal,
-			Usage = Usage.ToVk(Format),
+			// Color attachments can take part in a resolve: multisampled ones as its source, single-sampled ones as its target.
+			Usage = Usage.ToVk(Format) | ((Usage & TextureUsage.RenderAttachment) != 0 && !Format.IsDepth()
+				? (SampleCount > 1 ? ImageUsageFlags.TransferSrcBit : ImageUsageFlags.TransferDstBit) : 0),
 			SharingMode = SharingMode.Exclusive,
 			InitialLayout = ImageLayout.Undefined,
 		};
