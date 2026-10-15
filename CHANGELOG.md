@@ -195,6 +195,7 @@ My Changelog
 
 ### 🐛 Fixes
 
+* The desktop window opens centered on its monitor when `Ion:Window:WindowX` and `WindowY` are not set. It used to open at (-1, -1), with its title bar above the top-left of the screen.
 * Scenes: a scene registered with id 0 loads; a system registered as a singleton runs on its scene's `World` instead of the root one; coroutines started from a scene stop when it unloads (see Breaking and behaviour changes).
 * Null trace timer no longer allocates per `Start`; scenes call `next` in every stage, register per application and ignore unknown scene ids; `DrawString` defaults to white; `IFont.MeasureString` implemented; `Color(uint)` 4-digit parsing; input press and release in one frame and focus loss; texture loader and sprite renderer release their GPU resources; audio pitch shift and master volume; `Bonk.wav` casing in the Breakout sample.
 * Generators pin Roslyn 4.4 so they load in every SDK from 8.0 onwards.

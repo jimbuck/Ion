@@ -295,6 +295,10 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 		RegisterPlatform(platform);
 
 		var backend = _graphicsConfig.CurrentValue.PreferredBackend;
+		// SDL on Android and iOS is view-only: the view is the whole screen (size, position and state do not apply).
+		var viewOnly = Window.IsViewOnly;
+		// Without a configured position a normal window is centered on its monitor once it exists.
+		var center = !viewOnly && (config.WindowX is null || config.WindowY is null) && config.WindowState == IonWindowState.Normal;
 		var options = backend switch
 		{
 			// The GLES backend renders into offscreen targets and blits to the default framebuffer: no depth or stencil.
@@ -306,7 +310,8 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 			Title = _title,
 			Size = new Vector2D<int>(config.Width is > 0 ? config.Width.Value : 960, config.Height is > 0 ? config.Height.Value : 540),
 			Position = config.WindowX is { } x && config.WindowY is { } y ? new Vector2D<int>(x, y) : new Vector2D<int>(-1, -1),
-			IsVisible = config.WindowState != IonWindowState.Hidden,
+			// A window to be centered starts hidden so it never shows at its creation position.
+			IsVisible = config.WindowState != IonWindowState.Hidden && !center,
 			WindowState = config.WindowState switch
 			{
 				IonWindowState.FullScreen => SilkWindowState.Fullscreen,
@@ -322,8 +327,6 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 			ShouldSwapAutomatically = false,
 		};
 
-		// SDL on Android and iOS is view-only: the view is the whole screen (size, position and state do not apply).
-		var viewOnly = Window.IsViewOnly;
 		IView window = viewOnly ? Window.GetView(new ViewOptions(options)) : Window.Create(options);
 		try
 		{
@@ -339,7 +342,26 @@ public sealed class SilkWindow : IIonWindow, IWindowSurface, IDisposable
 			window.Initialize();
 		}
 
+		if (center && window is ISilkWindow placed)
+		{
+			if (placed.Monitor is { } monitor) placed.Position = CenteredPosition(monitor.Bounds, placed.Size, placed.BorderSize);
+			placed.IsVisible = true;
+		}
+
 		return window;
+	}
+
+	/// <summary>
+	/// The position that centers a window of client size <paramref name="size"/> with decorations
+	/// <paramref name="border"/> (title bar and frame, from <c>IWindow.BorderSize</c>) on a monitor with
+	/// <paramref name="bounds"/>. A window larger than the monitor keeps its title bar and left edge on screen.
+	/// </summary>
+	public static Vector2D<int> CenteredPosition(Rectangle<int> bounds, Vector2D<int> size, Rectangle<int> border)
+	{
+		// BorderSize.Origin is the decoration's left and top thickness; Size is its right and bottom.
+		var outer = size + border.Origin + border.Size;
+		var origin = bounds.Origin + (bounds.Size - outer) / 2;
+		return Vector2D.Max(origin, bounds.Origin) + border.Origin;
 	}
 
 	/// <summary>The window API for an OpenGL ES <paramref name="major"/>.<paramref name="minor"/> context.</summary>

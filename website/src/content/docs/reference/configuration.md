@@ -103,7 +103,7 @@ Bound to `WindowConfig`.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `Ion:Window:Width`, `Ion:Window:Height` | int | 960 x 540 (Silk.NET window) | The window size. The headless and offscreen targets are sized from these too. |
-| `Ion:Window:WindowX`, `Ion:Window:WindowY` | int | platform default | The window position, used when both are set. |
+| `Ion:Window:WindowX`, `Ion:Window:WindowY` | int | centered | The window position, used when both are set. Otherwise a `Normal` window opens centered on its monitor. |
 | `Ion:Window:WindowState` | `WindowState` | `Normal` | `Normal`, `FullScreen` (exclusive, at the window size), `Maximized`, `Minimized`, `BorderlessFullScreen` (borderless at the monitor size) or `Hidden`. |
 | `Ion:Window:Fullscreen` | bool | `false` | Shorthand for `WindowState = FullScreen`. |
 | `Ion:Window:Resizable` | bool | `true` | Whether the user can resize the window. |

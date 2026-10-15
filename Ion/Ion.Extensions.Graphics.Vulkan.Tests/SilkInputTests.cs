@@ -152,6 +152,28 @@ public class SilkInputTests
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]
+	public void AnUnplacedWindowIsCenteredOnItsMonitor()
+	{
+		// A 960x540 client with an 8 px frame and a 31 px title bar, on a 1920x1080 monitor right of the primary one.
+		var monitor = new Silk.NET.Maths.Rectangle<int>(1920, 0, 1920, 1080);
+		var border = new Silk.NET.Maths.Rectangle<int>(8, 31, 8, 8);
+		var position = SilkWindow.CenteredPosition(monitor, new Silk.NET.Maths.Vector2D<int>(960, 540), border);
+
+		// The outer frame (976x579) is centered; the position is the client area's.
+		Assert.Equal(new Silk.NET.Maths.Vector2D<int>(1920 + 472 + 8, 250 + 31), position);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
+	public void AWindowLargerThanTheMonitorKeepsItsTitleBarOnScreen()
+	{
+		var monitor = new Silk.NET.Maths.Rectangle<int>(0, 0, 1280, 720);
+		var border = new Silk.NET.Maths.Rectangle<int>(8, 31, 8, 8);
+		var position = SilkWindow.CenteredPosition(monitor, new Silk.NET.Maths.Vector2D<int>(1920, 1080), border);
+
+		Assert.Equal(new Silk.NET.Maths.Vector2D<int>(8, 31), position);
+	}
+
+	[Fact, Trait(CATEGORY, UNIT)]
 	public void TheWindowBindsItsConfiguration()
 	{
 		var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
