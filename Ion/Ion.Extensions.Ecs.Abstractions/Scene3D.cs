@@ -68,6 +68,11 @@ public static class Scene3DExtensions
 	/// Hides (adds <see cref="Hidden"/>) or shows (removes it from) <paramref name="entity"/> and, when
 	/// <paramref name="recursive"/>, all its descendants (a spawned model, for example). Structural: outside a query.
 	/// </summary>
+	/// <remarks>
+	/// Hiding an entity already hides its descendants (the transform propagation's <c>IsHidden</c>), so tagging them too is
+	/// needed only when they should stay hidden after leaving the subtree. Showing recursively clears their own tags, so
+	/// the whole subtree shows.
+	/// </remarks>
 	public static void SetHidden(this World world, Entity entity, bool hidden, bool recursive = true)
 	{
 		ArgumentNullException.ThrowIfNull(world);

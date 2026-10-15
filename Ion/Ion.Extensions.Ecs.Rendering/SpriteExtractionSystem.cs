@@ -117,6 +117,7 @@ public sealed class SpriteExtractionSystem(World world, ISpriteBatch spriteBatch
 				ref readonly var sprite = ref sprites[i];
 				if (sprite.Texture is not { } texture) continue;
 				ref readonly var global = ref globals[i];
+				if (global.IsHidden) continue;   // under a hidden ancestor
 				var size = sprite.ResolveSize() * global.Scale;
 
 				if (cull && !Aabb2D.FromSprite(global.Position, global.Rotation, size, sprite.Origin).Intersects(view))
@@ -146,6 +147,7 @@ public sealed class SpriteExtractionSystem(World world, ISpriteBatch spriteBatch
 				ref readonly var sprite = ref sprites[i];
 				if (sprite.Texture is null) continue;
 				ref readonly var global = ref globals[i];
+				if (global.IsHidden) continue;   // under a hidden ancestor
 				var size = sprite.ResolveSize() * global.Scale;
 
 				if (cull && !Aabb2D.FromSprite(global.Position, global.Rotation, size, sprite.Origin).Intersects(view))

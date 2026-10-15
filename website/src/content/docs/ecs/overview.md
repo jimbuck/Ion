@@ -216,8 +216,7 @@ and headless snapshot tests. See [Templates](/Ion/getting-started/templates/).
 ## Planned
 
 These are on the roadmap and not built yet: parallel queries (Arch's job-scheduled chunk queries are not exposed through
-`[Query]`), tilemaps, serialization of the 3D components (they hold renderer handles) and inherited visibility (a `Hidden`
-parent does not hide its children; see [ECS rendering](/Ion/ecs/ecs-rendering/)).
+`[Query]`), tilemaps and serialization of the 3D components (they hold renderer handles).
 
 ## See also
 

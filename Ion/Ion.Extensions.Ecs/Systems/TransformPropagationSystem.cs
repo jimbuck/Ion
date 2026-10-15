@@ -27,6 +27,11 @@ namespace Ion.Extensions.Ecs;
 /// or its parent was recomputed (a dirty-tree walk without change flags). Children need a transform of the same kind as
 /// their parent; an entity whose parent has none is not reached.
 /// </para>
+/// <para>
+/// It also works out whether each entity is hidden (<see cref="GlobalTransform2D.IsHidden"/>,
+/// <see cref="GlobalTransform.IsHidden"/>): tagged <see cref="Hidden"/> itself, or under a hidden ancestor. That is
+/// refreshed on every visit, so hiding or showing a parent takes effect for its whole subtree at the next propagation.
+/// </para>
 /// </remarks>
 public sealed class TransformPropagationSystem(World world)
 {
@@ -104,6 +109,7 @@ public sealed class TransformPropagationSystem(World world)
 		{
 			var locals = chunk.GetSpan<Transform2D>();
 			var globals = chunk.GetSpan<GlobalTransform2D>();
+			var hidden = chunk.Has<Hidden>();
 			var hasChildren = chunk.Has<Children>();
 			var children = hasChildren ? chunk.GetSpan<Children>() : default;
 			var count = chunk.Count;
@@ -125,6 +131,7 @@ public sealed class TransformPropagationSystem(World world)
 					_updated++;
 				}
 
+				global.IsHidden = hidden;
 				if (hasChildren && children[i].Count > 0) PropagateChildren2D(global, children[i]);
 			}
 		}
@@ -157,6 +164,7 @@ public sealed class TransformPropagationSystem(World world)
 				_updated++;
 			}
 
+			global.IsHidden = parent.IsHidden || chunk.Has<Hidden>();
 			if (chunk.Has<Children>())
 			{
 				ref var grandchildren = ref Unsafe.Add(ref chunk.GetFirst<Children>(), index);
@@ -171,6 +179,7 @@ public sealed class TransformPropagationSystem(World world)
 		{
 			var locals = chunk.GetSpan<Transform>();
 			var globals = chunk.GetSpan<GlobalTransform>();
+			var hidden = chunk.Has<Hidden>();
 			var hasChildren = chunk.Has<Children>();
 			var children = hasChildren ? chunk.GetSpan<Children>() : default;
 			var count = chunk.Count;
@@ -189,6 +198,7 @@ public sealed class TransformPropagationSystem(World world)
 					_updated++;
 				}
 
+				global.IsHidden = hidden;
 				if (hasChildren && children[i].Count > 0) PropagateChildren3D(global, children[i]);
 			}
 		}
@@ -216,6 +226,7 @@ public sealed class TransformPropagationSystem(World world)
 				_updated++;
 			}
 
+			global.IsHidden = parent.IsHidden || chunk.Has<Hidden>();
 			if (chunk.Has<Children>())
 			{
 				ref var grandchildren = ref Unsafe.Add(ref chunk.GetFirst<Children>(), index);

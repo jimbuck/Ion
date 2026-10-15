@@ -85,6 +85,12 @@ public struct GlobalTransform2D
 	internal uint Version;
 	internal uint ParentVersion;
 
+	/// <summary>
+	/// Whether the entity is hidden: it is tagged <see cref="Hidden"/>, or an ancestor is. Set by the propagation; the
+	/// extraction does not draw hidden entities.
+	/// </summary>
+	public bool IsHidden { readonly get; internal set; }
+
 	/// <summary>Whether the propagation has computed this transform at least once.</summary>
 	public readonly bool IsComputed => Version != 0;
 
@@ -112,6 +118,12 @@ public struct GlobalTransform
 	internal Transform Local;
 	internal uint Version;
 	internal uint ParentVersion;
+
+	/// <summary>
+	/// Whether the entity is hidden: it is tagged <see cref="Hidden"/>, or an ancestor is. Set by the propagation; the
+	/// extraction does not draw hidden entities.
+	/// </summary>
+	public bool IsHidden { readonly get; internal set; }
 
 	/// <summary>Whether the propagation has computed this transform at least once.</summary>
 	public readonly bool IsComputed => Version != 0;

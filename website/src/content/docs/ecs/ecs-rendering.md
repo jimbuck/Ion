@@ -266,17 +266,36 @@ asset.
 
 | Tool | Effect |
 |---|---|
-| `Hidden` tag | The entity is not extracted (2D sprites, 3D mesh renderers, cameras and lights) |
+| `Hidden` tag | The entity and everything under it in the hierarchy are not extracted (2D sprites, 3D mesh renderers, cameras and lights) |
 | `Visible` tag + `RequireVisible = true` | Only tagged sprites (2D) or mesh renderers (3D) are drawn |
-| `world.SetHidden(entity, hidden, recursive = true)` | Adds or removes `Hidden` on an entity and, by default, all its descendants |
+| `world.SetHidden(entity, hidden, recursive = true)` | Adds or removes `Hidden` on an entity and, by default, all its descendants (showing recursively also clears tags the descendants carry themselves) |
+| `GlobalTransform2D.IsHidden`, `GlobalTransform.IsHidden` | Whether the entity is hidden, by its own tag or an ancestor's (read only) |
 | `Camera.CullingMask` / `MeshRenderer.LayerMask` | Per-camera visibility in 3D |
 | `SpriteExtractionOptions.Cull` | 2D view culling |
 
-:::caution[Hidden is not inherited]
-`Hidden` hides only the entity that carries it. A hidden parent's children are still drawn. Use
-`world.SetHidden(root, true)` (recursive by default) to hide a spawned model or any subtree. Inherited visibility is
-planned, not built.
-:::
+`Hidden` is inherited: an entity is hidden when it or any of its ancestors carries the tag. The transform propagation
+works this out on every visit (in Last and again in Render, before the extraction) and stores it in the world
+transform's `IsHidden`, so hiding or showing a parent takes effect for its whole subtree the same frame:
+
+```csharp
+world.Add(enemy, new Hidden());      // the enemy, its weapon and its health bar disappear
+world.Remove<Hidden>(enemy);         // and come back, except a child that carries Hidden itself
+```
+
+The rule follows the hierarchy, not the tag: an entity moved out of a hidden subtree shows, and one moved into it hides.
+Only entities the propagation reaches inherit it (children need a transform of the same kind as their parent). Your
+own queries see the tag only, so filter on `IsHidden` where a hidden ancestor should matter:
+
+```csharp
+foreach (ref var chunk in world.Query(in enemies))
+{
+	var globals = chunk.GetSpan<GlobalTransform2D>();
+	for (var i = 0; i < chunk.Count; i++) if (!globals[i].IsHidden) { /* ... */ }
+}
+```
+
+The [UI module](/Ion/interaction/ui/overview/) is immediate mode: a widget you do not call is not drawn, so it has no
+`Hidden` tag of its own.
 
 ## In scenes
 

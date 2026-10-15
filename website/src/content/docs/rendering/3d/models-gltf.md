@@ -139,7 +139,7 @@ The entities are ordinary ECS entities:
 | To | Do |
 |---|---|
 | Move, turn or scale the whole model | Change the root entity's `Transform` |
-| Hide it | `world.SetHidden(root, true)` (recursive by default; the `Hidden` tag alone hides only one entity) |
+| Hide it | `world.Add(root, new Hidden())` hides the whole model (`Hidden` is inherited), or `world.SetHidden(root, true)` to tag every node |
 | Remove it | `world.DestroyRecursive(root)` |
 | Find a part | Search `EntityName` components, or walk `world.GetChildren(root)` |
 

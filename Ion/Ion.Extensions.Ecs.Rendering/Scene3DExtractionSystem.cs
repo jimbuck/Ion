@@ -45,8 +45,8 @@ public readonly record struct Scene3DExtractionStats(int MeshRenderers, int Came
 /// <c>SetEnvironment</c> when it changed since this system last passed it, and the default environment once it is removed.</item>
 /// </list>
 /// Cameras and lights are <c>[Query]</c> steps (generated chunk loops) that run right after <see cref="Extract"/> at the same
-/// order. <see cref="Hidden"/> hides the entity itself, not its children (use <see cref="Scene3DExtensions.SetHidden"/> for a
-/// subtree). Allocates nothing per frame.
+/// order. <see cref="Hidden"/> hides the entity and everything under it (<see cref="GlobalTransform.IsHidden"/>, worked
+/// out by the transform propagation). Allocates nothing per frame.
 /// </remarks>
 public sealed partial class Scene3DExtractionSystem(World world, IMeshBatch renderer, Scene3DExtractionOptions options)
 {
@@ -105,10 +105,11 @@ public sealed partial class Scene3DExtractionSystem(World world, IMeshBatch rend
 			// Arch's query order (last to first within a chunk), as the generated loops.
 			for (var i = n - 1; i >= 0; i--)
 			{
-				renderer.Submit(Unsafe.Add(ref renderers, i), Unsafe.Add(ref globals, i).Matrix);
+				ref readonly var global = ref Unsafe.Add(ref globals, i);
+				if (global.IsHidden) continue;   // under a hidden ancestor
+				renderer.Submit(Unsafe.Add(ref renderers, i), global.Matrix);
+				count++;
 			}
-
-			count += n;
 		}
 
 		return count;
@@ -139,6 +140,7 @@ public sealed partial class Scene3DExtractionSystem(World world, IMeshBatch rend
 	[Render(Order = StageOrder.Extract), Query, None<Hidden>]
 	private void ExtractCamera(in Camera camera, in GlobalTransform transform)
 	{
+		if (transform.IsHidden) return;
 		renderer.AddCamera(camera, transform.Matrix);
 		_cameras++;
 	}
@@ -147,6 +149,7 @@ public sealed partial class Scene3DExtractionSystem(World world, IMeshBatch rend
 	[Render(Order = StageOrder.Extract), Query, None<Hidden>]
 	private void ExtractDirectionalLight(in DirectionalLight light, in GlobalTransform transform)
 	{
+		if (transform.IsHidden) return;
 		renderer.AddLight(light, transform.Matrix);
 		_lights++;
 	}
@@ -155,6 +158,7 @@ public sealed partial class Scene3DExtractionSystem(World world, IMeshBatch rend
 	[Render(Order = StageOrder.Extract), Query, None<Hidden>]
 	private void ExtractPointLight(in PointLight light, in GlobalTransform transform)
 	{
+		if (transform.IsHidden) return;
 		renderer.AddLight(light, transform.Position);
 		_lights++;
 	}
@@ -163,6 +167,7 @@ public sealed partial class Scene3DExtractionSystem(World world, IMeshBatch rend
 	[Render(Order = StageOrder.Extract), Query, None<Hidden>]
 	private void ExtractSpotLight(in SpotLight light, in GlobalTransform transform)
 	{
+		if (transform.IsHidden) return;
 		renderer.AddLight(light, transform.Matrix);
 		_lights++;
 	}

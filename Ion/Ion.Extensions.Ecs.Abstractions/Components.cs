@@ -155,7 +155,11 @@ public readonly record struct Aabb2D(Vector2 Min, Vector2 Max)
 	}
 }
 
-/// <summary>Hides an entity from the renderer's extraction (its sprite is not drawn).</summary>
+/// <summary>
+/// Hides an entity and everything under it in the hierarchy from the renderer's extraction (sprites, meshes, cameras and
+/// lights are not drawn or used). The transform propagation works out who is hidden (<c>GlobalTransform2D.IsHidden</c>,
+/// <c>GlobalTransform.IsHidden</c>), so removing the tag shows the subtree again, except the entities tagged themselves.
+/// </summary>
 public record struct Hidden;
 
 /// <summary>
