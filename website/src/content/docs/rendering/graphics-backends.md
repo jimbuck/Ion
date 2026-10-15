@@ -211,8 +211,12 @@ the RHI types, and the built-in renderers follow them):
   shaders' storage buffers and storage textures in group 0, bindings 0 to 3 (ES 3.1 guarantees only 4 of each in the
   compute stage).
 
+- Multisampled textures are render attachments only (the GLES backend makes them renderbuffers): resolve them with
+  `ICommandEncoder.ResolveTexture` into a single-sampled texture to sample or read them. Check
+  `DeviceLimits.MaxSampleCount` (4 guaranteed on ES 3.0) and, before rendering to RGBA16F, `DeviceLimits.HdrRenderTargets`.
+
 `IGraphicsDevice.Limits` reports `MaxTextureDimension2D`, `MinUniformBufferOffsetAlignment`,
-`MaxUniformBufferBindingSize`, `MaxBindGroups` and `VertexStorageBuffers` for the running device, and the compute limits
+`MaxUniformBufferBindingSize`, `MaxBindGroups`, `VertexStorageBuffers`, `MaxSampleCount` and `HdrRenderTargets` for the running device, and the compute limits
 (`ComputeShaders`, the workgroup sizes and counts, `MaxStorageBufferBindingSize`) described in
 [Compute shaders](/Ion/rendering/compute/#limits).
 

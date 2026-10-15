@@ -526,6 +526,118 @@ public abstract class Renderer3DContractTests
 		Assert.True(far.B > far.R + 30 && far.B > far.G + 30, $"the far ground is {far}");
 	}
 
+	/// <summary>A lit scene with edges: a turned PBR cube on a plane, a sun with shadows and a sky-blue clear color.</summary>
+	private static Scene3DScript LitScene()
+	{
+		MeshHandle cube = default, plane = default;
+		MaterialHandle red = default, ground = default;
+		return new Scene3DScript
+		{
+			Init = (r, _) =>
+			{
+				cube = r.CreateMesh(MeshPrimitives.Cube(1.4f));
+				plane = r.CreateMesh(MeshPrimitives.Plane(10));
+				red = r.CreateMaterial(new PbrMaterial(new Color(0xD0, 0x40, 0x30), roughness: 0.6f));
+				ground = r.CreateMaterial(new PbrMaterial(Color.Gray));
+			},
+			Render = (r, _) =>
+			{
+				r.SetCamera(new Camera { ClearColor = new Color(0x60, 0x90, 0xC0) }, Transform.LookAt(new Vector3(0, 2, 5), Vector3.Zero));
+				r.AddLight(new DirectionalLight(Color.White, 2), new Vector3(-0.4f, -1, -0.5f));
+				r.Draw(plane, ground, Matrix4x4.CreateTranslation(0, -1, 0));
+				r.Draw(cube, red, Matrix4x4.CreateRotationY(0.5f) * Matrix4x4.CreateRotationX(0.3f));
+			},
+		};
+	}
+
+	/// <summary>One emissive cube (no light) on black: its color is <paramref name="intensity"/> times white.</summary>
+	private static Scene3DScript GlowingCube(float intensity, float size = 1.2f)
+	{
+		MeshHandle cube = default;
+		MaterialHandle glow = default;
+		return new Scene3DScript
+		{
+			Init = (r, _) =>
+			{
+				cube = r.CreateMesh(MeshPrimitives.Cube(size));
+				glow = r.CreateMaterial(new PbrMaterial(Color.Black) { Emissive = Color.White, EmissiveIntensity = intensity });
+				r.SetEnvironment(new SceneEnvironment { AmbientIntensity = 0 });
+			},
+			Render = (r, _) =>
+			{
+				r.SetCamera(new Camera { ClearColor = Color.Black }, LookAtOrigin);
+				r.Draw(cube, glow, Matrix4x4.Identity);
+			},
+		};
+	}
+
+	private static int PartlyCovered(Screenshot shot, Func<Rgba8, bool> partial)
+	{
+		var count = 0;
+		for (var y = 0; y < Size; y++) for (var x = 0; x < Size; x++) if (partial(shot.GetPixel(x, y))) count++;
+		return count;
+	}
+
+	[RhiFact, Trait(CATEGORY, INTEGRATION)]
+	public void HdrWithoutAToneCurveRendersAsLowDynamicRange()
+	{
+		// The HDR scene texture, composited with exposure 1 and no curve, is the image drawn straight into the frame.
+		var ldr = Render(LitScene());
+		var hdr = Render(LitScene(), inspect: host => Assert.True(host.Get<Renderer3D>().PostActive), options: o =>
+		{
+			o.Hdr = true;
+			o.ToneMapping = ToneMapping.None;
+		});
+		var comparison = GoldenImage.Compare(hdr, ldr, tolerance: 3);
+		Assert.True(comparison.MismatchedPixels == 0, comparison.ToString());
+	}
+
+	[RhiFact, Trait(CATEGORY, INTEGRATION)]
+	public void ToneMappingCompressesBrightnessAboveOne()
+	{
+		// An emissive cube 4 times brighter than white: clipped to white in LDR, mapped by the curve with HDR.
+		static int Expected(float linear) => (int)MathF.Round(ColorSpace.LinearToSrgb(Math.Clamp(linear, 0f, 1f)) * 255f);
+		var clipped = Render(GlowingCube(4f));
+		Assert.Equal(255, clipped.GetPixel(32, 32).R);
+
+		var reinhard = Render(GlowingCube(4f), options: o => { o.Hdr = true; o.ToneMapping = ToneMapping.Reinhard; });
+		AssertPixel(reinhard, 32, 32, Expected(4f / 5f), Expected(4f / 5f), Expected(4f / 5f), tolerance: 4);
+
+		var aces = Render(GlowingCube(4f), options: o => { o.Hdr = true; o.ToneMapping = ToneMapping.Aces; o.Exposure = 0.5f; });
+		var x = 2f;   // 4 times an exposure of 0.5
+		var mapped = x * (2.51f * x + 0.03f) / (x * (2.43f * x + 0.59f) + 0.14f);
+		AssertPixel(aces, 32, 32, Expected(mapped), Expected(mapped), Expected(mapped), tolerance: 4);
+	}
+
+	[RhiFact, Trait(CATEGORY, INTEGRATION)]
+	public void BloomSpreadsLightAroundBrightObjects()
+	{
+		// A small, very bright cube on black: without bloom the frame around it stays black; with bloom it glows.
+		var plain = Render(GlowingCube(8f, size: 0.6f), options: o => o.Hdr = true);
+		var bloom = Render(GlowingCube(8f, size: 0.6f), options: o => { o.Hdr = true; o.Bloom = true; o.BloomIntensity = 1f; });
+		Assert.True(plain.GetPixel(32, 20).R < 4, $"no bloom: {plain.GetPixel(32, 20)}");
+		Assert.True(bloom.GetPixel(32, 20).R > 12, $"bloom: {bloom.GetPixel(32, 20)}");
+		// It fades with distance from the cube.
+		Assert.True(bloom.GetPixel(32, 20).R > bloom.GetPixel(32, 6).R, $"{bloom.GetPixel(32, 20)} near, {bloom.GetPixel(32, 6)} far");
+	}
+
+	[RhiFact, Trait(CATEGORY, INTEGRATION)]
+	public void MsaaSmoothsEdgesAndLeavesTheRestOfTheImageAlone()
+	{
+		// With 4 samples, shadows and the depth prepass the cube's silhouette gets partly covered pixels (between the red of
+		// the cube and the blue sky); away from edges the image is the one without MSAA.
+		static bool Blend(Rgba8 p) => p.R > 0x70 && p.R < 0xC0 && p.B > 0x50 && p.B < 0xB0 && p.G < 0x80;
+		var hard = Render(LitScene());
+		var smooth = Render(LitScene(), options: o => { o.Msaa = 4; o.DepthPrepass = true; });
+		Assert.True(PartlyCovered(smooth, Blend) > PartlyCovered(hard, Blend) + 4, $"{PartlyCovered(smooth, Blend)} blended edge pixels with MSAA, {PartlyCovered(hard, Blend)} without");
+		var comparison = GoldenImage.Compare(smooth, hard, tolerance: 6);
+		Assert.True(comparison.MismatchedPixels < Size * Size / 10, comparison.ToString());
+
+		// More samples than any device has is clamped, not refused.
+		var many = Render(LitScene(), options: o => o.Msaa = 64);
+		Assert.True(GoldenImage.Compare(many, hard, tolerance: 6).MismatchedPixels < Size * Size / 10);
+	}
+
 	[RhiFact, Trait(CATEGORY, INTEGRATION)]
 	public void TheSampleModelLoadsAndRendersWithItsTextures()
 	{

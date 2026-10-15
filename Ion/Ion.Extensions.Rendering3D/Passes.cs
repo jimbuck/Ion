@@ -47,7 +47,7 @@ internal sealed class PassSet
 	/// whose material samples <paramref name="target"/> (the texture of the render target being drawn into) are skipped:
 	/// a texture cannot be sampled while it is an attachment.
 	/// </summary>
-	public static void DrawBatches(Renderer3D renderer, IRenderPassEncoder pass, ReadOnlySpan<Batch> batches, IBuffer instances, TextureFormat format, bool afterPrepass, TextureHandle target)
+	public static void DrawBatches(Renderer3D renderer, IRenderPassEncoder pass, ReadOnlySpan<Batch> batches, IBuffer instances, TextureFormat format, bool afterPrepass, TextureHandle target, uint samples = 1)
 	{
 		IRenderPipeline? pipeline = null;
 		var material = -1;
@@ -57,7 +57,7 @@ internal sealed class PassSet
 		{
 			var materialSlot = renderer.Material(batch.Material);
 			if (target.IsValid && Array.IndexOf(materialSlot.Textures, target) >= 0) continue;
-			var next = renderer.MainPipeline(materialSlot, format, afterPrepass, batch.Skinned);
+			var next = renderer.MainPipeline(materialSlot, format, afterPrepass, batch.Skinned, samples);
 			if (!ReferenceEquals(next, pipeline))
 			{
 				pass.SetPipeline(next);
@@ -88,7 +88,7 @@ internal sealed class PassSet
 	}
 
 	/// <summary>Draws batches depth only (materials ignored; only opaque ones when <paramref name="opaqueOnly"/>), switching between the rigid and skinned depth pipelines.</summary>
-	public static void DrawDepthBatches(Renderer3D renderer, IRenderPassEncoder pass, ReadOnlySpan<Batch> batches, IBuffer instances, bool opaqueOnly, bool shadow)
+	public static void DrawDepthBatches(Renderer3D renderer, IRenderPassEncoder pass, ReadOnlySpan<Batch> batches, IBuffer instances, bool opaqueOnly, bool shadow, uint samples = 1)
 	{
 		var mesh = -1;
 		MeshSlot? meshSlot = null;
@@ -96,7 +96,7 @@ internal sealed class PassSet
 		foreach (ref readonly var batch in batches)
 		{
 			if (opaqueOnly && renderer.Material(batch.Material).AlphaMode != AlphaMode.Opaque) continue;
-			var next = renderer.DepthPipeline(shadow, batch.Skinned);
+			var next = renderer.DepthPipeline(shadow, batch.Skinned, samples);
 			if (!ReferenceEquals(next, pipeline))
 			{
 				pass.SetPipeline(next);
@@ -172,7 +172,7 @@ internal sealed class DepthPrepass(Renderer3D renderer, int view) : RenderGraphP
 		var pass = context.Encoder.BeginRenderPass(new RenderPassDescriptor([], new RenderPassDepthStencilAttachment(depth.DefaultView, LoadOp.Clear, StoreOp.Store, 1f), "Ion 3D depth prepass"));
 		PassSet.SetViewport(pass, data);
 		pass.SetBindGroup(0, renderer.ViewGroup(view));
-		PassSet.DrawDepthBatches(renderer, pass, data.Opaque.Span, renderer.PassInstances, opaqueOnly: true, shadow: false);
+		PassSet.DrawDepthBatches(renderer, pass, data.Opaque.Span, renderer.PassInstances, opaqueOnly: true, shadow: false, renderer.ViewSamples(data));
 		pass.End();
 	}
 }
@@ -218,23 +218,24 @@ internal sealed class OpaquePass(Renderer3D renderer, int view) : RenderGraphPas
 		pass.SetBindGroup(0, renderer.ViewGroup(view));
 		if (data.DrawClearQuad)
 		{
-			pass.SetPipeline(renderer.BackgroundPipeline(color.Format, clearQuad: true));
+			pass.SetPipeline(renderer.BackgroundPipeline(color.Format, clearQuad: true, renderer.ViewSamples(data)));
 			pass.Draw(3);
 		}
 
-		PassSet.DrawBatches(renderer, pass, data.Opaque.Span, renderer.PassInstances, color.Format, _afterPrepass, renderer.TargetTexture(data));
+		PassSet.DrawBatches(renderer, pass, data.Opaque.Span, renderer.PassInstances, color.Format, _afterPrepass, renderer.TargetTexture(data), renderer.ViewSamples(data));
 		pass.End();
 	}
 
 	/// <summary>
 	/// The color attachment of a camera's first pass: the frame's own first-use attachment for the frame target (so the
-	/// 2D overlay loads what 3D drew), cleared to the camera's clear color when it is the first camera on its target.
+	/// 2D overlay loads what 3D drew), cleared to the camera's clear color when it is the first camera on its target. With
+	/// post-processing the frame's cameras draw into the scene texture instead, like a render target.
 	/// </summary>
 	private static RenderPassColorAttachment ColorAttachment(Renderer3D renderer, ViewData data, ITexture color)
 	{
 		var clear = data.FirstOnTarget && data.Camera.Clear != CameraClear.None;
 		var value = Renderer3D.ClearValue(data.Camera.ClearColor, color.Format);
-		if (data.Target == 0)
+		if (data.Target == 0 && !renderer.PostActive)
 		{
 			var attachment = renderer.Frame.ColorAttachment();
 			if (clear) return attachment with { LoadOp = LoadOp.Clear, ClearValue = value };
@@ -272,7 +273,7 @@ internal sealed class SkyboxPass(Renderer3D renderer, int view) : RenderGraphPas
 			[new RenderPassColorAttachment(color.DefaultView, LoadOp.Load, StoreOp.Store)],
 			new RenderPassDepthStencilAttachment(depth.DefaultView, LoadOp.Load, StoreOp.Store, 1f), "Ion 3D skybox"));
 		PassSet.SetViewport(pass, data);
-		pass.SetPipeline(renderer.BackgroundPipeline(color.Format, clearQuad: false));
+		pass.SetPipeline(renderer.BackgroundPipeline(color.Format, clearQuad: false, renderer.ViewSamples(data)));
 		pass.SetBindGroup(0, renderer.ViewGroup(view));
 		pass.Draw(3);
 		pass.End();
@@ -310,7 +311,7 @@ internal sealed class TransparentPass(Renderer3D renderer, int view) : RenderGra
 			new RenderPassDepthStencilAttachment(depth.DefaultView, LoadOp.Load, StoreOp.Discard, 1f), "Ion 3D transparent"));
 		PassSet.SetViewport(pass, data);
 		pass.SetBindGroup(0, renderer.ViewGroup(view));
-		PassSet.DrawBatches(renderer, pass, data.Transparent.Span, renderer.PassInstances, color.Format, afterPrepass: false, renderer.TargetTexture(data));
+		PassSet.DrawBatches(renderer, pass, data.Transparent.Span, renderer.PassInstances, color.Format, afterPrepass: false, renderer.TargetTexture(data), renderer.ViewSamples(data));
 		pass.End();
 	}
 }

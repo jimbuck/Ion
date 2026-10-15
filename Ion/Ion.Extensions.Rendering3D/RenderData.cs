@@ -106,6 +106,7 @@ internal sealed class MaterialSlot
 	public TextureFormat CachedFormat;
 	public bool CachedAfterPrepass;
 	public bool CachedSkinned;
+	public uint CachedSamples;
 
 	/// <summary>The pipeline part of the sort key: shader, alpha mode and culling.</summary>
 	public int PipelineSortId => ((Shader & 0x1F) << 3) | ((int)AlphaMode << 1) | (DoubleSided ? 1 : 0);

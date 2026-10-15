@@ -67,6 +67,7 @@ builder.AddRendering3D(options =>
 | `ShadowCascades` | `4` | Shadow cascades, 1 to 4 (see [Cascades](/Ion/rendering/3d/lighting-and-shadows/#cascades)) |
 | `DepthPrepass` | `false` | Draw opaque objects into the depth buffer first, so the opaque pass shades each pixel once. Pays off with expensive materials and heavy overdraw; costs a second vertex pass |
 | `MaxCameras` | `8` | The most cameras rendered in one frame (the uniform ring is sized for this many) |
+| `Msaa`, `Hdr`, `ToneMapping`, `Exposure`, `Bloom`, ... | off | Anti-aliasing, high dynamic range and bloom (see [MSAA, HDR and post-processing](/Ion/rendering/3d/post-processing/)) |
 
 ## Immediate mode: resources and submissions
 
@@ -353,7 +354,8 @@ What the 3D renderer does not do yet:
 
 - One shadow-casting directional light, with up to four cascades. No point or spot light shadows, no shadows from
   blended objects; masked objects cast opaque shadows.
-- No MSAA, HDR targets, tone mapping or post-processing stack (the render graph can host them as custom passes).
+- Post-processing is MSAA, HDR with tone mapping, and bloom (see [MSAA, HDR and post-processing](/Ion/rendering/3d/post-processing/));
+  other effects (depth of field, ambient occlusion, color grading) are custom render graph passes.
 - No GPU culling and no LOD.
 - Image-based lighting uses box-filtered mips of the skybox, not prefiltered specular or an irradiance map.
 - No morph targets; glTF cameras and lights are not imported. Skinned meshes and skeletal animation are covered in

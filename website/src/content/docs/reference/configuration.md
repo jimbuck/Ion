@@ -146,6 +146,15 @@ Bound to `Rendering3DOptions`; `AddRendering3D(options => ...)` runs after bindi
 | `Ion:Rendering3D:ShowShadowCascades` | bool | `false` | Tint what each cascade covers. |
 | `Ion:Rendering3D:DepthPrepass` | bool | `false` | Draw opaque objects into the depth buffer first, so the opaque pass shades each pixel once. |
 | `Ion:Rendering3D:MaxCameras` | int | `8` | The most cameras rendered in one frame. |
+| `Ion:Rendering3D:Msaa` | int | `1` | Samples per pixel of the frame's cameras: 1, 2, 4 or 8 (clamped to the device). |
+| `Ion:Rendering3D:Hdr` | bool | `false` | Draw the frame's cameras in RGBA16F and tone map them. |
+| `Ion:Rendering3D:ToneMapping` | enum | `Aces` | `Aces`, `Reinhard` or `None`. |
+| `Ion:Rendering3D:Exposure` | float | `1` | A multiplier of the HDR scene before tone mapping. |
+| `Ion:Rendering3D:Bloom` | bool | `false` | Bright parts bleed light around them. |
+| `Ion:Rendering3D:BloomThreshold` | float | `1` | The linear brightness from which bloom starts. |
+| `Ion:Rendering3D:BloomSoftKnee` | float | `0.5` | How gradually bloom starts below the threshold. |
+| `Ion:Rendering3D:BloomIntensity` | float | `0.6` | How strongly the bloom is added. |
+| `Ion:Rendering3D:BloomLevels` | int | `5` | Levels of the bloom chain, 1 to 8. |
 
 ## Audio (Ion:Audio)
 

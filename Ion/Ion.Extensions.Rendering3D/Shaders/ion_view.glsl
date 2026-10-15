@@ -47,8 +47,8 @@ layout(set = 0, binding = 0) uniform View
 	vec4 uLightColor;
 	// The clear color as written to the target (already encoded).
 	vec4 uClearColor;
-	// x: local light count, y: environment map mip count - 1, z: 1 to encode the output as sRGB, w: 1 when the background
-	// is the clear color (no skybox for this camera).
+	// x: local light count, y: environment map mip count - 1, z: 1 to encode the output as sRGB (2: an HDR target, linear
+	// and unclamped), w: 1 when the background is the clear color (no skybox for this camera).
 	vec4 uCounts;
 	IonLight uLights[ION_MAX_LIGHTS];
 };
@@ -79,9 +79,11 @@ vec3 ionLinearToSrgb(vec3 c)
 	return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
 }
 
-// The final color as stored in the target: sRGB encoded unless the target format encodes itself.
+// The final color as stored in the target: sRGB encoded unless the target format encodes itself; linear and unclamped
+// into an HDR scene texture (tone mapped later).
 vec4 ionOutput(vec3 linearColor, float alpha)
 {
+	if (uCounts.z > 1.5) return vec4(max(linearColor, vec3(0.0)), alpha);
 	vec3 c = uCounts.z > 0.5 ? ionLinearToSrgb(linearColor) : clamp(linearColor, 0.0, 1.0);
 	return vec4(c, alpha);
 }

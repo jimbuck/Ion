@@ -705,7 +705,8 @@ internal sealed class GlesRenderPipeline : IRenderPipeline
 
 		Blend = targets.Length > 0 ? targets[0].Blend : null;
 		WriteMask = targets.Length > 0 ? targets[0].WriteMask : ColorWriteMask.None;
-		if (descriptor.SampleCount > 1) device.LogWarning($"Pipeline {Label}: multisampling follows the attachment on GLES; SampleCount is ignored.");
+		// SampleCount needs nothing here: GL rasterizes with the samples of the bound framebuffer's attachments, which the
+		// RHI contract requires to match the pipeline's.
 	}
 
 	public readonly uint Program;

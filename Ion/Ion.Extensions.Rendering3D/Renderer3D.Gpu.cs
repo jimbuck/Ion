@@ -40,6 +40,13 @@ public sealed partial class Renderer3D
 	private IBindGroup?[] _shadowGroups = [];
 	private IBuffer?[] _instanceBuffers = [];
 	private int _boundEnvironment = -1;
+	private PostProcessing? _post;
+	private uint _samples = 1;
+	private TextureFormat _sceneFormat;
+	private bool _hdr;
+	private bool _postActive;
+	private uint _warnedSamples;
+	private bool _warnedHdr;
 	private ViewUniforms _uniforms;
 
 	/// <summary>Seconds since start, written into the view uniforms (<c>uCameraPosition.w</c>) for animated materials.</summary>
@@ -156,6 +163,7 @@ public sealed partial class Renderer3D
 			mesh.Pending = null;
 		}
 
+		_post = new PostProcessing(this, device);
 		if (Overlay is { } overlay) overlay.DeferSubmission = true;
 		_logger?.LogInformation("3D renderer ready on {Adapter} ({Backend}): shadow map {Size}x{Size}, depth prepass {Prepass}, up to {Cameras} cameras.",
 			device.AdapterName, device.Backend, size, size, Options.DepthPrepass ? "on" : "off", _views.Length);
@@ -188,6 +196,7 @@ public sealed partial class Renderer3D
 		var device = Device!;
 		var frame = _frame!;
 		var slot = device.FrameIndex;
+		ResolvePostSettings(device, frame);
 
 		// Instances: one upload into this frame slot's ring buffer.
 		var instances = _instances.Span;
@@ -248,11 +257,20 @@ public sealed partial class Renderer3D
 			_graph.AddPass(_passes.Shadow);
 		}
 
+		// With post-processing the frame's cameras draw into the scene texture (multisampled, then resolved, with MSAA).
+		RenderGraphTexture scene = default, sceneTarget = default;
+		if (_postActive)
+		{
+			scene = _graph.CreateTexture(RenderGraphResources.SceneColor, new RenderGraphTextureDescriptor(frame.Width, frame.Height, _sceneFormat, TextureUsage.RenderAttachment | TextureUsage.TextureBinding));
+			sceneTarget = _samples > 1 ? _graph.CreateTexture(RenderGraphResources.SceneColorMultisampled, new RenderGraphTextureDescriptor(frame.Width, frame.Height, _sceneFormat, TextureUsage.RenderAttachment, _samples)) : scene;
+		}
+
 		for (var v = 0; v < _viewCount; v++)
 		{
 			var view = _views[v];
-			var color = view.Target == 0 ? backbuffer : _graph.Import(_renderTargets[view.Target]!.GraphName, _renderTargets[view.Target]!.Color!, output: true);
-			var depth = _graph.CreateTexture(v == _frameViewIndex ? RenderGraphResources.Depth : _passes.DepthNames[v], new RenderGraphTextureDescriptor(view.TargetWidth, view.TargetHeight, DepthFormat));
+			var color = view.Target != 0 ? _graph.Import(_renderTargets[view.Target]!.GraphName, _renderTargets[view.Target]!.Color!, output: true)
+				: _postActive ? sceneTarget : backbuffer;
+			var depth = _graph.CreateTexture(v == _frameViewIndex ? RenderGraphResources.Depth : _passes.DepthNames[v], new RenderGraphTextureDescriptor(view.TargetWidth, view.TargetHeight, DepthFormat, SampleCount: ViewSamples(view)));
 			var prepass = Options.DepthPrepass && view.Opaque.Count > 0;
 			if (prepass)
 			{
@@ -275,6 +293,7 @@ public sealed partial class Renderer3D
 			}
 		}
 
+		if (_postActive) AddPostPasses(frame, scene, sceneTarget, backbuffer);
 		foreach (var pass in _customPasses) _graph.AddPass(pass);
 		var overlay = Overlay is not null;
 		if (overlay)
@@ -320,6 +339,100 @@ public sealed partial class Renderer3D
 
 	private static ITexture CreateJointTexture(IGraphicsDevice device, uint rows) =>
 		device.CreateTexture(new TextureDescriptor(JointPalette.Width, rows, TextureFormat.Rgba32Float, TextureUsage.TextureBinding | TextureUsage.CopyDst, Label: "Ion 3D joints"));
+
+	/// <summary>Whether this frame's cameras on the frame draw into a scene texture that the post passes finish.</summary>
+	internal bool PostActive => _postActive;
+
+	/// <summary>The sample count of a view's color and depth (the configured MSAA for the frame's cameras under post-processing).</summary>
+	internal uint ViewSamples(ViewData view) => view.Target == 0 && _postActive ? _samples : 1;
+
+	/// <summary>The color format a view draws into.</summary>
+	private TextureFormat ViewFormat(ViewData view, IGraphicsFrame frame) =>
+		view.Target != 0 ? TextureFormat.Rgba8Unorm : _postActive ? _sceneFormat : frame.ColorFormat;
+
+	/// <summary>
+	/// Works out this frame's MSAA, HDR and post-processing from the options and the device: the sample count is the
+	/// largest power of two up to both the option and the device's limit, HDR needs renderable RGBA16F, and post-processing
+	/// runs when any is on and a camera draws into the frame. Fallbacks are logged once.
+	/// </summary>
+	private void ResolvePostSettings(IGraphicsDevice device, IGraphicsFrame frame)
+	{
+		var requested = (uint)Math.Clamp(Options.Msaa, 1, 8);
+		var limit = Math.Max(1, device.Limits.MaxSampleCount);
+		var samples = 1u;
+		while (samples * 2 <= requested && samples * 2 <= limit) samples *= 2;
+		if (samples < requested && _warnedSamples != requested)
+		{
+			_logger?.LogWarning("MSAA of {Requested} samples is not supported on {Adapter}; using {Samples}.", requested, device.AdapterName, samples);
+			_warnedSamples = requested;
+		}
+
+		_samples = samples;
+		_hdr = Options.Hdr && device.Limits.HdrRenderTargets;
+		if (Options.Hdr && !_hdr && !_warnedHdr)
+		{
+			_logger?.LogWarning("HDR rendering needs a renderable RGBA16F target, which {Adapter} lacks; drawing in low dynamic range without tone mapping.", device.AdapterName);
+			_warnedHdr = true;
+		}
+
+		_sceneFormat = _hdr ? TextureFormat.Rgba16Float : frame.ColorFormat;
+		_postActive = (_samples > 1 || Options.Hdr || Options.Bloom) && _frameViewIndex >= 0 && _post is not null;
+	}
+
+	/// <summary>The resolve, the bloom chain and the composite into the frame.</summary>
+	private void AddPostPasses(IGraphicsFrame frame, RenderGraphTexture scene, RenderGraphTexture sceneTarget, RenderGraphTexture backbuffer)
+	{
+		var post = _post!;
+		post.BeginFrame();
+		if (_samples > 1)
+		{
+			post.Resolve.Configure(sceneTarget, scene);
+			_graph.AddPass(post.Resolve);
+		}
+
+		RenderGraphTexture bloom = default;
+		if (Options.Bloom)
+		{
+			// Level 0 is half the frame; each next level half again, while at least 8 pixels across.
+			var levels = 0;
+			var bloomTextures = new RenderGraphTexture[PostProcessing.MaxBloomLevels];
+			uint width = frame.Width, height = frame.Height;
+			var bloomFormat = _hdr ? TextureFormat.Rgba16Float : TextureFormat.Rgba8Unorm;
+			for (var i = 0; i < Math.Clamp(Options.BloomLevels, 1, PostProcessing.MaxBloomLevels); i++)
+			{
+				width = Math.Max(1, width / 2);
+				height = Math.Max(1, height / 2);
+				if (i > 0 && Math.Min(width, height) < 8) break;
+				bloomTextures[i] = _graph.CreateTexture(RenderGraphResources.Bloom[i], new RenderGraphTextureDescriptor(width, height, bloomFormat, TextureUsage.RenderAttachment | TextureUsage.TextureBinding));
+				levels++;
+			}
+
+			var threshold = new PostUniforms { Params = new Vector4(MathF.Max(0, Options.BloomThreshold), Math.Clamp(Options.BloomSoftKnee, 0f, 1f), 0, 0) };
+			post.Prefilter.Configure(scene, bloomTextures[0], threshold);
+			_graph.AddPass(post.Prefilter);
+			for (var i = 1; i < levels; i++)
+			{
+				post.Down[i].Configure(bloomTextures[i - 1], bloomTextures[i], default);
+				_graph.AddPass(post.Down[i]);
+			}
+
+			for (var i = levels - 1; i > 0; i--)
+			{
+				post.Up[i].Configure(bloomTextures[i], bloomTextures[i - 1], default);
+				_graph.AddPass(post.Up[i]);
+			}
+
+			bloom = bloomTextures[0];
+		}
+
+		var composite = new PostUniforms
+		{
+			Params = new Vector4(MathF.Max(0, Options.Exposure), Options.Bloom ? MathF.Max(0, Options.BloomIntensity) : 0, (float)Options.ToneMapping, frame.ColorFormat.IsSrgb() ? 0 : 1),
+			Flags = new Vector4(Options.Bloom ? 1 : 0, _hdr ? 1 : 0, 0, 0),
+		};
+		post.Composite.Configure(scene, backbuffer, composite, bloom);
+		_graph.AddPass(post.Composite);
+	}
 
 	private static ulong ViewOffset(int frameSlot, int view, int viewSlots) => (ulong)((frameSlot * viewSlots + view) * ViewUniforms.SlotSize);
 
@@ -372,16 +485,16 @@ public sealed partial class Renderer3D
 			u.LightColor = default;
 		}
 
-		var format = view.Target == 0 ? frame.ColorFormat : TextureFormat.Rgba8Unorm;
+		var format = ViewFormat(view, frame);
 		u.ClearColor = ClearValue(view.Camera.ClearColor, format);
-		u.Counts = new Vector4(view.LightCount, environmentTexture is null ? 0 : environmentTexture.MipLevelCount - 1, format.IsSrgb() ? 0 : 1,
-			view.DrawSkybox ? 0 : 1);
+		var encode = format == TextureFormat.Rgba16Float ? 2 : format.IsSrgb() ? 0 : 1;
+		u.Counts = new Vector4(view.LightCount, environmentTexture is null ? 0 : environmentTexture.MipLevelCount - 1, encode, view.DrawSkybox ? 0 : 1);
 		u.Lights = view.Lights;
 	}
 
-	/// <summary>The value a clear writes for <paramref name="color"/> (sRGB) into a target of <paramref name="format"/>.</summary>
+	/// <summary>The value a clear writes for <paramref name="color"/> (sRGB) into a target of <paramref name="format"/> (linear for sRGB and HDR formats).</summary>
 	internal static Vector4 ClearValue(Color color, TextureFormat format) =>
-		format.IsSrgb() ? ColorSpace.ToLinear(color) : color.ToVector4();
+		format.IsSrgb() || format == TextureFormat.Rgba16Float ? ColorSpace.ToLinear(color) : color.ToVector4();
 
 	private void EnsureMaterial(IGraphicsDevice device, MaterialSlot material)
 	{
@@ -466,11 +579,11 @@ public sealed partial class Renderer3D
 	/// The main-pass pipeline of a material. A skinned one uses the built-in skinning vertex stage (a custom material
 	/// shader's own vertex stage applies to rigid draws only) with the material's fragment stage.
 	/// </summary>
-	internal IRenderPipeline MainPipeline(MaterialSlot material, TextureFormat format, bool afterPrepass, bool skinned = false)
+	internal IRenderPipeline MainPipeline(MaterialSlot material, TextureFormat format, bool afterPrepass, bool skinned = false, uint samples = 1)
 	{
 		afterPrepass &= material.AlphaMode == AlphaMode.Opaque;
-		if (material.CachedPipeline is { } cached && material.CachedFormat == format && material.CachedAfterPrepass == afterPrepass && material.CachedSkinned == skinned) return cached;
-		var key = new PipelineKey(material.Shader, material.AlphaMode, material.DoubleSided, afterPrepass ? PipelineKind.MainAfterPrepass : PipelineKind.Main, format, skinned);
+		if (material.CachedPipeline is { } cached && material.CachedFormat == format && material.CachedAfterPrepass == afterPrepass && material.CachedSkinned == skinned && material.CachedSamples == samples) return cached;
+		var key = new PipelineKey(material.Shader, material.AlphaMode, material.DoubleSided, afterPrepass ? PipelineKind.MainAfterPrepass : PipelineKind.Main, format, skinned, samples);
 		if (!_pipelines.TryGetValue(key, out var pipeline))
 		{
 			var shader = _shaders[material.Shader]!;
@@ -483,6 +596,7 @@ public sealed partial class Renderer3D
 				Fragment = new FragmentState(shader.Fragment!, [new ColorTargetState(format, blend ? BlendState.AlphaBlend : null)]),
 				Primitive = new PrimitiveState { CullMode = material.DoubleSided ? CullMode.None : CullMode.Back },
 				DepthStencil = new DepthStencilState(DepthFormat, DepthWriteEnabled: !blend && !afterPrepass, afterPrepass ? CompareFunction.LessEqual : CompareFunction.Less),
+				SampleCount = samples,
 			});
 			_pipelines.Add(key, pipeline);
 		}
@@ -491,12 +605,13 @@ public sealed partial class Renderer3D
 		material.CachedFormat = format;
 		material.CachedAfterPrepass = afterPrepass;
 		material.CachedSkinned = skinned;
+		material.CachedSamples = samples;
 		return pipeline;
 	}
 
-	internal IRenderPipeline DepthPipeline(bool shadow, bool skinned = false)
+	internal IRenderPipeline DepthPipeline(bool shadow, bool skinned = false, uint samples = 1)
 	{
-		var key = new PipelineKey(0, AlphaMode.Opaque, false, shadow ? PipelineKind.ShadowDepth : PipelineKind.PrepassDepth, TextureFormat.Undefined, skinned);
+		var key = new PipelineKey(0, AlphaMode.Opaque, false, shadow ? PipelineKind.ShadowDepth : PipelineKind.PrepassDepth, TextureFormat.Undefined, skinned, samples);
 		if (_pipelines.TryGetValue(key, out var pipeline)) return pipeline;
 		pipeline = Device!.CreateRenderPipeline(new RenderPipelineDescriptor
 		{
@@ -506,14 +621,15 @@ public sealed partial class Renderer3D
 			// Shadows: no culling (thin and open meshes cast too; the bias handles acne). Prepass: back faces culled.
 			Primitive = new PrimitiveState { CullMode = shadow ? CullMode.None : CullMode.Back },
 			DepthStencil = new DepthStencilState(DepthFormat, true, CompareFunction.Less),
+			SampleCount = samples,
 		});
 		_pipelines.Add(key, pipeline);
 		return pipeline;
 	}
 
-	internal IRenderPipeline BackgroundPipeline(TextureFormat format, bool clearQuad)
+	internal IRenderPipeline BackgroundPipeline(TextureFormat format, bool clearQuad, uint samples = 1)
 	{
-		var key = new PipelineKey(0, AlphaMode.Opaque, false, clearQuad ? PipelineKind.ClearQuad : PipelineKind.Skybox, format);
+		var key = new PipelineKey(0, AlphaMode.Opaque, false, clearQuad ? PipelineKind.ClearQuad : PipelineKind.Skybox, format, Samples: samples);
 		if (_pipelines.TryGetValue(key, out var pipeline)) return pipeline;
 		pipeline = Device!.CreateRenderPipeline(new RenderPipelineDescriptor
 		{
@@ -522,6 +638,7 @@ public sealed partial class Renderer3D
 			Vertex = new VertexState(_skyboxVertex!, []),
 			Fragment = new FragmentState(_skyboxFragment!, [new ColorTargetState(format)]),
 			DepthStencil = new DepthStencilState(DepthFormat, false, clearQuad ? CompareFunction.Always : CompareFunction.LessEqual),
+			SampleCount = samples,
 		});
 		_pipelines.Add(key, pipeline);
 		return pipeline;
@@ -626,6 +743,7 @@ public sealed partial class Renderer3D
 		_shadowSampler?.Dispose();
 		_environmentSampler?.Dispose();
 		_jointSampler?.Dispose();
+		_post?.Dispose();
 		_jointTexture?.Dispose();
 		_viewOnlyPipelineLayout?.Dispose();
 		_shadowPipelineLayout?.Dispose();
@@ -654,5 +772,5 @@ public sealed partial class Renderer3D
 	}
 
 	[StructLayout(LayoutKind.Auto)]
-	private readonly record struct PipelineKey(int Shader, AlphaMode Alpha, bool DoubleSided, PipelineKind Kind, TextureFormat Color, bool Skinned = false);
+	private readonly record struct PipelineKey(int Shader, AlphaMode Alpha, bool DoubleSided, PipelineKind Kind, TextureFormat Color, bool Skinned = false, uint Samples = 1);
 }

@@ -16,13 +16,23 @@ public readonly record struct RenderGraphTexture(int Index)
 /// <param name="Height">Height in pixels.</param>
 /// <param name="Format">The format.</param>
 /// <param name="Usage">The usages (<see cref="TextureUsage.RenderAttachment"/> is always added).</param>
-public readonly record struct RenderGraphTextureDescriptor(uint Width, uint Height, TextureFormat Format, TextureUsage Usage = TextureUsage.RenderAttachment);
+/// <param name="SampleCount">Samples per texel (1: not multisampled; multisampled textures are render attachments to resolve).</param>
+public readonly record struct RenderGraphTextureDescriptor(uint Width, uint Height, TextureFormat Format, TextureUsage Usage = TextureUsage.RenderAttachment, uint SampleCount = 1);
 
 /// <summary>The well-known texture names the 3D renderer registers every frame.</summary>
 public static class RenderGraphResources
 {
 	/// <summary>The frame's color target (the window or offscreen target), imported as an output.</summary>
 	public const string Backbuffer = "Backbuffer";
+
+	/// <summary>The scene texture the frame's cameras draw into under post-processing (single-sampled: resolved with MSAA).</summary>
+	public const string SceneColor = "SceneColor";
+
+	/// <summary>The multisampled scene texture of MSAA, resolved into <see cref="SceneColor"/>.</summary>
+	public const string SceneColorMultisampled = "SceneColor.Msaa";
+
+	/// <summary>The levels of the bloom chain, level 0 at half the frame's size.</summary>
+	public static readonly string[] Bloom = ["Bloom.0", "Bloom.1", "Bloom.2", "Bloom.3", "Bloom.4", "Bloom.5", "Bloom.6", "Bloom.7"];
 
 	/// <summary>The directional light's shadow map (imported, persistent).</summary>
 	public const string ShadowMap = "ShadowMap";
@@ -195,7 +205,7 @@ public sealed class RenderGraph : IDisposable
 
 	/// <summary>Creates a graph that allocates transient textures on <paramref name="device"/> (none: a graph for tests that never executes on a GPU).</summary>
 	public RenderGraph(IGraphicsDevice? device)
-		: this(device is null ? null : (descriptor, name) => device.CreateTexture(new TextureDescriptor(descriptor.Width, descriptor.Height, descriptor.Format, descriptor.Usage | TextureUsage.RenderAttachment, Label: name)))
+		: this(device is null ? null : (descriptor, name) => device.CreateTexture(new TextureDescriptor(descriptor.Width, descriptor.Height, descriptor.Format, descriptor.Usage | TextureUsage.RenderAttachment, SampleCount: Math.Max(1, descriptor.SampleCount), Label: name)))
 	{
 	}
 

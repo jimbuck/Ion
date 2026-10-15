@@ -51,6 +51,41 @@ public sealed class Rendering3DOptions
 	/// </summary>
 	public bool DepthPrepass { get; set; }
 
+	/// <summary>
+	/// Multisample anti-aliasing of the cameras that draw into the frame: 1 (off, the default), 2, 4 or 8 samples per
+	/// pixel. More than the device supports (<c>DeviceLimits.MaxSampleCount</c>) uses the most it supports. Render
+	/// target cameras are not multisampled.
+	/// </summary>
+	public int Msaa { get; set; } = 1;
+
+	/// <summary>
+	/// Whether the frame's cameras draw into a high dynamic range (RGBA16F) scene texture, mapped to the display by
+	/// <see cref="ToneMapping"/> after <see cref="Exposure"/>. Devices that cannot render RGBA16F (some OpenGL ES ones)
+	/// draw in low dynamic range instead, without tone mapping.
+	/// </summary>
+	public bool Hdr { get; set; }
+
+	/// <summary>The curve that maps the HDR scene to the display (with <see cref="Hdr"/>).</summary>
+	public ToneMapping ToneMapping { get; set; } = ToneMapping.Aces;
+
+	/// <summary>The multiplier of the HDR scene before tone mapping (with <see cref="Hdr"/>).</summary>
+	public float Exposure { get; set; } = 1f;
+
+	/// <summary>Whether bright parts of the frame bleed light around them (bloom). Best with <see cref="Hdr"/>, where brightness above 1 is kept.</summary>
+	public bool Bloom { get; set; }
+
+	/// <summary>The brightness from which bloom starts (linear; 1 is full white in LDR, so lower it without <see cref="Hdr"/>).</summary>
+	public float BloomThreshold { get; set; } = 1f;
+
+	/// <summary>How gradually bloom starts below the threshold, as a fraction of it (0: a hard cut).</summary>
+	public float BloomSoftKnee { get; set; } = 0.5f;
+
+	/// <summary>How strongly the bloom is added to the frame.</summary>
+	public float BloomIntensity { get; set; } = 0.6f;
+
+	/// <summary>The levels of the bloom chain (each half the size of the last), 1 to 8: more spread the light wider.</summary>
+	public int BloomLevels { get; set; } = 5;
+
 	/// <summary>The most cameras rendered in one frame (the uniform ring is sized for this many).</summary>
 	public int MaxCameras { get; set; } = 8;
 }
