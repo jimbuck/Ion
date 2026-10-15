@@ -20,6 +20,8 @@ public enum VertexAttributes
 	Uv1 = 1 << 4,
 	/// <summary>Vertex colors.</summary>
 	Color = 1 << 5,
+	/// <summary>Skinning: joint indices and weights (<see cref="MeshData.Joints"/> and <see cref="MeshData.Weights"/>).</summary>
+	Skin = 1 << 6,
 }
 
 /// <summary>A range of a mesh's indices drawn as one piece (every sub-mesh is drawn with the renderer's material).</summary>
@@ -67,6 +69,18 @@ public sealed class MeshData
 	/// <summary>Vertex colors (sRGB, one per position), or null.</summary>
 	public Color[]? Colors { get; set; }
 
+	/// <summary>
+	/// The four joints that move each vertex (one per position, indices into the skeleton's joints), or null for a rigid
+	/// mesh. Set with <see cref="Weights"/>: a mesh with both is skinned.
+	/// </summary>
+	public JointIndices[]? Joints { get; set; }
+
+	/// <summary>The weights of <see cref="Joints"/> (one per position; each vertex's four should sum to 1), or null.</summary>
+	public Vector4[]? Weights { get; set; }
+
+	/// <summary>Whether the mesh has skinning data (<see cref="Joints"/> and <see cref="Weights"/>).</summary>
+	public bool IsSkinned => Joints is not null && Weights is not null;
+
 	/// <summary>Triangle-list indices.</summary>
 	public uint[] Indices { get; set; }
 
@@ -86,7 +100,8 @@ public sealed class MeshData
 		| (Tangents is not null ? VertexAttributes.Tangent : 0)
 		| (Uv0 is not null ? VertexAttributes.Uv0 : 0)
 		| (Uv1 is not null ? VertexAttributes.Uv1 : 0)
-		| (Colors is not null ? VertexAttributes.Color : 0);
+		| (Colors is not null ? VertexAttributes.Color : 0)
+		| (IsSkinned ? VertexAttributes.Skin : 0);
 
 	/// <summary>The bounding box of the positions.</summary>
 	public Aabb ComputeBounds() => Aabb.FromPoints(Positions);
@@ -107,6 +122,9 @@ public sealed class MeshData
 		Check(Uv0?.Length, nameof(Uv0));
 		Check(Uv1?.Length, nameof(Uv1));
 		Check(Colors?.Length, nameof(Colors));
+		Check(Joints?.Length, nameof(Joints));
+		Check(Weights?.Length, nameof(Weights));
+		if ((Joints is null) != (Weights is null)) throw new InvalidOperationException($"Mesh '{Name}': skinning needs both Joints and Weights.");
 		if (Indices.Length % 3 != 0) throw new InvalidOperationException($"Mesh '{Name}': {Indices.Length} indices is not a whole number of triangles.");
 		foreach (var sub in SubMeshes)
 		{

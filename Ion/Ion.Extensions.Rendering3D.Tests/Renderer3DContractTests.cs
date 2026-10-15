@@ -396,6 +396,68 @@ public abstract class Renderer3DContractTests
 	}
 
 	[RhiFact, Trait(CATEGORY, INTEGRATION)]
+	public void SkinnedMeshesRenderAsTheRigidMeshesTheirJointsPlace()
+	{
+		// Two cubes whose vertices follow joint 0, posed by their palettes (the second cube's palette after the first's in
+		// the frame), against the same cubes drawn rigid at those matrices. A sun casts their shadows on a plane, so the
+		// skinned shadow and (with the prepass) depth pipelines draw too.
+		var first = Matrix4x4.CreateRotationY(0.6f) * Matrix4x4.CreateTranslation(-0.9f, 0, 0);
+		var second = Matrix4x4.CreateScale(0.7f) * Matrix4x4.CreateRotationX(0.4f) * Matrix4x4.CreateTranslation(1.1f, 0.3f, 0);
+		Scene3DScript Scene(bool skinned)
+		{
+			MeshHandle cube = default, plane = default;
+			MaterialHandle red = default, ground = default;
+			return new Scene3DScript
+			{
+				Init = (r, _) =>
+				{
+					var data = MeshPrimitives.Cube(1);
+					if (skinned)
+					{
+						data.Joints = [.. data.Positions.Select(_ => new JointIndices(0, 0, 0, 0))];
+						data.Weights = [.. data.Positions.Select(_ => Vector4.UnitX)];
+					}
+
+					cube = r.CreateMesh(data);
+					plane = r.CreateMesh(MeshPrimitives.Plane(10));
+					red = r.CreateMaterial(new PbrMaterial(new Color(0xD0, 0x40, 0x30), roughness: 0.6f));
+					ground = r.CreateMaterial(new PbrMaterial(Color.Gray));
+				},
+				Render = (r, _) =>
+				{
+					r.SetCamera(new Camera(), Transform.LookAt(new Vector3(0, 2, 5), Vector3.Zero));
+					r.AddLight(new DirectionalLight(Color.White, 2), new Vector3(-0.4f, -1, -0.5f));
+					r.Draw(plane, ground, Matrix4x4.CreateTranslation(0, -1, 0));
+					var renderer = new MeshRenderer(cube, red);
+					if (skinned)
+					{
+						r.Submit(renderer, Matrix4x4.Identity, [first]);
+						r.Submit(renderer, Matrix4x4.Identity, [second, Matrix4x4.Identity]);
+					}
+					else
+					{
+						r.Submit(renderer, first);
+						r.Submit(renderer, second);
+					}
+				},
+			};
+		}
+
+		var rigid = Render(Scene(skinned: false));
+		var skinned = Render(Scene(skinned: true), inspect: host => Assert.Equal(2, host.Get<Renderer3D>().Skins.Length));
+		var comparison = GoldenImage.Compare(skinned, rigid, tolerance: 2);
+		Assert.True(comparison.MismatchedPixels == 0, comparison.ToString());
+		var prepass = Render(Scene(skinned: true), options: o => o.DepthPrepass = true);
+		comparison = GoldenImage.Compare(prepass, rigid, tolerance: 2);
+		Assert.True(comparison.MismatchedPixels == 0, comparison.ToString());
+
+		// The cubes are in the picture (red), away from the middle where an unposed cube would be.
+		var red = 0;
+		for (var y = 0; y < 64; y++) for (var x = 0; x < 64; x++) if (skinned.GetPixel(x, y) is var p && p.R > p.G + 40 && p.R > p.B + 40) red++;
+		Assert.True(red > 100, $"{red} red pixels");
+	}
+
+	[RhiFact, Trait(CATEGORY, INTEGRATION)]
 	public void TheSampleModelLoadsAndRendersWithItsTextures()
 	{
 		IModel model = null!;

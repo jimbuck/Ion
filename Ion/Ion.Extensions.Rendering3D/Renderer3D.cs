@@ -16,7 +16,7 @@ namespace Ion.Extensions.Rendering3D;
 /// </summary>
 /// <remarks>
 /// <list type="number">
-/// <item><b>Extract</b>: the submissions, copied into flat arrays as they are made (<see cref="Submit"/>).</item>
+/// <item><b>Extract</b>: the submissions, copied into flat arrays as they are made (<see cref="Submit(in MeshRenderer, in Matrix4x4)"/>).</item>
 /// <item><b>Prepare</b>: world bounds per object, per-view matrices and frusta, the light lists, the directional shadow
 /// fit; per-view uniforms and per-object instance data written into per-frame rings.</item>
 /// <item><b>Queue and sort</b>: per camera, frustum and layer culling, then opaque and masked objects binned by
@@ -134,6 +134,7 @@ public sealed partial class Renderer3D : IRenderer3D, IDisposable
 			IndexCount = data.Indices.Length,
 			Triangles = data.TriangleCount,
 			Attributes = data.Attributes,
+			MaxJoint = MaxJoint(data),
 		};
 
 		if (Device is { } device) UploadMesh(device, slot, data);
@@ -150,6 +151,36 @@ public sealed partial class Renderer3D : IRenderer3D, IDisposable
 		slot.Indices = device.CreateBuffer(new BufferDescriptor((ulong)Math.Max(1, data.Indices.Length) * 4, BufferUsage.Index | BufferUsage.CopyDst, data.Name + " indices"));
 		device.Queue.WriteBuffer(slot.Vertices, 0, (ReadOnlySpan<MeshVertex>)vertices);
 		device.Queue.WriteBuffer(slot.Indices, 0, (ReadOnlySpan<uint>)data.Indices);
+		if (data is { Joints: { } joints, Weights: { } weights })
+		{
+			var skin = new SkinVertex[joints.Length];
+			for (var i = 0; i < skin.Length; i++)
+			{
+				var j = joints[i];
+				skin[i] = new SkinVertex { J0 = j.J0, J1 = j.J1, J2 = j.J2, J3 = j.J3, Weights = weights[i] };
+			}
+
+			slot.Skin = device.CreateBuffer(new BufferDescriptor((ulong)Math.Max(1, skin.Length) * SkinVertex.Size, BufferUsage.Vertex | BufferUsage.CopyDst, data.Name + " skin"));
+			device.Queue.WriteBuffer(slot.Skin, 0, (ReadOnlySpan<SkinVertex>)skin);
+		}
+	}
+
+	/// <summary>The highest joint a weighted vertex uses, or -1 for a rigid mesh.</summary>
+	private static int MaxJoint(MeshData data)
+	{
+		if (data is not { Joints: { } joints, Weights: { } weights }) return -1;
+		var max = 0;
+		for (var i = 0; i < joints.Length; i++)
+		{
+			var j = joints[i];
+			var w = weights[i];
+			if (w.X != 0) max = Math.Max(max, j.J0);
+			if (w.Y != 0) max = Math.Max(max, j.J1);
+			if (w.Z != 0) max = Math.Max(max, j.J2);
+			if (w.W != 0) max = Math.Max(max, j.J3);
+		}
+
+		return max;
 	}
 
 	/// <summary>The GPU vertices of <paramref name="data"/>, with defaults for missing attributes.</summary>
@@ -439,6 +470,36 @@ public sealed partial class Renderer3D : IRenderer3D, IDisposable
 		o.Layers = renderer.LayerMask == 0 ? 1u : renderer.LayerMask;
 		o.CastShadows = renderer.CastShadows;
 		o.ReceiveShadows = renderer.ReceiveShadows;
+		o.Skin = -1;
+	}
+
+	/// <inheritdoc/>
+	/// <exception cref="ArgumentException">The mesh's vertices use a joint beyond <paramref name="joints"/>.</exception>
+	public void Submit(in MeshRenderer renderer, in Matrix4x4 world, ReadOnlySpan<Matrix4x4> joints)
+	{
+		Submit(renderer, world);
+		var mesh = Mesh(renderer.Mesh.Id);
+		if (joints.IsEmpty || mesh is not { Skinned: true }) return;
+		if (mesh.MaxJoint >= joints.Length) throw new ArgumentException($"Mesh '{mesh.Name}' uses joint {mesh.MaxJoint}; the palette has {joints.Length} joints.", nameof(joints));
+
+		var first = _palette.Count / 3;
+		_palette.EnsureCapacity(_palette.Count + joints.Length * 3);
+		var rows = _palette.Items.AsSpan(_palette.Count, joints.Length * 3);
+		var bounds = Aabb.Empty;
+		for (var j = 0; j < joints.Length; j++)
+		{
+			JointPalette.Write(rows.Slice(j * 3, 3), joints[j]);
+			// Every posed vertex is a weighted mean of its joints' transforms of it, so the union of the mesh's box under
+			// each joint holds the posed mesh.
+			bounds.Encapsulate(mesh.Bounds.Transform(joints[j]));
+		}
+
+		_palette.Count += joints.Length * 3;
+		ref var skin = ref _skins.Add();
+		skin.Palette = first;
+		skin.Joints = joints.Length;
+		skin.Bounds = bounds;
+		_objects.Items[_objects.Count - 1].Skin = _skins.Count - 1;
 	}
 
 	/// <inheritdoc/>
@@ -451,6 +512,7 @@ public sealed partial class Renderer3D : IRenderer3D, IDisposable
 		o.Layers = 1;
 		o.CastShadows = true;
 		o.ReceiveShadows = true;
+		o.Skin = -1;
 	}
 
 	/// <inheritdoc/>

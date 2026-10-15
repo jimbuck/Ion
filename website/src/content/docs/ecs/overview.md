@@ -58,8 +58,8 @@ itself. The result publishes with NativeAOT with no warnings from Ion or Arch (s
 |---|---|---|
 | `builder.AddEcs()` | `IonApplicationBuilder` | Registers `EcsWorlds`, `World`, `Commands` and `NameRegistry` (per scope), the built-in systems, the entity counter and the ECS remote methods. |
 | `services.AddEcs()` | `IServiceCollection` | The same, for code that composes services directly. |
-| `game.UseEcs()` | `IIonApplication` | Adds `EcsCommandsSystem`, `TransformPropagationSystem` and `SpriteAnimationSystem` to the root schedule. |
-| `scene.UseEcs()` | `ISceneBuilder` | Adds the same three systems to a scene's schedule, bound to the scene's world. |
+| `game.UseEcs()` | `IIonApplication` | Adds `EcsCommandsSystem`, `TransformPropagationSystem`, `SpriteAnimationSystem` and `SkeletalAnimationSystem` to the root schedule. |
+| `scene.UseEcs()` | `ISceneBuilder` | Adds the same four systems to a scene's schedule, bound to the scene's world. |
 | `builder.AddEcsSerialization(...)` | `IonApplicationBuilder` | Adds the ECS module plus the world serializers and the component registry. |
 | `builder.AddEcsRendering(...)` / `game.UseEcsRendering()` | | The 2D sprite extraction, plus the engine and the ECS module. |
 | `builder.AddEcsRendering3D(...)` / `game.UseEcsRendering3D()` | | The 3D extraction, plus the 3D renderer, the engine and the ECS module. |
@@ -167,7 +167,7 @@ whatever order you register modules in. Your own steps default to order `0`.
 | -400 | `StageOrder.TransformPropagation` | Last, Render | `TransformPropagationSystem`: global transforms (and sprite bounds in Render) |
 | -300 | `StageOrder.Extract` | Render | `SpriteExtractionSystem`, `Scene3DExtractionSystem` |
 | 0 | `StageOrder.Default` | any | Your steps |
-| 400 | `StageOrder.SpriteAnimation` | Update | `SpriteAnimationSystem` advances flip-books |
+| 400 | `StageOrder.SpriteAnimation` | Update | `SpriteAnimationSystem` advances flip-books, `SkeletalAnimationSystem` the `Animator`s |
 | 950 | `StageOrder.Ecs` | every stage | `EcsCommandsSystem` plays back `Commands` |
 | 970 | `StageOrder.Remote` | Last | Remote protocol requests (see the world after the frame's commands) |
 | 1000 | `StageOrder.Events` | Last | Event buffers stepped |

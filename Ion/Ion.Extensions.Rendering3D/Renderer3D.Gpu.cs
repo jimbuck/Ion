@@ -17,6 +17,8 @@ public sealed partial class Renderer3D
 	private readonly Dictionary<PipelineKey, IRenderPipeline> _pipelines = [];
 	private IShaderModule? _meshVertex;
 	private IShaderModule? _depthVertex;
+	private IShaderModule? _skinnedVertex;
+	private IShaderModule? _skinnedDepthVertex;
 	private IShaderModule? _skyboxVertex;
 	private IShaderModule? _skyboxFragment;
 	private IShaderModule? _unlitFragment;
@@ -27,6 +29,8 @@ public sealed partial class Renderer3D
 	private IPipelineLayout? _shadowPipelineLayout;
 	private ISampler? _shadowSampler;
 	private ISampler? _environmentSampler;
+	private ISampler? _jointSampler;
+	private ITexture? _jointTexture;
 	private ITexture? _white;
 	private ITexture? _flatNormal;
 	private ITexture? _blackCube;
@@ -62,6 +66,8 @@ public sealed partial class Renderer3D
 		IShaderModule Module(string file) => device.CreateShaderModule(EmbeddedShaders.Descriptor(device, assembly, file));
 		_meshVertex = Module("mesh.vert");
 		_depthVertex = Module("depth.vert");
+		_skinnedVertex = Module("mesh_skinned.vert");
+		_skinnedDepthVertex = Module("depth_skinned.vert");
 		_skyboxVertex = Module("skybox.vert");
 		_skyboxFragment = Module("skybox.frag");
 		_unlitFragment = Module("unlit.frag");
@@ -74,8 +80,15 @@ public sealed partial class Renderer3D
 			new(2, ShaderStage.Fragment, BindingType.Sampler),
 			new(3, ShaderStage.Fragment, BindingType.Texture),
 			new(4, ShaderStage.Fragment, BindingType.Sampler),
+			new(5, ShaderStage.Vertex, BindingType.Texture),
+			new(6, ShaderStage.Vertex, BindingType.Sampler),
 		], "Ion 3D view"));
-		_shadowViewLayout = device.CreateBindGroupLayout(new BindGroupLayoutDescriptor([new(0, ShaderStage.Vertex, BindingType.UniformBuffer)], "Ion 3D shadow view"));
+		_shadowViewLayout = device.CreateBindGroupLayout(new BindGroupLayoutDescriptor(
+		[
+			new(0, ShaderStage.Vertex, BindingType.UniformBuffer),
+			new(5, ShaderStage.Vertex, BindingType.Texture),
+			new(6, ShaderStage.Vertex, BindingType.Sampler),
+		], "Ion 3D shadow view"));
 		_viewOnlyPipelineLayout = device.CreatePipelineLayout(new PipelineLayoutDescriptor([_viewLayout], "Ion 3D view only"));
 		_shadowPipelineLayout = device.CreatePipelineLayout(new PipelineLayoutDescriptor([_shadowViewLayout], "Ion 3D shadow"));
 
@@ -107,6 +120,14 @@ public sealed partial class Renderer3D
 			MipmapFilter = FilterMode.Linear,
 			Label = "Ion 3D environment",
 		});
+		_jointSampler = device.CreateSampler(new SamplerDescriptor
+		{
+			MagFilter = FilterMode.Nearest,
+			MinFilter = FilterMode.Nearest,
+			MipmapFilter = FilterMode.Nearest,
+			Label = "Ion 3D joints",
+		});
+		_jointTexture = CreateJointTexture(device, 1);
 
 		_white = device.CreateTexture(new TextureDescriptor(1, 1, TextureFormat.Rgba8Unorm, TextureUsage.TextureBinding | TextureUsage.CopyDst, Label: "Ion 3D white"));
 		device.Queue.WriteTexture(_white, [255, 255, 255, 255]);
@@ -182,6 +203,7 @@ public sealed partial class Renderer3D
 
 		if (instances.Length > 0) device.Queue.WriteBuffer(instanceBuffer, 0, (ReadOnlySpan<InstanceData>)instances);
 		_passes.Instances = instanceBuffer;
+		UploadPalette(device);
 
 		// The environment cube map is part of the view bind groups.
 		var environment = _environment.Skybox.IsValid && GetTexture(_environment.Skybox) is { Dimension: TextureDimension.Cube } ? _environment.Skybox.Id : 0;
@@ -261,6 +283,39 @@ public sealed partial class Renderer3D
 		_graph.Execute(device);
 		return overlay;
 	}
+
+	/// <summary>
+	/// Uploads the frame's joint palette (whole rows of <see cref="JointPalette.RowJoints"/> joints), growing the texture
+	/// (and so rebuilding the view bind groups) when it has too few rows. Queue writes are ordered with submissions, so
+	/// one texture serves every frame in flight.
+	/// </summary>
+	private void UploadPalette(IGraphicsDevice device)
+	{
+		var joints = _palette.Count / 3;
+		if (joints == 0) return;
+		var rows = (joints + JointPalette.RowJoints - 1) / JointPalette.RowJoints;
+		if (_jointTexture!.Height < rows)
+		{
+			var height = Math.Max((uint)rows, _jointTexture.Height * 2);
+			_jointTexture.Dispose();
+			_jointTexture = CreateJointTexture(device, height);
+			InvalidateViewGroups();
+			for (var i = 0; i < _shadowGroups.Length; i++)
+			{
+				_shadowGroups[i]?.Dispose();
+				_shadowGroups[i] = null;
+			}
+		}
+
+		// Pad the last row (the texels past the last joint are never read).
+		var texels = rows * JointPalette.Width;
+		_palette.EnsureCapacity(texels);
+		var data = MemoryMarshal.AsBytes(_palette.Items.AsSpan(0, texels));
+		device.Queue.WriteTexture(_jointTexture, data, JointPalette.Width * 16, new TextureRegion(0, 0, JointPalette.Width, (uint)rows));
+	}
+
+	private static ITexture CreateJointTexture(IGraphicsDevice device, uint rows) =>
+		device.CreateTexture(new TextureDescriptor(JointPalette.Width, rows, TextureFormat.Rgba32Float, TextureUsage.TextureBinding | TextureUsage.CopyDst, Label: "Ion 3D joints"));
 
 	private static ulong ViewOffset(int frameSlot, int view, int viewSlots) => (ulong)((frameSlot * viewSlots + view) * ViewUniforms.SlotSize);
 
@@ -361,6 +416,8 @@ public sealed partial class Renderer3D
 			BindGroupEntry.ForSampler(2, _shadowSampler!),
 			BindGroupEntry.ForTexture(3, (environment ?? _blackCube!).DefaultView),
 			BindGroupEntry.ForSampler(4, _environmentSampler!),
+			BindGroupEntry.ForTexture(5, _jointTexture!.DefaultView),
+			BindGroupEntry.ForSampler(6, _jointSampler!),
 		], "Ion 3D view"));
 		_viewGroups[index] = group;
 		return group;
@@ -372,7 +429,11 @@ public sealed partial class Renderer3D
 		var index = device.FrameIndex;
 		if (_shadowGroups[index] is { } group) return group;
 		group = device.CreateBindGroup(new BindGroupDescriptor(_shadowViewLayout!,
-			[BindGroupEntry.ForBuffer(0, _viewBuffer!, ViewOffset(device.FrameIndex, _views.Length), ViewUniforms.SlotSize)], "Ion 3D shadow view"));
+		[
+			BindGroupEntry.ForBuffer(0, _viewBuffer!, ViewOffset(device.FrameIndex, _views.Length), ViewUniforms.SlotSize),
+			BindGroupEntry.ForTexture(5, _jointTexture!.DefaultView),
+			BindGroupEntry.ForSampler(6, _jointSampler!),
+		], "Ion 3D shadow view"));
 		_shadowGroups[index] = group;
 		return group;
 	}
@@ -388,20 +449,24 @@ public sealed partial class Renderer3D
 
 	// Pipelines.
 
-	internal IRenderPipeline MainPipeline(MaterialSlot material, TextureFormat format, bool afterPrepass)
+	/// <summary>
+	/// The main-pass pipeline of a material. A skinned one uses the built-in skinning vertex stage (a custom material
+	/// shader's own vertex stage applies to rigid draws only) with the material's fragment stage.
+	/// </summary>
+	internal IRenderPipeline MainPipeline(MaterialSlot material, TextureFormat format, bool afterPrepass, bool skinned = false)
 	{
 		afterPrepass &= material.AlphaMode == AlphaMode.Opaque;
-		if (material.CachedPipeline is { } cached && material.CachedFormat == format && material.CachedAfterPrepass == afterPrepass) return cached;
-		var key = new PipelineKey(material.Shader, material.AlphaMode, material.DoubleSided, afterPrepass ? PipelineKind.MainAfterPrepass : PipelineKind.Main, format);
+		if (material.CachedPipeline is { } cached && material.CachedFormat == format && material.CachedAfterPrepass == afterPrepass && material.CachedSkinned == skinned) return cached;
+		var key = new PipelineKey(material.Shader, material.AlphaMode, material.DoubleSided, afterPrepass ? PipelineKind.MainAfterPrepass : PipelineKind.Main, format, skinned);
 		if (!_pipelines.TryGetValue(key, out var pipeline))
 		{
 			var shader = _shaders[material.Shader]!;
 			var blend = material.AlphaMode == AlphaMode.Blend;
 			pipeline = Device!.CreateRenderPipeline(new RenderPipelineDescriptor
 			{
-				Label = $"Ion 3D {shader.Name} {material.AlphaMode}{(material.DoubleSided ? " double-sided" : "")}{(afterPrepass ? " after prepass" : "")}",
+				Label = $"Ion 3D {shader.Name} {material.AlphaMode}{(material.DoubleSided ? " double-sided" : "")}{(afterPrepass ? " after prepass" : "")}{(skinned ? " skinned" : "")}",
 				Layout = shader.PipelineLayout!,
-				Vertex = new VertexState(shader.Vertex ?? _meshVertex!, MeshBuffers),
+				Vertex = skinned ? new VertexState(_skinnedVertex!, SkinnedMeshBuffers) : new VertexState(shader.Vertex ?? _meshVertex!, MeshBuffers),
 				Fragment = new FragmentState(shader.Fragment!, [new ColorTargetState(format, blend ? BlendState.AlphaBlend : null)]),
 				Primitive = new PrimitiveState { CullMode = material.DoubleSided ? CullMode.None : CullMode.Back },
 				DepthStencil = new DepthStencilState(DepthFormat, DepthWriteEnabled: !blend && !afterPrepass, afterPrepass ? CompareFunction.LessEqual : CompareFunction.Less),
@@ -412,18 +477,19 @@ public sealed partial class Renderer3D
 		material.CachedPipeline = pipeline;
 		material.CachedFormat = format;
 		material.CachedAfterPrepass = afterPrepass;
+		material.CachedSkinned = skinned;
 		return pipeline;
 	}
 
-	internal IRenderPipeline DepthPipeline(bool shadow)
+	internal IRenderPipeline DepthPipeline(bool shadow, bool skinned = false)
 	{
-		var key = new PipelineKey(0, AlphaMode.Opaque, false, shadow ? PipelineKind.ShadowDepth : PipelineKind.PrepassDepth, TextureFormat.Undefined);
+		var key = new PipelineKey(0, AlphaMode.Opaque, false, shadow ? PipelineKind.ShadowDepth : PipelineKind.PrepassDepth, TextureFormat.Undefined, skinned);
 		if (_pipelines.TryGetValue(key, out var pipeline)) return pipeline;
 		pipeline = Device!.CreateRenderPipeline(new RenderPipelineDescriptor
 		{
-			Label = shadow ? "Ion 3D shadow depth" : "Ion 3D depth prepass",
+			Label = (shadow ? "Ion 3D shadow depth" : "Ion 3D depth prepass") + (skinned ? " skinned" : ""),
 			Layout = shadow ? _shadowPipelineLayout! : _viewOnlyPipelineLayout!,
-			Vertex = new VertexState(_depthVertex!, DepthBuffers),
+			Vertex = skinned ? new VertexState(_skinnedDepthVertex!, SkinnedDepthBuffers) : new VertexState(_depthVertex!, DepthBuffers),
 			// Shadows: no culling (thin and open meshes cast too; the bias handles acne). Prepass: back faces culled.
 			Primitive = new PrimitiveState { CullMode = shadow ? CullMode.None : CullMode.Back },
 			DepthStencil = new DepthStencilState(DepthFormat, true, CompareFunction.Less),
@@ -483,6 +549,30 @@ public sealed partial class Renderer3D
 		]),
 	];
 
+	/// <summary>The skinning stream of a skinned mesh (slot 2): four joints (unorm16, scaled back to indices) and four weights.</summary>
+	private static readonly VertexBufferLayout SkinBuffer = new(SkinVertex.Size, VertexStepMode.Vertex,
+	[
+		new VertexAttribute(VertexFormat.Unorm16x4, 0, 12),
+		new VertexAttribute(VertexFormat.Float32x4, 8, 13),
+	]);
+
+	/// <summary>The vertex buffer layouts of skinned draws: <see cref="MeshBuffers"/> and the skinning stream.</summary>
+	internal static readonly VertexBufferLayout[] SkinnedMeshBuffers = [MeshBuffers[0], MeshBuffers[1], SkinBuffer];
+
+	/// <summary>The vertex buffer layouts of skinned depth-only draws: the position, the world matrix, the palette offset (the second normal row's w) and the skinning stream.</summary>
+	internal static readonly VertexBufferLayout[] SkinnedDepthBuffers =
+	[
+		DepthBuffers[0],
+		new VertexBufferLayout(InstanceData.Size, VertexStepMode.Instance,
+		[
+			new VertexAttribute(VertexFormat.Float32x4, 0, 6),
+			new VertexAttribute(VertexFormat.Float32x4, 16, 7),
+			new VertexAttribute(VertexFormat.Float32x4, 32, 8),
+			new VertexAttribute(VertexFormat.Float32x4, 64, 10),
+		]),
+		SkinBuffer,
+	];
+
 	// Drawing (called by the passes).
 
 	internal MeshSlot? Mesh(int id) => (uint)id < (uint)_meshes.Count ? _meshes[id] : null;
@@ -522,12 +612,16 @@ public sealed partial class Renderer3D
 		_blackCube?.Dispose();
 		_shadowSampler?.Dispose();
 		_environmentSampler?.Dispose();
+		_jointSampler?.Dispose();
+		_jointTexture?.Dispose();
 		_viewOnlyPipelineLayout?.Dispose();
 		_shadowPipelineLayout?.Dispose();
 		_viewLayout?.Dispose();
 		_shadowViewLayout?.Dispose();
 		_meshVertex?.Dispose();
 		_depthVertex?.Dispose();
+		_skinnedVertex?.Dispose();
+		_skinnedDepthVertex?.Dispose();
 		_skyboxVertex?.Dispose();
 		_skyboxFragment?.Dispose();
 		_unlitFragment?.Dispose();
@@ -547,5 +641,5 @@ public sealed partial class Renderer3D
 	}
 
 	[StructLayout(LayoutKind.Auto)]
-	private readonly record struct PipelineKey(int Shader, AlphaMode Alpha, bool DoubleSided, PipelineKind Kind, TextureFormat Color);
+	private readonly record struct PipelineKey(int Shader, AlphaMode Alpha, bool DoubleSided, PipelineKind Kind, TextureFormat Color, bool Skinned = false);
 }

@@ -196,8 +196,12 @@ Converted on load:
 **Not supported** (a clear `InvalidDataException`): glTF 1.0, sparse accessors, and any *required* extension other than
 the two above (for example Draco or meshopt compression, texture transforms).
 
-**Ignored**: skins, animations, morph targets, cameras, lights, and sampler objects (every material uses one trilinear,
-repeating sampler).
+**Ignored**: morph targets, cameras, lights, animation of nodes that are not joints, and sampler objects (every material
+uses one trilinear, repeating sampler).
+
+**Skins and animations** are imported as `model.Skins` (one `Skeleton` per skin) and `model.Animations` (one
+`AnimationClip` per animation), and skinned primitives carry their skin's index in `ModelPrimitive.Skin`. See
+[Skinned meshes and animation](/Ion/rendering/3d/animation/).
 
 :::tip
 Convert models that need unsupported features with a tool such as Blender or `gltf-transform` (for example to remove

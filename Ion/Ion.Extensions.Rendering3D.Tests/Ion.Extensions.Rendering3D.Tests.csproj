@@ -33,6 +33,8 @@
     <None Include="Golden\*.png" CopyToOutputDirectory="PreserveNewest" />
     <!-- The model sample's glTF asset (Microsoft's CC0 Avocado), parsed by the loader tests. -->
     <None Include="..\..\Ion.Examples\Ion.Examples.Model\Assets\Avocado\*" Link="Assets\Avocado\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The puppet sample's skinned character (written by its tools/make_puppet.py), parsed by the skinning tests. -->
+    <None Include="..\..\Ion.Examples\Ion.Examples.Puppet\Assets\puppet.gltf" Link="Assets\puppet.gltf" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <!-- A custom material shader for the extension point test. -->

@@ -15,7 +15,7 @@ public static class EcsBuilderExtensions
 	/// Registers the ECS module: <see cref="EcsWorlds"/>, and <see cref="World"/>, <see cref="Commands"/> and
 	/// <see cref="NameRegistry"/> resolved per scope (the root provider gets the root world; each scene scope its own,
 	/// disposed with the scene), the built-in systems (<see cref="EcsCommandsSystem"/>, <see cref="TransformPropagationSystem"/>,
-	/// <see cref="SpriteAnimationSystem"/>, registered as transients so the root schedule and each scene get instances
+	/// <see cref="SpriteAnimationSystem"/>, <see cref="SkeletalAnimationSystem"/>, registered as transients so the root schedule and each scene get instances
 	/// bound to their own world) and <see cref="FrameStats.Entities"/>. Add the systems with
 	/// <see cref="UseEcs(IIonApplication)"/> (and <see cref="UseEcs(ISceneBuilder)"/> in scenes that use ECS), and the world
 	/// serializers with <see cref="AddEcsSerialization(IServiceCollection, Action{ComponentSerializerRegistry})"/>.
@@ -34,6 +34,7 @@ public static class EcsBuilderExtensions
 		services.TryAddTransient(static sp => new EcsCommandsSystem(sp.GetRequiredService<Commands>()));
 		services.TryAddTransient(static sp => new TransformPropagationSystem(sp.GetRequiredService<World>()));
 		services.TryAddTransient(static _ => new SpriteAnimationSystem());
+		services.TryAddTransient(static _ => new SkeletalAnimationSystem());
 		services.TryAddTransient(static sp => new SpatialAudioSystem(sp.GetRequiredService<World>(), sp));
 
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IFrameStatsSource, EcsStatsSource>(static sp => new EcsStatsSource(sp.GetRequiredService<EcsWorlds>())));
@@ -98,7 +99,7 @@ public static class EcsBuilderExtensions
 	/// <summary>
 	/// Adds the ECS systems to the root schedule (for the root world): commands played back at the end of every stage
 	/// (<see cref="StageOrder.Ecs"/>), transform propagation (<see cref="StageOrder.TransformPropagation"/> in Last and
-	/// Render) and sprite animation (<see cref="StageOrder.SpriteAnimation"/> in Update).
+	/// Render), and sprite and skeletal animation (<see cref="StageOrder.SpriteAnimation"/> in Update).
 	/// </summary>
 	public static IIonApplication UseEcs(this IIonApplication app)
 	{
@@ -106,7 +107,8 @@ public static class EcsBuilderExtensions
 		return app
 			.UseSystem<EcsCommandsSystem>()
 			.UseSystem<TransformPropagationSystem>()
-			.UseSystem<SpriteAnimationSystem>();
+			.UseSystem<SpriteAnimationSystem>()
+			.UseSystem<SkeletalAnimationSystem>();
 	}
 
 	/// <summary>
@@ -133,6 +135,7 @@ public static class EcsBuilderExtensions
 		return scene
 			.UseSystem<EcsCommandsSystem>()
 			.UseSystem<TransformPropagationSystem>()
-			.UseSystem<SpriteAnimationSystem>();
+			.UseSystem<SpriteAnimationSystem>()
+			.UseSystem<SkeletalAnimationSystem>();
 	}
 }

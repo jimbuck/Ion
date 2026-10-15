@@ -57,7 +57,7 @@ internal sealed class PassSet
 		{
 			var materialSlot = renderer.Material(batch.Material);
 			if (target.IsValid && Array.IndexOf(materialSlot.Textures, target) >= 0) continue;
-			var next = renderer.MainPipeline(materialSlot, format, afterPrepass);
+			var next = renderer.MainPipeline(materialSlot, format, afterPrepass, batch.Skinned);
 			if (!ReferenceEquals(next, pipeline))
 			{
 				pass.SetPipeline(next);
@@ -78,6 +78,7 @@ internal sealed class PassSet
 				mesh = batch.Mesh;
 			}
 
+			if (batch.Skinned) pass.SetVertexBuffer(2, meshSlot!.Skin!);
 			pass.SetVertexBuffer(1, instances, (ulong)batch.FirstInstance * InstanceData.Size);
 			foreach (var sub in meshSlot!.SubMeshes)
 			{
@@ -86,14 +87,22 @@ internal sealed class PassSet
 		}
 	}
 
-	/// <summary>Draws batches with the depth-only pipeline already set (materials ignored; only opaque ones when <paramref name="opaqueOnly"/>).</summary>
-	public static void DrawDepthBatches(Renderer3D renderer, IRenderPassEncoder pass, ReadOnlySpan<Batch> batches, IBuffer instances, bool opaqueOnly)
+	/// <summary>Draws batches depth only (materials ignored; only opaque ones when <paramref name="opaqueOnly"/>), switching between the rigid and skinned depth pipelines.</summary>
+	public static void DrawDepthBatches(Renderer3D renderer, IRenderPassEncoder pass, ReadOnlySpan<Batch> batches, IBuffer instances, bool opaqueOnly, bool shadow)
 	{
 		var mesh = -1;
 		MeshSlot? meshSlot = null;
+		IRenderPipeline? pipeline = null;
 		foreach (ref readonly var batch in batches)
 		{
 			if (opaqueOnly && renderer.Material(batch.Material).AlphaMode != AlphaMode.Opaque) continue;
+			var next = renderer.DepthPipeline(shadow, batch.Skinned);
+			if (!ReferenceEquals(next, pipeline))
+			{
+				pass.SetPipeline(next);
+				pipeline = next;
+			}
+
 			if (batch.Mesh != mesh)
 			{
 				meshSlot = renderer.Mesh(batch.Mesh)!;
@@ -102,6 +111,7 @@ internal sealed class PassSet
 				mesh = batch.Mesh;
 			}
 
+			if (batch.Skinned) pass.SetVertexBuffer(2, meshSlot!.Skin!);
 			pass.SetVertexBuffer(1, instances, (ulong)batch.FirstInstance * InstanceData.Size);
 			foreach (var sub in meshSlot!.SubMeshes)
 			{
@@ -129,9 +139,8 @@ internal sealed class ShadowPass(Renderer3D renderer) : RenderGraphPass("Shadow"
 	{
 		var target = context.GetTexture(Target);
 		var pass = context.Encoder.BeginRenderPass(new RenderPassDescriptor([], new RenderPassDepthStencilAttachment(target.DefaultView, LoadOp.Clear, StoreOp.Store, 1f), "Ion 3D shadow"));
-		pass.SetPipeline(renderer.DepthPipeline(shadow: true));
 		pass.SetBindGroup(0, renderer.ShadowGroup());
-		PassSet.DrawDepthBatches(renderer, pass, renderer.ShadowBatches, renderer.PassInstances, opaqueOnly: false);
+		PassSet.DrawDepthBatches(renderer, pass, renderer.ShadowBatches, renderer.PassInstances, opaqueOnly: false, shadow: true);
 		pass.End();
 	}
 }
@@ -151,9 +160,8 @@ internal sealed class DepthPrepass(Renderer3D renderer, int view) : RenderGraphP
 		var depth = context.GetTexture(_depth);
 		var pass = context.Encoder.BeginRenderPass(new RenderPassDescriptor([], new RenderPassDepthStencilAttachment(depth.DefaultView, LoadOp.Clear, StoreOp.Store, 1f), "Ion 3D depth prepass"));
 		PassSet.SetViewport(pass, data);
-		pass.SetPipeline(renderer.DepthPipeline(shadow: false));
 		pass.SetBindGroup(0, renderer.ViewGroup(view));
-		PassSet.DrawDepthBatches(renderer, pass, data.Opaque.Span, renderer.PassInstances, opaqueOnly: true);
+		PassSet.DrawDepthBatches(renderer, pass, data.Opaque.Span, renderer.PassInstances, opaqueOnly: true, shadow: false);
 		pass.End();
 	}
 }

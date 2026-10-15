@@ -177,6 +177,8 @@ written as its saved position and resolved on load.
 
 - Computed components (`GlobalTransform2D`, `GlobalTransform`, `Aabb2D`): the propagation recomputes them after a load.
 - `Sprite`: it holds a texture. Register your own codec that saves the asset path if you need it.
+- `Animator` and `SkinnedMesh`: they hold an animation player and an entity reference. Respawn skinned models after a
+  load.
 - Any component without a registration: skipped silently on save.
 
 ### 3D components and renderer handles

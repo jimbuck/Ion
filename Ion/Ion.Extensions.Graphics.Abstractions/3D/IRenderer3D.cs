@@ -31,6 +31,15 @@ public interface IMeshBatch
 	/// <summary>Draws <paramref name="renderer"/>'s mesh with its material at <paramref name="world"/> in every camera whose culling mask includes its layers.</summary>
 	void Submit(in MeshRenderer renderer, in Matrix4x4 world);
 
+	/// <summary>
+	/// Draws a skinned mesh posed by <paramref name="joints"/>, its skinning palette in the space <paramref name="world"/>
+	/// places (one matrix per joint of its skeleton, <see cref="AnimationPlayer.SkinningMatrices"/>): every vertex is
+	/// moved by its four joints' matrices blended by its weights, then by <paramref name="world"/>. The palette is copied.
+	/// A mesh without skinning data, or an empty palette, is drawn as <see cref="Submit(in MeshRenderer, in Matrix4x4)"/>
+	/// draws it (which is also what a batch without skinning support does).
+	/// </summary>
+	void Submit(in MeshRenderer renderer, in Matrix4x4 world, ReadOnlySpan<Matrix4x4> joints) => Submit(renderer, world);
+
 	/// <summary>Draws <paramref name="mesh"/> with <paramref name="material"/> at <paramref name="world"/> (casting and receiving shadows, layer 1).</summary>
 	void Draw(MeshHandle mesh, MaterialHandle material, in Matrix4x4 world);
 
@@ -116,7 +125,8 @@ public interface IRenderer3D : IMeshBatch
 /// <summary>One mesh of a model node, drawn with its material.</summary>
 /// <param name="Mesh">The mesh.</param>
 /// <param name="Material">The material.</param>
-public readonly record struct ModelPrimitive(MeshHandle Mesh, MaterialHandle Material);
+/// <param name="Skin">The index of the skeleton in <see cref="IModel.Skins"/> that moves the mesh, or -1 for a rigid mesh.</param>
+public readonly record struct ModelPrimitive(MeshHandle Mesh, MaterialHandle Material, int Skin = -1);
 
 /// <summary>A node of a model's hierarchy.</summary>
 public sealed class ModelNode
@@ -208,6 +218,29 @@ public interface IModel : IAsset
 
 	/// <summary>The bounds of the whole model in model space (every node's meshes at their model matrices).</summary>
 	Aabb Bounds { get; }
+
+	/// <summary>
+	/// The skeletons of the model's skinned meshes (glTF skins), referenced by <see cref="ModelPrimitive.Skin"/>. A skinned
+	/// primitive is posed in model space: draw it at the model's world matrix, not its node's.
+	/// </summary>
+	IReadOnlyList<Skeleton> Skins => [];
+
+	/// <summary>The animation clips (glTF animations); a clip's channels index the joints of one of <see cref="Skins"/> (<see cref="SkinOf"/> says which).</summary>
+	IReadOnlyList<AnimationClip> Animations => [];
+
+	/// <summary>The index in <see cref="Skins"/> of the skeleton <paramref name="clip"/> animates, or -1.</summary>
+	int SkinOf(AnimationClip clip) => -1;
+
+	/// <summary>The animation named <paramref name="name"/>, or null.</summary>
+	AnimationClip? FindAnimation(string name)
+	{
+		foreach (var clip in Animations)
+		{
+			if (clip.Name == name) return clip;
+		}
+
+		return null;
+	}
 }
 
 /// <summary>A cube map texture loaded from six images (<c>Load&lt;ICubemap&gt;("skybox")</c>), for skyboxes and ambient light.</summary>
@@ -240,5 +273,51 @@ public static class ModelExtensions
 				batch.Submit(renderer, matrix);
 			}
 		}
+	}
+
+	/// <summary>
+	/// Submits every primitive of <paramref name="model"/> placed at <paramref name="world"/>, its skinned primitives posed
+	/// by <paramref name="players"/> (one per skin of <see cref="IModel.Skins"/>, in order; a missing or null player draws
+	/// that skin's meshes at the rest pose).
+	/// </summary>
+	public static void Draw(this IMeshBatch batch, IModel model, in Matrix4x4 world, ReadOnlySpan<AnimationPlayer?> players, bool castShadows = true, bool receiveShadows = true, uint layerMask = 1)
+	{
+		ArgumentNullException.ThrowIfNull(batch);
+		ArgumentNullException.ThrowIfNull(model);
+		var nodes = model.Nodes;
+		for (var i = 0; i < nodes.Count; i++)
+		{
+			var node = nodes[i];
+			if (node.Primitives.Length == 0) continue;
+			var matrix = node.ModelMatrix * world;
+			foreach (var primitive in node.Primitives)
+			{
+				var renderer = new MeshRenderer(primitive.Mesh, primitive.Material) { CastShadows = castShadows, ReceiveShadows = receiveShadows, LayerMask = layerMask };
+				if (primitive.Skin < 0)
+				{
+					batch.Submit(renderer, matrix);
+					continue;
+				}
+
+				var player = (uint)primitive.Skin < (uint)players.Length ? players[primitive.Skin] : null;
+				batch.Submit(renderer, world, player is null ? RestPalette(model.Skins[primitive.Skin]) : player.SkinningMatrices);
+			}
+		}
+
+		static Matrix4x4[] RestPalette(Skeleton skeleton)
+		{
+			var model = new Matrix4x4[skeleton.JointCount];
+			var palette = new Matrix4x4[skeleton.JointCount];
+			skeleton.ComputeModelMatrices(skeleton.CreateRestPose(), model);
+			skeleton.ComputeSkinningMatrices(model, palette);
+			return palette;
+		}
+	}
+
+	/// <summary>Submits <paramref name="model"/> with one player for its first skin (see the overload taking players).</summary>
+	public static void Draw(this IMeshBatch batch, IModel model, in Matrix4x4 world, AnimationPlayer player, bool castShadows = true, bool receiveShadows = true, uint layerMask = 1)
+	{
+		ReadOnlySpan<AnimationPlayer?> players = [player];
+		Draw(batch, model, world, players, castShadows, receiveShadows, layerMask);
 	}
 }

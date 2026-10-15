@@ -44,6 +44,13 @@ internal readonly record struct PendingModel(IModel Model, ModelSpawnOptions Opt
 /// per primitive (identity transform, one <see cref="MeshRenderer"/> each), since an entity holds one mesh renderer.
 /// </summary>
 /// <remarks>
+/// A skinned model (one with <see cref="IModel.Skins"/>) gets an <see cref="Animator"/> per skin, the first on the root
+/// entity and any others on child entities of the root, each with a player at the rest pose; its skinned primitives get
+/// a <see cref="SkinnedMesh"/> pointing at their skin's animator. Play a clip with
+/// <c>world.Get&lt;Animator&gt;(root).Player.Play(model.Animations[0])</c>. The joints' node entities are spawned like any
+/// node but the animation does not move them (read <see cref="AnimationPlayer.JointMatrices"/> to attach things to a joint).
+/// </remarks>
+/// <remarks>
 /// The entities are ordinary ECS entities: move the root to move the model, tag it <see cref="Hidden"/> with
 /// <see cref="Scene3DExtensions.SetHidden"/> (recursive) to hide it, and destroy it with
 /// <see cref="HierarchyExtensions.DestroyRecursive"/>. The model's meshes and materials stay owned by the model asset.
@@ -86,12 +93,29 @@ public static class ModelSpawnExtensions
 	{
 		if (options.Names && !string.IsNullOrEmpty(model.Name) && !world.Has<EntityName>(root)) world.Add(root, new EntityName(model.Name));
 
+		var skins = model.Skins;
+		var animators = new Entity[skins.Count];
+		for (var s = 0; s < skins.Count; s++)
+		{
+			if (s == 0)
+			{
+				animators[s] = root;
+			}
+			else
+			{
+				animators[s] = world.Create(Transform.Identity);
+				world.SetParent(animators[s], root);
+			}
+
+			world.Add(animators[s], new Animator(new AnimationPlayer(skins[s])));
+		}
+
 		var nodes = model.Nodes;
 		var spawned = new bool[nodes.Count];
-		foreach (var index in model.RootNodes) Spawn(world, root, nodes, spawned, index, options);
+		foreach (var index in model.RootNodes) Spawn(world, root, nodes, spawned, index, options, animators);
 	}
 
-	private static void Spawn(World world, Entity parent, IReadOnlyList<ModelNode> nodes, bool[] spawned, int index, in ModelSpawnOptions options)
+	private static void Spawn(World world, Entity parent, IReadOnlyList<ModelNode> nodes, bool[] spawned, int index, in ModelSpawnOptions options, Entity[] animators)
 	{
 		if ((uint)index >= (uint)nodes.Count || spawned[index]) return;
 		spawned[index] = true;
@@ -104,6 +128,7 @@ public static class ModelSpawnExtensions
 		if (primitives.Length == 1)
 		{
 			world.Add(entity, Renderer(primitives[0], options));
+			AddSkin(world, entity, primitives[0], animators);
 		}
 		else
 		{
@@ -111,10 +136,16 @@ public static class ModelSpawnExtensions
 			{
 				var child = world.Create(Transform.Identity, Renderer(primitive, options));
 				world.SetParent(child, entity);
+				AddSkin(world, child, primitive, animators);
 			}
 		}
 
-		foreach (var child in node.Children) Spawn(world, entity, nodes, spawned, child, options);
+		foreach (var child in node.Children) Spawn(world, entity, nodes, spawned, child, options, animators);
+	}
+
+	private static void AddSkin(World world, Entity entity, in ModelPrimitive primitive, Entity[] animators)
+	{
+		if ((uint)primitive.Skin < (uint)animators.Length) world.Add(entity, new SkinnedMesh(animators[primitive.Skin]));
 	}
 
 	private static MeshRenderer Renderer(in ModelPrimitive primitive, in ModelSpawnOptions options) => new(primitive.Mesh, primitive.Material)

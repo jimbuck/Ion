@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Skinned meshes and skeletal animation on the ECS module: a glTF character (Assets/puppet.gltf, written by
+    tools/make_puppet.py) spawned three times, playing, cross-fading and walking its Idle, Walk and Wave clips.
+    Options: - -Ion:Run:Frames=N and - -Ion:Run:Screenshot=puppet.png, - -Ion:Headless=true (no window; add
+    - -Ion:Headless:Render=true to render offscreen).
+    Publishes with NativeAOT: dotnet publish -c Release -r linux-x64 -p:PublishAot=true
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <Platforms>AnyCPU</Platforms>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="appsettings.json" />
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="tools\**\*" />
+    <!-- The HUD font (SIL Open Font License), shared with the Breakout ECS sample. -->
+    <Content Include="..\Ion.Examples.Breakout\Assets\Bungee-Regular.ttf" Link="Assets\Bungee-Regular.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations and expands its [Query] steps (reflection-free). -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
+  </ItemGroup>
+</Project>

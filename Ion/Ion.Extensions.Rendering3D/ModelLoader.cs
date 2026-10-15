@@ -15,8 +15,9 @@ namespace Ion.Extensions.Rendering3D;
 /// triangle primitive becomes a mesh, every material a <see cref="PbrMaterial"/> (or an <see cref="UnlitMaterial"/> with
 /// <c>KHR_materials_unlit</c>), every image a texture (decoded with ImageSharp like the 2D loader, straight alpha, full
 /// mip chain, through the 2D renderer's <see cref="TextureFactory"/> so the sprite batch can draw it too), and the node
-/// hierarchy of the default scene is kept. Without a GPU the geometry and materials are loaded and textures are
-/// placeholders.
+/// hierarchy of the default scene is kept. Every skin becomes a <see cref="Skeleton"/> (<see cref="IModel.Skins"/>) and
+/// every animation an <see cref="AnimationClip"/> of the skin whose joints it animates (<see cref="IModel.Animations"/>).
+/// Without a GPU the geometry and materials are loaded and textures are placeholders.
 /// </summary>
 internal sealed class ModelLoader(Renderer3D renderer, IPersistentStorage storage, TextureFactory? textures) : IAssetLoader<IModel>
 {
@@ -119,17 +120,21 @@ internal sealed class ModelLoader(Renderer3D renderer, IPersistentStorage storag
 
 		var meshes = new List<MeshHandle>();
 		var meshPrimitives = new List<ModelPrimitive[]>();
+		var meshSkinned = new List<bool[]>();
 		foreach (var mesh in document.Meshes)
 		{
 			var primitives = new ModelPrimitive[mesh.Count];
+			var skinned = new bool[mesh.Count];
 			for (var p = 0; p < mesh.Count; p++)
 			{
 				var handle = renderer.CreateMesh(mesh[p].Mesh);
 				meshes.Add(handle);
 				primitives[p] = new ModelPrimitive(handle, MaterialOf(mesh[p].Material));
+				skinned[p] = mesh[p].Mesh.IsSkinned;
 			}
 
 			meshPrimitives.Add(primitives);
+			meshSkinned.Add(skinned);
 		}
 
 		if (defaultMaterial is { } fallback) materials.Add(fallback);
@@ -166,6 +171,17 @@ internal sealed class ModelLoader(Renderer3D renderer, IPersistentStorage storag
 			if (!reachable[i]) continue;
 			var node = document.Nodes[i];
 			var primitives = node.Mesh >= 0 && node.Mesh < meshPrimitives.Count ? meshPrimitives[node.Mesh] : [];
+			if (node.Skin >= 0 && node.Skin < document.Skins.Count && primitives.Length > 0)
+			{
+				// The node's skinned primitives are moved by its skin (rigid ones stay at the node).
+				var skinned = meshSkinned[node.Mesh];
+				primitives = [.. primitives];
+				for (var p = 0; p < primitives.Length; p++)
+				{
+					if (skinned[p]) primitives[p] = primitives[p] with { Skin = node.Skin };
+				}
+			}
+
 			var parent = parents[i] >= 0 && reachable[parents[i]] ? remap[parents[i]] : -1;
 			nodes.Add(new ModelNode(node.Name, parent, node.Transform, primitives));
 		}
@@ -179,11 +195,90 @@ internal sealed class ModelLoader(Renderer3D renderer, IPersistentStorage storag
 		{
 			foreach (var primitive in node.Primitives)
 			{
-				bounds.Encapsulate(renderer.GetMeshInfo(primitive.Mesh).Bounds.Transform(node.ModelMatrix));
+				// A skinned mesh is posed in model space (its bind pose is where its vertices are).
+				var info = renderer.GetMeshInfo(primitive.Mesh).Bounds;
+				bounds.Encapsulate(primitive.Skin >= 0 ? info : info.Transform(node.ModelMatrix));
 			}
 		}
 
-		return new Model(renderer, name, nodes, roots, meshes, materials, textureHandles, owned, bounds);
+		var (skins, animations, skinOf) = CreateAnimation(document, parents);
+		return new Model(renderer, name, nodes, roots, meshes, materials, textureHandles, owned, bounds)
+		{
+			Skins = skins,
+			Animations = animations,
+			SkinIndex = skinOf,
+		};
+	}
+
+	/// <summary>
+	/// The skeletons of the skins and the clips of the animations. A skin's joints keep its order (the vertices' joint
+	/// indices); a joint's parent is its nearest ancestor among them, and the root joints hang under the model matrix of
+	/// the first root joint's parent node. An animation belongs to the skin with the most of its channels' nodes; channels
+	/// of other nodes are dropped, and an animation of no joint is skipped.
+	/// </summary>
+	private static (List<Skeleton> Skins, List<AnimationClip> Animations, Dictionary<AnimationClip, int> SkinOf) CreateAnimation(GltfDocument document, int[] parents)
+	{
+		var skins = new List<Skeleton>();
+		var jointMaps = new List<Dictionary<int, int>>();
+		var model = new Matrix4x4?[document.Nodes.Count];
+		Matrix4x4 ModelMatrix(int node)
+		{
+			if (model[node] is { } known) return known;
+			var local = document.Nodes[node].Transform.ToMatrix();
+			var result = parents[node] >= 0 ? local * ModelMatrix(parents[node]) : local;
+			model[node] = result;
+			return result;
+		}
+
+		foreach (var skin in document.Skins)
+		{
+			var map = new Dictionary<int, int>();
+			for (var j = 0; j < skin.Joints.Length; j++) map.TryAdd(skin.Joints[j], j);
+			var joints = new SkeletonJoint[skin.Joints.Length];
+			Matrix4x4? root = null;
+			for (var j = 0; j < joints.Length; j++)
+			{
+				var node = skin.Joints[j];
+				var parent = -1;
+				for (var up = parents[node]; up >= 0; up = parents[up])
+				{
+					if (map.TryGetValue(up, out var p)) { parent = p; break; }
+				}
+
+				if (parent < 0 && root is null) root = parents[node] >= 0 ? ModelMatrix(parents[node]) : Matrix4x4.Identity;
+				joints[j] = new SkeletonJoint(document.Nodes[node].Name, parent, document.Nodes[node].Transform, skin.InverseBind[j]);
+			}
+
+			skins.Add(new Skeleton(skin.Name, joints, root));
+			jointMaps.Add(map);
+		}
+
+		var animations = new List<AnimationClip>();
+		var skinOf = new Dictionary<AnimationClip, int>();
+		foreach (var animation in document.Animations)
+		{
+			var best = -1;
+			var bestCount = 0;
+			for (var s = 0; s < jointMaps.Count; s++)
+			{
+				var count = 0;
+				foreach (var channel in animation.Channels) if (jointMaps[s].ContainsKey(channel.Node)) count++;
+				if (count > bestCount) (best, bestCount) = (s, count);
+			}
+
+			if (best < 0) continue;
+			var channels = new List<AnimationChannel>();
+			foreach (var channel in animation.Channels)
+			{
+				if (jointMaps[best].TryGetValue(channel.Node, out var joint)) channels.Add(new AnimationChannel(joint, channel.Path, channel.Interpolation, channel.Times, channel.Values));
+			}
+
+			var clip = new AnimationClip(animation.Name, channels);
+			animations.Add(clip);
+			skinOf[clip] = best;
+		}
+
+		return (skins, animations, skinOf);
 	}
 
 	private static byte[] ReadAll(Stream stream)
@@ -215,6 +310,14 @@ internal sealed class Model(Renderer3D renderer, string name, List<ModelNode> no
 	public IReadOnlyList<TextureHandle> Textures { get; } = textures;
 
 	public Aabb Bounds { get; } = bounds;
+
+	public IReadOnlyList<Skeleton> Skins { get; init; } = [];
+
+	public IReadOnlyList<AnimationClip> Animations { get; init; } = [];
+
+	internal Dictionary<AnimationClip, int> SkinIndex { get; init; } = [];
+
+	public int SkinOf(AnimationClip clip) => SkinIndex.TryGetValue(clip, out var skin) ? skin : -1;
 
 	public void Dispose()
 	{

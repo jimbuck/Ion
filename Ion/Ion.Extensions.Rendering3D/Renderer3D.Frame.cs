@@ -16,6 +16,8 @@ public sealed partial class Renderer3D
 	private GrowableArray<LocalLightEntry> _local = new(16);
 	private GrowableArray<InstanceData> _instances = new(1024);
 	private GrowableArray<Batch> _shadowBatches = new(64);
+	private GrowableArray<SkinEntry> _skins = new(16);
+	private GrowableArray<Vector4> _palette = new(JointPalette.Width);
 	private readonly ViewData[] _views;
 	private int _viewCount;
 	private Aabb[] _worldBounds = new Aabb[1024];
@@ -49,6 +51,15 @@ public sealed partial class Renderer3D
 	/// <summary>The instance data of the last frame, in batch order.</summary>
 	internal ReadOnlySpan<InstanceData> Instances => _instances.Span;
 
+	/// <summary>The joint palette rows of the last frame (three per joint).</summary>
+	internal ReadOnlySpan<Vector4> PaletteRows => _palette.Span;
+
+	/// <summary>The skinned submissions of the last frame.</summary>
+	internal ReadOnlySpan<SkinEntry> Skins => _skins.Span;
+
+	/// <summary>The world-space bounds of the last frame's objects, in submission order.</summary>
+	internal ReadOnlySpan<Aabb> WorldBounds => _worldBounds.AsSpan(0, _objects.Count);
+
 	/// <summary>The shadow batches of the last frame.</summary>
 	internal ReadOnlySpan<Batch> ShadowBatches => _shadowBatches.Span;
 
@@ -71,6 +82,8 @@ public sealed partial class Renderer3D
 		_cameras.Clear();
 		_directional.Clear();
 		_local.Clear();
+		_skins.Clear();
+		_palette.Clear();
 	}
 
 	/// <summary>
@@ -116,7 +129,7 @@ public sealed partial class Renderer3D
 		{
 			ref readonly var o = ref objects[i];
 			var mesh = (uint)o.Mesh < (uint)meshes.Length ? meshes[o.Mesh] : null;
-			bounds[i] = mesh is null ? Aabb.Empty : mesh.Bounds.Transform(o.World);
+			bounds[i] = mesh is null ? Aabb.Empty : (o.Skin >= 0 ? _skins.Items[o.Skin].Bounds : mesh.Bounds).Transform(o.World);
 		}
 
 		PrepareViews();
@@ -321,7 +334,8 @@ public sealed partial class Renderer3D
 		{
 			var i = _casters[c];
 			if (!lightFrustum.Intersects(_casterBounds[c])) continue;
-			_keys[count] = (ulong)(uint)_objects.Items[i].Mesh << 32 | (uint)i;
+			ref readonly var caster = ref _objects.Items[i];
+			_keys[count] = (caster.Skin >= 0 ? 1UL << 63 : 0) | (ulong)(uint)caster.Mesh << 32 | (uint)i;
 			count++;
 		}
 
@@ -329,21 +343,25 @@ public sealed partial class Renderer3D
 		keys.Sort();
 		var objects = _objects.Items;
 		var lastMesh = -1;
+		var lastSkinned = false;
 		for (var k = 0; k < keys.Length; k++)
 		{
 			var i = (int)(uint)keys[k];
 			ref readonly var o = ref objects[i];
-			if (o.Mesh != lastMesh)
+			var skinned = o.Skin >= 0;
+			if (o.Mesh != lastMesh || skinned != lastSkinned)
 			{
 				ref var batch = ref _shadowBatches.Add();
 				batch.Mesh = o.Mesh;
 				batch.Material = 0;
 				batch.FirstInstance = _instances.Count;
 				batch.InstanceCount = 0;
+				batch.Skinned = skinned;
 				lastMesh = o.Mesh;
+				lastSkinned = skinned;
 			}
 
-			InstanceData.Write(ref _instances.Add(), o.World, 0);
+			InstanceData.Write(ref _instances.Add(), o.World, 0, skinned ? _skins.Items[o.Skin].Palette : 0);
 			_shadowBatches.Items[_shadowBatches.Count - 1].InstanceCount++;
 		}
 
@@ -394,12 +412,12 @@ public sealed partial class Renderer3D
 					Array.Resize(ref _transparentItems, transparent * 2);
 				}
 
-				_transparentKeys[transparent] = TransparentKey(depth, material.PipelineSortId, materialId, o.Mesh);
+				_transparentKeys[transparent] = TransparentKey(depth, material.PipelineSortId, materialId, o.Mesh, o.Skin >= 0);
 				_transparentItems[transparent++] = i;
 			}
 			else
 			{
-				keys[opaque] = OpaqueKey(depth, material.PipelineSortId, materialId, o.Mesh);
+				keys[opaque] = OpaqueKey(depth, material.PipelineSortId, materialId, o.Mesh, o.Skin >= 0);
 				items[opaque++] = i;
 			}
 		}
@@ -416,43 +434,49 @@ public sealed partial class Renderer3D
 
 	/// <summary>
 	/// The sort key of an opaque or masked draw: bins by pipeline (shader, alpha mode, culling), then material, then mesh,
-	/// and front to back inside a bin (24 bits of view depth).
+	/// then skinned or rigid, and front to back inside a bin (23 bits of view depth).
 	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal static ulong OpaqueKey(float depth, int pipeline, int material, int mesh) =>
-		((ulong)(uint)(pipeline & 0xFF) << 56) | ((ulong)(uint)(material & 0xFFFF) << 40) | ((ulong)(uint)(mesh & 0xFFFF) << 24) | (ulong)(uint)(depth * 0xFFFFFF);
+	internal static ulong OpaqueKey(float depth, int pipeline, int material, int mesh, bool skinned = false) =>
+		((ulong)(uint)(pipeline & 0xFF) << 56) | ((ulong)(uint)(material & 0xFFFF) << 40) | ((ulong)(uint)(mesh & 0xFFFF) << 24)
+		| (skinned ? 1UL << 23 : 0) | (ulong)(uint)(depth * 0x7FFFFF);
 
 	/// <summary>
-	/// The sort key of a blended draw: back to front first (32 bits of inverted view depth), then pipeline, material and
-	/// mesh so that equal neighbours still batch.
+	/// The sort key of a blended draw: back to front first (32 bits of inverted view depth), then pipeline, material, mesh
+	/// and skinned or rigid so that equal neighbours still batch.
 	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal static ulong TransparentKey(float depth, int pipeline, int material, int mesh) =>
-		((ulong)(uint.MaxValue - (uint)(depth * (double)uint.MaxValue)) << 32) | ((ulong)(uint)(pipeline & 0xFF) << 24) | ((ulong)(uint)(material & 0xFFF) << 12) | (ulong)(uint)(mesh & 0xFFF);
+	internal static ulong TransparentKey(float depth, int pipeline, int material, int mesh, bool skinned = false) =>
+		((ulong)(uint.MaxValue - (uint)(depth * (double)uint.MaxValue)) << 32) | ((ulong)(uint)(pipeline & 0xFF) << 24) | ((ulong)(uint)(material & 0xFFF) << 12)
+		| ((ulong)(uint)(mesh & 0x7FF) << 1) | (skinned ? 1UL : 0);
 
 	private void BuildBatches(ref GrowableArray<Batch> batches, ReadOnlySpan<int> items, Span<MaterialSlot?> materials)
 	{
 		var objects = _objects.Items;
 		var lastMesh = -1;
 		var lastMaterial = -1;
+		var lastSkinned = false;
 		var current = -1;
 		foreach (var i in items)
 		{
 			ref readonly var o = ref objects[i];
 			var material = ResolveMaterialId(materials, o.Material);
-			if (o.Mesh != lastMesh || material != lastMaterial)
+			var skinned = o.Skin >= 0;
+			if (o.Mesh != lastMesh || material != lastMaterial || skinned != lastSkinned)
 			{
 				ref var batch = ref batches.Add();
 				batch.Mesh = o.Mesh;
 				batch.Material = material;
 				batch.FirstInstance = _instances.Count;
 				batch.InstanceCount = 0;
+				batch.Skinned = skinned;
 				lastMesh = o.Mesh;
 				lastMaterial = material;
+				lastSkinned = skinned;
 				current = batches.Count - 1;
 			}
 
-			InstanceData.Write(ref _instances.Add(), o.World, o.ReceiveShadows ? InstanceData.ReceiveShadows : 0);
+			InstanceData.Write(ref _instances.Add(), o.World, o.ReceiveShadows ? InstanceData.ReceiveShadows : 0, skinned ? _skins.Items[o.Skin].Palette : 0);
 			batches.Items[current].InstanceCount++;
 		}
 	}

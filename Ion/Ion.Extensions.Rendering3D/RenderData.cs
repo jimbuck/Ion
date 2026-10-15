@@ -14,6 +14,9 @@ internal sealed class MeshSlot
 	public required string Name;
 	public IBuffer? Vertices;
 	public IBuffer? Indices;
+
+	/// <summary>The skinning stream (<see cref="SkinVertex"/>, vertex slot 2) of a skinned mesh.</summary>
+	public IBuffer? Skin;
 	public required SubMesh[] SubMeshes;
 	public Aabb Bounds;
 	public BoundingSphere Sphere;
@@ -22,6 +25,11 @@ internal sealed class MeshSlot
 	public int Triangles;
 	public VertexAttributes Attributes;
 
+	/// <summary>The highest joint index the vertices use (-1: not skinned).</summary>
+	public int MaxJoint = -1;
+
+	public bool Skinned => MaxJoint >= 0;
+
 	/// <summary>The data of a mesh created before the device existed, uploaded at initialization.</summary>
 	public MeshData? Pending;
 
@@ -29,7 +37,8 @@ internal sealed class MeshSlot
 	{
 		Vertices?.Dispose();
 		Indices?.Dispose();
-		Vertices = Indices = null;
+		Skin?.Dispose();
+		Vertices = Indices = Skin = null;
 	}
 }
 
@@ -96,6 +105,7 @@ internal sealed class MaterialSlot
 	public IRenderPipeline? CachedPipeline;
 	public TextureFormat CachedFormat;
 	public bool CachedAfterPrepass;
+	public bool CachedSkinned;
 
 	/// <summary>The pipeline part of the sort key: shader, alpha mode and culling.</summary>
 	public int PipelineSortId => ((Shader & 0x1F) << 3) | ((int)AlphaMode << 1) | (DoubleSided ? 1 : 0);
@@ -130,6 +140,22 @@ internal struct RenderObject
 	public uint Layers;
 	public bool CastShadows;
 	public bool ReceiveShadows;
+
+	/// <summary>The object's entry in the frame's skins, or -1 for a rigid draw.</summary>
+	public int Skin;
+}
+
+/// <summary>A skinned submission: its joints in the frame's palette and its posed bounds.</summary>
+internal struct SkinEntry
+{
+	/// <summary>The first joint in the palette.</summary>
+	public int Palette;
+
+	/// <summary>The number of joints.</summary>
+	public int Joints;
+
+	/// <summary>The bounds of the posed mesh before the world matrix.</summary>
+	public Aabb Bounds;
 }
 
 /// <summary>A submitted camera.</summary>
@@ -161,6 +187,9 @@ internal struct Batch
 	public int Material;
 	public int FirstInstance;
 	public int InstanceCount;
+
+	/// <summary>Whether the instances are skinned (drawn with the skinning pipelines and the mesh's skin stream).</summary>
+	public bool Skinned;
 }
 
 /// <summary>A view of the frame: a camera resolved against its target, with its culled, sorted and batched draws.</summary>

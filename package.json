@@ -45,6 +45,7 @@
 		"example:quad": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Quad --",
 		"example:particles": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Particles --",
 		"example:marbles": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Marbles --",
+		"example:puppet": "dotnet run -c Release --project Ion.Examples/Ion.Examples.Puppet --",
 
 		"docs": "npm run dev --prefix website",
 		"docs:install": "npm ci --prefix website",

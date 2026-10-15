@@ -38,6 +38,8 @@ public readonly record struct Scene3DExtractionStats(int MeshRenderers, int Came
 /// <item>every <see cref="MeshRenderer"/> with a <see cref="GlobalTransform"/> (without <see cref="Hidden"/>; only with
 /// <see cref="Visible"/> under <see cref="Scene3DExtractionOptions.RequireVisible"/>) is submitted at its world matrix
 /// (a chunk loop, since the query depends on the options);</item>
+/// <item>every <see cref="MeshRenderer"/> with a <see cref="SkinnedMesh"/> is submitted posed by its animator entity's
+/// <see cref="Animator"/> (its skinning palette), at the animator entity's world matrix;</item>
 /// <item>every <see cref="Camera"/> is added with <c>AddCamera(camera, world)</c> (a camera looks down its entity's -Z);</item>
 /// <item>every <see cref="DirectionalLight"/> (shining along the entity's -Z), <see cref="PointLight"/> (at the entity's
 /// position) and <see cref="SpotLight"/> (at the entity's position, along its -Z) is added with <c>AddLight</c>;</item>
@@ -50,8 +52,8 @@ public readonly record struct Scene3DExtractionStats(int MeshRenderers, int Came
 /// </remarks>
 public sealed partial class Scene3DExtractionSystem(World world, IMeshBatch renderer, Scene3DExtractionOptions options)
 {
-	private static readonly QueryDescription Meshes = new QueryDescription().WithAll<MeshRenderer, GlobalTransform>().WithNone<Hidden>();
-	private static readonly QueryDescription VisibleMeshes = new QueryDescription().WithAll<MeshRenderer, GlobalTransform, Visible>().WithNone<Hidden>();
+	private static readonly QueryDescription Meshes = new QueryDescription().WithAll<MeshRenderer, GlobalTransform>().WithNone<Hidden, SkinnedMesh>();
+	private static readonly QueryDescription VisibleMeshes = new QueryDescription().WithAll<MeshRenderer, GlobalTransform, Visible>().WithNone<Hidden, SkinnedMesh>();
 
 	private SceneEnvironment _environment;
 	private bool _hasEnvironment;
@@ -88,6 +90,7 @@ public sealed partial class Scene3DExtractionSystem(World world, IMeshBatch rend
 	public void ExtractAll(GameTime dt)
 	{
 		Extract(dt);
+		__IonQuery_ExtractSkinnedMesh(dt, world);
 		__IonQuery_ExtractCamera(dt, world);
 		__IonQuery_ExtractDirectionalLight(dt, world);
 		__IonQuery_ExtractPointLight(dt, world);
@@ -135,6 +138,28 @@ public sealed partial class Scene3DExtractionSystem(World world, IMeshBatch rend
 
 	private static bool Same(in SceneEnvironment a, in SceneEnvironment b) =>
 		a.AmbientColor == b.AmbientColor && a.AmbientIntensity.Equals(b.AmbientIntensity) && a.Skybox == b.Skybox && a.SkyboxIntensity.Equals(b.SkyboxIntensity);
+
+	/// <summary>
+	/// Submits a skinned mesh renderer posed by its animator's player, at the animator entity's world matrix (the palette
+	/// is in model space); unskinned at its own world matrix while the animator is missing.
+	/// </summary>
+	[Render(Order = StageOrder.Extract), Query, None<Hidden>]
+	private void ExtractSkinnedMesh(Entity entity, in MeshRenderer mesh, in SkinnedMesh skin, in GlobalTransform transform)
+	{
+		if (transform.IsHidden) return;
+		if (options.RequireVisible && !world.Has<Visible>(entity)) return;
+		if (world.IsAlive(skin.Animator) && world.TryGet<Animator>(skin.Animator, out var animator) && animator.Player is { } player
+			&& world.TryGet<GlobalTransform>(skin.Animator, out var root))
+		{
+			renderer.Submit(mesh, root.Matrix, player.SkinningMatrices);
+		}
+		else
+		{
+			renderer.Submit(mesh, transform.Matrix);
+		}
+
+		_meshes++;
+	}
 
 	/// <summary>Adds a camera placed by its entity's world matrix.</summary>
 	[Render(Order = StageOrder.Extract), Query, None<Hidden>]

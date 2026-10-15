@@ -85,7 +85,7 @@ internal struct MaterialUniforms
 /// <summary>
 /// The per-instance data of one drawn object (vertex buffer slot 1, instance rate, 96 bytes): the world matrix's first
 /// three columns and the normal matrix's rows (the adjugate of the 3x3 part, so no division; the shader normalizes). The
-/// first normal row's w holds the flags.
+/// first normal row's w holds the flags, the second's the first joint of a skinned draw in the joint palette.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 internal struct InstanceData
@@ -104,7 +104,7 @@ internal struct InstanceData
 
 	/// <summary>Fills the instance from a world matrix (row-vector convention).</summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static void Write(ref InstanceData instance, in Matrix4x4 m, float flags)
+	public static void Write(ref InstanceData instance, in Matrix4x4 m, float flags, int palette = 0)
 	{
 		instance.World0 = new Vector4(m.M11, m.M21, m.M31, m.M41);
 		instance.World1 = new Vector4(m.M12, m.M22, m.M32, m.M42);
@@ -126,8 +126,44 @@ internal struct InstanceData
 		}
 
 		instance.Normal0 = new Vector4(a.X, b.X, c.X, flags);
-		instance.Normal1 = new Vector4(a.Y, b.Y, c.Y, 0);
+		instance.Normal1 = new Vector4(a.Y, b.Y, c.Y, palette);
 		instance.Normal2 = new Vector4(a.Z, b.Z, c.Z, 0);
+	}
+}
+
+/// <summary>
+/// The skinning stream of a skinned mesh (vertex buffer slot 2, 24 bytes): its four joints (unorm16x4, read back as
+/// indices by the shader) and their weights. Mirrors the inputs of <c>ion_skinning.glsl</c>.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct SkinVertex
+{
+	public const int Size = 24;
+
+	public ushort J0, J1, J2, J3;
+	public Vector4 Weights;
+}
+
+/// <summary>
+/// The joint palette: an RGBA32F texture of every skinned draw's joint matrices for the frame (group 0, binding 5), three
+/// texels per joint (the rows of <see cref="InstanceData"/>'s world matrix), <see cref="RowJoints"/> joints per row.
+/// Mirrors <c>ion_skinning.glsl</c>.
+/// </summary>
+internal static class JointPalette
+{
+	/// <summary>Joints per texture row.</summary>
+	public const int RowJoints = 256;
+
+	/// <summary>The texture width in texels.</summary>
+	public const int Width = RowJoints * 3;
+
+	/// <summary>Writes a joint matrix's three rows.</summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static void Write(Span<Vector4> rows, in Matrix4x4 m)
+	{
+		rows[0] = new Vector4(m.M11, m.M21, m.M31, m.M41);
+		rows[1] = new Vector4(m.M12, m.M22, m.M32, m.M42);
+		rows[2] = new Vector4(m.M13, m.M23, m.M33, m.M43);
 	}
 }
 

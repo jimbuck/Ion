@@ -262,6 +262,18 @@ Create options with `new()` or `ModelSpawnOptions.Default`: `default(ModelSpawnO
 empty layer mask. Destroy a spawned model with `DestroyRecursive(root)`; its meshes and materials stay owned by the model
 asset.
 
+A skinned model's root also gets an `Animator` (an `AnimationPlayer` at the rest pose), and its skinned primitives a
+`SkinnedMesh` pointing at the root. `SkeletalAnimationSystem` (part of `UseEcs()`) advances the players, and the 3D
+extraction draws each skinned mesh posed by its animator, at the root's world matrix:
+
+```csharp
+var model = assets.Load<IModel>("puppet.gltf");
+var root = world.SpawnModel(model);
+world.Get<Animator>(root).Player.Play(model.FindAnimation("Walk")!);
+```
+
+See [Skinned meshes and animation](/Ion/rendering/3d/animation/#on-the-ecs).
+
 ## Visibility
 
 | Tool | Effect |

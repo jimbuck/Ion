@@ -59,6 +59,8 @@ public static class EcsComponents
 		Register<SpotLight>();
 		Register<SceneEnvironment>();
 		Register<PendingModel>();
+		Register<Animator>();
+		Register<SkinnedMesh>();
 		_builtIns = true;
 	}
 

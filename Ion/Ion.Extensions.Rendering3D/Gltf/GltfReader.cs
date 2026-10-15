@@ -31,17 +31,26 @@ internal sealed class GltfMaterial
 /// <summary>A glTF mesh primitive: its geometry and material index (-1: the default material).</summary>
 internal sealed record GltfPrimitive(MeshData Mesh, int Material);
 
-/// <summary>A glTF node.</summary>
-internal sealed record GltfNode(string Name, Transform Transform, int Mesh, int[] Children);
+/// <summary>A glTF node (<paramref name="Skin"/>: the skin of its mesh, -1 for none).</summary>
+internal sealed record GltfNode(string Name, Transform Transform, int Mesh, int[] Children, int Skin = -1);
+
+/// <summary>A glTF skin: its joint nodes and their inverse bind matrices (row-vector convention).</summary>
+internal sealed record GltfSkin(string Name, int[] Joints, Matrix4x4[] InverseBind);
+
+/// <summary>A glTF animation channel: the node and property it animates, and its sampler's keys.</summary>
+internal sealed record GltfChannel(int Node, AnimationPath Path, AnimationInterpolation Interpolation, float[] Times, Vector4[] Values);
+
+/// <summary>A glTF animation.</summary>
+internal sealed record GltfAnimation(string Name, List<GltfChannel> Channels);
 
 /// <summary>An image: its encoded bytes (PNG or JPEG) and name.</summary>
 internal sealed record GltfImage(string Name, byte[] Data);
 
 /// <summary>
 /// A parsed glTF 2.0 asset: the subset Ion renders (meshes with triangle primitives, metallic-roughness materials,
-/// textures and images, the node hierarchy and the default scene). Skins, animations, cameras, morph targets and sparse
-/// accessors are not supported yet; extensions other than <c>KHR_materials_unlit</c> and
-/// <c>KHR_materials_emissive_strength</c> are ignored.
+/// textures and images, the node hierarchy and the default scene, skins and the translation, rotation and scale channels
+/// of animations). Cameras, morph targets (and their weight channels) and sparse accessors are not supported; extensions
+/// other than <c>KHR_materials_unlit</c> and <c>KHR_materials_emissive_strength</c> are ignored.
 /// </summary>
 internal sealed class GltfDocument
 {
@@ -53,6 +62,8 @@ internal sealed class GltfDocument
 
 	public List<GltfImage> Images { get; } = [];
 	public List<GltfNode> Nodes { get; } = [];
+	public List<GltfSkin> Skins { get; } = [];
+	public List<GltfAnimation> Animations { get; } = [];
 	public List<int> SceneRoots { get; } = [];
 }
 
@@ -198,6 +209,24 @@ internal static class GltfReader
 					for (var i = 0; i < colors.Length; i++) meshData.Colors[i] = ColorSpace.FromLinear(colors[i]);
 				}
 
+				if (attributes.TryGetProperty("JOINTS_0", out var jointsAccessor) && attributes.TryGetProperty("WEIGHTS_0", out var weightsAccessor))
+				{
+					var joints = ReadVec4(accessors[jointsAccessor.GetInt32()], views);
+					var weights = ReadVec4(accessors[weightsAccessor.GetInt32()], views);
+					if (joints.Length != positions.Length || weights.Length != positions.Length) throw new InvalidDataException($"Mesh '{meshName}' primitive {index}: JOINTS_0 and WEIGHTS_0 need one entry per position.");
+					meshData.Joints = new JointIndices[joints.Length];
+					meshData.Weights = new Vector4[weights.Length];
+					for (var i = 0; i < joints.Length; i++)
+					{
+						var j = joints[i];
+						meshData.Joints[i] = new JointIndices((ushort)j.X, (ushort)j.Y, (ushort)j.Z, (ushort)j.W);
+						// The spec asks for weights summing to 1; exporters round, so normalize.
+						var w = weights[i];
+						var sum = w.X + w.Y + w.Z + w.W;
+						meshData.Weights[i] = sum > 1e-6f ? w / sum : new Vector4(1, 0, 0, 0);
+					}
+				}
+
 				var materialIndex = primitive.TryGetProperty("material", out var materialElement) ? materialElement.GetInt32() : -1;
 				primitives.Add(new GltfPrimitive(meshData, materialIndex));
 				index++;
@@ -232,7 +261,77 @@ internal static class GltfReader
 
 			var children = new List<int>();
 			foreach (var child in Array(node, "children")) children.Add(child.GetInt32());
-			result.Nodes.Add(new GltfNode(String(node, "name") ?? $"node{result.Nodes.Count}", transform, node.TryGetProperty("mesh", out var meshIndex) ? meshIndex.GetInt32() : -1, [.. children]));
+			result.Nodes.Add(new GltfNode(String(node, "name") ?? $"node{result.Nodes.Count}", transform, node.TryGetProperty("mesh", out var meshIndex) ? meshIndex.GetInt32() : -1, [.. children],
+				node.TryGetProperty("skin", out var skinIndex) ? skinIndex.GetInt32() : -1));
+		}
+
+		// Skins.
+		foreach (var skin in Array(root, "skins"))
+		{
+			var name = String(skin, "name") ?? $"skin{result.Skins.Count}";
+			var joints = new List<int>();
+			foreach (var joint in Array(skin, "joints"))
+			{
+				var node = joint.GetInt32();
+				if ((uint)node >= (uint)result.Nodes.Count) throw new InvalidDataException($"Skin '{name}' has an invalid joint node {node}.");
+				joints.Add(node);
+			}
+
+			var inverseBind = new Matrix4x4[joints.Count];
+			if (skin.TryGetProperty("inverseBindMatrices", out var ibm))
+			{
+				var m = ReadFloats(accessors[ibm.GetInt32()], views, 16);
+				if (m.Length < joints.Count * 16) throw new InvalidDataException($"Skin '{name}' has fewer inverse bind matrices than joints.");
+				for (var j = 0; j < joints.Count; j++)
+				{
+					var o = j * 16;
+					// Column-major column-vector storage read row by row is the row-vector matrix (as node matrices).
+					inverseBind[j] = new Matrix4x4(m[o], m[o + 1], m[o + 2], m[o + 3], m[o + 4], m[o + 5], m[o + 6], m[o + 7], m[o + 8], m[o + 9], m[o + 10], m[o + 11], m[o + 12], m[o + 13], m[o + 14], m[o + 15]);
+				}
+			}
+			else
+			{
+				System.Array.Fill(inverseBind, Matrix4x4.Identity);
+			}
+
+			result.Skins.Add(new GltfSkin(name, [.. joints], inverseBind));
+		}
+
+		// Animations: translation, rotation and scale channels (morph target weights are skipped).
+		foreach (var animation in Array(root, "animations"))
+		{
+			var name = String(animation, "name") ?? $"animation{result.Animations.Count}";
+			var samplers = Array(animation, "samplers");
+			var channels = new List<GltfChannel>();
+			foreach (var channel in Array(animation, "channels"))
+			{
+				if (!channel.TryGetProperty("target", out var target) || !target.TryGetProperty("node", out var nodeElement)) continue;
+				AnimationPath? path = String(target, "path") switch
+				{
+					"translation" => AnimationPath.Translation,
+					"rotation" => AnimationPath.Rotation,
+					"scale" => AnimationPath.Scale,
+					_ => null,
+				};
+				if (path is null) continue;
+				var samplerIndex = channel.GetProperty("sampler").GetInt32();
+				if ((uint)samplerIndex >= (uint)samplers.Count) throw new InvalidDataException($"Animation '{name}' has an invalid sampler {samplerIndex}.");
+				var sampler = samplers[samplerIndex];
+				var interpolation = String(sampler, "interpolation") switch
+				{
+					"STEP" => AnimationInterpolation.Step,
+					"CUBICSPLINE" => AnimationInterpolation.CubicSpline,
+					_ => AnimationInterpolation.Linear,
+				};
+				var times = ReadFloats(accessors[sampler.GetProperty("input").GetInt32()], views, 1);
+				var output = accessors[sampler.GetProperty("output").GetInt32()];
+				var values = path == AnimationPath.Rotation ? ReadVec4(output, views) : Widen(ReadVec3(output, views));
+				var perKey = interpolation == AnimationInterpolation.CubicSpline ? 3 : 1;
+				if (times.Length == 0 || values.Length != times.Length * perKey) throw new InvalidDataException($"Animation '{name}': a sampler has {times.Length} keys and {values.Length} values.");
+				channels.Add(new GltfChannel(nodeElement.GetInt32(), path.Value, interpolation, times, values));
+			}
+
+			result.Animations.Add(new GltfAnimation(name, channels));
 		}
 
 		var scenes = Array(root, "scenes");
@@ -405,6 +504,13 @@ internal static class GltfReader
 		var f = ReadFloats(accessor, views, 4);
 		var result = new Vector4[f.Length / 4];
 		for (var i = 0; i < result.Length; i++) result[i] = new Vector4(f[i * 4], f[i * 4 + 1], f[i * 4 + 2], available < 4 ? fillW : f[i * 4 + 3]);
+		return result;
+	}
+
+	private static Vector4[] Widen(Vector3[] values)
+	{
+		var result = new Vector4[values.Length];
+		for (var i = 0; i < values.Length; i++) result[i] = new Vector4(values[i], 0);
 		return result;
 	}
 

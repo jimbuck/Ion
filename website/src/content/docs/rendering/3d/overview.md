@@ -355,7 +355,8 @@ What the 3D renderer does not do yet:
 - No MSAA, HDR targets, tone mapping or post-processing stack (the render graph can host them as custom passes).
 - No GPU culling and no LOD.
 - Image-based lighting uses box-filtered mips of the skybox, not prefiltered specular or an irradiance map.
-- No skinning, morph targets or animation; glTF cameras and lights are not imported.
+- No morph targets; glTF cameras and lights are not imported. Skinned meshes and skeletal animation are covered in
+  [Skinned meshes and animation](/Ion/rendering/3d/animation/).
 - A custom vertex shader that moves vertices still casts its undeformed shadow.
 
 ## See also
