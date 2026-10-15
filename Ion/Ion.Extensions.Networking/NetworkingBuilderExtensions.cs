@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 
 using Ion.Extensions.Ecs;
 using Ion.Extensions.Metrics;
+using Ion.Extensions.Scenes;
 
 namespace Ion.Extensions.Networking;
 
@@ -17,11 +18,13 @@ public static class NetworkingBuilderExtensions
 	/// <summary>
 	/// Registers the networking module: <see cref="NetworkConfig"/> bound from <c>Ion:Network</c> in
 	/// <paramref name="config"/> and then <paramref name="configure"/>; the <see cref="NetworkSession"/> (also as
-	/// <see cref="INetworkSession"/> and <see cref="INetworkMessages"/>), its <see cref="NetworkWorld"/> (also as
-	/// <see cref="INetworkWorld"/>) and <see cref="NetworkPrediction"/> (also as <see cref="INetworkPrediction"/>), for the
-	/// root ECS <see cref="World"/>; and the <see cref="NetworkSystem"/>. Registers the ECS module (<c>AddEcs</c>) too. Needs a
+	/// <see cref="INetworkSession"/> and <see cref="INetworkMessages"/>), its <see cref="NetworkWorlds"/> (also as
+	/// <see cref="INetworkWorlds"/>), <see cref="NetworkWorld"/> (also as <see cref="INetworkWorld"/>: the root world's from
+	/// the root services, a networked scene's from its scope, see <see cref="UseNetworking(ISceneBuilder, string)"/>) and
+	/// <see cref="NetworkPrediction"/> (also as <see cref="INetworkPrediction"/>); and the <see cref="NetworkSystem"/>.
+	/// Registers the ECS module (<c>AddEcs</c>) too. Needs a
 	/// transport (<see cref="AddLoopbackTransport(IServiceCollection, LoopbackNetwork)"/>, <c>AddLiteNetLibTransport</c>) unless the mode is
-	/// <see cref="NetworkMode.Offline"/>. Add the steps with <see cref="UseNetworking"/>.
+	/// <see cref="NetworkMode.Offline"/>. Add the steps with <see cref="UseNetworking(IIonApplication)"/>.
 	/// </summary>
 	public static IServiceCollection AddNetworking(this IServiceCollection services, IConfiguration? config = null, Action<NetworkConfig>? configure = null)
 	{
@@ -51,8 +54,16 @@ public static class NetworkingBuilderExtensions
 		});
 		services.TryAddSingleton<INetworkSession>(static sp => sp.GetRequiredService<NetworkSession>());
 		services.TryAddSingleton<INetworkMessages>(static sp => sp.GetRequiredService<NetworkSession>());
-		services.TryAddSingleton(static sp => sp.GetRequiredService<NetworkSession>().World);
-		services.TryAddSingleton<INetworkWorld>(static sp => sp.GetRequiredService<NetworkSession>().World);
+		services.TryAddSingleton(static sp => sp.GetRequiredService<NetworkSession>().Worlds);
+		services.TryAddSingleton<INetworkWorlds>(static sp => sp.GetRequiredService<NetworkSession>().Worlds);
+
+		// Like World, resolved per scope: a transient whose factory returns the scope's (see NetworkScope).
+		services.TryAddSingleton(static sp => new NetworkRootServices(sp));
+		services.TryAddScoped(static sp => new NetworkScope(sp.GetRequiredService<NetworkSession>(), sp));
+		services.TryAddTransient(static sp => WorldFor(sp));
+		services.TryAddTransient<INetworkWorld>(static sp => WorldFor(sp));
+		services.TryAddTransient(static sp => new SceneNetworkSystem(sp.GetRequiredService<NetworkScope>()));
+
 		services.TryAddSingleton(static sp => sp.GetRequiredService<NetworkSession>().Prediction);
 		services.TryAddSingleton<INetworkPrediction>(static sp => sp.GetRequiredService<NetworkSession>().Prediction);
 		services.TryAddSingleton(static sp => new NetworkSystem(sp.GetRequiredService<NetworkSession>()));
@@ -65,6 +76,14 @@ public static class NetworkingBuilderExtensions
 		}
 
 		return services;
+	}
+
+	/// <summary>The networked world of <paramref name="services"/>' scope: the root world's, or a networked scene's.</summary>
+	private static NetworkWorld WorldFor(IServiceProvider services)
+	{
+		var session = services.GetRequiredService<NetworkSession>();
+		if (ReferenceEquals(services, services.GetRequiredService<NetworkRootServices>().Services)) return session.World;
+		return services.GetRequiredService<NetworkScope>().World ?? session.World;
 	}
 
 	/// <summary>
@@ -86,7 +105,7 @@ public static class NetworkingBuilderExtensions
 	/// Registers the networking module (see <see cref="AddNetworking(IServiceCollection, IConfiguration, Action{NetworkConfig})"/>,
 	/// with the application's configuration) and the ECS module it replicates (<c>AddEcs</c>). Register a transport too
 	/// (<see cref="AddLoopbackTransport(IonApplicationBuilder, LoopbackNetwork)"/>, <c>AddLiteNetLibTransport</c>) unless
-	/// the mode is <see cref="NetworkMode.Offline"/>. Add the steps with <see cref="UseNetworking"/>.
+	/// the mode is <see cref="NetworkMode.Offline"/>. Add the steps with <see cref="UseNetworking(IIonApplication)"/>.
 	/// </summary>
 	public static IonApplicationBuilder AddNetworking(this IonApplicationBuilder builder, Action<NetworkConfig>? configure = null)
 	{
@@ -119,6 +138,82 @@ public static class NetworkingBuilderExtensions
 		ArgumentNullException.ThrowIfNull(app);
 		return app.UseEcs().UseSystem<NetworkSystem>();
 	}
+
+	/// <summary>
+	/// Networks the scene's world as the named world <paramref name="name"/> (see <see cref="INetworkWorlds"/>), with the
+	/// scene's ECS systems (<c>UseEcs</c>). The world is replicated while the scene is loaded: <see cref="INetworkWorld"/>
+	/// resolved in the scene is this world's; on the server its entities get ids and are sent to the clients that have the
+	/// world open; a client asks the server for it when the scene loads and stops when it unloads. The root schedule must
+	/// call <see cref="UseNetworking(IIonApplication)"/>. Both sides must network the same set of names (the set is part of
+	/// the handshake), so call this unconditionally: the name is registered when the application's schedule is built.
+	/// </summary>
+	public static ISceneBuilder UseNetworking(this ISceneBuilder scene, string name)
+	{
+		ArgumentNullException.ThrowIfNull(scene);
+		ArgumentException.ThrowIfNullOrEmpty(name);
+		scene.Services.GetRequiredService<NetworkScope>().Use(name);
+		return scene.UseEcs().UseSystem<SceneNetworkSystem>();
+	}
+}
+
+/// <summary>The application's root services, to tell them apart from a scene's scope.</summary>
+internal sealed record NetworkRootServices(IServiceProvider Services);
+
+/// <summary>
+/// The networked world of one service scope: set by a scene's <see cref="NetworkingBuilderExtensions.UseNetworking(ISceneBuilder, string)"/>,
+/// attached on first use (its scene's schedule is built) and detached when the scope is disposed (the scene unloads).
+/// </summary>
+public sealed class NetworkScope : IDisposable
+{
+	private readonly NetworkSession _session;
+	private readonly IServiceProvider _services;
+	private NetworkWorld? _world;
+	private bool _disposed;
+
+	internal NetworkScope(NetworkSession session, IServiceProvider services)
+	{
+		_session = session;
+		_services = services;
+	}
+
+	/// <summary>The name the scope's world is networked under, or null when its scene is not networked.</summary>
+	public string? Name { get; private set; }
+
+	/// <summary>The scope's networked world (attached on first use), or null when its scene is not networked.</summary>
+	public NetworkWorld? World
+	{
+		get
+		{
+			if (Name is null || _disposed) return _world;
+			return _world ??= _session.Worlds.Attach(Name, _services.GetRequiredService<World>());
+		}
+	}
+
+	internal void Use(string name)
+	{
+		if (Name is not null && Name != name) throw new InvalidOperationException($"The scene's world is already networked as '{Name}'; a world has one name.");
+		_session.Worlds.Register(name);
+		Name = name;
+	}
+
+	/// <summary>Detaches the world.</summary>
+	public void Dispose()
+	{
+		if (_disposed) return;
+		_disposed = true;
+		if (_world is not null) _session.Worlds.Detach(_world);
+	}
+}
+
+/// <summary>A networked scene's step: attaches the scene's world before the scene's other Init steps (see <see cref="NetworkScope"/>).</summary>
+public sealed class SceneNetworkSystem(NetworkScope scope)
+{
+	/// <summary>The scene's networked world.</summary>
+	public NetworkWorld? World => scope.World;
+
+	/// <summary>Attaches the scene's world, if no step resolved it yet.</summary>
+	[Init(Order = StageOrder.Network)]
+	public void Attach(GameTime dt) => _ = scope.World;
 }
 
 /// <summary>
@@ -145,11 +240,11 @@ public sealed class NetworkSystem(NetworkSession session)
 
 	/// <summary>Opens the tick: increments <see cref="INetworkWorld.CurrentTick"/>.</summary>
 	[Begin(Stage.FixedUpdate, Order = StageOrder.Network)]
-	public void BeginTick(GameTime dt) => session.World.BeginTick();
+	public void BeginTick(GameTime dt) => session.BeginTick();
 
 	/// <summary>Closes the tick (after every other fixed step, even one that threw): captures the snapshot (server).</summary>
 	[End(Stage.FixedUpdate, Order = StageOrder.Network)]
-	public void EndTick(GameTime dt) => session.World.Capture();
+	public void EndTick(GameTime dt) => session.Capture();
 
 	/// <summary>Applies the inputs of the tick: sampled and predicted (client), received (server).</summary>
 	[FixedUpdate(Order = StageOrder.Network + 10)]
@@ -157,7 +252,7 @@ public sealed class NetworkSystem(NetworkSession session)
 
 	/// <summary>Writes the interpolated state of the remote entities (client).</summary>
 	[Render(Order = StageOrder.Network)]
-	public void Interpolate(GameTime dt) => session.World.Interpolate();
+	public void Interpolate(GameTime dt) => session.Interpolate();
 
 	/// <summary>Sends snapshots, messages, owner updates and pings, and flushes the transport.</summary>
 	[Last(Order = StageOrder.NetworkSend)]

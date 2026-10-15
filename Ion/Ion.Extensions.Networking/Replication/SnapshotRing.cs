@@ -174,6 +174,16 @@ internal sealed class SnapshotRing
 	/// <summary>The frame slot of <paramref name="tick"/> (whatever tick it holds).</summary>
 	public SnapshotFrame Slot(uint tick) => _frames[tick % (uint)_frames.Length];
 
+	/// <summary>Forgets every frame (a client starting over).</summary>
+	public void Clear()
+	{
+		foreach (var frame in _frames)
+		{
+			frame.Tick = 0;
+			frame.Complete = false;
+		}
+	}
+
 	/// <summary>The complete frame of <paramref name="tick"/>, or null.</summary>
 	public SnapshotFrame? Get(uint tick)
 	{

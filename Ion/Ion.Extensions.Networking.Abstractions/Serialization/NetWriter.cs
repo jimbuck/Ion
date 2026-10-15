@@ -205,11 +205,12 @@ public ref struct NetWriter
 	/// <summary>Writes a quaternion.</summary>
 	public void WriteQuaternion(Quaternion value) => WriteVector4(new Vector4(value.X, value.Y, value.Z, value.W));
 
-	/// <summary>Writes a network id (5 bytes).</summary>
+	/// <summary>Writes a network id (6 bytes).</summary>
 	public void WriteNetworkId(NetworkId value)
 	{
 		WriteUInt32(value.Id);
 		WriteByte(value.OwnerPeer);
+		WriteByte(value.World);
 	}
 
 	/// <summary>Writes raw bytes.</summary>

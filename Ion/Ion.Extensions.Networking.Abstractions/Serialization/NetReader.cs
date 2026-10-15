@@ -207,7 +207,8 @@ public ref struct NetReader
 	public NetworkId ReadNetworkId()
 	{
 		var id = ReadUInt32();
-		return new NetworkId(id, ReadByte());
+		var owner = ReadByte();
+		return new NetworkId(id, owner, ReadByte());
 	}
 
 	/// <summary>Reads <paramref name="count"/> raw bytes (a slice of the packet, valid while it is).</summary>

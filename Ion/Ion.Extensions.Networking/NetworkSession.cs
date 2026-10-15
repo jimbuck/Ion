@@ -12,8 +12,9 @@ namespace Ion.Extensions.Networking;
 
 /// <summary>
 /// A network session: the transport, the peers and their handshakes, the security checks, the typed messages
-/// (<see cref="INetworkMessages"/>), and the owner of the replication (<see cref="World"/>) and prediction
-/// (<see cref="Prediction"/>). Driven by the networking systems from the game thread; nothing in it is thread safe.
+/// (<see cref="INetworkMessages"/>), the tick, and the owner of the replication (<see cref="Worlds"/>: the root
+/// <see cref="World"/> and the named scene worlds) and prediction (<see cref="Prediction"/>). Driven by the networking
+/// systems from the game thread; nothing in it is thread safe.
 /// </summary>
 public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposable
 {
@@ -40,11 +41,12 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 	private TimeSpan _handshakeSentAt;
 	private bool _started;
 	private int _mtu;
+	private double _syncError;
 
 	/// <summary>Creates a session. Normally created by <c>AddNetworking</c>.</summary>
 	/// <param name="config">The settings.</param>
 	/// <param name="transport">The transport (null only in <see cref="NetworkMode.Offline"/>).</param>
-	/// <param name="world">The ECS world replicated.</param>
+	/// <param name="world">The root ECS world (always replicated; scene worlds join with <see cref="NetworkWorlds.Attach"/>).</param>
 	/// <param name="events">The frame event bus inbound messages are emitted on.</param>
 	/// <param name="clock">The clock timeouts, pings and rate limits are measured with.</param>
 	/// <param name="tickRate">The fixed-step rate, used when <see cref="NetworkConfig.TickRate"/> is 0.</param>
@@ -74,8 +76,8 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		_secret = string.IsNullOrEmpty(config.JoinSecret) ? null : Encoding.UTF8.GetBytes(config.JoinSecret);
 		_mtu = Math.Clamp(config.MtuBytes, 256, Protocol.MaxPacketSize);
 
-		World = new NetworkWorld(this, world, config, Table);
-		Prediction = new NetworkPrediction(this, World, events);
+		Worlds = new NetworkWorlds(this, new NetworkWorld(this, world, config, Table));
+		Prediction = new NetworkPrediction(this, events);
 	}
 
 	/// <summary>The settings.</summary>
@@ -90,8 +92,16 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 	/// <summary>The simulation rate in ticks per second.</summary>
 	public double TickRate { get; }
 
-	/// <summary>The replication side.</summary>
-	public NetworkWorld World { get; }
+	/// <summary>The root world's replication.</summary>
+	public NetworkWorld World => Worlds.Root;
+
+	internal NetworkWorld Root => Worlds.Root;
+
+	/// <summary>The networked worlds: the root and the named worlds of the loaded scenes.</summary>
+	public NetworkWorlds Worlds { get; }
+
+	/// <summary>The current tick, shared by every world (incremented at the start of every fixed step; on a client, ahead of the server).</summary>
+	public uint Tick { get; private set; }
 
 	/// <summary>Prediction and reconciliation.</summary>
 	public NetworkPrediction Prediction { get; }
@@ -144,6 +154,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		if (_started || Mode == NetworkMode.Offline) return;
 		if (_transport is null) throw new InvalidOperationException($"Networking mode {Mode} needs a transport: register one (AddLoopbackTransport, AddLiteNetLibTransport).");
 		_started = true;
+		Worlds.Freeze();
 		_mtu = Math.Min(_mtu, _transport.MaxPacketSize(Delivery.Unreliable));
 
 		if (IsServer)
@@ -152,7 +163,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 			_transport.StartServer(_config.Bind, _config.Port, Math.Clamp(_config.MaxPeers, 1, NetworkPeer.MaxClientId));
 			_localPeer = NetworkPeer.Server;
 			_state = NetworkState.Connected;
-			_logger.LogInformation("Network server started on {Bind}:{Port} ({Transport}, {Rate} ticks per second, registry {Hash:X16}).", _config.Bind, _transport.LocalPort, _transport.Name, TickRate, Table.Hash);
+			_logger.LogInformation("Network server started on {Bind}:{Port} ({Transport}, {Rate} ticks per second, registry {Hash:X16}, {Worlds} named worlds).", _config.Bind, _transport.LocalPort, _transport.Name, TickRate, Worlds.Hash(Table.Hash), Worlds.Names.Count);
 		}
 		else
 		{
@@ -213,7 +224,48 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 
 		CheckTimeouts();
 
-		if (IsClient && IsActive) World.ApplyLatest();
+		if (IsClient && IsActive)
+		{
+			foreach (var world in Worlds.LiveWorlds) world.ApplyLatest();
+		}
+	}
+
+	// Ticks -------------------------------------------------------------------------------------------------------------------
+
+	/// <summary>Opens a tick: increments <see cref="Tick"/> (FixedUpdate begin).</summary>
+	internal void BeginTick()
+	{
+		if (!IsActive) return;
+		Tick++;
+	}
+
+	/// <summary>Closes a tick: the server captures every live world (FixedUpdate end, after every fixed step of the root and the scenes).</summary>
+	internal void Capture()
+	{
+		foreach (var world in Worlds.LiveWorlds) world.Capture();
+	}
+
+	/// <summary>Client: writes the interpolated state of the remote entities of every live world (Render).</summary>
+	internal void Interpolate()
+	{
+		foreach (var world in Worlds.LiveWorlds) world.Interpolate();
+	}
+
+	// The client runs ahead of the server's snapshot by a full round trip (the snapshot took half of it to arrive, and an
+	// input takes the other half to reach the server) plus the input lead, so its inputs for tick N arrive before the
+	// server simulates N. The error is smoothed; beyond 3 ticks the tick is reset (and predictions cleared). Driven by the
+	// root world's snapshots, which every client gets.
+	internal void SyncTick(uint serverTick)
+	{
+		var rtt = RoundTripTime(NetworkPeer.Server).TotalSeconds;
+		var target = serverTick + rtt * TickRate + Math.Max(0, _config.InputLeadTicks);
+		var error = Tick - target;
+		_syncError = _syncError * 0.8 + error * 0.2;
+		if (Math.Abs(_syncError) <= 3 && Math.Abs(error) <= 12) return;
+		Tick = (uint)Math.Max(1, Math.Round(target));
+		_syncError = 0;
+		_stats.Resyncs++;
+		Prediction.OnResync();
 	}
 
 	private void OnConnected(int connection)
@@ -233,7 +285,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 			// A random nonce the client must sign with the join secret; the handshake must complete in time.
 			RandomNumberGenerator.Fill(state.Nonce);
 			var w = new NetWriter(_control);
-			Protocol.WriteHeader(ref w, PacketKind.Challenge, World.CurrentTick, 0);
+			Protocol.WriteHeader(ref w, PacketKind.Challenge, Tick, 0);
 			w.WriteUInt16(NetworkTypeTable.ProtocolVersion);
 			w.WriteBytes(state.Nonce);
 			SendRaw(state, w.Written, Delivery.ReliableOrdered);
@@ -311,7 +363,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 			return;
 		}
 
-		if (ack != 0 && ack <= World.CurrentTick && ack > state.AckTick) state.AckTick = ack;
+		Root.OnAck(state, ack);
 
 		switch (kind)
 		{
@@ -319,7 +371,16 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 				OnMessages(state, ref reader);
 				break;
 			case PacketKind.OwnerUpdate:
-				World.OnOwnerUpdate(state, ref reader);
+				OnOwnerUpdate(state, ref reader);
+				break;
+			case PacketKind.OpenWorld:
+				OnOpenWorld(state, ref reader);
+				break;
+			case PacketKind.CloseWorld:
+				OnCloseWorld(state, ref reader);
+				break;
+			case PacketKind.WorldAck:
+				OnWorldAck(state, ref reader);
 				break;
 			case PacketKind.Ping:
 				OnPing(state, ref reader);
@@ -369,7 +430,10 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		switch (kind)
 		{
 			case PacketKind.Snapshot:
-				World.OnSnapshotPart(tick, ref reader);
+				OnSnapshotPart(tick, ref reader);
+				break;
+			case PacketKind.WorldUnavailable:
+				OnWorldUnavailable(ref reader);
 				break;
 			case PacketKind.Messages:
 				OnMessages(state, ref reader);
@@ -399,10 +463,10 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		}
 
 		var w = new NetWriter(_control);
-		Protocol.WriteHeader(ref w, PacketKind.Handshake, World.CurrentTick, 0);
+		Protocol.WriteHeader(ref w, PacketKind.Handshake, Tick, 0);
 		w.WriteUInt16(NetworkTypeTable.ProtocolVersion);
 		w.WriteUInt64(_gameHash);
-		w.WriteUInt64(Table.Hash);
+		w.WriteUInt64(Worlds.Hash(Table.Hash));
 		w.WriteDouble(TickRate);
 		Span<byte> proof = stackalloc byte[Protocol.ProofSize];
 		if (_secret is not null) HMACSHA256.HashData(_secret, nonce, proof);
@@ -425,7 +489,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		if (reader.Failed) reason = DisconnectReason.ProtocolMismatch;
 		else if (protocol != NetworkTypeTable.ProtocolVersion) reason = DisconnectReason.ProtocolMismatch;
 		else if (game != _gameHash) reason = DisconnectReason.GameMismatch;
-		else if (registry != Table.Hash) reason = DisconnectReason.RegistryMismatch;
+		else if (registry != Worlds.Hash(Table.Hash)) reason = DisconnectReason.RegistryMismatch;
 		else if (Math.Abs(rate - TickRate) > 1e-6) reason = DisconnectReason.TickRateMismatch;
 		else if (!SecretMatches(state, proof)) reason = DisconnectReason.WrongSecret;
 		else if (_peers.Count >= Math.Clamp(_config.MaxPeers, 1, NetworkPeer.MaxClientId)) reason = DisconnectReason.ServerFull;
@@ -446,10 +510,10 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		state.Stage = PeerStage.Connected;
 		_byPeer[id] = state;
 		_peers.Add(state.Peer);
-		World.OnPeerConnected(state);
+		Root.AddPeer(state, 0);
 
 		var w = new NetWriter(_control);
-		Protocol.WriteHeader(ref w, PacketKind.Accept, World.CurrentTick, 0);
+		Protocol.WriteHeader(ref w, PacketKind.Accept, Tick, 0);
 		w.WriteByte(id);
 		w.WriteDouble(TickRate);
 		SendRaw(state, w.Written, Delivery.ReliableOrdered);
@@ -484,9 +548,170 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		_peers.Add(NetworkPeer.Server);
 		_state = NetworkState.Connected;
 		_reason = DisconnectReason.None;
-		World.OnAccepted(serverTick, state.Rtt);
+
+		// The server is half a round trip past the tick it stamped the accept with, and an input takes another half to
+		// reach it: a full round trip ahead, plus the lead.
+		Tick = serverTick + (uint)Math.Max(0, Math.Ceiling(state.Rtt.TotalSeconds * TickRate)) + (uint)Math.Max(0, _config.InputLeadTicks);
+		_syncError = 0;
+		Root.OnAccepted();
+
+		// The named worlds created before the connection are asked for now.
+		foreach (var world in Worlds.LiveWorlds)
+		{
+			if (world.Index == 0) continue;
+			world.Reset();
+			SendWorldControl(state, PacketKind.OpenWorld, world.Index, world.Epoch);
+		}
+
 		_logger.LogInformation("Joined the server as {Peer}.", _localPeer);
 		_events.Emit(new PeerConnected(_localPeer));
+	}
+
+	// Worlds -------------------------------------------------------------------------------------------------------------------
+
+	/// <summary>A named world became live: the server sends it to the clients that have it open; a client asks for it.</summary>
+	internal void OnWorldAttached(NetworkWorld world)
+	{
+		if (IsServer)
+		{
+			foreach (var state in _states)
+			{
+				if (state.Stage == PeerStage.Connected && state.OpenWorlds.TryGetValue(world.Index, out var epoch)) world.AddPeer(state, epoch);
+			}
+		}
+		else if (IsActive && _byPeer[0] is { } server)
+		{
+			SendWorldControl(server, PacketKind.OpenWorld, world.Index, world.Epoch);
+		}
+	}
+
+	/// <summary>A named world went away: the server tells the clients that had it; a client tells the server it closed it.</summary>
+	internal void OnWorldDetached(NetworkWorld world)
+	{
+		if (IsServer)
+		{
+			foreach (var view in world.Views.ToArray())
+			{
+				if (view.State.Stage == PeerStage.Connected) SendWorldControl(view.State, PacketKind.WorldUnavailable, world.Index, view.Epoch);
+				world.RemovePeer(view.State);
+			}
+		}
+		else if (IsActive && _byPeer[0] is { } server)
+		{
+			SendWorldControl(server, PacketKind.CloseWorld, world.Index, world.Epoch);
+		}
+
+		Prediction.OnWorldReset(world);
+	}
+
+	private void SendWorldControl(PeerState state, PacketKind kind, byte index, byte epoch)
+	{
+		var w = new NetWriter(_control);
+		Protocol.WriteHeader(ref w, kind, Tick, Root.AckTick);
+		w.WriteByte(index);
+		w.WriteByte(epoch);
+		SendRaw(state, w.Written, Delivery.ReliableOrdered);
+	}
+
+	private void OnOpenWorld(PeerState state, ref NetReader reader)
+	{
+		var index = reader.ReadByte();
+		var epoch = reader.ReadByte();
+		if (reader.Failed || !Worlds.IsNamed(index))
+		{
+			Malformed(state);
+			return;
+		}
+
+		state.OpenWorlds[index] = epoch;
+		if (Worlds.Get(index) is { } world)
+		{
+			world.RemovePeer(state);
+			world.AddPeer(state, epoch);
+		}
+		else
+		{
+			SendWorldControl(state, PacketKind.WorldUnavailable, index, epoch);
+		}
+	}
+
+	private void OnCloseWorld(PeerState state, ref NetReader reader)
+	{
+		var index = reader.ReadByte();
+		var epoch = reader.ReadByte();
+		if (reader.Failed || !Worlds.IsNamed(index))
+		{
+			Malformed(state);
+			return;
+		}
+
+		// A close of an earlier open (the client reopened since) leaves the newer one.
+		if (!state.OpenWorlds.TryGetValue(index, out var open) || open != epoch) return;
+		state.OpenWorlds.Remove(index);
+		Worlds.Get(index)?.RemovePeer(state);
+	}
+
+	private void OnWorldAck(PeerState state, ref NetReader reader)
+	{
+		while (!reader.End)
+		{
+			var index = reader.ReadByte();
+			var tick = reader.ReadUInt32();
+			if (reader.Failed || !Worlds.IsNamed(index))
+			{
+				Malformed(state);
+				return;
+			}
+
+			Worlds.Get(index)?.OnAck(state, tick);
+		}
+	}
+
+	private void OnOwnerUpdate(PeerState state, ref NetReader reader)
+	{
+		var index = reader.ReadByte();
+		if (reader.Failed || (index != 0 && !Worlds.IsNamed(index)))
+		{
+			Malformed(state);
+			return;
+		}
+
+		Worlds.Get(index)?.OnOwnerUpdate(state, ref reader);
+	}
+
+	private void OnSnapshotPart(uint tick, ref NetReader reader)
+	{
+		var baseline = reader.ReadUInt32();
+		var part = reader.ReadUInt16();
+		var flags = reader.ReadByte();
+		var index = reader.ReadByte();
+		var epoch = reader.ReadByte();
+		if (reader.Failed || tick == 0 || part >= Protocol.MaxParts)
+		{
+			_stats.Malformed++;
+			return;
+		}
+
+		// A world this client does not have open (closed, or a snapshot of an earlier open still in flight) is skipped.
+		if (Worlds.Get(index) is not { } world || world.Epoch != epoch) return;
+		world.OnSnapshotPart(tick, baseline, part, flags, ref reader);
+	}
+
+	private void OnWorldUnavailable(ref NetReader reader)
+	{
+		var index = reader.ReadByte();
+		var epoch = reader.ReadByte();
+		if (reader.Failed)
+		{
+			_stats.Malformed++;
+			return;
+		}
+
+		if (Worlds.Get(index) is not { } world || world.Epoch != epoch) return;
+		_logger.LogInformation("The server has no networked world '{World}' (now): it stays empty until the server has it.", world.Name);
+		world.Reset();
+		Prediction.OnWorldReset(world);
+		_events.Emit(new NetworkWorldUnavailable(world.Index));
 	}
 
 	// Messages ---------------------------------------------------------------------------------------------------------------
@@ -559,7 +784,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		if (IsServer && peer.IsServer)
 		{
 			// A listen server's own messages (of either direction) are delivered locally.
-			_events.Emit(new NetworkMessageReceived<T>(NetworkPeer.Server, World.CurrentTick, message));
+			_events.Emit(new NetworkMessageReceived<T>(NetworkPeer.Server, Tick, message));
 			return;
 		}
 
@@ -568,7 +793,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		var state = _byPeer[peer.Id];
 		if (state is null || state.Stage != PeerStage.Connected) return;
 		var payload = Serialize(info, message);
-		Append(state, delivery, (uint)info.Ordinal, World.CurrentTick, payload);
+		Append(state, delivery, (uint)info.Ordinal, Tick, payload);
 	}
 
 	/// <inheritdoc/>
@@ -587,7 +812,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		var payload = Serialize(info, message);
 		foreach (var state in _states)
 		{
-			if (state.Stage == PeerStage.Connected) Append(state, info.Delivery, (uint)info.Ordinal, World.CurrentTick, payload);
+			if (state.Stage == PeerStage.Connected) Append(state, info.Delivery, (uint)info.Ordinal, Tick, payload);
 		}
 	}
 
@@ -663,7 +888,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		var box = state.Outboxes[(int)delivery];
 		if (box.Count == 0) return;
 		var w = new NetWriter(box.Buffer);
-		Protocol.WriteHeader(ref w, PacketKind.Messages, World.CurrentTick, World.AckTick);
+		Protocol.WriteHeader(ref w, PacketKind.Messages, Tick, Root.AckTick);
 		SendRaw(state, new ReadOnlySpan<byte>(box.Buffer, 0, box.Length), delivery);
 		box.Reset();
 	}
@@ -678,8 +903,13 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 
 		if (IsActive)
 		{
-			if (IsServer) World.SendSnapshots();
-			else World.SendOwnerUpdates(_byPeer[0]);
+			foreach (var world in Worlds.LiveWorlds)
+			{
+				if (IsServer) world.SendSnapshots();
+				else world.SendOwnerUpdates(_byPeer[0]);
+			}
+
+			if (IsClient && _byPeer[0] is { } host) SendWorldAcks(host);
 
 			foreach (var state in _states)
 			{
@@ -688,7 +918,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 				{
 					state.LastPing = now;
 					var w = new NetWriter(_control);
-					Protocol.WriteHeader(ref w, PacketKind.Ping, World.CurrentTick, World.AckTick);
+					Protocol.WriteHeader(ref w, PacketKind.Ping, Tick, Root.AckTick);
 					w.WriteInt64(now.Ticks);
 					SendRaw(state, w.Written, Delivery.Unreliable);
 				}
@@ -696,19 +926,35 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 				for (var d = 0; d < state.Outboxes.Length; d++) FlushOutbox(state, (Delivery)d);
 			}
 
-			// A client acknowledges every completed snapshot, even when it has nothing else to send.
-			if (IsClient && World.AckPending && _byPeer[0] is { } server)
+			// A client acknowledges every completed snapshot of the root world, even when it has nothing else to send.
+			if (IsClient && Root.AckPending && _byPeer[0] is { } server)
 			{
 				var w = new NetWriter(_control);
-				Protocol.WriteHeader(ref w, PacketKind.Messages, World.CurrentTick, World.AckTick);
+				Protocol.WriteHeader(ref w, PacketKind.Messages, Tick, Root.AckTick);
 				SendRaw(server, w.Written, Delivery.Unreliable);
 			}
 
-			World.AckPending = false;
+			Root.AckPending = false;
 		}
 
 		_transport.Flush();
 		_metrics?.Update(this);
+	}
+
+	/// <summary>Client: acknowledges the named worlds that completed a snapshot since the last send (the root's ack is in every header).</summary>
+	private void SendWorldAcks(PeerState server)
+	{
+		var w = new NetWriter(_control);
+		Protocol.WriteHeader(ref w, PacketKind.WorldAck, Tick, Root.AckTick);
+		foreach (var world in Worlds.LiveWorlds)
+		{
+			if (world.Index == 0 || !world.AckPending) continue;
+			w.WriteByte(world.Index);
+			w.WriteUInt32(world.AckTick);
+			world.AckPending = false;
+		}
+
+		if (w.Position > Protocol.HeaderSize) SendRaw(server, w.Written, Delivery.Unreliable);
 	}
 
 	/// <summary>Sends a raw packet (header included) to a connection and counts it.</summary>
@@ -717,13 +963,13 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		_transport!.Send(state.Connection, packet, delivery);
 		_stats.BytesOut += packet.Length;
 		_stats.PacketsOut++;
-		if (IsClient && packet.Length >= Protocol.HeaderSize) World.AckPending = false;
+		if (IsClient && packet.Length >= Protocol.HeaderSize) Root.AckPending = false;
 	}
 
 	private void SendControl(PeerState state, PacketKind kind, byte value)
 	{
 		var w = new NetWriter(_control);
-		Protocol.WriteHeader(ref w, kind, World.CurrentTick, World.AckTick);
+		Protocol.WriteHeader(ref w, kind, Tick, Root.AckTick);
 		w.WriteByte(value);
 		SendRaw(state, w.Written, Delivery.ReliableOrdered);
 	}
@@ -738,7 +984,7 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		}
 
 		var w = new NetWriter(_control);
-		Protocol.WriteHeader(ref w, PacketKind.Pong, World.CurrentTick, World.AckTick);
+		Protocol.WriteHeader(ref w, PacketKind.Pong, Tick, Root.AckTick);
 		w.WriteInt64(stamp);
 		SendRaw(state, w.Written, Delivery.Unreliable);
 	}
@@ -860,7 +1106,8 @@ public sealed class NetworkSession : INetworkSession, INetworkMessages, IDisposa
 		if (!state.Peer.IsClient || _byPeer[state.Peer.Id] != state) return;
 		_byPeer[state.Peer.Id] = null;
 		_peers.Remove(state.Peer);
-		World.OnPeerDisconnected(state);
+		foreach (var world in Worlds.LiveWorlds) world.RemovePeer(state);
+		state.OpenWorlds.Clear();
 		_events.Emit(new PeerDisconnected(state.Peer, reason));
 		_logger.LogInformation("Client {Peer} left: {Reason}.", state.Peer, reason);
 	}

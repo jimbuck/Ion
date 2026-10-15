@@ -75,7 +75,7 @@ public static class NetworkRegistry
 public sealed class NetworkTypeTable
 {
 	/// <summary>The protocol version, part of the hash and of the handshake.</summary>
-	public const ushort ProtocolVersion = 1;
+	public const ushort ProtocolVersion = 2;
 
 	private readonly ReplicatedTypeInfo[] _components;
 	private readonly MessageTypeInfo[] _messages;

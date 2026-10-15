@@ -41,7 +41,7 @@ internal sealed class NetPeer : IDisposable
 	public void Fixed()
 	{
 		Events.BeginFixedStep();
-		Net.BeginTick();
+		Session.BeginTick();
 		try
 		{
 			Session.Prediction.FixedStep((float)(1.0 / Harness.TickRate));
@@ -49,7 +49,7 @@ internal sealed class NetPeer : IDisposable
 		}
 		finally
 		{
-			Net.Capture();
+			Session.Capture();
 			Events.EndFixedSteps();
 		}
 	}
@@ -93,15 +93,16 @@ internal sealed class NetHarness : IDisposable
 		return config;
 	}
 
-	public NetPeer Server(Action<NetworkConfig>? configure = null, NetworkTypeTable? table = null)
+	public NetPeer Server(Action<NetworkConfig>? configure = null, NetworkTypeTable? table = null, string[]? worlds = null)
 	{
 		var peer = new NetPeer(this, Config(NetworkMode.Server, configure), table);
 		_peers.Add(peer);
+		foreach (var name in worlds ?? []) peer.Session.Worlds.Register(name);
 		peer.Session.Start();
 		return peer;
 	}
 
-	public NetPeer Client(NetPeer server, Action<NetworkConfig>? configure = null, NetworkTypeTable? table = null)
+	public NetPeer Client(NetPeer server, Action<NetworkConfig>? configure = null, NetworkTypeTable? table = null, string[]? worlds = null)
 	{
 		var peer = new NetPeer(this, Config(NetworkMode.Client, c =>
 		{
@@ -109,6 +110,7 @@ internal sealed class NetHarness : IDisposable
 			configure?.Invoke(c);
 		}), table);
 		_peers.Add(peer);
+		foreach (var name in worlds ?? []) peer.Session.Worlds.Register(name);
 		peer.Session.Start();
 		return peer;
 	}

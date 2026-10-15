@@ -38,7 +38,7 @@ public class RegistryTests
 		// Pinned: the hash is what two builds of a game compare in the handshake, so it must not depend on anything but
 		// the type signatures (not on string hashing, which .NET randomizes per process, nor on the runtime).
 		NetworkTypeInfo[] types = [Component("Game.Health", "Current:int;Max:int"), Message("Game.Chat", "Text:Ion.Extensions.Networking.FixedString64")];
-		Assert.Equal(0xB4308183BF81C42CUL, NetworkTypeTable.Create(types).Hash);
+		Assert.Equal(0xBD4FAD521A102E0DUL, NetworkTypeTable.Create(types).Hash);
 		Assert.Equal(0xCBF29CE484222325UL, NetworkTypeTable.Fnv1a64(""));
 		Assert.Equal(0xAF63DC4C8601EC8CUL, NetworkTypeTable.Fnv1a64("a"));
 	}

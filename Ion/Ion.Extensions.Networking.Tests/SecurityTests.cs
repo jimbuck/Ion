@@ -163,6 +163,7 @@ public class SecurityTests
 		// A forged update of someone else's entity is rejected and changes nothing.
 		SendRaw(owner, PacketKind.OwnerUpdate, box => box.Write((ref NetWriter w) =>
 		{
+			w.WriteByte(0); // the root world
 			w.WriteVarUInt32((uint)theirsId.Slot);
 			w.WriteUInt32(theirsId.Id);
 			w.WriteVarUInt32((uint)NetworkTypes<Aim>.Component!.Ordinal);
@@ -172,6 +173,7 @@ public class SecurityTests
 		// So is an update of a server-authority component on its own entity.
 		SendRaw(owner, PacketKind.OwnerUpdate, box => box.Write((ref NetWriter w) =>
 		{
+			w.WriteByte(0); // the root world
 			w.WriteVarUInt32((uint)mineId.Slot);
 			w.WriteUInt32(mineId.Id);
 			w.WriteVarUInt32((uint)NetworkTypes<Health>.Component!.Ordinal);

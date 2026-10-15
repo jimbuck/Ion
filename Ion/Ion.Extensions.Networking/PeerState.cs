@@ -59,9 +59,6 @@ internal sealed class PeerState
 
 	public TimeSpan Rtt;
 
-	/// <summary>Server: the newest snapshot tick the client completed.</summary>
-	public uint AckTick;
-
 	public int Violations;
 
 	public double MessageTokens;
@@ -74,6 +71,21 @@ internal sealed class PeerState
 
 	/// <summary>One outbox per <see cref="Delivery"/>.</summary>
 	public readonly Outbox[] Outboxes = new Outbox[4];
+
+	/// <summary>Server: the named worlds the client has open, by world index, with the epoch of each open.</summary>
+	public readonly Dictionary<byte, byte> OpenWorlds = [];
+}
+
+/// <summary>What one networked world knows about one peer (on the server, a client that has the world open).</summary>
+internal sealed class PeerView(PeerState state, byte epoch)
+{
+	public readonly PeerState State = state;
+
+	/// <summary>The epoch of the client's open (snapshot parts carry it; 0 for the root world).</summary>
+	public readonly byte Epoch = epoch;
+
+	/// <summary>The newest snapshot tick of this world the client completed.</summary>
+	public uint AckTick;
 
 	/// <summary>Interest management: the slots the peer received per tick (ring by tick), and the ticks they belong to.</summary>
 	public ulong[][]? Relevance;

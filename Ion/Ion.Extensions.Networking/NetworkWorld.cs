@@ -5,9 +5,10 @@ using Arch.Core;
 namespace Ion.Extensions.Networking;
 
 /// <summary>
-/// The replication side of a <see cref="NetworkSession"/>: network ids and their dense slots, the snapshot ring
-/// (captured on the server, received on a client), delta encoding against each peer's acknowledged tick, applying
-/// received snapshots to the world, owner-authority updates, interpolation and lag compensation.
+/// The replication of one networked world of a <see cref="NetworkSession"/> (the root world, or a named scene world, see
+/// <see cref="INetworkWorlds"/>): network ids and their dense slots, the snapshot ring (captured on the server, received
+/// on a client), delta encoding against each peer's acknowledged tick, applying received snapshots to the world,
+/// owner-authority updates, interpolation and lag compensation.
 /// </summary>
 public sealed class NetworkWorld : INetworkWorld
 {
@@ -20,6 +21,9 @@ public sealed class NetworkWorld : INetworkWorld
 	private readonly SnapshotRing _ring;
 	private readonly int _history;
 	private readonly bool _hasOwnerUpdates;
+
+	// Server: what this world knows about each peer that has it open (by peer id; every connected peer for the root).
+	private readonly PeerView?[] _views = new PeerView?[256];
 
 	// Server: the id allocated to each slot (0: free), the generations, when each was allocated, the free slots, the
 	// entity found with each id at the last capture, and which slots were seen at the last capture.
@@ -47,7 +51,6 @@ public sealed class NetworkWorld : INetworkWorld
 	private uint _latestComplete;
 	private uint _applied;
 	private TimeSpan _latestArrival;
-	private double _syncError;
 	private double _interpolationTick;
 	private TimeSpan _lastInterpolation;
 
@@ -55,12 +58,15 @@ public sealed class NetworkWorld : INetworkWorld
 	private SnapshotFrame? _rewindScratch;
 	private readonly List<int> _rewound = [];
 
-	internal NetworkWorld(NetworkSession session, World world, NetworkConfig config, NetworkTypeTable table)
+	internal NetworkWorld(NetworkSession session, World world, NetworkConfig config, NetworkTypeTable table, string name = "", byte index = 0, byte epoch = 0)
 	{
 		_session = session;
 		_world = world;
 		_config = config;
 		_table = table;
+		Name = name;
+		Index = index;
+		Epoch = epoch;
 		_history = Math.Max(2, config.SnapshotHistory);
 		_ring = new SnapshotRing(table, _history, 64);
 		_part = new byte[Protocol.MaxPacketSize];
@@ -74,7 +80,19 @@ public sealed class NetworkWorld : INetworkWorld
 	}
 
 	/// <inheritdoc/>
-	public uint CurrentTick { get; internal set; }
+	public string Name { get; }
+
+	/// <inheritdoc/>
+	public byte Index { get; }
+
+	/// <summary>On a client, the epoch of this open of the world (snapshot parts of an earlier open carry another); 0 for the root world.</summary>
+	internal byte Epoch { get; }
+
+	/// <summary>Whether the world was detached (its scene unloaded).</summary>
+	internal bool IsDetached { get; set; }
+
+	/// <inheritdoc/>
+	public uint CurrentTick => _session.Tick;
 
 	/// <inheritdoc/>
 	public uint OldestTick => CurrentTick >= (uint)_history ? CurrentTick - (uint)_history + 1 : 1;
@@ -103,19 +121,25 @@ public sealed class NetworkWorld : INetworkWorld
 	/// <summary>The newest snapshot tick applied to the world (client).</summary>
 	public uint AppliedTick => _applied;
 
-	/// <summary>The ack a client puts in its packet headers: the newest complete snapshot tick.</summary>
+	/// <summary>The ack a client sends for this world: the newest complete snapshot tick.</summary>
 	internal uint AckTick => _session.IsClient ? _latestComplete : 0;
 
 	/// <summary>Whether a client completed a snapshot it has not acknowledged yet.</summary>
 	internal bool AckPending { get; set; }
 
+	/// <summary>The newest server tick the prediction reconciled against in this world (client).</summary>
+	internal uint ReconciledTick { get; set; }
+
 	internal SnapshotRing Ring => _ring;
 
 	/// <inheritdoc/>
-	public uint LastAckedTick(NetworkPeer peer) => _session.StateOf(peer)?.AckTick ?? 0;
+	public uint LastAckedTick(NetworkPeer peer) => _views[peer.Id]?.AckTick ?? 0;
 
 	/// <inheritdoc/>
 	public bool IsOwned(in NetworkId id) => _session.LocalPeer.Id == id.OwnerPeer && _session.LocalPeer != NetworkPeer.None;
+
+	/// <summary>Whether <paramref name="peer"/> gets this world's snapshots (server).</summary>
+	internal bool HasPeer(NetworkPeer peer) => _views[peer.Id] is not null;
 
 	/// <summary>
 	/// The number of networked entities in the snapshot of <paramref name="tick"/> (captured on a server, received on a
@@ -160,7 +184,7 @@ public sealed class NetworkWorld : INetworkWorld
 		_slotIds[slot] = id;
 		_allocatedAt[slot] = CurrentTick;
 		_slotEntities[slot] = Entity.Null;
-		return new NetworkId(id, owner.Id);
+		return new NetworkId(id, owner.Id, Index);
 	}
 
 	private void EnsureSlots(int count)
@@ -178,6 +202,12 @@ public sealed class NetworkWorld : INetworkWorld
 	public bool TryGetEntity(NetworkId id, out Entity entity)
 	{
 		var slot = id.Slot;
+		if (id.World != Index)
+		{
+			entity = Entity.Null;
+			return false;
+		}
+
 		if (_session.IsServer)
 		{
 			if (slot < _highWater && _slotIds[slot] == id.Id && _slotEntities[slot] != Entity.Null && _world.IsAlive(_slotEntities[slot]))
@@ -198,16 +228,10 @@ public sealed class NetworkWorld : INetworkWorld
 
 	// Ticks ------------------------------------------------------------------------------------------------------------------
 
-	internal void BeginTick()
-	{
-		if (!_session.IsActive) return;
-		CurrentTick++;
-	}
-
 	/// <summary>Server: gives ids to new entities, then captures every replicated component of this tick into the ring.</summary>
 	internal void Capture()
 	{
-		if (!_session.IsServer || !_session.IsActive || CurrentTick == 0) return;
+		if (!_session.IsServer || !_session.IsActive || CurrentTick == 0 || IsDetached) return;
 
 		// Entities with a replicated component and no id get a server-owned one.
 		_unidentified.Clear();
@@ -235,7 +259,8 @@ public sealed class NetworkWorld : INetworkWorld
 			{
 				var id = networkIds[i];
 				var slot = id.Slot;
-				if (slot >= _highWater || _slotIds[slot] != id.Id) continue;
+				// An id of another world (allocated from another INetworkWorld) is not this world's.
+				if (slot >= _highWater || _slotIds[slot] != id.Id || id.World != Index) continue;
 				ids[slot] = id.Id;
 				owners[slot] = id.OwnerPeer;
 				_slotEntities[slot] = Unsafe.Add(ref entities, i);
@@ -261,24 +286,50 @@ public sealed class NetworkWorld : INetworkWorld
 
 	// Server: snapshots out ---------------------------------------------------------------------------------------------------
 
-	internal void OnPeerConnected(PeerState state)
+	/// <summary>Server: <paramref name="state"/> gets this world's snapshots from now on, starting with a full one.</summary>
+	internal void AddPeer(PeerState state, byte epoch)
 	{
-		state.AckTick = 0;
-		if (InterestPolicy is not null && state.Relevance is null)
+		var view = new PeerView(state, epoch);
+		if (InterestPolicy is not null)
 		{
-			state.Relevance = new ulong[_history][];
-			state.RelevanceTicks = new uint[_history];
-			for (var i = 0; i < _history; i++) state.Relevance[i] = new ulong[1];
+			view.Relevance = new ulong[_history][];
+			view.RelevanceTicks = new uint[_history];
+			for (var i = 0; i < _history; i++) view.Relevance[i] = new ulong[1];
+		}
+
+		_views[state.Peer.Id] = view;
+	}
+
+	/// <summary>Server: <paramref name="state"/> no longer gets this world (it left, or closed the world).</summary>
+	internal void RemovePeer(PeerState state)
+	{
+		if (state.Peer.Id < _views.Length && _views[state.Peer.Id]?.State == state) _views[state.Peer.Id] = null;
+	}
+
+	/// <summary>Server: the peers that get this world, with the epochs of their opens.</summary>
+	internal IEnumerable<PeerView> Views
+	{
+		get
+		{
+			foreach (var view in _views)
+			{
+				if (view is not null) yield return view;
+			}
 		}
 	}
 
-	internal void OnPeerDisconnected(PeerState state) => state.AckTick = 0;
+	/// <summary>Server: <paramref name="state"/> completed this world's snapshot of <paramref name="tick"/>.</summary>
+	internal void OnAck(PeerState state, uint tick)
+	{
+		if (_views[state.Peer.Id] is not { } view || view.State != state) return;
+		if (tick != 0 && tick <= CurrentTick && tick > view.AckTick) view.AckTick = tick;
+	}
 
-	/// <summary>Sends the newest captured tick to every connected peer, as a delta against its acknowledged tick.</summary>
+	/// <summary>Sends the newest captured tick to every peer that has the world, as a delta against its acknowledged tick.</summary>
 	internal void SendSnapshots()
 	{
 		var tick = _capturedTick;
-		if (tick == 0 || tick == _lastSentTick) return;
+		if (tick == 0 || tick == _lastSentTick || IsDetached) return;
 		var interval = _config.SendRate > 0 ? Math.Max(1, (int)Math.Round(_session.TickRate / _config.SendRate)) : 1;
 		if (_lastSentTick != 0 && tick - _lastSentTick < interval) return;
 		_lastSentTick = tick;
@@ -286,25 +337,27 @@ public sealed class NetworkWorld : INetworkWorld
 		var current = _ring.Get(tick);
 		if (current is null) return;
 
-		foreach (var state in _session.States)
+		foreach (var view in _views)
 		{
-			if (state.Stage != PeerStage.Connected) continue;
-			var ack = state.AckTick;
+			if (view is null || view.State.Stage != PeerStage.Connected) continue;
+			var ack = view.AckTick;
 			var baseline = ack != 0 && tick > ack && tick - ack < (uint)_history ? _ring.Get(ack) : null;
 			if (baseline is null) _session.MutableStats.FullSnapshots++;
-			Encode(state, current, baseline);
+			Encode(view, current, baseline);
 		}
 	}
 
-	private void Encode(PeerState state, SnapshotFrame current, SnapshotFrame? baseline)
+	private void Encode(PeerView view, SnapshotFrame current, SnapshotFrame? baseline)
 	{
+		var state = view.State;
+
 		// Interest: the slots this peer gets now, and the ones it had at the baseline.
 		ulong[]? relevant = null;
 		ulong[]? relevantBefore = null;
-		if (InterestPolicy is { } policy && state.Relevance is not null && state.RelevanceTicks is not null)
+		if (InterestPolicy is { } policy && view.Relevance is not null && view.RelevanceTicks is not null)
 		{
 			var index = (int)(current.Tick % (uint)_history);
-			ref var bits = ref state.Relevance[index];
+			ref var bits = ref view.Relevance[index];
 			if (bits.Length * 64 < current.SlotCount) bits = new ulong[(current.SlotCount + 63) / 64];
 			Array.Clear(bits);
 			policy.BeginPeer(state.Peer, _world);
@@ -316,12 +369,12 @@ public sealed class NetworkWorld : INetworkWorld
 				if (policy.IsRelevant(state.Peer, entity, new NetworkId(current.Ids[slot], current.Owners[slot]))) bits[slot >> 6] |= 1UL << slot;
 			}
 
-			state.RelevanceTicks[index] = current.Tick;
+			view.RelevanceTicks[index] = current.Tick;
 			relevant = bits;
 			if (baseline is not null)
 			{
 				var before = (int)(baseline.Tick % (uint)_history);
-				relevantBefore = state.RelevanceTicks[before] == baseline.Tick ? state.Relevance[before] : null;
+				relevantBefore = view.RelevanceTicks[before] == baseline.Tick ? view.Relevance[before] : null;
 				if (relevantBefore is null) baseline = null;
 			}
 		}
@@ -331,7 +384,7 @@ public sealed class NetworkWorld : INetworkWorld
 		var partIndex = 0;
 		var total = 0;
 		var truncated = false;
-		var writer = BeginPart(current.Tick, baseline?.Tick ?? 0, partIndex);
+		var writer = BeginPart(current.Tick, baseline?.Tick ?? 0, partIndex, view.Epoch);
 		var count = Math.Max(current.SlotCount, baseline?.SlotCount ?? 0);
 
 		for (var slot = 0; slot < count; slot++)
@@ -423,7 +476,7 @@ public sealed class NetworkWorld : INetworkWorld
 					break;
 				}
 
-				writer = BeginPart(current.Tick, baseline?.Tick ?? 0, partIndex);
+				writer = BeginPart(current.Tick, baseline?.Tick ?? 0, partIndex, view.Epoch);
 				if (writer.Remaining < bytes.Length) continue;
 			}
 
@@ -450,13 +503,15 @@ public sealed class NetworkWorld : INetworkWorld
 		return now == before;
 	}
 
-	private NetWriter BeginPart(uint tick, uint baseline, int index)
+	private NetWriter BeginPart(uint tick, uint baseline, int index, byte epoch)
 	{
 		var writer = new NetWriter(_part.AsSpan(0, _session.Mtu));
 		Protocol.WriteHeader(ref writer, PacketKind.Snapshot, tick, 0);
 		writer.WriteUInt32(baseline);
 		writer.WriteUInt16((ushort)index);
 		writer.WriteByte(0);
+		writer.WriteByte(Index);
+		writer.WriteByte(epoch);
 		return writer;
 	}
 
@@ -470,30 +525,40 @@ public sealed class NetworkWorld : INetworkWorld
 
 	// Client: snapshots in ------------------------------------------------------------------------------------------------------
 
-	internal void OnAccepted(uint serverTick, TimeSpan rtt)
+	/// <summary>
+	/// Client: forgets everything received (a new connection, or the server's copy of the world went away): destroys the
+	/// replicated entities and empties the ring, so the next snapshot is applied as new.
+	/// </summary>
+	internal void Reset()
 	{
-		// The server is half a round trip past the tick it stamped the accept with, and an input takes another half to
-		// reach it: a full round trip ahead, plus the lead.
-		CurrentTick = serverTick + TicksFor(rtt.TotalSeconds) + (uint)Math.Max(0, _config.InputLeadTicks);
-		_syncError = 0;
+		for (var slot = 0; slot < _clientIds.Length; slot++)
+		{
+			if (_clientIds[slot] == 0) continue;
+			if (_world.IsAlive(_clientEntities[slot])) _world.Destroy(_clientEntities[slot]);
+			_clientIds[slot] = 0;
+			_clientEntities[slot] = Entity.Null;
+		}
+
+		_ring.Clear();
 		_latestComplete = 0;
 		_applied = 0;
 		_interpolationTick = 0;
+		_lastInterpolation = TimeSpan.Zero;
+		ReconciledTick = 0;
+		AckPending = false;
 	}
 
-	private uint TicksFor(double seconds) => (uint)Math.Max(0, Math.Ceiling(seconds * _session.TickRate));
-
-	internal void OnSnapshotPart(uint tick, ref NetReader reader)
+	/// <summary>Client: the accept arrived (the session set the tick); nothing received before it counts.</summary>
+	internal void OnAccepted()
 	{
-		var baselineTick = reader.ReadUInt32();
-		var index = reader.ReadUInt16();
-		var flags = reader.ReadByte();
-		if (reader.Failed || tick == 0 || index >= Protocol.MaxParts)
-		{
-			_session.MutableStats.Malformed++;
-			return;
-		}
+		_latestComplete = 0;
+		_applied = 0;
+		_interpolationTick = 0;
+		ReconciledTick = 0;
+	}
 
+	internal void OnSnapshotPart(uint tick, uint baselineTick, int index, byte flags, ref NetReader reader)
+	{
 		if ((flags & Protocol.Truncated) != 0)
 		{
 			// The server could not send this snapshot whole: forget what arrived of it.
@@ -554,7 +619,8 @@ public sealed class NetworkWorld : INetworkWorld
 		AckPending = true;
 		_session.MutableStats.Snapshots++;
 		_session.MutableStats.LastSnapshotBytes = frame.Bytes;
-		SyncTick(tick);
+		// The root world's snapshots, which every client gets, keep the shared tick in step.
+		if (Index == 0) _session.SyncTick(tick);
 	}
 
 	private bool Decode(SnapshotFrame frame, ref NetReader reader)
@@ -619,21 +685,6 @@ public sealed class NetworkWorld : INetworkWorld
 		return !reader.Failed;
 	}
 
-	// The client runs ahead of the server's snapshot by a full round trip (the snapshot took half of it to arrive, and an
-	// input takes the other half to reach the server) plus the input lead, so its inputs for tick N arrive before the
-	// server simulates N. The error is smoothed; beyond 3 ticks the tick is reset (and predictions cleared).
-	private void SyncTick(uint serverTick)
-	{
-		var rtt = _session.RoundTripTime(NetworkPeer.Server).TotalSeconds;
-		var target = serverTick + rtt * _session.TickRate + Math.Max(0, _config.InputLeadTicks);
-		var error = CurrentTick - target;
-		_syncError = _syncError * 0.8 + error * 0.2;
-		if (Math.Abs(_syncError) <= 3 && Math.Abs(error) <= 12) return;
-		CurrentTick = (uint)Math.Max(1, Math.Round(target));
-		_syncError = 0;
-		_session.MutableStats.Resyncs++;
-		_session.Prediction.OnResync();
-	}
 
 	/// <summary>Applies the newest complete snapshot to the world: spawns, despawns, component values.</summary>
 	internal void ApplyLatest()
@@ -679,7 +730,7 @@ public sealed class NetworkWorld : INetworkWorld
 				if (_world.IsAlive(old)) _world.Destroy(old);
 				_clientIds[slot] = 0;
 				_clientEntities[slot] = Entity.Null;
-				events.Emit(new NetworkEntityDespawned(new NetworkId(existing, 0)));
+				events.Emit(new NetworkEntityDespawned(new NetworkId(existing, 0, Index)));
 			}
 
 			if (!alive) continue;
@@ -688,7 +739,7 @@ public sealed class NetworkWorld : INetworkWorld
 			var spawned = false;
 			if (_clientIds[slot] == 0 || !_world.IsAlive(_clientEntities[slot]))
 			{
-				_clientEntities[slot] = _world.Create(new NetworkId(id, owner));
+				_clientEntities[slot] = _world.Create(new NetworkId(id, owner, Index));
 				_clientIds[slot] = id;
 				spawned = true;
 			}
@@ -719,7 +770,7 @@ public sealed class NetworkWorld : INetworkWorld
 				}
 			}
 
-			if (spawned) events.Emit(new NetworkEntitySpawned(entity, new NetworkId(id, owner)));
+			if (spawned) events.Emit(new NetworkEntitySpawned(entity, new NetworkId(id, owner, Index)));
 		}
 
 		_applied = frame.Tick;
@@ -728,7 +779,7 @@ public sealed class NetworkWorld : INetworkWorld
 	/// <summary>Client: writes the interpolated value of every interpolated component of the remote entities (Render).</summary>
 	internal void Interpolate()
 	{
-		if (!_session.IsClient || !_session.IsActive || _latestComplete == 0) return;
+		if (!_session.IsClient || !_session.IsActive || _latestComplete == 0 || IsDetached) return;
 		var now = _session.Clock.Elapsed;
 		var rate = _session.TickRate;
 		var delay = Math.Max(0, _config.InterpolationDelay);
@@ -838,19 +889,25 @@ public sealed class NetworkWorld : INetworkWorld
 			}
 		}
 
-		if (writer.Position > Protocol.HeaderSize) _session.SendRaw(server, writer.Written, Delivery.Unreliable);
+		if (writer.Position > OwnerPacketHeader) _session.SendRaw(server, writer.Written, Delivery.Unreliable);
 	}
 
 	private NetWriter BeginOwnerPacket()
 	{
 		var writer = new NetWriter(_part.AsSpan(0, _session.Mtu));
-		Protocol.WriteHeader(ref writer, PacketKind.OwnerUpdate, CurrentTick, AckTick);
+		Protocol.WriteHeader(ref writer, PacketKind.OwnerUpdate, CurrentTick, _session.Root.AckTick);
+		writer.WriteByte(Index);
 		return writer;
 	}
+
+	// The packet header and the world index.
+	private const int OwnerPacketHeader = Protocol.HeaderSize + 1;
 
 	/// <summary>Server: applies a client's owner-authority values after checking it owns each entity and each type is owner-authority.</summary>
 	internal void OnOwnerUpdate(PeerState state, ref NetReader reader)
 	{
+		// A peer that closed the world may still have updates in flight: they are dropped, not counted against it.
+		if (!HasPeer(state.Peer) || IsDetached) return;
 		var columns = _ring.Slot(CurrentTick).Columns;
 		while (!reader.End)
 		{
@@ -867,7 +924,7 @@ public sealed class NetworkWorld : INetworkWorld
 			var authorized = column.Info.Authority == Authority.Owner && !column.Info.Predicted
 				&& slot < (uint)_highWater && _slotIds[slot] == id
 				&& _slotEntities[slot] is var entity && entity != Entity.Null && _world.IsAlive(entity)
-				&& _world.TryGet<NetworkId>(entity, out var networkId) && networkId.Id == id && networkId.OwnerPeer == state.Peer.Id;
+				&& _world.TryGet<NetworkId>(entity, out var networkId) && networkId.Id == id && networkId.World == Index && networkId.OwnerPeer == state.Peer.Id;
 			if (!authorized)
 			{
 				// Not the owner, or not an owner-authority component: the rest of the packet is not trusted either.

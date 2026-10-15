@@ -37,11 +37,13 @@ public readonly record struct NetworkPeer(byte Id)
 /// The network identity of a replicated entity, the same on the server and on every client. The server adds it to every
 /// entity with a replicated component (or the game adds one from <see cref="INetworkWorld.Allocate"/>, to give the entity
 /// to a client). <see cref="Id"/> packs a dense slot (the low 20 bits, used to index the snapshot ring) and a generation
-/// (the high 12 bits) so that a reused slot is a different id.
+/// (the high 12 bits) so that a reused slot is a different id. <see cref="World"/> is the networked world the entity is
+/// in (0 for the root world, see <see cref="INetworkWorlds"/>), so ids are unique across worlds.
 /// </summary>
-/// <param name="Id">The id; 0 is no id.</param>
+/// <param name="Id">The id within its world; 0 is no id.</param>
 /// <param name="OwnerPeer">The id of the owning peer (<see cref="NetworkPeer.Id"/>; 0 is the server).</param>
-public readonly record struct NetworkId(uint Id, byte OwnerPeer)
+/// <param name="World">The index of the networked world (<see cref="INetworkWorld.Index"/>; 0 is the root world).</param>
+public readonly record struct NetworkId(uint Id, byte OwnerPeer, byte World = 0)
 {
 	/// <summary>The number of bits of <see cref="Id"/> that hold the slot.</summary>
 	public const int SlotBits = 20;
@@ -65,7 +67,7 @@ public readonly record struct NetworkId(uint Id, byte OwnerPeer)
 	public static uint Make(int slot, uint generation) => (generation << SlotBits) | (uint)slot;
 
 	/// <inheritdoc/>
-	public override string ToString() => $"net#{Slot}.{Generation} ({Owner})";
+	public override string ToString() => World == 0 ? $"net#{Slot}.{Generation} ({Owner})" : $"net#{World}:{Slot}.{Generation} ({Owner})";
 }
 
 /// <summary>
@@ -91,6 +93,14 @@ public readonly record struct NetworkEntitySpawned(Entity Entity, NetworkId Id);
 /// <summary>A client destroyed the entity of a replicated despawn (emitted on the client's <see cref="IEvents"/>).</summary>
 /// <param name="Id">The network id of the destroyed entity.</param>
 public readonly record struct NetworkEntityDespawned(NetworkId Id);
+
+/// <summary>
+/// A client opened a networked world the server does not have, or the server's copy of it went away (its scene
+/// unloaded). The client's world keeps no replicated entities until the server has the world again, and then gets a full
+/// snapshot. Emitted on the client's <see cref="IEvents"/>.
+/// </summary>
+/// <param name="World">The world's index (its name is <see cref="INetworkWorlds.Names"/>[World - 1]).</param>
+public readonly record struct NetworkWorldUnavailable(byte World);
 
 /// <summary>Why a connection ended or was refused. Sent to the peer in the disconnect or reject packet.</summary>
 public enum DisconnectReason : byte

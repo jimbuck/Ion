@@ -46,8 +46,8 @@ internal sealed class NetBenchPair : IDisposable
 
 	public void ServerTick()
 	{
-		Server.World.BeginTick();
-		Server.World.Capture();
+		Server.BeginTick();
+		Server.Capture();
 	}
 
 	public void Frame()
@@ -55,7 +55,7 @@ internal sealed class NetBenchPair : IDisposable
 		Server.Poll();
 		Client.Poll();
 		ServerTick();
-		Client.World.BeginTick();
+		Client.BeginTick();
 		Server.Send();
 		Client.Send();
 		ServerEvents.Step();

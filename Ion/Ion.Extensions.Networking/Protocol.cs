@@ -32,6 +32,18 @@ internal enum PacketKind : byte
 
 	/// <summary>Either side: the connection is closing (a <see cref="DisconnectReason"/>).</summary>
 	Disconnect = 10,
+
+	/// <summary>Client: it created a named networked world (world index, epoch); the server starts sending it.</summary>
+	OpenWorld = 11,
+
+	/// <summary>Client: its named world went away (world index); the server stops sending it.</summary>
+	CloseWorld = 12,
+
+	/// <summary>Server: it does not have, or no longer has, a world the client opened (world index, epoch).</summary>
+	WorldUnavailable = 13,
+
+	/// <summary>Client: the newest complete snapshot tick of each named world that completed one (world index, tick)*; the root world's is in every packet header.</summary>
+	WorldAck = 14,
 }
 
 /// <summary>Packet layout constants.</summary>
@@ -40,8 +52,11 @@ internal static class Protocol
 	/// <summary>Kind (1), the sender's tick (4) and, from a client, its newest complete snapshot tick (4).</summary>
 	public const int HeaderSize = 9;
 
-	/// <summary>Snapshot part header after the packet header: baseline tick (4), part index (2), flags (1).</summary>
-	public const int SnapshotHeaderSize = 7;
+	/// <summary>
+	/// Snapshot part header after the packet header: baseline tick (4), part index (2), flags (1), world index (1) and the
+	/// epoch of the client's open of that world (1; 0 for the root world).
+	/// </summary>
+	public const int SnapshotHeaderSize = 9;
 
 	/// <summary>The offset of the part flags in a snapshot packet.</summary>
 	public const int PartFlagsOffset = HeaderSize + 6;

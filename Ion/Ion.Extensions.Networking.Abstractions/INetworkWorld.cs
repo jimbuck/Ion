@@ -114,9 +114,20 @@ public interface INetworkSession
 /// <c>FixedUpdate</c> <c>End</c> scope at <see cref="StageOrder.Network"/>) into a ring of
 /// <see cref="NetworkConfig.SnapshotHistory"/> ticks, indexed by the entities' dense slots (<see cref="NetworkId.Slot"/>).
 /// A client keeps the snapshots it received in the same shape, indexed by server tick.
+/// <para>
+/// There is one per networked world (see <see cref="INetworkWorlds"/>): the root world, and each scene world whose scene
+/// calls <c>scene.UseNetworking("name")</c>. Resolved from a scene's services it is that scene's (the root one in a scene
+/// that is not networked). The tick is the session's, shared by every world.
+/// </para>
 /// </remarks>
 public interface INetworkWorld
 {
+	/// <summary>The world's name: empty for the root world, else the name its scene networks it under.</summary>
+	string Name { get; }
+
+	/// <summary>The world's index (<see cref="NetworkId.World"/>): 0 for the root world, 1 to 255 for named worlds, in name order.</summary>
+	byte Index { get; }
+
 	/// <summary>The current tick (incremented at the start of every fixed step; on a client, ahead of the server by the input lead).</summary>
 	uint CurrentTick { get; }
 
@@ -177,6 +188,42 @@ public interface INetworkWorld
 
 	/// <summary>Decides which entities each peer receives (null: every entity to every peer). Set before clients connect.</summary>
 	IInterestPolicy? InterestPolicy { get; set; }
+}
+
+/// <summary>
+/// The networked worlds of a session. The root world is always networked (index 0); a scene world takes part when its
+/// scene calls <c>scene.UseNetworking("name")</c>, under a name both sides register (the names are part of the handshake:
+/// a client whose set differs is refused with <see cref="DisconnectReason.RegistryMismatch"/>). Each world is replicated
+/// on its own.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A world is live while its scene is loaded. A client that creates a networked world asks the server for it, and the
+/// server sends that world's snapshots to that client until the client's world goes away. The server never follows the
+/// clients' scenes: a client that opens a world the server does not have (or no longer has) gets
+/// <see cref="NetworkWorldUnavailable"/>, and its world stays empty until the server has the world again. Moving players
+/// between levels is game logic (for example a replicated value or a message that clients answer with a scene change).
+/// </para>
+/// </remarks>
+public interface INetworkWorlds
+{
+	/// <summary>The root world's replication.</summary>
+	INetworkWorld Root { get; }
+
+	/// <summary>The live networked worlds: the root first, then the named worlds whose scenes are loaded.</summary>
+	IReadOnlyList<INetworkWorld> Live { get; }
+
+	/// <summary>The registered names of the named worlds, in index order (the name of index <c>i</c> is at <c>i - 1</c>).</summary>
+	IReadOnlyList<string> Names { get; }
+
+	/// <summary>The live world with <paramref name="index"/>, if its scene is loaded.</summary>
+	bool TryGet(byte index, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out INetworkWorld? world);
+
+	/// <summary>The live world named <paramref name="name"/> (empty for the root), if its scene is loaded.</summary>
+	bool TryGet(string name, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out INetworkWorld? world);
+
+	/// <summary>The local entity with the network id <paramref name="id"/>, in the live world <see cref="NetworkId.World"/> names.</summary>
+	bool TryGetEntity(NetworkId id, out World world, out Entity entity);
 }
 
 /// <summary>

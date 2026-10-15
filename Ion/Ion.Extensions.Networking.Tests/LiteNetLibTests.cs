@@ -96,8 +96,8 @@ public class LiteNetLibTests
 		{
 			Session.Poll();
 			Events.BeginFixedStep();
-			Session.World.BeginTick();
-			Session.World.Capture();
+			Session.BeginTick();
+			Session.Capture();
 			Events.EndFixedSteps();
 			Session.Send();
 			Events.Step();
@@ -176,7 +176,7 @@ public class LiteNetLibTests
 				allocatingFrames++;
 			}
 			client.Events.BeginFixedStep();
-			client.Session.World.BeginTick();
+			client.Session.BeginTick();
 			client.Events.EndFixedSteps();
 			client.Session.Send();
 			client.Events.Step();
