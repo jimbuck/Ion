@@ -8,6 +8,7 @@ using Ion.Extensions.Ecs;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Networking;
 using Ion.Extensions.Physics2D;
+using Ion.Extensions.Scenes;
 
 using World = Arch.Core.World;
 
@@ -22,7 +23,8 @@ public sealed class PaddleInputSource
 
 /// <summary>
 /// Registers the paddle's prediction step on every peer: a client samples its input, sends it and moves its own paddle at
-/// once; the server applies every player's input to that player's paddle; a listen server also samples its own.
+/// once; the server applies every player's input to that player's paddle; a listen server also samples its own. The
+/// step runs in every live networked world, so it reaches the paddles of the level while it is loaded.
 /// </summary>
 public sealed class PaddlePredictionSystem(INetworkPrediction prediction, INetworkSession session, PaddleInputSource input)
 {
@@ -37,11 +39,102 @@ public sealed class PaddlePredictionSystem(INetworkPrediction prediction, INetwo
 }
 
 /// <summary>
-/// The authoritative game, run on the server only (dedicated or listen): the level, a paddle per player, launches, the
-/// physics collisions, lost balls and new rounds. Everything it creates with replicated components is networked
-/// automatically; walls are <see cref="NetworkLocal"/>.
+/// The flow of the game, in the root world: menu, level, menu, level... The server owns the replicated
+/// <see cref="Stage"/> and <see cref="Scoreboard"/> and moves the stage on (the menu counts down once someone plays; a
+/// level ends when its blocks are gone, or when its time is up if levels are timed). Every peer, the server included,
+/// follows the stage with its own scene change; the server never tracks the clients' scenes.
 /// </summary>
-public sealed class ServerGameSystem(World world, INetworkSession session, INetworkWorld network, INetworkMessages messages, IEvents events, ILogger<ServerGameSystem> logger)
+public sealed class FlowSystem(World world, INetworkSession session, IEvents events, SceneSystem scenes, BreakoutSettings settings, ILogger<FlowSystem> logger)
+{
+	private static readonly QueryDescription Stages = new QueryDescription().WithAll<Stage>();
+	private static readonly QueryDescription Scoreboards = new QueryDescription().WithAll<Scoreboard>();
+
+	private Entity _stage = Entity.Null;
+	private Entity _scoreboard = Entity.Null;
+	private bool _cleared;
+
+	/// <summary>The stage this peer knows (on a client, the replicated one; the menu before the first snapshot).</summary>
+	public Stage Stage => Find(Stages, out Stage stage) ? stage : new Stage(GameScene.Menu, 0);
+
+	/// <summary>The score this peer knows.</summary>
+	public Scoreboard Score => Find(Scoreboards, out Scoreboard score) ? score : default;
+
+	[Init]
+	public void Init(GameTime dt)
+	{
+		if (!session.IsServer) return;
+		_stage = world.Create(new Stage(GameScene.Menu, settings.MenuSeconds));
+		_scoreboard = world.Create(new Scoreboard(0, 0, 1));
+	}
+
+	/// <summary>The level's game reports a broken block.</summary>
+	public void AddScore(int points) => world.Get<Scoreboard>(_scoreboard).Score += points;
+
+	/// <summary>The level's game reports lost balls.</summary>
+	public void LoseBalls(int count) => world.Get<Scoreboard>(_scoreboard).BallsLost += count;
+
+	/// <summary>The level's game reports that every block is broken: back to the menu.</summary>
+	public void LevelCleared() => _cleared = true;
+
+	/// <summary>Server: moves the stage on.</summary>
+	[FixedUpdate]
+	public void Advance(GameTime dt)
+	{
+		if (!session.IsServer || _stage == Entity.Null) return;
+		ref var stage = ref world.Get<Stage>(_stage);
+		ref var score = ref world.Get<Scoreboard>(_scoreboard);
+		switch (stage.Scene)
+		{
+			case GameScene.Menu:
+				// Someone has to play: a listen server's own player, or a client.
+				if (session.Mode != NetworkMode.ListenServer && session.Peers.Count == 0) break;
+				stage.SecondsLeft -= dt.Delta;
+				if (stage.SecondsLeft > 0) break;
+				stage = new Stage(GameScene.Level, settings.LevelSeconds);
+				logger.LogInformation("Level {Round}.", score.Round);
+				break;
+
+			case GameScene.Level:
+				if (settings.LevelSeconds > 0) stage.SecondsLeft -= dt.Delta;
+				if (!_cleared && !(settings.LevelSeconds > 0 && stage.SecondsLeft <= 0)) break;
+				logger.LogInformation("Level {Round} over: score {Score}.", score.Round, score.Score);
+				_cleared = false;
+				score.Round++;
+				stage = new Stage(GameScene.Menu, settings.MenuSeconds);
+				break;
+		}
+	}
+
+	/// <summary>Every peer: changes to the stage's scene when it differs from the loaded one (before the scene step runs).</summary>
+	[First(Order = StageOrder.Scenes - 10)]
+	public void Follow(GameTime dt)
+	{
+		var scene = (int)Stage.Scene;
+		if (scenes.IsLoading || (scenes.HasScene && scenes.CurrentSceneId == scene)) return;
+		events.Emit(new ChangeSceneEvent(scene));
+	}
+
+	private bool Find<T>(QueryDescription query, out T value) where T : unmanaged
+	{
+		var found = default(T);
+		var any = false;
+		world.Query(in query, (ref T component) =>
+		{
+			found = component;
+			any = true;
+		});
+		value = found;
+		return any;
+	}
+}
+
+/// <summary>
+/// The authoritative level, in the level scene on the server only (dedicated or listen): walls, blocks, a paddle per
+/// player, launches, the physics collisions and lost balls. Its world is the scene's (networked as "level"): everything
+/// it creates with replicated components is networked automatically and goes to the clients that are in their level
+/// scene; walls are <see cref="NetworkLocal"/>. The score and the flow are the root world's (<see cref="FlowSystem"/>).
+/// </summary>
+public sealed class ServerGameSystem(World world, INetworkSession session, INetworkWorld network, INetworkMessages messages, IEvents events, FlowSystem flow, ILogger<ServerGameSystem> logger)
 {
 	private static readonly QueryDescription Paddles = new QueryDescription().WithAll<Paddle, PaddleControl, Transform2D>();
 	private static readonly QueryDescription Balls = new QueryDescription().WithAll<Ball, Transform2D>();
@@ -53,7 +146,7 @@ public sealed class ServerGameSystem(World world, INetworkSession session, INetw
 	private NetworkReader<LaunchBall> _launches = messages.Reader<LaunchBall>();
 	private readonly List<Entity> _scratch = [];
 	private readonly Random _random = new(2026);
-	private Entity _scoreboard = Entity.Null;
+	private bool _over;
 
 	[Init]
 	public void Init(GameTime dt)
@@ -61,16 +154,22 @@ public sealed class ServerGameSystem(World world, INetworkSession session, INetw
 		if (!session.IsServer) return;
 		CreateWalls();
 		CreateBlocks();
-		_scoreboard = world.Create(new Scoreboard(0, 0, 1));
 		if (session.Mode == NetworkMode.ListenServer) CreatePaddle(NetworkPeer.Server);
-		logger.LogInformation("Breakout server ready: {Blocks} blocks, field {Width}x{Height}.", Field.Columns * Field.Rows, Field.Width, Field.Height);
+		foreach (var peer in session.Peers) CreatePaddle(peer);
+		logger.LogInformation("Level ready: {Blocks} blocks, {Players} players, field {Width}x{Height}.", Field.Columns * Field.Rows, session.Peers.Count + (session.Mode == NetworkMode.ListenServer ? 1 : 0), Field.Width, Field.Height);
 	}
 
-	/// <summary>A paddle for every player that joins; a player's paddle leaves with it.</summary>
+	/// <summary>A paddle for every player that joins during the level; a player's paddle leaves with it.</summary>
 	[First(Order = 10)]
 	public void Players(GameTime dt)
 	{
-		if (!session.IsServer) return;
+		if (!session.IsServer)
+		{
+			_joined.Skip();
+			_left.Skip();
+			return;
+		}
+
 		foreach (ref readonly var joined in _joined.Read())
 		{
 			if (joined.Peer.IsClient) CreatePaddle(joined.Peer);
@@ -122,15 +221,15 @@ public sealed class ServerGameSystem(World world, INetworkSession session, INetw
 			if (block == Entity.Null) continue;
 			messages.Broadcast(new BlockBroken(world.Get<Transform2D>(block).Position));
 			world.Destroy(block);
-			world.Get<Scoreboard>(_scoreboard).Score += 10;
+			flow.AddScore(10);
 		}
 	}
 
-	/// <summary>Launches, lost balls and new rounds.</summary>
+	/// <summary>Launches and lost balls; the level is over when its blocks are gone.</summary>
 	[FixedUpdate]
 	public void Play(GameTime dt)
 	{
-		if (!session.IsServer)
+		if (!session.IsServer || _over)
 		{
 			_launches.Skip();
 			return;
@@ -153,15 +252,12 @@ public sealed class ServerGameSystem(World world, INetworkSession session, INetw
 		}
 
 		foreach (var ball in _scratch) world.Destroy(ball);
-		if (_scratch.Count > 0) world.Get<Scoreboard>(_scoreboard).BallsLost += _scratch.Count;
+		if (_scratch.Count > 0) flow.LoseBalls(_scratch.Count);
 
 		if (world.CountEntities(in Blocks) == 0)
 		{
-			world.Destroy(in Balls);
-			CreateBlocks();
-			ref var scoreboard = ref world.Get<Scoreboard>(_scoreboard);
-			scoreboard.Round++;
-			logger.LogInformation("Round {Round}: score {Score}.", scoreboard.Round, scoreboard.Score);
+			_over = true;
+			flow.LevelCleared();
 		}
 	}
 
@@ -185,7 +281,8 @@ public sealed class ServerGameSystem(World world, INetworkSession session, INetw
 
 	private void CreatePaddle(NetworkPeer player)
 	{
-		// The id is allocated for the player, so the player owns the paddle (and predicts its PaddleControl).
+		// The id is allocated by the level's network world for the player, so the player owns the paddle (and predicts its
+		// PaddleControl).
 		var x = Field.Width / 2f;
 		world.Create(network.Allocate(player), new Paddle(player.Id), new PaddleControl(x), new Transform2D(new Vector2(x, Field.PaddleY)),
 			Collider2D.Capsule(Field.PaddleSize) with { Restitution = 1f, Friction = 0f }, RigidBody2D.Kinematic());
@@ -231,23 +328,19 @@ public sealed class ServerGameSystem(World world, INetworkSession session, INetw
 }
 
 /// <summary>
-/// What a player sees (clients and a listen server; nothing on a dedicated server): sprites for the replicated entities,
-/// its own paddle drawn at the predicted position, the score, and a sound when a block breaks.
+/// What a player sees of the level (clients and a listen server; nothing on a dedicated server), in the level scene:
+/// sprites for the replicated entities, its own paddle drawn at the predicted position, and a sound when a block breaks.
 /// </summary>
-public sealed class PresentationSystem(World world, INetworkSession session, INetworkWorld network, INetworkMessages messages, IAssetManager assets, ISpriteBatch spriteBatch, IAudioManager audio, IWindow window)
+public sealed class PresentationSystem(World world, INetworkSession session, INetworkWorld network, INetworkMessages messages, IAssetManager assets, IAudioManager audio)
 {
 	private static readonly QueryDescription BallsWithoutSprite = new QueryDescription().WithAll<Ball, Transform2D>().WithNone<Sprite>();
 	private static readonly QueryDescription BlocksWithoutSprite = new QueryDescription().WithAll<Block, Transform2D>().WithNone<Sprite>();
 	private static readonly QueryDescription PaddlesWithoutSprite = new QueryDescription().WithAll<Paddle, Transform2D>().WithNone<Sprite>();
 	private static readonly QueryDescription OwnPaddles = new QueryDescription().WithAll<NetworkId, PaddleControl, Transform2D>();
-	private static readonly QueryDescription Scoreboards = new QueryDescription().WithAll<Scoreboard>();
 
 	private NetworkReader<BlockBroken> _broken = messages.Reader<BlockBroken>();
 	private ITexture2D _ball = default!, _block = default!, _paddle = default!;
-	private IFont _font = default!;
 	private ISoundEffect _ping = default!;
-	private Scoreboard _shown = new(-1, -1, -1);
-	private string _text = "";
 
 	private bool Shows => session.Mode is NetworkMode.Client or NetworkMode.ListenServer;
 
@@ -255,12 +348,9 @@ public sealed class PresentationSystem(World world, INetworkSession session, INe
 	public void Init(GameTime dt)
 	{
 		if (!Shows) return;
-		window.Size = new Vector2(Field.Width, Field.Height);
-		window.IsResizable = false;
 		_ball = assets.Load<ITexture2D>("58-Breakout-Tiles.png");
 		_block = assets.Load<ITexture2D>("15-Breakout-Tiles.png");
 		_paddle = assets.Load<ITexture2D>("49-Breakout-Tiles.png");
-		_font = assets.Load<IFontSet>("Bungee-Regular.ttf").CreateStyle(24);
 		_ping = assets.Load<ISoundEffect>("ping.wav");
 	}
 
@@ -297,27 +387,54 @@ public sealed class PresentationSystem(World world, INetworkSession session, INe
 			}
 		}
 	}
+}
 
-	[Render]
-	public void DrawScore(GameTime dt)
+/// <summary>
+/// The heads-up display, in the root schedule so it shows in every scene (clients and a listen server): the score, and in
+/// the menu the next level's countdown. Sizes the window to the field.
+/// </summary>
+public sealed class HudSystem(INetworkSession session, FlowSystem flow, IAssetManager assets, ISpriteBatch spriteBatch, IWindow window)
+{
+	private IFont _font = default!, _title = default!;
+	private Scoreboard _shown = new(-1, -1, -1);
+	private string _text = "";
+
+	private bool Shows => session.Mode is NetworkMode.Client or NetworkMode.ListenServer;
+
+	[Init]
+	public void Init(GameTime dt)
 	{
 		if (!Shows) return;
-		foreach (ref var chunk in world.Query(in Scoreboards))
+		window.Size = new Vector2(Field.Width, Field.Height);
+		window.IsResizable = false;
+		var fonts = assets.Load<IFontSet>("Bungee-Regular.ttf");
+		_font = fonts.CreateStyle(24);
+		_title = fonts.CreateStyle(64);
+	}
+
+	[Render]
+	public void Draw(GameTime dt)
+	{
+		if (!Shows) return;
+		var score = flow.Score;
+		if (score != _shown)
 		{
-			var scoreboard = chunk.GetSpan<Scoreboard>()[0];
-			if (scoreboard != _shown)
-			{
-				_shown = scoreboard;
-				_text = $"Score {scoreboard.Score}   Round {scoreboard.Round}   Lost {scoreboard.BallsLost}";
-			}
+			_shown = score;
+			_text = $"Score {score.Score}   Level {score.Round}   Lost {score.BallsLost}";
 		}
 
 		spriteBatch.DrawString(_font, _text, new Vector2(20f, Field.Height - 60f), Color.White);
+
+		var stage = flow.Stage;
+		if (stage.Scene != GameScene.Menu) return;
+		spriteBatch.DrawString(_title, "Breakout Net", new Vector2(Field.Width / 2f - 260f, Field.Height / 2f - 120f), Color.White);
+		var line = session.State != NetworkState.Connected ? "Connecting..." : $"Level {score.Round} in {Math.Max(0, Math.Ceiling(stage.SecondsLeft)):0}";
+		spriteBatch.DrawString(_font, line, new Vector2(Field.Width / 2f - 120f, Field.Height / 2f), Color.White);
 	}
 }
 
 /// <summary>The local player's input (windowed): the mouse moves the paddle, a click launches a ball.</summary>
-public sealed class PlayerInputSystem(IWindow window, IInputState input, INetworkSession session, INetworkMessages messages, PaddleInputSource source)
+public sealed class PlayerInputSystem(IWindow window, IInputState input, INetworkSession session, INetworkMessages messages, FlowSystem flow, PaddleInputSource source)
 {
 	[Update]
 	public void Read(GameTime dt)
@@ -336,7 +453,7 @@ public sealed class PlayerInputSystem(IWindow window, IInputState input, INetwor
 				window.IsMouseGrabbed = true;
 				window.IsCursorVisible = false;
 			}
-			else
+			else if (flow.Stage.Scene == GameScene.Level)
 			{
 				messages.SendToServer(new LaunchBall());
 			}
@@ -347,10 +464,11 @@ public sealed class PlayerInputSystem(IWindow window, IInputState input, INetwor
 }
 
 /// <summary>
-/// Plays when running headless (clients and a listen server): follows the lowest ball with the paddle and launches a ball
-/// every second, so a headless client exercises inputs, prediction, messages and replication.
+/// Plays when running headless (clients and a listen server): in the level, follows the lowest ball with the paddle and
+/// launches a ball every second, so a headless client exercises inputs, prediction, messages and replication. In the
+/// root schedule (it reads the level's world through <see cref="INetworkWorlds"/>), so its counters last across levels.
 /// </summary>
-public sealed class NetAutopilotSystem(World world, INetworkSession session, INetworkMessages messages, PaddleInputSource source)
+public sealed class NetAutopilotSystem(INetworkWorlds worlds, INetworkSession session, INetworkMessages messages, PaddleInputSource source)
 {
 	private static readonly QueryDescription Balls = new QueryDescription().WithAll<Ball, Transform2D>();
 
@@ -372,6 +490,7 @@ public sealed class NetAutopilotSystem(World world, INetworkSession session, INe
 	public void Play(GameTime dt)
 	{
 		if (!Enabled || session.Mode is not (NetworkMode.Client or NetworkMode.ListenServer) || session.State != NetworkState.Connected) return;
+		if (!worlds.TryGet("level", out var level)) return;
 		_frames++;
 		if (_frames % LaunchInterval == 0 && Launches < MaxLaunches)
 		{
@@ -381,7 +500,7 @@ public sealed class NetAutopilotSystem(World world, INetworkSession session, INe
 
 		var lowest = float.MinValue;
 		var target = Field.Width / 2f;
-		foreach (ref var chunk in world.Query(in Balls))
+		foreach (ref var chunk in level.World.Query(in Balls))
 		{
 			var transforms = chunk.GetSpan<Transform2D>();
 			for (var i = 0; i < chunk.Count; i++)

@@ -1,6 +1,6 @@
 ---
 title: Breakout Net
-description: Multiplayer Breakout with a server-authoritative simulation, replicated and interpolated components, a predicted paddle, network messages and a dedicated server mode.
+description: Multiplayer Breakout with a server-authoritative simulation, replicated and interpolated components, a predicted paddle, network messages, a level in a networked scene world and a dedicated server mode.
 sidebar:
   order: 3
 ---
@@ -12,6 +12,9 @@ Breakout for several players over the network. The server simulates balls, block
 module; clients draw the replicated state, interpolate remote entities and predict their own paddle so it responds
 immediately. The same executable is a listen server, a dedicated server or a client, depending on configuration.
 
+The game goes menu, level, menu, level. The score and the stage live in the root world. Each level is a scene whose
+world is networked as `"level"`, so a client gets the level only while its own level scene is loaded.
+
 ## What it shows
 
 - The networking module on the LiteNetLib UDP transport: `AddNetworking`, `AddLiteNetLibTransport`, `UseNetworking`.
@@ -21,6 +24,8 @@ immediately. The same executable is a listen server, a dedicated server or a cli
 - Typed `[NetworkMessage]` structs sent client to server (reliable and unreliable) and broadcast server to clients.
 - Server-only logic gated on `INetworkSession`, and entities kept local with `NetworkLocal`.
 - Peer join and leave events, per-player entities with `INetworkWorld.Allocate(player)`.
+- A level in a networked scene world (`scene.UseNetworking("level")`), with every peer following a replicated stage
+  with its own scene changes.
 - Testing a server and a client in one process over a deterministic loopback, a lossy loopback and real UDP.
 
 ## Run it
@@ -45,6 +50,8 @@ launch a ball from your paddle. Headless peers (clients or a listen server) play
 | `Ion:Network:JoinSecret` | none | Set on both sides to require a secret (an HMAC challenge; the secret never crosses the network). |
 | `Ion:Network:GameId` | `ion-breakout-net` (set in code) | Compared in the handshake. |
 | `Ion:Network:Simulate:Latency`, `Jitter`, `Loss`, `Reorder`, `Seed` | none | A simulated bad network for local testing. |
+| `Breakout:MenuSeconds` | `3` | The menu's countdown before each level, once someone plays. |
+| `Breakout:LevelSeconds` | `0` | The length of a level in seconds; 0 plays each level until every block is broken. |
 
 To play across machines, bind the server to the LAN address and point clients at it:
 
@@ -80,26 +87,40 @@ builder.AddIon(graphics => graphics.ClearColor = new Color(0x223))
 	})
 	.AddLiteNetLibTransport()
 	.AddSystem<PaddlePredictionSystem>()
+	.AddSystem<FlowSystem>()
+	.AddSystem<HudSystem>()
+	.AddSystem<PlayerInputSystem>()
 	.AddSystem<ServerGameSystem>()
-	.AddSystem<PresentationSystem>()
-	.AddSystem<PlayerInputSystem>();
+	.AddSystem<PresentationSystem>();
 builder.Services.AddSingleton<PaddleInputSource>();
+builder.Services.AddSingleton(BreakoutSettings.From(builder.Configuration));
 if (headless) builder.AddSystem<NetAutopilotSystem>();
 
 using var game = builder.Build();
 game.UseIon()
-	.UseEcsRendering()
-	.UsePhysics2D()
 	.UseNetworking()
 	.UseSystem<PaddlePredictionSystem>()
-	.UseSystem<ServerGameSystem>()
-	.UseSystem<PresentationSystem>()
+	.UseSystem<FlowSystem>()
+	.UseSystem<HudSystem>()
 	.UseSystem<PlayerInputSystem>();
 if (headless) game.UseSystem<NetAutopilotSystem>();
+
+// The menu has nothing networked of its own (the stage and the score are in the root world).
+game.UseScene(GameScene.Menu, scene => scene.UseEcs());
+
+// The level: its world is networked as "level", with its own physics and sprites.
+game.UseScene(GameScene.Level, scene => scene
+	.UseNetworking("level")
+	.UsePhysics2D()
+	.UseEcsRendering()
+	.UseSystem<ServerGameSystem>()
+	.UseSystem<PresentationSystem>());
 game.Run();
 ```
 
 The `AddNetworking` delegate runs after `Ion:Network` is bound, so it only fills in what configuration left unset.
+Systems used in a scene are created from the scene's scope on every load, so `ServerGameSystem` gets the level's
+`World` and `INetworkWorld`.
 
 ## Components and messages
 
@@ -116,7 +137,9 @@ The `AddNetworking` delegate runs after `Ion:Network` is bound, so it only fills
 [Replicated(Authority = Authority.Owner), Predicted]
 public record struct PaddleControl(float X);
 
+// In the root world: the score, and the scene every peer should be in.
 [Replicated] public record struct Scoreboard(int Score, int BallsLost, int Round);
+[Replicated] public record struct Stage(GameScene Scene, float SecondsLeft);
 
 [NetworkMessage(Direction = MessageDirection.ClientToServer, Delivery = Delivery.Unreliable)]
 public record struct PaddleInput(float TargetX);
@@ -140,13 +163,35 @@ by what they are.
 
 ## The systems
 
-| System | Runs on | Job |
-|---|---|---|
-| `PaddlePredictionSystem` | every peer | Registers the paddle's prediction step at Init; clients and a listen server also sample local input. |
-| `ServerGameSystem` | server only (returns early elsewhere) | Walls, blocks, the scoreboard, a paddle per player, launches, block breaks, lost balls and new rounds. |
-| `PresentationSystem` | clients and a listen server | Window size, textures, sprites for replicated entities, the predicted own paddle, the score and the block sound. |
-| `PlayerInputSystem` | clients and a listen server | Mouse capture, the paddle target and `LaunchBall` messages. |
-| `NetAutopilotSystem` | headless clients and listen servers | Follows the lowest ball and launches a ball every 60 frames (up to 20). |
+| System | Schedule | Runs on | Job |
+|---|---|---|---|
+| `PaddlePredictionSystem` | root | every peer | Registers the paddle's prediction step at Init; clients and a listen server also sample local input. |
+| `FlowSystem` | root | every peer | The server owns the `Stage` and the `Scoreboard` and moves the stage on (menu countdown, level over). Every peer follows the stage with its own scene change. |
+| `HudSystem` | root | clients and a listen server | Window size, the score, and the menu's countdown. |
+| `PlayerInputSystem` | root | clients and a listen server | Mouse capture, the paddle target and `LaunchBall` messages. |
+| `NetAutopilotSystem` | root | headless clients and listen servers | In the level, follows the lowest ball and launches a ball every 60 frames (up to 20). It reads the level's world through `INetworkWorlds`. |
+| `ServerGameSystem` | level scene | server only (returns early elsewhere) | Walls, blocks, a paddle per player, launches, block breaks and lost balls; reports the level cleared. |
+| `PresentationSystem` | level scene | clients and a listen server | Textures, sprites for replicated entities, the predicted own paddle and the block sound. |
+
+### Menu, level, menu
+
+The server decides where the game is. `FlowSystem` counts the menu down once someone plays, switches the replicated
+`Stage` to the level, and switches back when the level's blocks are gone (or its time is up, with
+`Breakout:LevelSeconds`). Every peer, the server included, follows the stage:
+
+```csharp title="Systems.cs"
+[First(Order = StageOrder.Scenes - 10)]
+public void Follow(GameTime dt)
+{
+	var scene = (int)Stage.Scene;
+	if (scenes.IsLoading || (scenes.HasScene && scenes.CurrentSceneId == scene)) return;
+	events.Emit(new ChangeSceneEvent(scene));
+}
+```
+
+When a client loads its level scene, it asks the server for the `"level"` world and gets a full snapshot of it. When
+the scene unloads, the level's entities go with its world. The server never tracks which scene a client is in. See
+[Scene worlds](/Ion/networking/multiplayer/scene-worlds/).
 
 ### Prediction
 
@@ -182,8 +227,9 @@ inputs. See [Prediction](/Ion/networking/multiplayer/prediction/).
 
 ### The authoritative server
 
-`ServerGameSystem` checks `session.IsServer` at the top of every step. Players get a paddle when they join, owned by
-them because its network id is allocated for them:
+`ServerGameSystem` checks `session.IsServer` at the top of every step. When the level loads, every connected player
+gets a paddle, and so does a player who joins during the level. The paddle is owned by the player because its network
+id is allocated for them, by the level's network world:
 
 ```csharp title="Systems.cs"
 private void CreatePaddle(NetworkPeer player)
@@ -217,7 +263,7 @@ missing sound):
 ```csharp title="Systems.cs"
 messages.Broadcast(new BlockBroken(world.Get<Transform2D>(block).Position));
 world.Destroy(block);
-world.Get<Scoreboard>(_scoreboard).Score += 10;
+flow.AddScore(10);   // the scoreboard is in the root world, kept across levels
 ```
 
 Walls carry `NetworkLocal`, so they exist on the server only. Everything else the server creates with replicated
@@ -248,23 +294,25 @@ them, a couple of ticks behind the newest snapshot.
 ## The tests
 
 [`ConvergenceTests`](https://github.com/jimbuck/Ion/blob/main/Ion.Examples/Ion.Examples.Breakout.Net.Tests/ConvergenceTests.cs)
-run a headless dedicated server and a headless client of the real `Program.cs` in one process, stepped frame by frame.
-The client's replicated state must equal the server's at the tick of the client's newest snapshot, within a few ticks,
-all along the game.
+run a headless dedicated server and a headless client of the real `Program.cs` in one process, stepped frame by frame,
+with a quarter-second menu. The client's replicated state must equal the server's, at the tick of the client's newest
+snapshot and within a few ticks, all along the game. This holds in the root world, and in the level once both sides
+are in it.
 
 | Test | Transport | Checks |
 |---|---|---|
-| `ServerAndClientConvergeOverLoopback` | `LoopbackTransport` | 900 frames, converging within 10 ticks. |
+| `ServerAndClientConvergeOverLoopback` | `LoopbackTransport` | 900 frames in the level, converging within 10 ticks. |
 | `ServerAndClientConvergeOverALossyLaggyLoopback` | loopback with 40 ms latency, 10 ms jitter, 5% loss, 5% reordering | 900 frames, within 30 ticks. |
 | `ServerAndClientConvergeOverUdpOnLocalhost` (E2E) | LiteNetLib UDP with a join secret | 900 frames, within 30 ticks. |
-| `AListenServerPlaysOnItsOwn` | loopback | 400 frames: the autopilot launches balls and scores. |
+| `TheGameGoesFromTheMenuToTheLevelAndBack` | loopback | Two-second levels: the client goes menu, level, menu, level, and gets each new level's blocks, converged with the server's. |
+| `AListenServerPlaysOnItsOwn` | loopback | 400 frames: the listen server reaches the level, and the autopilot launches balls and scores. |
 
 The loopback tests swap the transport after the program's own registrations:
 
 ```csharp title="ConvergenceTests.cs"
 private static IonTestHost Host(LoopbackNetwork? loopback, params string[] args)
 {
-	var host = new IonTestHost().UseEntryPoint<Program>(args);
+	var host = new IonTestHost().UseEntryPoint<Program>(["--Breakout:MenuSeconds=0.25", .. args]);
 	if (loopback is not null) host.Configure(services => services.RemoveAll<INetworkTransport>().AddLoopbackTransport(loopback));
 	return host;
 }
@@ -293,8 +341,8 @@ The networking module, its generated serializers and the LiteNetLib transport pu
 with a color picked from `Paddle.Player` (`new Sprite(_paddle, Field.PaddleSize) with { Color = ... }`), so players can
 tell their paddles apart.
 
-**A lobby.** Show "Waiting for players" until two paddles exist, by counting `Paddle` entities on the client, and
-start launching only then on the server.
+**A lobby.** The menu starts its countdown as soon as one player is connected. Wait for two instead, by checking
+`session.Peers.Count` in `FlowSystem.Advance`, and show "Waiting for players" in `HudSystem` meanwhile.
 
 **Lag compensation.** Balls are server-simulated, so a player sees them slightly in the past. For hit tests that must
 feel fair (a shot, not a bounce), use the module's lag compensation; see

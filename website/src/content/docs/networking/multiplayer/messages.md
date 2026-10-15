@@ -49,7 +49,8 @@ if (session.IsServer)
 ```
 
 Clients receive a spawn record with the full components the first time, then only the members that changed, then a
-despawn record when the entity is destroyed. On the client the entity is created in the root ECS world (see
+despawn record when the entity is destroyed. On the client the entity is created in the matching ECS world (the root
+world, or a networked scene's world, see [Scene worlds](/Ion/networking/multiplayer/scene-worlds/) and
 [Entities and commands](/Ion/ecs/entities-and-commands/)), a `NetworkId` component is added, and a
 `NetworkEntitySpawned` event is raised. Local-only components (sprites, audio handles) are added by client systems as
 entities arrive, as Breakout Net does:

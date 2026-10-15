@@ -270,8 +270,8 @@ column, so unchanged entities cost almost nothing.
   core), not implemented.
 - **Grid interest management.** The `IInterestPolicy` hook exists and works, but no ready-made spatial policy ships;
   write your own.
-- **Replication in scene worlds.** The session is bound to the root ECS world; entities inside
-  [scene](/Ion/ecs/scenes/) worlds are not replicated.
+- **Networked worlds outside scenes.** [Scene worlds](/Ion/networking/multiplayer/scene-worlds/) are replicated
+  besides the root world, but a server cannot yet host several rooms or matches at once outside the scene system.
 - Whole-schedule rollback and resimulation (only registered prediction steps are replayed), clock-rate nudging (drift is
   corrected by resynchronizing), NAT punch-through, and bandwidth-aware snapshot prioritization.
 :::
@@ -279,6 +279,7 @@ column, so unchanged entities cost almost nothing.
 ## See also
 
 - [Messages and replication](/Ion/networking/multiplayer/messages/)
+- [Scene worlds](/Ion/networking/multiplayer/scene-worlds/): replicating a scene's world, such as a level
 - [Transports](/Ion/networking/multiplayer/transports/)
 - [Dedicated servers](/Ion/networking/multiplayer/dedicated-server/)
 - [Breakout Net example](/Ion/examples/breakout-net/)

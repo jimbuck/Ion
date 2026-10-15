@@ -265,7 +265,8 @@ See [Transports](/Ion/networking/multiplayer/transports/) for swapping UDP for t
 - A `--server` shortcut in the `ion` CLI.
 - The WebSocket transport, so browser clients can join.
 - A ready-made grid interest policy for large worlds (write an `IInterestPolicy` for now).
-- Replication inside scene worlds; replicated entities must live in the root ECS world.
+- Hosting several networked worlds at once outside the scene system (several rooms or matches on one server).
+  [Scene worlds](/Ion/networking/multiplayer/scene-worlds/) are replicated.
 - NAT punch-through, and bandwidth-aware prioritization of snapshot contents.
 :::
 

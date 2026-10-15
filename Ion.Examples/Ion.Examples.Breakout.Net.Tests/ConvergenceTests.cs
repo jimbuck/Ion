@@ -19,8 +19,9 @@ namespace Ion.Examples.Breakout.Net.Tests;
 
 /// <summary>
 /// A headless dedicated server and a headless client (played by <see cref="NetAutopilotSystem"/>) of the real game in one
-/// process, stepped frame by frame: the client's replicated state must equal the server's at the tick of the client's
-/// newest snapshot, within a few ticks of the server, all along the game.
+/// process, stepped frame by frame: in every networked world both have live (the root, and the level while both are in
+/// it), the client's replicated state must equal the server's at the tick of the client's newest snapshot, within a few
+/// ticks of the server, all along the game.
 /// </summary>
 public class ConvergenceTests(ITestOutputHelper output)
 {
@@ -54,10 +55,10 @@ public class ConvergenceTests(ITestOutputHelper output)
 		}
 	}
 
-	/// <summary>The game's own Program.cs, on <paramref name="loopback"/> instead of UDP when given.</summary>
+	/// <summary>The game's own Program.cs, on <paramref name="loopback"/> instead of UDP when given, with a short menu.</summary>
 	private static IonTestHost Host(LoopbackNetwork? loopback, params string[] args)
 	{
-		var host = new IonTestHost().UseEntryPoint<Program>(args);
+		var host = new IonTestHost().UseEntryPoint<Program>(["--Breakout:MenuSeconds=0.25", .. args]);
 		if (loopback is not null) host.Configure(services => services.RemoveAll<INetworkTransport>().AddLoopbackTransport(loopback));
 		return host;
 	}
@@ -82,13 +83,37 @@ public class ConvergenceTests(ITestOutputHelper output)
 	}
 
 	/// <summary>
-	/// Whether the client's replicated state equals the server's at the client's newest snapshot tick: the same number of
-	/// networked entities, and for each server entity alive then, the same values of every replicated component.
+	/// Whether the client's replicated state equals the server's in the root world and, when both have it live, the level:
+	/// at the client's newest snapshot tick of each, the same number of networked entities, and for each server entity
+	/// alive then, the same values of every replicated component. False while only one of them is in the level.
 	/// </summary>
 	internal static bool Converged(Session session, out string why)
 	{
-		var serverNet = session.Server.Get<NetworkWorld>();
-		var clientNet = session.Client.Get<NetworkWorld>();
+		var serverWorlds = session.Server.Get<NetworkSession>().Worlds;
+		var clientWorlds = session.Client.Get<NetworkSession>().Worlds;
+		if (!Converged(serverWorlds.Root, clientWorlds.Root, out why)) return false;
+
+		var serverHas = serverWorlds.TryGet("level", out var serverLevel);
+		var clientHas = clientWorlds.TryGet("level", out var clientLevel);
+		if (serverHas != clientHas)
+		{
+			why = serverHas ? "the server is in the level, the client is not" : "the client is in the level, the server is not";
+			return false;
+		}
+
+		if (!serverHas) return true;
+		if (!Converged((NetworkWorld)serverLevel!, (NetworkWorld)clientLevel!, out var level))
+		{
+			why = "level: " + level;
+			return false;
+		}
+
+		why += "; level: " + level;
+		return true;
+	}
+
+	private static bool Converged(NetworkWorld serverNet, NetworkWorld clientNet, out string why)
+	{
 		var tick = clientNet.LastReceivedServerTick;
 		why = "";
 		if (tick == 0)
@@ -110,7 +135,7 @@ public class ConvergenceTests(ITestOutputHelper output)
 			return false;
 		}
 
-		var serverWorld = session.Server.Get<World>();
+		var serverWorld = serverNet.World;
 		var mismatches = 0;
 		var compared = 0;
 		foreach (ref var chunk in serverWorld.Query(in Networked))
@@ -119,7 +144,7 @@ public class ConvergenceTests(ITestOutputHelper output)
 			for (var i = 0; i < chunk.Count; i++)
 			{
 				var entity = chunk.Entity(i);
-				if (!serverNet.TryGetAtTick<Transform2D>(entity, tick, out var transform) && !serverNet.TryGetAtTick<Scoreboard>(entity, tick, out _)) continue;
+				if (!serverNet.TryGetAtTick<Transform2D>(entity, tick, out _) && !serverNet.TryGetAtTick<Scoreboard>(entity, tick, out _) && !serverNet.TryGetAtTick<Stage>(entity, tick, out _)) continue;
 				compared++;
 				if (!clientNet.TryGetEntity(ids[i], out var mirror)
 					|| !Same<Transform2D>(serverNet, clientNet, entity, mirror, tick)
@@ -127,12 +152,11 @@ public class ConvergenceTests(ITestOutputHelper output)
 					|| !Same<Block>(serverNet, clientNet, entity, mirror, tick)
 					|| !Same<Paddle>(serverNet, clientNet, entity, mirror, tick)
 					|| !Same<PaddleControl>(serverNet, clientNet, entity, mirror, tick)
-					|| !Same<Scoreboard>(serverNet, clientNet, entity, mirror, tick))
+					|| !Same<Scoreboard>(serverNet, clientNet, entity, mirror, tick)
+					|| !Same<Stage>(serverNet, clientNet, entity, mirror, tick))
 				{
 					mismatches++;
 				}
-
-				_ = transform;
 			}
 		}
 
@@ -154,6 +178,9 @@ public class ConvergenceTests(ITestOutputHelper output)
 		var server = session.Server;
 		Assert.True(RunUntil(session, () => client.Get<INetworkSession>().State == NetworkState.Connected, 300), "the client did not connect");
 
+		// The menu counts down once the client joined; then both load the level (each on its own) and converge in it.
+		Assert.True(RunUntil(session, () => Level(client) is not null && Level(server) is not null && Converged(session, out _), 300), "the client never got the level");
+
 		// Play: the autopilot launches balls and follows them; the server breaks blocks. At every point the client must be
 		// converged within a few ticks.
 		var converged = 0;
@@ -174,9 +201,9 @@ public class ConvergenceTests(ITestOutputHelper output)
 			}
 		}
 
-		var serverWorld = server.Get<World>();
-		var clientWorld = client.Get<World>();
-		var scoreboard = QueryScore(serverWorld);
+		var serverWorld = Level(server)!.World;
+		var clientWorld = Level(client)!.World;
+		var scoreboard = QueryScore(server.Get<World>());
 		output.WriteLine($"{frames} frames: converged in {converged}, longest divergence {longest} frames; server tick {server.Get<INetworkWorld>().CurrentTick}, client snapshot {client.Get<INetworkWorld>().LastReceivedServerTick}; score {scoreboard.Score}, {serverWorld.CountEntities(in Balls)} balls, {serverWorld.CountEntities(in Blocks)} blocks; {client.Get<NetAutopilotSystem>().Launches} launches; corrections {client.Get<INetworkSession>().Stats.Corrections}, snapshots {client.Get<INetworkSession>().Stats.Snapshots}, {client.Get<INetworkSession>().Stats.BytesIn} bytes in");
 
 		Assert.True(client.Get<NetAutopilotSystem>().Launches > 3);
@@ -192,13 +219,17 @@ public class ConvergenceTests(ITestOutputHelper output)
 		client.Get<NetAutopilotSystem>().Enabled = false;
 		client.Get<PaddleInputSource>().TargetX = 400;
 		session.Step(90);
-		var id = OwnPaddle(clientWorld, client.Get<INetworkWorld>());
-		Assert.True(server.Get<INetworkWorld>().TryGetEntity(id, out var serverPaddle));
-		Assert.True(client.Get<INetworkWorld>().TryGetEntity(id, out var clientPaddle));
+		var id = OwnPaddle(clientWorld, Level(client)!);
+		Assert.Equal(Level(client)!.Index, id.World);
+		Assert.True(Level(server)!.TryGetEntity(id, out var serverPaddle));
+		Assert.True(Level(client)!.TryGetEntity(id, out var clientPaddle));
 		Assert.Equal(400f, serverWorld.Get<PaddleControl>(serverPaddle).X);
 		Assert.Equal(400f, clientWorld.Get<PaddleControl>(clientPaddle).X);
 		Assert.Equal(client.Get<INetworkSession>().LocalPeer.Id, serverWorld.Get<Paddle>(serverPaddle).Player);
 	}
+
+	/// <summary>The level's networked world, while the level scene is loaded.</summary>
+	private static INetworkWorld? Level(IonTestHost host) => host.Get<INetworkWorlds>().TryGet("level", out var level) ? level : null;
 
 	private static bool RunUntil(Session session, Func<bool> condition, int maxFrames)
 	{
@@ -257,12 +288,49 @@ public class ConvergenceTests(ITestOutputHelper output)
 	}
 
 	[Fact, Trait(CATEGORY, INTEGRATION)]
+	public void TheGameGoesFromTheMenuToTheLevelAndBack()
+	{
+		// Timed levels: two seconds each, a quarter of a second of menu in between.
+		using var session = Loopback("--Breakout:LevelSeconds=2");
+		var client = session.Client;
+		var server = session.Server;
+		var blocks = new QueryDescription().WithAll<Block>();
+		var scenes = new List<GameScene>();
+		var levelsWithBlocks = 0;
+		var counted = false;
+		for (var frame = 0; frame < 720; frame++)
+		{
+			session.Step();
+			var scene = (GameScene)client.Get<Ion.Extensions.Scenes.SceneSystem>().CurrentSceneId;
+			if (scenes.Count == 0 || scenes[^1] != scene) scenes.Add(scene);
+			if (scene == GameScene.Menu) counted = false;
+
+			// Each visit of the level gets the server's new level, converged with the server's.
+			if (!counted && Level(client) is { } level && level.World.CountEntities(in blocks) > 0 && Converged(session, out _))
+			{
+				levelsWithBlocks++;
+				counted = true;
+			}
+		}
+
+		output.WriteLine(string.Join(" > ", scenes));
+		Assert.Equal([GameScene.Menu, GameScene.Level, GameScene.Menu, GameScene.Level], scenes.Take(4));
+		Assert.True(levelsWithBlocks >= 2, $"{levelsWithBlocks} levels seen with blocks");
+		Assert.True(QueryScore(server.Get<World>()).Round >= 3);
+		Assert.True(RunUntil(session, () => QueryScore(server.Get<World>()).Round == QueryScore(client.Get<World>()).Round, 30));
+		Assert.Equal(0, client.Get<INetworkSession>().Stats.Malformed);
+		Assert.Equal(0, server.Get<INetworkSession>().Stats.Malformed);
+		Assert.Equal(0, server.Get<INetworkSession>().Stats.Rejected);
+	}
+
+	[Fact, Trait(CATEGORY, INTEGRATION)]
 	public void AListenServerPlaysOnItsOwn()
 	{
 		using var host = Host(new LoopbackNetwork(), "--Ion:Network:Port=0");
 		host.Step(400);
 		var session = host.Get<INetworkSession>();
 		Assert.Equal(NetworkMode.ListenServer, session.Mode);
+		Assert.Equal((int)GameScene.Level, host.Get<Ion.Extensions.Scenes.SceneSystem>().CurrentSceneId);
 		Assert.True(host.Get<NetAutopilotSystem>().Launches > 3);
 		Assert.True(QueryScore(host.Get<World>()).Score > 0);
 		Assert.True(host.SpriteBatch.LastFrame.Sprites > 0);

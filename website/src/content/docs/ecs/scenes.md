@@ -8,6 +8,8 @@ sidebar:
 A scene is a schedule of its own (systems and function steps) that runs only while it is active, inside a fresh service
 scope created when it loads and disposed when it unloads. With the ECS module, each scene also gets its own `World`, so
 unloading a level throws its entities away. `Ion.Extensions.Scenes` is part of the engine core: `AddIon()` registers it.
+In a multiplayer game, `scene.UseNetworking("name")` replicates a scene's world (see
+[Scene worlds](/Ion/networking/multiplayer/scene-worlds/)).
 
 ```csharp title="Program.cs"
 using Microsoft.Extensions.DependencyInjection;

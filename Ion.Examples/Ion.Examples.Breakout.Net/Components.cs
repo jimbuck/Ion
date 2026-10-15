@@ -27,9 +27,27 @@ public record struct Paddle(byte Player);
 [Replicated(Authority = Authority.Owner), Predicted]
 public record struct PaddleControl(float X);
 
-/// <summary>The score of the game, on a singleton entity (replicated, so a client that joins late sees it).</summary>
+/// <summary>
+/// The score of the game, on a singleton entity of the root world (replicated, so a client that joins late sees it, and
+/// kept across levels). <see cref="Round"/> is the number of the level being played or coming next.
+/// </summary>
 [Replicated]
 public record struct Scoreboard(int Score, int BallsLost, int Round);
+
+/// <summary>The game's scenes: the menu between levels, and the level, whose world is networked as <c>"level"</c>.</summary>
+public enum GameScene
+{
+	Menu = 0,
+	Level = 1,
+}
+
+/// <summary>
+/// Where the game is, on a singleton entity of the root world: the scene every peer should be in, and the seconds left
+/// before the next level (in the menu) or before the level ends (when levels are timed). The server decides; the clients
+/// follow it with their own scene changes (<see cref="FlowSystem"/>).
+/// </summary>
+[Replicated]
+public record struct Stage(GameScene Scene, float SecondsLeft);
 
 /// <summary>A player's input for one tick: where the paddle should go.</summary>
 [NetworkMessage(Direction = MessageDirection.ClientToServer, Delivery = Delivery.Unreliable)]
@@ -45,6 +63,17 @@ public record struct BlockBroken(Vector2 Position);
 
 /// <summary>A wall around the field: created by the server only, never networked.</summary>
 public record struct Wall();
+
+/// <summary>
+/// The pacing of the game: <c>Breakout:MenuSeconds</c> in the menu before each level once someone plays (default 3), and
+/// <c>Breakout:LevelSeconds</c> per level (default 0: until every block is broken).
+/// </summary>
+public sealed record BreakoutSettings(float MenuSeconds, float LevelSeconds)
+{
+	public static BreakoutSettings From(Microsoft.Extensions.Configuration.IConfiguration config) => new(
+		float.TryParse(config["Breakout:MenuSeconds"], System.Globalization.CultureInfo.InvariantCulture, out var menu) ? Math.Max(0, menu) : 3f,
+		float.TryParse(config["Breakout:LevelSeconds"], System.Globalization.CultureInfo.InvariantCulture, out var level) ? Math.Max(0, level) : 0f);
+}
 
 /// <summary>The play field, the same on every peer (the window is sized to it).</summary>
 public static class Field
