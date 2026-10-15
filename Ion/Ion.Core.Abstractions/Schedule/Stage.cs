@@ -117,6 +117,12 @@ public static class StageOrder
 	/// </summary>
 	public const int UiFrame = -550;
 
+	/// <summary>
+	/// ECS world files: the files a scene declared with <c>LoadWorld</c> are instantiated into its world in Init, at the
+	/// end of the engine setup band so the game's own Init steps see the entities.
+	/// </summary>
+	public const int WorldFiles = -510;
+
 	/// <summary>Scenes: the active scene's schedule, in every stage.</summary>
 	public const int Scenes = -500;
 

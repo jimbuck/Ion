@@ -255,6 +255,9 @@ registered components by name. Vectors are arrays and entity references are posi
 }
 ```
 
+To fill a scene from a file when it loads, or to instantiate a saved subtree several times (a prefab), load it as a
+`WorldFile` asset: see [Loading a scene's entities from a file](/Ion/ecs/scenes/#loading-a-scenes-entities-from-a-file).
+
 `JsonWorldSerializer` also has `ToJson(world)`, `FromJson(json, world)` and an `Indented` init property;
 `BinaryWorldSerializer` has `ToBytes(world)` and `FromBytes(bytes, world)`. The binary format stores a table of component
 names and a byte length per component, so a reader skips components it does not know and keeps the rest.

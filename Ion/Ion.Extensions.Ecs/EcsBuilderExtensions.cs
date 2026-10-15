@@ -3,6 +3,7 @@ using Arch.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using Ion.Extensions.Assets;
 using Ion.Extensions.Remote;
 using Ion.Extensions.Scenes;
 
@@ -36,6 +37,8 @@ public static class EcsBuilderExtensions
 		services.TryAddTransient(static _ => new SpriteAnimationSystem());
 		services.TryAddTransient(static _ => new SkeletalAnimationSystem());
 		services.TryAddTransient(static sp => new SpatialAudioSystem(sp.GetRequiredService<World>(), sp));
+		services.TryAddScoped(static _ => new SceneWorldFiles());
+		services.TryAddTransient(static sp => new WorldFileLoadSystem(sp.GetRequiredService<SceneWorldFiles>(), sp.GetRequiredService<World>(), sp.GetRequiredService<IAssetManager>()));
 
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IFrameStatsSource, EcsStatsSource>(static sp => new EcsStatsSource(sp.GetRequiredService<EcsWorlds>())));
 
@@ -69,6 +72,8 @@ public static class EcsBuilderExtensions
 		services.TryAddSingleton(static sp => new JsonWorldSerializer(sp.GetRequiredService<ComponentSerializerRegistry>()));
 		services.TryAddSingleton(static sp => new BinaryWorldSerializer(sp.GetRequiredService<ComponentSerializerRegistry>()));
 		services.TryAddSingleton<IWorldSerializer>(static sp => sp.GetRequiredService<BinaryWorldSerializer>());
+		services.TryAddEnumerable(ServiceDescriptor.Singleton<IAssetLoader, WorldFileLoader>(static sp => new WorldFileLoader(
+			sp.GetRequiredService<IPersistentStorage>(), sp.GetRequiredService<JsonWorldSerializer>(), sp.GetRequiredService<BinaryWorldSerializer>())));
 		return services;
 	}
 
@@ -126,6 +131,23 @@ public static class EcsBuilderExtensions
 	{
 		ArgumentNullException.ThrowIfNull(scene);
 		return scene.UseEcs().UseSystem<SpatialAudioSystem>();
+	}
+
+	/// <summary>
+	/// Fills the scene's world from a saved entity tree when the scene loads: the <see cref="WorldFile"/> at asset
+	/// <paramref name="path"/> (JSON or binary, as the world serializers write it) is instantiated in Init, at
+	/// <see cref="StageOrder.WorldFiles"/>, before the game's Init steps, with its hierarchy. Call it more than once to load
+	/// several files, in order. Needs <c>AddEcsSerialization</c> (the loader, and the registry that names the game's
+	/// components) and the assets module; the file is cached by the scene's asset manager.
+	/// </summary>
+	public static ISceneBuilder LoadWorld(this ISceneBuilder scene, string path)
+	{
+		ArgumentNullException.ThrowIfNull(scene);
+		ArgumentException.ThrowIfNullOrEmpty(path);
+		var files = scene.Services.GetRequiredService<SceneWorldFiles>();
+		if (files.Paths.Count == 0) scene.UseSystem<WorldFileLoadSystem>();
+		files.Paths.Add(path);
+		return scene;
 	}
 
 	/// <summary>Adds the ECS systems to a scene's schedule (for the scene's own world); see <see cref="UseEcs(IIonApplication)"/>.</summary>

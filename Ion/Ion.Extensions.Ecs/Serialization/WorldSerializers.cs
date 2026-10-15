@@ -147,6 +147,9 @@ public sealed class JsonWorldSerializer(ComponentSerializerRegistry components) 
 public sealed class BinaryWorldSerializer(ComponentSerializerRegistry components) : IWorldSerializer
 {
 	private static ReadOnlySpan<byte> Magic => "IONW"u8;
+
+	/// <summary>Whether <paramref name="data"/> starts with the binary form's <c>IONW</c> header.</summary>
+	public static bool HasHeader(ReadOnlySpan<byte> data) => data.StartsWith(Magic);
 	private const int Version = 1;
 	private static readonly QueryDescription Everything = new();
 

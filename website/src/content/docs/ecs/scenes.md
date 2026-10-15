@@ -128,6 +128,38 @@ public sealed partial class LevelSystem(World world, Commands commands, IAssetMa
 public record struct Falling;
 ```
 
+### Loading a scene's entities from a file
+
+A scene can be authored as a saved entity tree instead of code. `LoadWorld` names an asset file written by the
+[world serializers](/Ion/ecs/components-and-serialization/#world-serialization) (JSON or binary, told apart by the
+binary form's `IONW` header):
+
+```csharp
+builder.AddEcsSerialization(components => components.AddTag<Falling>("Falling")); // the loader, and your components' names
+
+app.UseScene(Scenes.Level, scene => scene
+    .UseEcs()
+    .LoadWorld("levels/one.ion")      // Assets/levels/one.ion
+    .UseSystem<LevelSystem>());
+```
+
+Each time the scene loads, the file's entities are created in its fresh world in Init, at `StageOrder.WorldFiles`
+(-510): before the game's own Init steps, which can find them by name (`NameRegistry`) and add what the file does not
+hold, such as sprites, whose textures are not saved. `Parent`/`Children` come back as saved, in sibling order. Call
+`LoadWorld` several times to load several files, in order. The file is loaded through the scene's `IAssetManager` (as a
+`WorldFile` asset), so a scene that loads it twice reads it once.
+
+`WorldFile` is also a **prefab**: load it with `assets.Load<WorldFile>(path)` and instantiate it as often as you like.
+
+```csharp
+var tank = assets.Load<WorldFile>("prefabs/tank.ion");
+var entities = tank.Instantiate(world, spawnPoint);   // the file's roots become children of spawnPoint
+```
+
+`Instantiate(world)` creates the entities as saved; `Instantiate(world, parent)` also appends the file's roots to
+`parent`'s children, so the prefab is placed by the parent's transform. Both return the entities in saved order and are
+structural changes (not inside a query).
+
 ### Scene systems and registration lifetimes
 
 A system added with `scene.UseSystem<T>()` is always created from the scene's scope, once per load, so its `World`,
