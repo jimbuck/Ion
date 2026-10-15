@@ -79,8 +79,6 @@ internal sealed class UiNodeState(uint id)
 	public int Caret;
 	public string? Text;
 	public bool Edited;
-	public string? CaretPrefix;
-	public int CaretPrefixLength = -1;
 
 	// Values set through the tree, applied by the next widget call.
 	public long PendingFrame;
@@ -93,6 +91,22 @@ internal sealed class UiNodeState(uint id)
 	public float FormattedNumber = float.NaN;
 	public string? FormattedText;
 
+	// The selection of a text input: from the anchor to the caret (none when the anchor is -1 or at the caret).
+	public int Anchor = -1;
+
+	// The x offset of every caret position of the text in WidthsSource (Widths[i]: the width of the first i characters).
+	public float[]? Widths;
+	public string? WidthsSource;
+	public object? WidthsFont;
+
+	public bool HasSelection => Anchor >= 0 && Anchor != Caret;
+
+	public int SelectionStart => HasSelection ? Math.Min(Anchor, Caret) : Caret;
+
+	public int SelectionEnd => HasSelection ? Math.Max(Anchor, Caret) : Caret;
+
+	public ReadOnlySpan<char> SelectedText => Buffer is null ? default : Buffer.AsSpan(SelectionStart, SelectionEnd - SelectionStart);
+
 	public void SetText(string value, int maxLength)
 	{
 		var capacity = Math.Max(maxLength, 1);
@@ -100,12 +114,95 @@ internal sealed class UiNodeState(uint id)
 		Length = Math.Min(value.Length, Buffer.Length);
 		value.AsSpan(0, Length).CopyTo(Buffer);
 		Caret = Math.Clamp(Caret, 0, Length);
+		Anchor = -1;
 		Text = value;
+	}
+
+	/// <summary>Moves the caret to <paramref name="to"/>; with <paramref name="extend"/> the selection grows from where the caret was (shift held), otherwise it is dropped.</summary>
+	public void MoveCaret(int to, bool extend)
+	{
+		to = Math.Clamp(to, 0, Length);
+		if (extend)
+		{
+			if (Anchor < 0) Anchor = Caret;
+		}
+		else
+		{
+			Anchor = -1;
+		}
+
+		Caret = to;
+	}
+
+	public void Select(int start, int end)
+	{
+		Anchor = Math.Clamp(start, 0, Length);
+		Caret = Math.Clamp(end, 0, Length);
+	}
+
+	public void SelectAll() => Select(0, Length);
+
+	/// <summary>Removes the selected text, leaving the caret where it started. Returns false when nothing was selected.</summary>
+	public bool DeleteSelection()
+	{
+		if (Buffer is null || !HasSelection) return false;
+		var start = SelectionStart;
+		var end = SelectionEnd;
+		Array.Copy(Buffer, end, Buffer, start, Length - end);
+		Length -= end - start;
+		Caret = start;
+		Anchor = -1;
+		Edited = true;
+		return true;
+	}
+
+	/// <summary>The kind of a character for word movement: 0 space, 1 a word character (letter, digit, underscore), 2 anything else.</summary>
+	private static int _kind(char c) => char.IsWhiteSpace(c) ? 0 : char.IsLetterOrDigit(c) || c == '_' ? 1 : 2;
+
+	/// <summary>Where Ctrl+Left goes from <paramref name="from"/>: back over spaces, then to the start of the word (or run of punctuation) before them.</summary>
+	public int WordStart(int from)
+	{
+		if (Buffer is null) return 0;
+		var i = Math.Clamp(from, 0, Length);
+		while (i > 0 && _kind(Buffer[i - 1]) == 0) i--;
+		if (i == 0) return 0;
+		var kind = _kind(Buffer[i - 1]);
+		while (i > 0 && _kind(Buffer[i - 1]) == kind) i--;
+		return i;
+	}
+
+	/// <summary>Where Ctrl+Right goes from <paramref name="from"/>: over spaces, then to the end of the word (or run of punctuation) after them.</summary>
+	public int WordEnd(int from)
+	{
+		if (Buffer is null) return 0;
+		var i = Math.Clamp(from, 0, Length);
+		while (i < Length && _kind(Buffer[i]) == 0) i++;
+		if (i == Length) return Length;
+		var kind = _kind(Buffer[i]);
+		while (i < Length && _kind(Buffer[i]) == kind) i++;
+		return i;
+	}
+
+	/// <summary>The run of one kind of character (a word, spaces, punctuation) at <paramref name="index"/>: what a double click selects.</summary>
+	public (int Start, int End) WordAt(int index)
+	{
+		if (Buffer is null || Length == 0) return (0, 0);
+		// The character after the caret position, or before it at a word's end (a click on the right half of a word's last
+		// character lands on the position after it, and should still pick the word).
+		var at = Math.Clamp(index, 0, Length - 1);
+		if (at > 0 && _kind(Buffer[at]) != 1 && _kind(Buffer[at - 1]) == 1) at--;
+		var kind = _kind(Buffer[at]);
+		var start = at;
+		var end = at + 1;
+		while (start > 0 && _kind(Buffer[start - 1]) == kind) start--;
+		while (end < Length && _kind(Buffer[end]) == kind) end++;
+		return (start, end);
 	}
 
 	public void Insert(ReadOnlySpan<char> text)
 	{
-		if (Buffer is null) return;
+		if (Buffer is null || text.IsEmpty) return;
+		DeleteSelection();
 		foreach (var c in text)
 		{
 			if (char.IsControl(c) || Length >= Buffer.Length) continue;
@@ -118,7 +215,7 @@ internal sealed class UiNodeState(uint id)
 
 	public void Backspace()
 	{
-		if (Buffer is null || Caret == 0) return;
+		if (DeleteSelection() || Buffer is null || Caret == 0) return;
 		Array.Copy(Buffer, Caret, Buffer, Caret - 1, Length - Caret);
 		Caret--;
 		Length--;
@@ -127,7 +224,7 @@ internal sealed class UiNodeState(uint id)
 
 	public void Delete()
 	{
-		if (Buffer is null || Caret >= Length) return;
+		if (DeleteSelection() || Buffer is null || Caret >= Length) return;
 		Array.Copy(Buffer, Caret + 1, Buffer, Caret, Length - Caret - 1);
 		Length--;
 		Edited = true;

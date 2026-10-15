@@ -221,11 +221,43 @@ value `ValueWidth`.
 
 A single-line text field with a caption.
 
-- Clicking it, or activating it (Enter, Space, A) while focused, starts editing. The caret goes to the end.
+- Clicking it starts editing with the caret where you clicked. Activating it (Enter, Space, A) while focused starts
+  editing with the caret at the end.
 - While editing: typed text is inserted at the caret, and Backspace, Delete, Left, Right, Home and End edit. Held
   editing keys repeat.
 - Enter, Escape, gamepad A or B, a click elsewhere, Tab, or Up/Down stop editing (Tab and Up/Down also move the focus).
 - `IUiTree.SetValue(path, text)` replaces the text; `IUiTree.Type(path, text)` types into it.
+
+### Selection and the clipboard
+
+| Input | Effect |
+|---|---|
+| Shift+Left/Right, Shift+Home/End | Extend the selection from the caret |
+| Ctrl+Left/Right (with Shift: select) | Move by words |
+| Ctrl+Backspace, Ctrl+Delete | Delete the word before or after the caret |
+| Ctrl+A | Select everything |
+| Ctrl+C, Ctrl+X, Ctrl+V | Copy, cut, paste |
+| Left/Right with a selection | Drop it, with the caret at its start or end |
+| Typing, Backspace, Delete with a selection | Replace or delete the selected text |
+| Drag | Select from where the press put the caret |
+| Shift-click | Extend the selection to the click |
+| Double click, triple click | Select the word under the pointer, select everything |
+
+On macOS the Command key works as Ctrl. A word is a run of letters, digits and underscores; a run of punctuation or of
+spaces counts as one word too. Clicks closer together than `UiOptions.DoubleClickSeconds` (0.4) count as a double or
+triple click. The selection is drawn in `UiTheme.TextSelection` behind the text.
+
+Pasted text goes through the same filter as typed text: each line break or tab becomes a space, other control
+characters are dropped, and the field's `maxLength` cuts what does not fit. Copy and cut do nothing without a
+selection.
+
+The clipboard is `Ui.Clipboard`, an `IClipboard` the window backend provides: the desktop clipboard on Silk.NET
+windows, a `MemoryClipboard` headless and in tests (a `Ui` created without one gets its own). Read and write it from
+your own code too, for a "copy link" button say:
+
+```csharp
+if (ui.Button("Copy invite code")) ui.Clipboard.SetText(_inviteCode);
+```
 
 Returns true when `value` changed. A new string is allocated per edit, never per frame.
 
@@ -242,9 +274,9 @@ if (ui.TextInput("Search", ref _query, maxLength: 32)) Filter(_query);
 While a field is being edited, `ui.IsEditingText` is true and Escape or B stop editing instead of setting
 `BackPressed`. Check `IsEditingText` before reacting to keys in your game code.
 
-:::caution[Editing is basic]
-There is no text selection (Shift+arrows, double-click), no clipboard (Ctrl+C, Ctrl+V), no multi-line editing and no
-display of IME composition: text composed with an IME is inserted when the operating system commits it. On devices
+:::caution[Editing limits]
+There is no multi-line editing and no display of IME composition: text composed with an IME is inserted when the
+operating system commits it. On devices
 without a keyboard (gamepads, the R36S) there is no on-screen keyboard; `TextInput` is reachable but can only be typed
 into through `IUiTree` or injected text input (`ScriptedInput`, the remote `input.send`).
 :::

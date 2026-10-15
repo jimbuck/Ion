@@ -57,7 +57,7 @@ builder.AddUi(options => options.Gamepad = 0);
 | `Button` | Reports a click: the `Button` call returns true this frame. |
 | `Toggle` | Flips the value. |
 | `ListItem` | Selects the item. |
-| `TextInput` | Starts editing (the caret goes to the end). |
+| `TextInput` | Starts editing (the caret goes to the end; a click puts it at the pointer). |
 | `Slider` | Nothing; use Left/Right. |
 
 If nothing has the focus, the first move or activate press focuses the first focusable widget instead.

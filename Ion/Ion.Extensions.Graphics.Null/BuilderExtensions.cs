@@ -52,6 +52,7 @@ public static class BuilderExtensions
 			.AddSingleton<IWindow>(sp => sp.GetRequiredService<NullWindow>())
 			.AddSingleton(static sp => new NullInputState(sp.GetRequiredService<InputTracker>()))
 			.AddSingleton<IInputState>(sp => sp.GetRequiredService<NullInputState>())
+			.AddSingleton<IClipboard, MemoryClipboard>()
 			.AddSingleton<NullSpriteBatch>()
 			.AddSingleton<ISpriteBatch>(sp => sp.GetRequiredService<NullSpriteBatch>())
 

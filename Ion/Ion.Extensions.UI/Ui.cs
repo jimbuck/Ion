@@ -68,16 +68,21 @@ public sealed partial class Ui
 	/// <summary>
 	/// Creates a UI context reading <paramref name="input"/>. The UI module registers one per application (<c>AddUi</c>);
 	/// tests and tools may create their own and drive <see cref="BeginFrame"/>, <see cref="EndFrame"/> and <see cref="Draw"/>.
+	/// Text inputs copy and paste through <paramref name="clipboard"/> (a <see cref="MemoryClipboard"/> when null).
 	/// </summary>
-	public Ui(IInputState input, UiOptions? options = null, ILogger<Ui>? logger = null)
+	public Ui(IInputState input, UiOptions? options = null, ILogger<Ui>? logger = null, IClipboard? clipboard = null)
 	{
 		ArgumentNullException.ThrowIfNull(input);
 		_input = input;
+		Clipboard = clipboard ?? new MemoryClipboard();
 		_options = options ?? new UiOptions();
 		_logger = logger;
 		_theme = _options.Theme ?? UiTheme.Default;
 		_tree = new UiTree(this);
 	}
+
+	/// <summary>The clipboard text inputs copy to, cut to and paste from.</summary>
+	public IClipboard Clipboard { get; }
 
 	/// <summary>The theme; changes apply from the next widget call.</summary>
 	public UiTheme Theme

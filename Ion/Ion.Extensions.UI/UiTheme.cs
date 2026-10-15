@@ -52,6 +52,9 @@ public struct UiTheme
 	/// <summary>The background of text input fields.</summary>
 	public Color InputBackground { get; set; }
 
+	/// <summary>The highlight behind selected text in a text input.</summary>
+	public Color TextSelection { get; set; }
+
 	/// <summary>The background of a list item under the pointer.</summary>
 	public Color ListItemHover { get; set; }
 
@@ -138,6 +141,7 @@ public struct UiTheme
 		Track = new Color(16, 18, 24, 255),
 		Thumb = new Color(232, 234, 240, 255),
 		InputBackground = new Color(16, 18, 24, 255),
+		TextSelection = new Color(64, 156, 255, 110),
 		ListItemHover = new Color(58, 64, 82, 255),
 		ListItemSelected = new Color(36, 86, 150, 255),
 		FocusOutline = new Color(255, 196, 60, 255),
@@ -177,4 +181,7 @@ public sealed class UiOptions
 
 	/// <summary>The theme the <see cref="Ui"/> starts with; <see cref="UiTheme.Default"/> when null.</summary>
 	public UiTheme? Theme { get; set; }
+
+	/// <summary>The longest time, in seconds, between the clicks of a double click (a word) or a triple click (everything) in a text input.</summary>
+	public float DoubleClickSeconds { get; set; } = 0.4f;
 }

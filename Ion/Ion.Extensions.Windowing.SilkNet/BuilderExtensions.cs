@@ -32,6 +32,7 @@ public static class BuilderExtensions
 			.AddSingleton<IWindowSurface>(static sp => sp.GetRequiredService<SilkWindow>())
 			.AddSingleton(static sp => new SilkInputState(sp.GetRequiredService<SilkWindow>(), sp.GetRequiredService<IEvents>(), sp.GetRequiredService<InputTracker>()))
 			.AddSingleton<IInputState>(static sp => sp.GetRequiredService<SilkInputState>())
+			.AddSingleton<IClipboard>(static sp => sp.GetRequiredService<SilkInputState>())
 			.AddSingleton<SilkWindowSystem>()
 			.AddSingleton<SilkInputSystem>();
 

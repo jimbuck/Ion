@@ -155,10 +155,20 @@ public sealed partial class Ui
 					batch.DrawRect(theme.InputBackground, field);
 					var textHeight = MeasureText(null).Y;
 					var textY = centerY - textHeight * 0.5f;
-					_text(batch, node.Value, new Vector2(field.X + 6, textY), textColor, 1f);
+					var state = node.State;
+					if (node.Id == _editingId && state.HasSelection)
+					{
+						var widths = _prefixWidths(state);
+						var from = widths[Math.Min(state.SelectionStart, widths.Length - 1)];
+						var to = widths[Math.Min(state.SelectionEnd, widths.Length - 1)];
+						batch.DrawRect(theme.TextSelection, new RectangleF(field.X + TextInputPadding + from, textY, to - from, textHeight));
+					}
+
+					_text(batch, node.Value, new Vector2(field.X + TextInputPadding, textY), textColor, 1f);
 					if (node.Id == _editingId)
 					{
-						var caretX = field.X + 6 + _caretOffset(node.State);
+						var widths = _prefixWidths(state);
+						var caretX = field.X + TextInputPadding + widths[Math.Clamp(state.Caret, 0, widths.Length - 1)];
 						batch.DrawRect(theme.Accent, new RectangleF(caretX, textY, 2, textHeight));
 					}
 
@@ -201,13 +211,24 @@ public sealed partial class Ui
 		}
 	}
 
-	private float _caretOffset(UiNodeState state)
+	/// <summary>The padding between a text input's field edge and its text.</summary>
+	private const float TextInputPadding = 6;
+
+	/// <summary>
+	/// The x offset of every caret position of a text input's text (entry i: the width of the first i characters), for the
+	/// caret, the selection and pointer hits. Measured again only when the text changed (an edit), so drawing and dragging
+	/// allocate nothing.
+	/// </summary>
+	private float[] _prefixWidths(UiNodeState state)
 	{
-		if (state.Caret <= 0 || state.Buffer is null) return 0;
-		var prefix = state.Buffer.AsSpan(0, Math.Min(state.Caret, state.Length));
-		// The prefix string is rebuilt only when the text before the caret changed (an edit or a caret move).
-		if (state.CaretPrefix is null || !prefix.SequenceEqual(state.CaretPrefix)) state.CaretPrefix = new string(prefix);
-		return MeasureText(state.CaretPrefix).X;
+		var text = state.Buffer is null ? default : state.Buffer.AsSpan(0, state.Length);
+		if (state.Widths is { } cached && state.WidthsSource is { } source && ReferenceEquals(state.WidthsFont, _theme.Font) && text.SequenceEqual(source)) return cached;
+		var widths = new float[text.Length + 1];
+		for (var i = 1; i <= text.Length; i++) widths[i] = MeasureText(new string(text[..i])).X;
+		state.Widths = widths;
+		state.WidthsSource = new string(text);
+		state.WidthsFont = _theme.Font;
+		return widths;
 	}
 
 	private void _text(ISpriteBatch batch, string? text, Vector2 position, Color color, float scale)

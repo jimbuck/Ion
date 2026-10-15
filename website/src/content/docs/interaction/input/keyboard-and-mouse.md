@@ -117,7 +117,9 @@ public sealed class ConsoleSystem(IInputState input)
 - From FixedUpdate it holds everything typed since the previous fixed step.
 - Editing keys (Backspace, Delete, arrows) do not produce text; read them as keys.
 
-The [UI module](/Ion/interaction/ui/widgets/)'s `TextInput` widget does all of this for you, with a caret.
+The [UI module](/Ion/interaction/ui/widgets/)'s `TextInput` widget does all of this for you, with a caret, selection
+and the clipboard. The clipboard itself is the `IClipboard` service (`GetText`, `SetText`): the desktop clipboard on
+Silk.NET windows, a `MemoryClipboard` headless.
 
 :::note[IME]
 Composed characters arrive in `Text` once the operating system commits them. Ion does not display the composition

@@ -34,7 +34,7 @@ namespace Ion.Extensions.Windowing;
 /// <see cref="SdlTouchSource"/>); GLFW has no touch input.
 /// </para>
 /// </remarks>
-public sealed class SilkInputState : TrackedInputState, IDisposable
+public sealed class SilkInputState : TrackedInputState, IClipboard, IDisposable
 {
 	private const int KeyCount = (int)Key.LastKey + 1;
 
@@ -154,6 +154,41 @@ public sealed class SilkInputState : TrackedInputState, IDisposable
 				if (connected) _hookGamepad(gamepad);
 				if ((uint)gamepad.Index < InputTracker.MaxGamepads) _queue.Add(InputEvent.ForGamepadConnection(gamepad.Index, connected));
 				break;
+		}
+	}
+
+	private string _memoryClipboard = string.Empty;
+
+	/// <summary>The desktop clipboard's text (through the first keyboard), or the text kept in memory before the window exists.</summary>
+	public string GetText()
+	{
+		if (_input is { Keyboards.Count: > 0 } input)
+		{
+			try
+			{
+				return input.Keyboards[0].ClipboardText ?? string.Empty;
+			}
+			catch (Exception)
+			{
+				// No clipboard (a headless display, an unsupported platform): fall back to the in-memory text.
+			}
+		}
+
+		return _memoryClipboard;
+	}
+
+	/// <summary>Sets the desktop clipboard's text (and the in-memory copy).</summary>
+	public void SetText(string text)
+	{
+		_memoryClipboard = text ?? string.Empty;
+		if (_input is not { Keyboards.Count: > 0 } input) return;
+		try
+		{
+			input.Keyboards[0].ClipboardText = _memoryClipboard;
+		}
+		catch (Exception)
+		{
+			// Kept in memory only.
 		}
 	}
 

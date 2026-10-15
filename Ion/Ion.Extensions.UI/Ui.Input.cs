@@ -34,6 +34,15 @@ public sealed partial class Ui
 	private Nav _repeatNav;
 	private float _repeatTimer;
 	private Nav _stickPrevious;
+	private float _time;
+	private float _lastClickTime = float.NegativeInfinity;
+	private uint _lastClickId;
+	private int _clickCount;
+	private bool _dragSelecting;
+
+	/// <summary>The caret and selection of the text input being edited (all -1 when none is).</summary>
+	internal (int Caret, int Start, int End) EditingSelection =>
+		_editingId != 0 && _states.TryGetValue(_editingId, out var state) ? (state.Caret, state.SelectionStart, state.SelectionEnd) : (-1, -1, -1);
 
 	/// <summary>The id of the widget under the pointer (from the previous frame's layout), or 0.</summary>
 	internal uint HotId => _hotId;
@@ -44,6 +53,7 @@ public sealed partial class Ui
 	private void _processInput(float dt)
 	{
 		_focusSeen = false;
+		_time += dt;
 		var input = _input;
 
 		// Pointer, against the previous frame's layout.
@@ -58,12 +68,20 @@ public sealed partial class Ui
 			if (hit >= 0)
 			{
 				_setFocus(_hotId, scroll: false);
-				if (_prev[hit].Kind == UiNodeKind.TextInput) _startEditing(_prev[hit].State);
+				if (_prev[hit].Kind == UiNodeKind.TextInput) _pressText(hit);
 			}
 			else
 			{
 				_editingId = 0;
 			}
+		}
+
+		// Dragging over the field being edited selects from where the press put the caret.
+		if (_dragSelecting)
+		{
+			var editing = _prevIndex(_editingId);
+			if (editing >= 0 && input.Down(MouseButton.Left)) _prev[editing].State.MoveCaret(_textIndexAt(editing, _pointer.X), extend: true);
+			else _dragSelecting = false;
 		}
 
 		if (input.Released(MouseButton.Left) && _activeId != 0 && _activeId == _hotId && hit >= 0)
@@ -188,18 +206,42 @@ public sealed partial class Ui
 			return;
 		}
 
-		var text = input.Text;
-		if (!text.IsEmpty) state.Insert(text);
+		const ModifierKeys command = ModifierKeys.Control | ModifierKeys.Gui;
+		var commandHeld = (input.Modifiers & command) != 0;
+		bool Command(Key key) => input.Pressed(key, command) || (commandHeld && input.Pressed(key));
+
+		// The clipboard and select all (Ctrl, or Cmd on macOS); typed text is ignored while a command key is held.
+		if (Command(Key.A)) state.SelectAll();
+		else if (Command(Key.C)) _copy(state, cut: false);
+		else if (Command(Key.X)) _copy(state, cut: true);
+		else if (Command(Key.V)) _paste(state);
+		else if (!commandHeld && !input.Text.IsEmpty) state.Insert(input.Text);
 
 		var (pressed, held) = _navigation(editing: true);
-		switch (_repeat(pressed, held, dt))
+		var fire = _repeat(pressed, held, dt);
+		// Shift extends the selection and Ctrl moves by words, whether reported with the key or held.
+		var shift = (input.Modifiers & ModifierKeys.Shift) != 0 || _pressedWith(ModifierKeys.Shift);
+		var word = commandHeld || _pressedWith(ModifierKeys.Control);
+		switch (fire)
 		{
-			case Nav.Left: state.Caret = Math.Max(0, state.Caret - 1); break;
-			case Nav.Right: state.Caret = Math.Min(state.Length, state.Caret + 1); break;
-			case Nav.Home: state.Caret = 0; break;
-			case Nav.End: state.Caret = state.Length; break;
-			case Nav.Backspace: state.Backspace(); break;
-			case Nav.Delete: state.Delete(); break;
+			case Nav.Left:
+				if (!shift && state.HasSelection) state.MoveCaret(state.SelectionStart, extend: false);
+				else state.MoveCaret(word ? state.WordStart(state.Caret) : state.Caret - 1, shift);
+				break;
+			case Nav.Right:
+				if (!shift && state.HasSelection) state.MoveCaret(state.SelectionEnd, extend: false);
+				else state.MoveCaret(word ? state.WordEnd(state.Caret) : state.Caret + 1, shift);
+				break;
+			case Nav.Home: state.MoveCaret(0, shift); break;
+			case Nav.End: state.MoveCaret(state.Length, shift); break;
+			case Nav.Backspace:
+				if (word && !state.HasSelection) state.Select(state.WordStart(state.Caret), state.Caret);
+				state.Backspace();
+				break;
+			case Nav.Delete:
+				if (word && !state.HasSelection) state.Select(state.Caret, state.WordEnd(state.Caret));
+				state.Delete();
+				break;
 			case Nav.Up or Nav.Down:
 				{
 					var focused = _prevIndex(_focusId);
@@ -221,6 +263,76 @@ public sealed partial class Ui
 		{
 			_editingId = 0;
 		}
+	}
+
+	/// <summary>Whether a text editing key went down this frame with <paramref name="modifiers"/> reported on its event.</summary>
+	private bool _pressedWith(ModifierKeys modifiers)
+	{
+		var input = _input;
+		return input.Pressed(Key.Left, modifiers) || input.Pressed(Key.Right, modifiers) || input.Pressed(Key.Home, modifiers)
+			|| input.Pressed(Key.End, modifiers) || input.Pressed(Key.BackSpace, modifiers) || input.Pressed(Key.Delete, modifiers);
+	}
+
+	/// <summary>
+	/// A press on a text input: starts editing it and puts the caret at the pointer (shift-click extends the selection,
+	/// dragging selects); a double click selects the word under the pointer and a triple click everything.
+	/// </summary>
+	private void _pressText(int index)
+	{
+		var state = _prev[index].State;
+		var wasEditing = _editingId == state.Id;
+		if (!wasEditing) _startEditing(state);
+		var at = _textIndexAt(index, _pointer.X);
+		var repeat = _lastClickId == state.Id && _time - _lastClickTime <= _options.DoubleClickSeconds;
+		_clickCount = repeat ? _clickCount + 1 : 1;
+		_lastClickId = state.Id;
+		_lastClickTime = _time;
+		_dragSelecting = false;
+		if (_clickCount == 2)
+		{
+			var (start, end) = state.WordAt(at);
+			state.Select(start, end);
+		}
+		else if (_clickCount >= 3)
+		{
+			state.SelectAll();
+		}
+		else
+		{
+			state.MoveCaret(at, extend: wasEditing && (_input.Modifiers & ModifierKeys.Shift) != 0);
+			_dragSelecting = true;
+		}
+	}
+
+	/// <summary>The caret position nearest to <paramref name="x"/> in the text input at <paramref name="index"/> (of the previous layout).</summary>
+	private int _textIndexAt(int index, float x)
+	{
+		ref var node = ref _prev[index];
+		var widths = _prefixWidths(node.State);
+		var local = x - (node.Rect.X + node.LabelWidth + _theme.Gap + TextInputPadding);
+		var best = 0;
+		for (var i = 1; i < widths.Length && i <= node.State.Length; i++)
+		{
+			if (MathF.Abs(widths[i] - local) < MathF.Abs(widths[best] - local)) best = i;
+		}
+
+		return best;
+	}
+
+	private void _copy(UiNodeState state, bool cut)
+	{
+		if (!state.HasSelection) return;
+		Clipboard.SetText(new string(state.SelectedText));
+		if (cut) state.DeleteSelection();
+	}
+
+	private void _paste(UiNodeState state)
+	{
+		var text = Clipboard.GetText();
+		if (string.IsNullOrEmpty(text)) return;
+		// A single-line field: each line break or tab becomes one space (other control characters are dropped by Insert).
+		var line = text.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
+		state.Insert(line);
 	}
 
 	private (Nav Pressed, Nav Held) _navigation(bool editing)
@@ -476,6 +588,7 @@ public sealed partial class Ui
 		_focusId = state.Id;
 		_editingId = state.Id;
 		state.Caret = state.Length;
+		state.Anchor = -1;
 	}
 
 	// Tree commands ---------------------------------------------------------------------------------------------------

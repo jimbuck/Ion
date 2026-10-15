@@ -24,7 +24,7 @@ public static class UiBuilderExtensions
 		services.AddOptions<UiOptions>();
 		if (configure is not null) services.Configure(configure);
 
-		services.TryAddSingleton(static sp => new Ui(sp.GetRequiredService<IInputState>(), sp.GetRequiredService<IOptions<UiOptions>>().Value, sp.GetService<ILogger<Ui>>()));
+		services.TryAddSingleton(static sp => new Ui(sp.GetRequiredService<IInputState>(), sp.GetRequiredService<IOptions<UiOptions>>().Value, sp.GetService<ILogger<Ui>>(), sp.GetService<IClipboard>()));
 		services.TryAddSingleton(static sp => sp.GetRequiredService<Ui>().Tree);
 		services.TryAddSingleton(static sp => new UiSystem(sp.GetRequiredService<Ui>(), sp.GetRequiredService<IWindow>(), sp.GetRequiredService<ISpriteBatch>()));
 		return services;
