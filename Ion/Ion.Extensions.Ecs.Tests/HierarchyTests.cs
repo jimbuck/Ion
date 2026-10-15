@@ -231,4 +231,75 @@ public class HierarchyTests
 		AssertClose(new Vector2(11, 0), world.Get<GlobalTransform2D>(a).Position);
 		AssertClose(new Vector2(12, 0), world.Get<GlobalTransform2D>(b).Position);
 	}
+
+	[Fact]
+	public void APlainDestroyOfAParentTakesItsSubtreeAtTheNextPropagation()
+	{
+		using var world = World.Create();
+		var root = world.Create(new Transform2D());
+		var parent = world.Create(new Transform2D());
+		var child = world.Create(new Transform2D());
+		var grandchild = world.Create(new Transform2D());
+		var sibling = world.Create(new Transform2D());
+		world.SetParent(parent, root);
+		world.SetParent(sibling, root);
+		world.SetParent(child, parent);
+		world.SetParent(grandchild, child);
+		var system = new TransformPropagationSystem(world);
+		system.Propagate();
+		Assert.Equal(0, system.LastRepaired);
+
+		world.Destroy(parent);
+		system.Propagate();
+
+		Assert.Equal(2, system.LastRepaired);
+		Assert.False(world.IsAlive(child));
+		Assert.False(world.IsAlive(grandchild));
+		Assert.Equal([sibling], world.GetChildren(root).ToArray());
+		Assert.Equal(2, world.Size);
+
+		// Nothing left to repair.
+		system.Propagate();
+		Assert.Equal(0, system.LastRepaired);
+	}
+
+	[Fact]
+	public void APlainDestroyOfAChildLeavesItsParentsChildren()
+	{
+		using var world = World.Create();
+		var parent = world.Create(new Transform());
+		var a = world.Create(new Transform());
+		var b = world.Create(new Transform());
+		world.SetParent(a, parent);
+		world.SetParent(b, parent);
+		var system = new TransformPropagationSystem(world);
+		system.Propagate();
+
+		world.Destroy(a);
+		system.Propagate();
+
+		Assert.Equal([b], world.GetChildren(parent).ToArray());
+		Assert.Equal(0, world.GetSiblingIndex(b));
+		Assert.True(world.IsAlive(parent));
+	}
+
+	[Fact]
+	public void RepairHierarchyRepairsWithoutThePropagation()
+	{
+		using var world = World.Create();
+		var parent = world.Create(new Transform2D());
+		var child = world.Create(new Transform2D());
+		var other = world.Create(new Transform2D());
+		var leaf = world.Create(new Transform2D());
+		world.SetParent(child, parent);
+		world.SetParent(leaf, other);
+
+		world.Destroy(parent);
+		world.Destroy(leaf);
+		Assert.Equal(1, world.RepairHierarchy());
+
+		Assert.False(world.IsAlive(child));
+		Assert.Equal(0, world.GetChildren(other).Length);
+		Assert.Equal(0, world.RepairHierarchy());
+	}
 }

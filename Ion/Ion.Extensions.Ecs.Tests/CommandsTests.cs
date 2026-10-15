@@ -122,4 +122,59 @@ public class CommandsTests
 		Assert.Equal(existing, children[2]);
 		Assert.Equal(a, children[3]);
 	}
+
+	[Fact]
+	public void DestroyTakesTheSubtreeAndLeavesTheParent()
+	{
+		using var world = World.Create();
+		var commands = new Commands(world);
+		var root = world.Create(new Transform2D());
+		var parent = world.Create(new Transform2D());
+		var child = world.Create(new Transform2D());
+		var grandchild = world.Create(new Transform2D());
+		var sibling = world.Create(new Transform2D());
+		world.SetParent(parent, root);
+		world.SetParent(sibling, root);
+		world.SetParent(child, parent);
+		world.SetParent(grandchild, child);
+
+		commands.Destroy(parent);
+		commands.Flush();
+
+		Assert.False(world.IsAlive(parent));
+		Assert.False(world.IsAlive(child));
+		Assert.False(world.IsAlive(grandchild));
+		Assert.Equal([sibling], world.GetChildren(root).ToArray());
+
+		// A child destroyed through the commands leaves its parent's Children at once.
+		commands.Destroy(sibling);
+		commands.Flush();
+		Assert.Equal(0, world.GetChildren(root).Length);
+		Assert.Equal(1, world.Size);
+	}
+
+	[Fact]
+	public void DestroyKeepsChildrenTheSameCommandsMoveAway()
+	{
+		using var world = World.Create();
+		var commands = new Commands(world);
+		var parent = world.Create(new Transform2D());
+		var keeper = world.Create(new Transform2D());
+		var moved = world.Create(new Transform2D());
+		var detached = world.Create(new Transform2D());
+		var doomed = world.Create(new Transform2D());
+		foreach (var e in new[] { moved, detached, doomed }) world.SetParent(e, parent);
+
+		commands.Destroy(parent);
+		commands.SetParent(moved, keeper);
+		commands.RemoveParent(detached);
+		commands.Flush();
+
+		Assert.False(world.IsAlive(doomed));
+		Assert.True(world.TryGetParent(moved, out var found));
+		Assert.Equal(keeper, found);
+		Assert.Equal([moved], world.GetChildren(keeper).ToArray());
+		Assert.True(world.IsAlive(detached));
+		Assert.False(world.TryGetParent(detached, out _));
+	}
 }

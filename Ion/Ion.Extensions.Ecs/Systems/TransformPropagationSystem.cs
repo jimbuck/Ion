@@ -32,6 +32,11 @@ namespace Ion.Extensions.Ecs;
 /// <see cref="GlobalTransform.IsHidden"/>): tagged <see cref="Hidden"/> itself, or under a hidden ancestor. That is
 /// refreshed on every visit, so hiding or showing a parent takes effect for its whole subtree at the next propagation.
 /// </para>
+/// <para>
+/// When the walk finds a dead child, or reaches fewer children than there are entities with a <see cref="Parent"/>, it
+/// calls <see cref="HierarchyExtensions.RepairHierarchy"/>: an entity destroyed with a plain <c>World.Destroy</c> takes its
+/// descendants with it at the next propagation.
+/// </para>
 /// </remarks>
 public sealed class TransformPropagationSystem(World world)
 {
@@ -41,9 +46,12 @@ public sealed class TransformPropagationSystem(World world)
 	private static readonly QueryDescription Roots2D = new QueryDescription().WithAll<Transform2D, GlobalTransform2D>().WithNone<Parent>();
 	private static readonly QueryDescription Roots3D = new QueryDescription().WithAll<Transform, GlobalTransform>().WithNone<Parent>();
 	private static readonly QueryDescription Bounds = new QueryDescription().WithAll<Sprite, GlobalTransform2D, Aabb2D>();
+	private static readonly QueryDescription Parented = new QueryDescription().WithAll<Parent>();
 
 	private int _updated;
 	private int _visited;
+	private int _childVisits;
+	private bool _sawDead;
 
 	/// <summary>The world.</summary>
 	public World World => world;
@@ -74,11 +82,24 @@ public sealed class TransformPropagationSystem(World world)
 
 		_updated = 0;
 		_visited = 0;
+		_childVisits = 0;
+		_sawDead = false;
 		Propagate2D();
 		Propagate3D();
 		LastUpdated = _updated;
 		LastVisited = _visited;
+
+		// A plain World.Destroy leaves a dead child in its parent's Children, or children under a dead parent, which the
+		// walk does not reach. Either shows here; the repair destroys the orphaned subtrees and drops the dead entries.
+		if (_sawDead || _childVisits != world.CountEntities(in Parented)) LastRepaired = world.RepairHierarchy();
+		else LastRepaired = 0;
 	}
+
+	/// <summary>
+	/// The number of entities the last <see cref="Propagate()"/> destroyed because their parent had been destroyed
+	/// without <see cref="HierarchyExtensions.DestroyRecursive"/> (see <see cref="HierarchyExtensions.RepairHierarchy"/>).
+	/// </summary>
+	public int LastRepaired { get; private set; }
 
 	/// <summary>Adds missing <see cref="Aabb2D"/> components to sprites and computes every sprite's bounds.</summary>
 	public void UpdateBounds()
@@ -143,13 +164,19 @@ public sealed class TransformPropagationSystem(World world)
 		{
 			// One entity lookup: its chunk and index, then the components by index.
 			ref var data = ref world.IsAlive(child, out var alive);
-			if (!alive) continue;
+			if (!alive)
+			{
+				_sawDead = true;
+				continue;
+			}
+
 			ref var chunk = ref data.Archetype.GetChunk(data.Slot.ChunkIndex);
 			if (!chunk.Has<Transform2D>() || !chunk.Has<GlobalTransform2D>()) continue;
 			var index = data.Slot.Index;
 			ref var local = ref Unsafe.Add(ref chunk.GetFirst<Transform2D>(), index);
 			ref var global = ref Unsafe.Add(ref chunk.GetFirst<GlobalTransform2D>(), index);
 			_visited++;
+			_childVisits++;
 
 			if (global.Version == 0 || global.ParentVersion != parent.Version || !Same(local, global.Local))
 			{
@@ -209,13 +236,19 @@ public sealed class TransformPropagationSystem(World world)
 		foreach (var child in children.AsSpan())
 		{
 			ref var data = ref world.IsAlive(child, out var alive);
-			if (!alive) continue;
+			if (!alive)
+			{
+				_sawDead = true;
+				continue;
+			}
+
 			ref var chunk = ref data.Archetype.GetChunk(data.Slot.ChunkIndex);
 			if (!chunk.Has<Transform>() || !chunk.Has<GlobalTransform>()) continue;
 			var index = data.Slot.Index;
 			ref var local = ref Unsafe.Add(ref chunk.GetFirst<Transform>(), index);
 			ref var global = ref Unsafe.Add(ref chunk.GetFirst<GlobalTransform>(), index);
 			_visited++;
+			_childVisits++;
 
 			if (global.Version == 0 || global.ParentVersion != parent.Version || !Same(local, global.Local))
 			{

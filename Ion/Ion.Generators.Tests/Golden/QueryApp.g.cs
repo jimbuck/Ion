@@ -150,16 +150,16 @@ namespace Ion.Generated
 
 		private Schedule0Factory()
 			: base("the application built at Program.cs:46",
-				new string[] { "Ion.Extensions.Ecs#0", "Ion.Extensions.Ecs#1", "Ion.Extensions.Ecs#2", "QueryApp#0" },
-				new bool[] { false, false, false, false },
+				new string[] { "Ion.Extensions.Ecs#0", "Ion.Extensions.Ecs#1", "Ion.Extensions.Ecs#2", "Ion.Extensions.Ecs#3", "QueryApp#0" },
+				new bool[] { false, false, false, false, false },
 				new string[][]
 				{
 					new string[] { "0|S|FlushInit|0" }, // Init
 					new string[] { "0|S|FlushFirst|1" }, // First
 					new string[] { "0|S|FlushFixedUpdate|2" }, // FixedUpdate
-					new string[] { "3|S|Move|1", "3|S|Damage|2", "2|S|Animate|0", "0|S|FlushUpdate|3" }, // Update
-					new string[] { "1|S|PropagateBeforeRender|1", "3|S|Draw|0", "0|S|FlushRender|4" }, // Render
-					new string[] { "1|S|PropagateLast|0", "3|S|Report|3", "0|S|FlushLast|5" }, // Last
+					new string[] { "4|S|Move|1", "4|S|Damage|2", "2|S|Animate|0", "3|S|Animate|0", "0|S|FlushUpdate|3" }, // Update
+					new string[] { "1|S|PropagateBeforeRender|1", "4|S|Draw|0", "0|S|FlushRender|4" }, // Render
+					new string[] { "1|S|PropagateLast|0", "4|S|Report|3", "0|S|FlushLast|5" }, // Last
 					new string[] { "0|S|FlushDestroy|6" } // Destroy
 				})
 		{
@@ -181,23 +181,25 @@ namespace Ion.Generated
 		private readonly global::Ion.SpanId _span1;
 		private readonly global::Ion.SpanId _span2;
 		private readonly global::Arch.Core.World _p3_0;
-		private readonly global::Movement _s3;
+		private readonly global::Movement _s4;
 		private readonly global::Ion.SpanId _span3;
 		private readonly global::Arch.Core.World _p4_0;
 		private readonly global::Ion.Extensions.Ecs.Commands _p4_1;
 		private readonly global::Ion.SpanId _span4;
 		private readonly global::Arch.Core.World _p6_0;
 		private readonly global::Ion.SpanId _span5;
+		private readonly global::Arch.Core.World _p7_0;
 		private readonly global::Ion.SpanId _span6;
-		private readonly global::Ion.Extensions.Ecs.TransformPropagationSystem _s1;
 		private readonly global::Ion.SpanId _span7;
+		private readonly global::Ion.Extensions.Ecs.TransformPropagationSystem _s1;
 		private readonly global::Ion.SpanId _span8;
 		private readonly global::Ion.SpanId _span9;
 		private readonly global::Ion.SpanId _span10;
-		private readonly global::Arch.Core.World _p11_0;
 		private readonly global::Ion.SpanId _span11;
+		private readonly global::Arch.Core.World _p12_0;
 		private readonly global::Ion.SpanId _span12;
 		private readonly global::Ion.SpanId _span13;
+		private readonly global::Ion.SpanId _span14;
 
 		public Schedule0(global::Ion.GeneratedScheduleContext context)
 		{
@@ -206,24 +208,26 @@ namespace Ion.Generated
 			_span0 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushInit");
 			_span1 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushFirst");
 			_span2 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushFixedUpdate");
-			_p3_0 = context.Service<global::Arch.Core.World>(3);
-			_s3 = context.System<global::Movement>(3);
+			_p3_0 = context.Service<global::Arch.Core.World>(4);
+			_s4 = context.System<global::Movement>(4);
 			_span3 = global::Ion.MetricsIds.Register("Movement.Move");
-			_p4_0 = context.Service<global::Arch.Core.World>(3);
-			_p4_1 = context.Service<global::Ion.Extensions.Ecs.Commands>(3);
+			_p4_0 = context.Service<global::Arch.Core.World>(4);
+			_p4_1 = context.Service<global::Ion.Extensions.Ecs.Commands>(4);
 			_span4 = global::Ion.MetricsIds.Register("Movement.Damage");
 			_p6_0 = context.Service<global::Arch.Core.World>(2);
 			_span5 = global::Ion.MetricsIds.Register("SpriteAnimationSystem.Animate");
-			_span6 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushUpdate");
+			_p7_0 = context.Service<global::Arch.Core.World>(3);
+			_span6 = global::Ion.MetricsIds.Register("SkeletalAnimationSystem.Animate");
+			_span7 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushUpdate");
 			_s1 = context.System<global::Ion.Extensions.Ecs.TransformPropagationSystem>(1);
-			_span7 = global::Ion.MetricsIds.Register("TransformPropagationSystem.PropagateBeforeRender");
-			_span8 = global::Ion.MetricsIds.Register("Movement.Draw");
-			_span9 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushRender");
-			_span10 = global::Ion.MetricsIds.Register("TransformPropagationSystem.PropagateLast");
-			_p11_0 = context.Service<global::Arch.Core.World>(3);
-			_span11 = global::Ion.MetricsIds.Register("Movement.Report");
-			_span12 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushLast");
-			_span13 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushDestroy");
+			_span8 = global::Ion.MetricsIds.Register("TransformPropagationSystem.PropagateBeforeRender");
+			_span9 = global::Ion.MetricsIds.Register("Movement.Draw");
+			_span10 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushRender");
+			_span11 = global::Ion.MetricsIds.Register("TransformPropagationSystem.PropagateLast");
+			_p12_0 = context.Service<global::Arch.Core.World>(4);
+			_span12 = global::Ion.MetricsIds.Register("Movement.Report");
+			_span13 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushLast");
+			_span14 = global::Ion.MetricsIds.Register("EcsCommandsSystem.FlushDestroy");
 		}
 
 		[global::System.Diagnostics.StackTraceHidden]
@@ -284,12 +288,12 @@ namespace Ion.Generated
 			{
 				{
 					long t3 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span3) : 0L;
-					_s3.__IonQuery_Move(dt, _p3_0); // 0 Movement.Move
+					_s4.__IonQuery_Move(dt, _p3_0); // 0 Movement.Move
 					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span3, t3);
 				}
 				{
 					long t4 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span4) : 0L;
-					_s3.__IonQuery_Damage(dt, _p4_0, _p4_1); // 5 Movement.Damage
+					_s4.__IonQuery_Damage(dt, _p4_0, _p4_1); // 5 Movement.Damage
 					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span4, t4);
 				}
 				{
@@ -299,15 +303,21 @@ namespace Ion.Generated
 				}
 				{
 					long t6 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span6) : 0L;
-					_s0.FlushUpdate(dt); // 950 EcsCommandsSystem.FlushUpdate
+					global::Ion.Extensions.Ecs.SkeletalAnimationSystem.__IonQuery_Animate(dt, _p7_0); // 400 SkeletalAnimationSystem.Animate
 					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span6, t6);
+				}
+				{
+					long t7 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span7) : 0L;
+					_s0.FlushUpdate(dt); // 950 EcsCommandsSystem.FlushUpdate
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span7, t7);
 				}
 			}
 			else
 			{
-				_s3.__IonQuery_Move(dt, _p3_0); // 0 Movement.Move
-				_s3.__IonQuery_Damage(dt, _p4_0, _p4_1); // 5 Movement.Damage
+				_s4.__IonQuery_Move(dt, _p3_0); // 0 Movement.Move
+				_s4.__IonQuery_Damage(dt, _p4_0, _p4_1); // 5 Movement.Damage
 				global::Ion.Extensions.Ecs.SpriteAnimationSystem.__IonQuery_Animate(dt, _p6_0); // 400 SpriteAnimationSystem.Animate
+				global::Ion.Extensions.Ecs.SkeletalAnimationSystem.__IonQuery_Animate(dt, _p7_0); // 400 SkeletalAnimationSystem.Animate
 				_s0.FlushUpdate(dt); // 950 EcsCommandsSystem.FlushUpdate
 			}
 		}
@@ -318,25 +328,25 @@ namespace Ion.Generated
 			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
 			{
 				{
-					long t7 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span7) : 0L;
-					_s1.PropagateBeforeRender(dt); // -400 TransformPropagationSystem.PropagateBeforeRender
-					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span7, t7);
-				}
-				{
 					long t8 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span8) : 0L;
-					_s3.Draw(dt); // 0 Movement.Draw
+					_s1.PropagateBeforeRender(dt); // -400 TransformPropagationSystem.PropagateBeforeRender
 					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span8, t8);
 				}
 				{
 					long t9 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span9) : 0L;
-					_s0.FlushRender(dt); // 950 EcsCommandsSystem.FlushRender
+					_s4.Draw(dt); // 0 Movement.Draw
 					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span9, t9);
+				}
+				{
+					long t10 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span10) : 0L;
+					_s0.FlushRender(dt); // 950 EcsCommandsSystem.FlushRender
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span10, t10);
 				}
 			}
 			else
 			{
 				_s1.PropagateBeforeRender(dt); // -400 TransformPropagationSystem.PropagateBeforeRender
-				_s3.Draw(dt); // 0 Movement.Draw
+				_s4.Draw(dt); // 0 Movement.Draw
 				_s0.FlushRender(dt); // 950 EcsCommandsSystem.FlushRender
 			}
 		}
@@ -347,25 +357,25 @@ namespace Ion.Generated
 			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
 			{
 				{
-					long t10 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span10) : 0L;
-					_s1.PropagateLast(dt); // -400 TransformPropagationSystem.PropagateLast
-					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span10, t10);
-				}
-				{
 					long t11 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span11) : 0L;
-					global::Movement.__IonQuery_Report(dt, _p11_0); // 7 Movement.Report
+					_s1.PropagateLast(dt); // -400 TransformPropagationSystem.PropagateLast
 					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span11, t11);
 				}
 				{
 					long t12 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span12) : 0L;
-					_s0.FlushLast(dt); // 950 EcsCommandsSystem.FlushLast
+					global::Movement.__IonQuery_Report(dt, _p12_0); // 7 Movement.Report
 					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span12, t12);
+				}
+				{
+					long t13 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span13) : 0L;
+					_s0.FlushLast(dt); // 950 EcsCommandsSystem.FlushLast
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span13, t13);
 				}
 			}
 			else
 			{
 				_s1.PropagateLast(dt); // -400 TransformPropagationSystem.PropagateLast
-				global::Movement.__IonQuery_Report(dt, _p11_0); // 7 Movement.Report
+				global::Movement.__IonQuery_Report(dt, _p12_0); // 7 Movement.Report
 				_s0.FlushLast(dt); // 950 EcsCommandsSystem.FlushLast
 			}
 		}
@@ -376,9 +386,9 @@ namespace Ion.Generated
 			if (global::Ion.FrameProfiler.IsProfilingEnabled && _prof.IsActive)
 			{
 				{
-					long t13 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span13) : 0L;
+					long t14 = global::Ion.FrameProfiler.IsProfilingEnabled ? _prof.Begin(_span14) : 0L;
 					_s0.FlushDestroy(dt); // 950 EcsCommandsSystem.FlushDestroy
-					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span13, t13);
+					if (global::Ion.FrameProfiler.IsProfilingEnabled) _prof.End(_span14, t14);
 				}
 			}
 			else

@@ -134,6 +134,7 @@ Do not add or edit `Parent` and `Children` yourself; use the operations, which k
 | `GetSiblingIndex(child)` | | The child's index among its siblings, or -1 for a root. |
 | `RemoveParent(child)` | `commands.RemoveParent(child)` | Detach: the child becomes a root and its local transform is now relative to the world. |
 | `DestroyRecursive(entity)` | `commands.DestroyRecursive(entity)` | Destroy the entity and all its descendants. |
+| `RepairHierarchy()` | | Destroy the subtrees of dead parents and drop dead children, after plain `world.Destroy` calls. |
 | `TryGetParent(entity, out parent)` | | Read the parent. |
 | `GetChildren(entity)` | | Read the children as a span. |
 
@@ -164,8 +165,23 @@ if you want it to stay put.
 
 Children need a transform of the same kind as their parent: a `Transform2D` child under a `Transform2D` parent, a
 `Transform` child under a `Transform` parent. An entity whose parent lacks that transform is not reached by the
-propagation. Destroying a parent with `world.Destroy` does not destroy its children (they keep a stale `Parent`); use
-`DestroyRecursive`.
+propagation.
+
+### Destroying entities in a hierarchy
+
+The rule is that **destroying an entity destroys its descendants**, and a destroyed child leaves its parent's
+`Children`. How soon that happens depends on the call:
+
+| Call | Descendants and parent |
+|---|---|
+| `world.DestroyRecursive(entity)`, `commands.DestroyRecursive(entity)` | At once (the commands form after the other commands). |
+| `commands.Destroy(entity)` | At the flush, right after the buffer destroys the entity. A child that the same commands reparent (`SetParent`) or detach (`RemoveParent`) survives. |
+| `world.Destroy(entity)` (Arch's own) | At the next transform propagation, which repairs the hierarchy when its walk finds a dead child or misses one. `TransformPropagationSystem.LastRepaired` counts the entities it destroyed. |
+
+Arch's `World.Destroy` cannot tell the hierarchy, so between a plain destroy and the next propagation the children still
+point at the dead parent, and `GetChildren` can return a dead entity. Call `world.RepairHierarchy()` (outside a query)
+to repair at once, or use `DestroyRecursive`. To keep the children, detach them (`RemoveParent`) or move them to another
+parent before destroying.
 
 ## When the propagation runs
 

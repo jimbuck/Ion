@@ -18,6 +18,9 @@ public sealed class Commands
 	private CommandBuffer _buffer = new();
 	private readonly List<(Entity Child, Entity Parent, int Index)> _parents = [];
 	private readonly List<(Entity Child, int Index)> _siblings = [];
+	private readonly List<Entity> _destroys = [];
+	private readonly List<(Entity Entity, Entity Parent)> _detached = [];
+	private readonly List<(Entity Child, Entity Parent)> _orphaned = [];
 	private readonly List<Entity> _unparents = [];
 	private readonly List<Entity> _destroyTrees = [];
 	private readonly QueryDescription _pending = new QueryDescription().WithAll<PendingParent>();
@@ -94,11 +97,15 @@ public sealed class Commands
 		return entity;
 	}
 
-	/// <summary>Records the destruction of <paramref name="entity"/>.</summary>
+	/// <summary>
+	/// Records the destruction of <paramref name="entity"/>. Its descendants are destroyed with it and it leaves its
+	/// parent's <see cref="Children"/>, as with <see cref="DestroyRecursive"/>, but at its place among the commands.
+	/// </summary>
 	public void Destroy(Entity entity)
 	{
 		_count++;
 		_buffer.Destroy(in entity);
+		if (entity.Id >= 0) _destroys.Add(entity);
 	}
 
 	/// <summary>Records the destruction of <paramref name="entity"/> and all its descendants (an existing entity), after the other commands.</summary>
@@ -173,7 +180,35 @@ public sealed class Commands
 		_count = 0;
 		Playbacks++;
 
+		// The hierarchy of destroyed entities, read before the buffer destroys them.
+		foreach (var entity in _destroys)
+		{
+			if (!World.IsAlive(entity)) continue;
+			if (World.TryGet<Parent>(entity, out var parent)) _detached.Add((entity, parent.Value));
+			if (World.Has<Children>(entity))
+			{
+				foreach (var child in World.Get<Children>(entity).AsSpan()) _orphaned.Add((child, entity));
+			}
+		}
+
+		_destroys.Clear();
 		_buffer.Playback(World, dispose: true);
+
+		if (_detached.Count > 0 || _orphaned.Count > 0)
+		{
+			foreach (var (entity, parent) in _detached)
+			{
+				if (!World.IsAlive(entity) && World.IsAlive(parent) && World.Has<Children>(parent)) World.Get<Children>(parent).Remove(entity);
+			}
+
+			foreach (var (child, parent) in _orphaned)
+			{
+				if (!World.IsAlive(parent) && World.IsAlive(child) && World.TryGet<Parent>(child, out var current) && current.Value == parent && !MovedAway(child)) HierarchyExtensions.DestroyTree(World, child);
+			}
+
+			_detached.Clear();
+			_orphaned.Clear();
+		}
 
 		if (World.CountEntities(in _pending) > 0)
 		{
@@ -228,6 +263,17 @@ public sealed class Commands
 		_destroyTrees.Clear();
 	}
 
+	// A child of a destroyed entity that these commands reparent or detach survives it.
+	private bool MovedAway(Entity child)
+	{
+		foreach (var (moved, parent, _) in _parents)
+		{
+			if (moved == child && World.IsAlive(parent)) return true;
+		}
+
+		return _unparents.Contains(child);
+	}
+
 	/// <summary>Discards every recorded command.</summary>
 	public void Clear()
 	{
@@ -235,6 +281,7 @@ public sealed class Commands
 		_buffer = new CommandBuffer();
 		_parents.Clear();
 		_siblings.Clear();
+		_destroys.Clear();
 		_unparents.Clear();
 		_destroyTrees.Clear();
 		_count = 0;

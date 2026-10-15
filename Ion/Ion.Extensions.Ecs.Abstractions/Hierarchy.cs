@@ -39,6 +39,19 @@ public struct Children
 		Items[Length++] = child;
 	}
 
+	/// <summary>Removes the entries of dead entities.</summary>
+	internal void RemoveDead(World world)
+	{
+		var kept = 0;
+		for (var i = 0; i < Length; i++)
+		{
+			if (world.IsAlive(Items![i])) Items[kept++] = Items[i];
+		}
+
+		if (kept < Length) Array.Clear(Items!, kept, Length - kept);
+		Length = kept;
+	}
+
 	/// <summary>Inserts <paramref name="child"/> at <paramref name="index"/> (clamped to the ends).</summary>
 	internal void Insert(int index, Entity child)
 	{
@@ -213,7 +226,46 @@ public static class HierarchyExtensions
 		DestroyTree(world, entity);
 	}
 
-	private static void DestroyTree(World world, Entity entity)
+	private static readonly QueryDescription Parented = new QueryDescription().WithAll<Parent>();
+	private static readonly QueryDescription WithChildren = new QueryDescription().WithAll<Children>();
+
+	/// <summary>
+	/// Repairs the hierarchy after plain destroys (<see cref="World.Destroy(Entity)"/>, which does not know about it):
+	/// every entity whose parent is dead is destroyed with its descendants, as <see cref="DestroyRecursive"/> would have,
+	/// and dead entities are removed from every <see cref="Children"/>. Returns the number of entities destroyed. The
+	/// transform propagation calls it when its walk finds a dead entity or misses a child; call it yourself (outside a
+	/// query) to repair at once.
+	/// </summary>
+	public static int RepairHierarchy(this World world)
+	{
+		ArgumentNullException.ThrowIfNull(world);
+		List<Entity>? orphans = null;
+		foreach (ref var chunk in world.Query(in Parented))
+		{
+			var parents = chunk.GetSpan<Parent>();
+			var entities = chunk.Entities;
+			for (var i = 0; i < chunk.Count; i++)
+			{
+				if (!world.IsAlive(parents[i].Value)) (orphans ??= []).Add(entities[i]);
+			}
+		}
+
+		foreach (ref var chunk in world.Query(in WithChildren))
+		{
+			var children = chunk.GetSpan<Children>();
+			for (var i = 0; i < chunk.Count; i++) children[i].RemoveDead(world);
+		}
+
+		var before = world.Size;
+		foreach (var orphan in orphans ?? [])
+		{
+			if (world.IsAlive(orphan)) DestroyTree(world, orphan);
+		}
+
+		return before - world.Size;
+	}
+
+	internal static void DestroyTree(World world, Entity entity)
 	{
 		if (world.Has<Children>(entity))
 		{

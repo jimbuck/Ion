@@ -59,7 +59,7 @@ Arch's entity extension methods in `Arch.Core.Extensions`
 | Arch call | Structural | Notes |
 |---|---|---|
 | `world.Create(c0, c1, ...)` | yes | Returns the new `Entity`. |
-| `world.Destroy(entity)` | yes | The id may be reused later: keep `world.IsAlive(entity)` checks on stored entities. |
+| `world.Destroy(entity)` | yes | The id may be reused later: keep `world.IsAlive(entity)` checks on stored entities. Its children are destroyed at the next transform propagation ([details](/Ion/ecs/transforms/#destroying-entities-in-a-hierarchy)). |
 | `world.Add(entity, component)` / `world.Add<T>(entity)` | yes | Moves the entity to another archetype. |
 | `world.Remove<T>(entity)` | yes | |
 | `world.Get<T>(entity)` | no | Returns a `ref T`: assign through it to write. |
@@ -99,7 +99,7 @@ public sealed partial class DamageSystem
 |---|---|
 | `Create<T0>(in c0)` ... `Create<T0, T1, T2, T3>(in c0, ..., in c3)` | Creating an entity with one to four components. Returns a placeholder entity (see below). |
 | `Create(ComponentType[] types)` | Creating an entity with a signature; set the values with `Set<T>`. |
-| `Destroy(entity)` | Destroying an entity. |
+| `Destroy(entity)` | Destroying an entity, and its descendants with it. |
 | `DestroyRecursive(entity)` | Destroying an existing entity and all its descendants in the hierarchy (applied after the other commands). |
 | `Add<T>(entity, in component = default)` | Adding a component. |
 | `Remove<T>(entity)` | Removing a component. |
@@ -197,7 +197,7 @@ ECS sample does that when it launches a ball, so the score counts it in the same
 | A plain step that iterates nothing (Init, reacting to an event) | Either. `World` if you need the entity now. |
 | Spawning from a physics collision handler | `Commands` or `World`, as long as you are not inside a query |
 | Many entities at once, from many places | `Commands`: one playback per stage |
-| Destroying a parent and its children | `commands.DestroyRecursive(entity)` or `world.DestroyRecursive(entity)` |
+| Destroying a parent and its children | `commands.Destroy(entity)`, or `DestroyRecursive` to have it at once with the `World` |
 
 ## Finding entities by name
 
@@ -236,6 +236,7 @@ query):
 | `world.TryGetParent(entity, out parent)` | The parent, or false for a root. |
 | `world.GetChildren(entity)` | A `ReadOnlySpan<Entity>` of children, valid until the hierarchy changes. |
 | `world.DestroyRecursive(entity)` | Destroys an entity and all its descendants. |
+| `world.RepairHierarchy()` | Destroys the descendants of entities destroyed with a plain `world.Destroy`, and drops them from `Children`. |
 
 See [Transforms](/Ion/ecs/transforms/) for what the hierarchy does to positions.
 
