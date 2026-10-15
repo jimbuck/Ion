@@ -1,6 +1,6 @@
 ---
 title: Queries
-description: Write [Query] methods that the Ion source generator expands into allocation-free chunk loops, with the supported parameter shapes, All/Any/None filters, diagnostics ION301 to ION307 and performance numbers.
+description: Write [Query] methods that the Ion source generator expands into allocation-free chunk loops, with the supported parameter shapes, All/Any/None filters, diagnostics ION301 to ION308 and performance numbers.
 sidebar:
   order: 3
 ---
@@ -252,10 +252,52 @@ public record struct Enemy;
 documentation. The same structural-change rule applies inside them, but only `[Query]` methods get the ION305 check and
 the run-time guard.
 
-## Planned: parallel queries
+## Parallel queries
 
-Parallel queries (running a query's chunks on several threads through Arch's job scheduler) are not built. Every query
-runs on the game thread today. The roadmap lists them as open work for the ECS module.
+`[Query(Parallel = true)]` runs a query on several threads. The generated step collects the matching chunks, shares
+them out among the .NET thread pool's workers (a chunk's entities run on one worker, in the usual order), and returns
+when every chunk is done. The step still runs at its place in the schedule. Use it for heavy per-entity work over many
+entities: steering, particles, animation sampling.
+
+```csharp
+public sealed partial class FlockSystem
+{
+    [Update, Query(Parallel = true)]
+    private static void Steer(ref Boid boid, ref Transform2D transform, [Data] in float dt)
+    {
+        boid.Velocity = Vector2.Normalize(boid.Velocity + boid.Desired * dt) * boid.Speed;
+        transform.Position += boid.Velocity * dt;
+    }
+}
+```
+
+The method runs on many threads at once, so it follows stricter rules than a serial query:
+
+- **Touch only your own entity.** Read and write the entity's components through the `ref` and `in` parameters. Read
+  anything else only if nothing writes it during the query (settings, a lookup table built earlier, the delta time).
+- **No shared writes.** Do not write fields, statics or services. If you must (a counter, a list), synchronize it
+  yourself (`Interlocked`, a concurrent collection), and remember that contention costs what the threads gained.
+- **No `Commands` or `World` parameter** (ION308): neither is safe to use from several threads. Do structural changes
+  in a serial query or step that runs after it.
+- **No order.** Chunks finish in any order, so the result must not depend on which entity runs first. Each entity's
+  components are written by one thread only, so per-entity results are deterministic.
+
+A structural change on the world is detected once, after the query, and throws a `StructuralChangeException` (naming
+the step, not an entity). An exception thrown by the method comes out of the step as itself, not wrapped in an
+`AggregateException`.
+
+Below `ParallelQuery.MinimumEntities` (4,096) matching entities, or when they fit in one chunk, the query runs on the
+calling thread: the threads would cost more than they save. A parallel query allocates about 6 KB per run (the loop's
+closure and the thread pool's work items), so it is for big queries, not many small ones. Without the generator, the
+reflection binder runs it on the calling thread.
+
+`ParallelQueryBenchmarks` (about 100 ns of work per entity, 12 cores and 24 threads):
+
+| Entities | Serial | Parallel | Ratio |
+|---|---|---|---|
+| 2,000 (inline) | 258 us | 264 us | 1.02 |
+| 50,000 | 6.95 ms | 1.07 ms | 0.15 |
+| 500,000 | 59.0 ms | 6.63 ms | 0.11 |
 
 ## Common problems
 

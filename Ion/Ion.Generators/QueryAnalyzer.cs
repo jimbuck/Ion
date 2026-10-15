@@ -30,6 +30,9 @@ internal sealed class QueryInfo
 	/// <summary><c>[Query(Unchecked = true)]</c>: no structural-change check after each entity.</summary>
 	public bool Unchecked { get; set; }
 
+	/// <summary><c>[Query(Parallel = true)]</c>: the chunks run on the thread pool.</summary>
+	public bool Parallel { get; set; }
+
 	/// <summary>The name of the generated method that runs the query (public, hidden from IntelliSense).</summary>
 	public string CompanionName => QueryAnalyzer.CompanionName(Method.Name);
 }
@@ -91,6 +94,7 @@ internal sealed class QueryAnalyzer(KnownSymbols known)
 		{
 			Method = method,
 			Unchecked = method.GetAttributes().Any(a => KnownSymbols.Is(a.AttributeClass, known.QueryAttribute) && a.NamedArguments.Any(n => n.Key == "Unchecked" && n.Value.Value is true)),
+			Parallel = method.GetAttributes().Any(a => KnownSymbols.Is(a.AttributeClass, known.QueryAttribute) && a.NamedArguments.Any(n => n.Key == "Parallel" && n.Value.Value is true)),
 		};
 		foreach (var parameter in method.Parameters)
 		{
@@ -122,10 +126,15 @@ internal sealed class QueryAnalyzer(KnownSymbols known)
 				if (KnownSymbols.Is(type, known.GameTime)) info.Parameters.Add(new QueryParameter(QueryParameterKind.Time, type, parameter.RefKind, parameter.Name));
 				else if (KnownSymbols.Is(type, known.Commands))
 				{
+					if (info.Parallel) Report(Generators.Diagnostics.ParallelQueryShared, at, $"Parameter '{parameter.Name}' of the parallel query '{name}' is Commands, which is not safe to use from several threads; record structural changes in a serial query.");
 					info.Parameters.Add(new QueryParameter(QueryParameterKind.Commands, type, parameter.RefKind, parameter.Name));
 					info.UsesCommands = true;
 				}
-				else if (KnownSymbols.Is(type, known.ArchWorld)) info.Parameters.Add(new QueryParameter(QueryParameterKind.World, type, parameter.RefKind, parameter.Name));
+				else if (KnownSymbols.Is(type, known.ArchWorld))
+				{
+					if (info.Parallel) Report(Generators.Diagnostics.ParallelQueryShared, at, $"Parameter '{parameter.Name}' of the parallel query '{name}' is the World, which is not safe to use from several threads; a parallel query touches only its own entity's components.");
+					info.Parameters.Add(new QueryParameter(QueryParameterKind.World, type, parameter.RefKind, parameter.Name));
+				}
 				else if (type.IsValueType) Report(Generators.Diagnostics.QueryParameterNotByRef, at, $"Component parameter '{parameter.Name}' ({type.Name}) of '{name}' is passed by value, so changes would be lost and the component copied; pass it by ref (or in, to read it).");
 				else Report(Generators.Diagnostics.QueryUnsupported, at, $"Parameter '{parameter.Name}' ({type.Name}) of '{name}' is not a component (ref or in), Entity, [Data] float, GameTime, Commands or World; inject services through the system's constructor.");
 				continue;

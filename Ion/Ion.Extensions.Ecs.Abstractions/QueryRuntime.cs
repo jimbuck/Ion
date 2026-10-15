@@ -42,6 +42,48 @@ public static class QueryGuard
 	public static void ThrowStructuralChange(string step, Entity entity) => throw new StructuralChangeException(step, entity);
 }
 
+/// <summary>Helpers of the parallel loops the Ion generator emits for <c>[Query(Parallel = true)]</c> methods.</summary>
+public static class ParallelQuery
+{
+	/// <summary>Below this many matching entities a parallel query runs on the calling thread (the threads cost more than they save).</summary>
+	public const int MinimumEntities = 4096;
+
+	/// <summary>The options of the parallel loops (all processors).</summary>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	public static ParallelOptions Options { get; } = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
+
+	/// <summary>
+	/// Copies the non-empty chunks matching <paramref name="description"/> into <paramref name="buffer"/> (grown as
+	/// needed); returns how many, and the number of entities in them.
+	/// </summary>
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	public static int Gather(World world, in QueryDescription description, ref Chunk[]? buffer, out int entities)
+	{
+		var count = 0;
+		entities = 0;
+		foreach (ref var chunk in world.Query(in description))
+		{
+			if (chunk.Count == 0) continue;
+			buffer ??= new Chunk[16];
+			if (count == buffer.Length) Array.Resize(ref buffer, count * 2);
+			buffer[count++] = chunk;
+			entities += chunk.Count;
+		}
+
+		return count;
+	}
+
+	/// <summary>Rethrows the first exception of a parallel loop as itself (not wrapped in an <see cref="AggregateException"/>).</summary>
+	[DoesNotReturn]
+	[StackTraceHidden]
+	[EditorBrowsable(EditorBrowsableState.Never)]
+	public static void Rethrow(AggregateException exception)
+	{
+		System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception.Flatten().InnerExceptions[0]).Throw();
+		throw exception;
+	}
+}
+
 /// <summary>What a <see cref="QueryAttribute"/> parameter receives.</summary>
 internal enum QueryParameterKind
 {
@@ -85,6 +127,7 @@ internal sealed class QueryMethod
 		var result = new QueryParameter[parameters.Length];
 		var components = new List<Type>();
 		var usesCommands = false;
+		var parallel = method.GetCustomAttribute<QueryAttribute>(inherit: true)?.Parallel == true;
 
 		for (var i = 0; i < parameters.Length; i++)
 		{
@@ -113,6 +156,11 @@ internal sealed class QueryMethod
 
 			if (element == typeof(Entity)) result[i] = new QueryParameter(QueryParameterKind.Entity, element, true, -1);
 			else if (!type.IsByRef && type == typeof(GameTime)) result[i] = new QueryParameter(QueryParameterKind.Time, type, true, -1);
+			else if (!type.IsByRef && (type == typeof(Commands) || type == typeof(World)) && parallel)
+			{
+				reason = $"parameter '{parameter.Name}' is the {type.Name} of a parallel query, which is not safe to use from several threads";
+				return null;
+			}
 			else if (!type.IsByRef && type == typeof(Commands))
 			{
 				result[i] = new QueryParameter(QueryParameterKind.Commands, type, true, -1);

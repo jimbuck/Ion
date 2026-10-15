@@ -66,6 +66,7 @@ times in one process and keeps the best, which is robust for A/B checks while op
 | `Renderer3DBenchmarks` | The 3D renderer's CPU cost for 10k mesh renderers: submission, and extract plus queue (culling, sort keys, instancing, the shadow fit), without shadows and with two cameras. |
 | `Scene3DExtractionBenchmarks` | ECS 3D extraction of 10k mesh entities against the same submissions from flat arrays. |
 | `EcsQueryBenchmarks`, `TransformPropagationBenchmarks`, `SpriteExtractionBenchmarks` | The ECS module's queries, transform propagation and 2D sprite extraction. |
+| `ParallelQueryBenchmarks` | A serial `[Query]` against the same method with `Parallel = true`, at 2,000, 50,000 and 500,000 entities. |
 | `ArchQueryBenchmarks` | Arch 2.1 delegate query against an inline struct query and chunk spans over 10k entities. |
 | `EcsComparisonBenchmarks` | Arch 2.1 against Friflo.Engine.ECS 3.6: iteration styles, entity creation and structural churn on 10k entities. |
 | `UiBenchmarks` | A 500-widget UI frame: building, flex layout, tree publication, and the draw submission. |

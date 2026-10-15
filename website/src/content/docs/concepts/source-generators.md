@@ -18,7 +18,7 @@ everything, only speed does.
 |---|---|---|---|
 | Schedule generator (`Ion.Generators`) | `Ion`, `Ion.Core` packages (as an analyzer) | `IonSchedule.g.cs`: pre-bound system descriptions, a generated schedule per application and scene, registration summaries, interceptors | `ION001` to `ION014` |
 | Event bus (same generator) | as above | `IonEvents.g.cs`: a closed, typed event bus for the application, compile-time event ids, `EventUsage` summaries, interceptors for `Emit` and `Reader` | `ION101` to `ION106` |
-| ECS queries (same generator) | as above | `IonQueries.g.cs`: a chunk loop for every `[Query]` method, plus component registrations for NativeAOT | `ION301` to `ION307` |
+| ECS queries (same generator) | as above | `IonQueries.g.cs`: a chunk loop for every `[Query]` method, plus component registrations for NativeAOT | `ION301` to `ION308` |
 | Public `Program` (same generator) | as above | `IonProgram.g.cs`: `public partial class Program`, so tests can name it | none |
 | Networking (`Ion.Extensions.Networking.Generators`) | referenced as an analyzer | `IonNetworking.g.cs`: a `NetSerializer<T>` (full, delta, comparison, and a blend for interpolated components) for every `[Replicated]` component and `[NetworkMessage]` struct, and a registry whose hash both peers compare in the handshake | `ION201` to `ION210` |
 | Web routes (`Ion.Extensions.Web.Generators`) | referenced as an analyzer | `IonWebRoutes.g.cs`: a static route table with a typed invoker per `[Http]` and `[WebSocket]` method | `ION401` to `ION407` |
@@ -163,7 +163,7 @@ These two are separate analyzers. The samples reference them by project:
 | `ION001` to `ION014` | Schedule | `ION002` ordering cycle, `ION005` async step, `ION009` unregistered system, `ION014` generator disabled |
 | `ION101` to `ION106` | Events | `ION101` emitted but never read, `ION106` reader in a `readonly` field |
 | `ION201` to `ION210` | Networking | `ION201` network type not unmanaged, `ION209` `[Predicted]` without `[Replicated]` |
-| `ION301` to `ION307` | ECS queries | `ION301` query on a class that is not `partial`, `ION305` structural change without `Commands` |
+| `ION301` to `ION308` | ECS queries | `ION301` query on a class that is not `partial`, `ION305` structural change without `Commands` |
 | `ION401` to `ION407` | Web | `ION401` invalid route, `ION407` async endpoint |
 
 The schedule diagnostics carry the same messages at compile time as at run time, at the offending method or registration

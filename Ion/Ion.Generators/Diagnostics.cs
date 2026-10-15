@@ -58,6 +58,7 @@ internal static class Diagnostics
 	public static readonly DiagnosticDescriptor QueryStructuralChange = Query("ION305", "Structural change inside a query without Commands", DiagnosticSeverity.Error);
 	public static readonly DiagnosticDescriptor QueryUnsupported = Query("ION306", "Unsupported query method", DiagnosticSeverity.Error);
 	public static readonly DiagnosticDescriptor QueryWithoutStage = Query("ION307", "Query without a stage", DiagnosticSeverity.Warning);
+	public static readonly DiagnosticDescriptor ParallelQueryShared = Query("ION308", "Parallel query takes Commands or World", DiagnosticSeverity.Error);
 
 	private static DiagnosticDescriptor Query(string id, string title, DiagnosticSeverity severity) => new(id, title, "{0}", QueryCategory, severity, isEnabledByDefault: true, helpLinkUri: QueryHelpLink);
 

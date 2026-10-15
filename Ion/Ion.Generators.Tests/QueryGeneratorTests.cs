@@ -156,6 +156,7 @@ public class QueryGeneratorTests(ITestOutputHelper output)
 		{ "ION305", "public sealed partial class Direct { [Update, Query] private void Tick(Entity entity, ref Hp hp, World world) { if (hp.Value <= 0) {|#0:world.Destroy(entity)|}; } }" },
 		{ "ION306", "public sealed partial class Returns { [Update, Query] private int {|#0:Tick|}(ref Hp hp) => hp.Value; }" },
 		{ "ION307", "public sealed partial class Stageless { [Query] private void {|#0:Tick|}(ref Hp hp) { } }" },
+		{ "ION308", "public sealed partial class Shared { [Update, Query(Parallel = true)] private void Tick(ref Hp hp, Commands {|#0:commands|}) { } }" },
 	};
 
 	[Theory]
@@ -168,6 +169,25 @@ public class QueryGeneratorTests(ITestOutputHelper output)
 		var test = new DiagnosticTests.GeneratorTest { TestCode = DiagnosticPreamble + source };
 		test.ExpectedDiagnostics.Add(new DiagnosticResult(descriptor.Id, descriptor.DefaultSeverity).WithLocation(0));
 		await test.RunAsync();
+	}
+
+	[Fact]
+	public void ParallelQueriesRunTheirChunksOnTheThreadPool()
+	{
+		var result = GeneratorHarness.Run(DiagnosticPreamble + """
+			public sealed partial class Wide
+			{
+				[Update, Query(Parallel = true), None<Dead>]
+				private void Tick(Entity entity, ref Hp hp, [Data] in float dt) => hp = new Hp(hp.Value + entity.Id);
+			}
+			""");
+
+		Assert.Empty(result.Diagnostics);
+		result.AssertCompiles();
+		Assert.Contains("global::Ion.Extensions.Ecs.ParallelQuery.Gather(", result.GeneratedQueries);
+		Assert.Contains("global::System.Threading.Tasks.Parallel.For(", result.GeneratedQueries);
+		Assert.Contains("[global::System.ThreadStatic]", result.GeneratedQueries);
+		Assert.Contains("ThrowStructuralChange(\"Wide.Tick\", global::Arch.Core.Entity.Null)", result.GeneratedQueries);
 	}
 
 	[Fact]

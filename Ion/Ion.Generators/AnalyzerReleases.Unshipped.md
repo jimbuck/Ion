@@ -31,3 +31,4 @@ ION304 | Ion.Ecs | Error | Query component both required and excluded
 ION305 | Ion.Ecs | Error | Structural change inside a query without Commands
 ION306 | Ion.Ecs | Error | Unsupported query method
 ION307 | Ion.Ecs | Warning | Query without a stage
+ION308 | Ion.Ecs | Error | Parallel query takes Commands or World

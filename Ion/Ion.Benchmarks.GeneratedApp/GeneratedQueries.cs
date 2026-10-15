@@ -39,3 +39,38 @@ public sealed partial class UncheckedCornerQuerySystem
 	[Update, Query(Unchecked = true)]
 	private static void Corner(in BenchTransform transform, in BenchSprite sprite, ref BenchCorner corner) => corner.Value = CornerMath.TopLeft(transform, sprite);
 }
+
+/// <summary>
+/// Heavier per-entity work (a short orbit integration, about 100 ns) for the serial and parallel query benchmarks: the
+/// same method body as a serial and as a parallel <c>[Query]</c>.
+/// </summary>
+public static class OrbitMath
+{
+	public static void Step(ref BenchTransform transform, ref BenchCorner corner)
+	{
+		var p = transform.Position;
+		var angle = transform.Rotation;
+		for (var k = 0; k < 8; k++)
+		{
+			var (sin, cos) = MathF.SinCos(angle + k * 0.1f);
+			p += new Vector2(cos, sin) * 0.01f;
+		}
+
+		corner.Value = p;
+		transform.Rotation = angle + 0.001f;
+	}
+}
+
+/// <summary>The orbit step as a serial query.</summary>
+public sealed partial class SerialOrbitSystem
+{
+	[Update, Query]
+	private static void Orbit(ref BenchTransform transform, ref BenchCorner corner) => OrbitMath.Step(ref transform, ref corner);
+}
+
+/// <summary>The orbit step as a parallel query (<c>[Query(Parallel = true)]</c>).</summary>
+public sealed partial class ParallelOrbitSystem
+{
+	[Update, Query(Parallel = true)]
+	private static void Orbit(ref BenchTransform transform, ref BenchCorner corner) => OrbitMath.Step(ref transform, ref corner);
+}

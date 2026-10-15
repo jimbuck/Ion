@@ -215,8 +215,8 @@ and headless snapshot tests. See [Templates](/Ion/getting-started/templates/).
 
 ## Planned
 
-These are on the roadmap and not built yet: parallel queries (Arch's job-scheduled chunk queries are not exposed through
-`[Query]`), tilemaps and serialization of the 3D components (they hold renderer handles).
+These are on the roadmap and not built yet: tilemaps and serialization of the 3D components (they hold renderer
+handles). Parallel queries are built: see [Queries](/Ion/ecs/queries/#parallel-queries).
 
 ## See also
 

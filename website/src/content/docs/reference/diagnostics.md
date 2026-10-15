@@ -15,7 +15,7 @@ errors, warnings or info in your IDE and build output), and at **run time** when
 | `ION001` to `ION014` | The schedule: stages, ordering, scopes, signatures, services | `Ion.Generators` and the runtime planner | `Ion.Schedule` |
 | `ION101` to `ION106` | Events | `Ion.Generators` (event analyzer) | `Ion.Events` |
 | `ION201` to `ION210` | Networking | `Ion.Extensions.Networking.Generators` | `Ion.Networking` |
-| `ION301` to `ION307` | ECS `[Query]` methods | `Ion.Generators` (query analyzer) | `Ion.Ecs` |
+| `ION301` to `ION308` | ECS `[Query]` methods | `Ion.Generators` (query analyzer) | `Ion.Ecs` |
 | `ION401` to `ION407` | Web routing | `Ion.Extensions.Web.Generators` | `Ion.Web` |
 | `IONPUB001` to `IONPUB004`, `IONMOB001` | Publishing and mobile builds | MSBuild (`build/*.props`, `build/*.targets`) | |
 
@@ -260,7 +260,7 @@ public record struct Nameplate(FixedString32 Name);        // not ION201: a fixe
 
 See [Multiplayer](/Ion/networking/multiplayer/overview/).
 
-## ECS queries (ION301 to ION307)
+## ECS queries (ION301 to ION308)
 
 | Id | Severity | Title | Example message |
 |---|---|---|---|
@@ -271,6 +271,7 @@ See [Multiplayer](/Ion/networking/multiplayer/overview/).
 | `ION305` | Error | Structural change inside a query without Commands | `'Move' calls World.Destroy inside its query, a structural change that invalidates the chunks being iterated. Add a Commands parameter and record it there (commands.Destroy); ...` |
 | `ION306` | Error | Unsupported query method | Returns a value, is generic or async, has an `out` parameter, a `[Data]` parameter that is not `float` or `GameTime`, a parameter that is not a component or a supported type, or the same component twice. |
 | `ION307` | Warning | Query without a stage | `'Move' has [Query] but no stage attribute ([Update], [FixedUpdate], ...), so it never runs.` |
+| `ION308` | Error | Parallel query takes Commands or World | `Parameter 'commands' of the parallel query 'Steer' is Commands, which is not safe to use from several threads; record structural changes in a serial query.` See [Parallel queries](/Ion/ecs/queries/#parallel-queries). |
 
 Supported query parameters are components (`ref T` to write, `in T` to read), `Entity`, `[Data] in float` (the delta
 time), `GameTime`, `Commands` and `World`. Services go in the system's constructor.

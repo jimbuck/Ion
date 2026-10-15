@@ -120,6 +120,12 @@ internal sealed class QueryEmitter(KnownSymbols known, QueryAnalyzer queries)
 
 		var usesDelta = query.Parameters.Any(p => p.Kind == QueryParameterKind.Delta);
 		if (usesDelta) w.WriteLine("var __delta = dt.Delta;");
+		if (query.Parallel)
+		{
+			WriteParallelQuery(w, query, companion, description, stepName);
+			return;
+		}
+
 		w.WriteLine($"foreach (ref var __chunk in world.Query(in {description}))");
 		w.OpenBlock();
 		var usesEntity = !query.Unchecked || query.Parameters.Any(p => p.Kind == QueryParameterKind.Entity);
@@ -135,6 +141,72 @@ internal sealed class QueryEmitter(KnownSymbols known, QueryAnalyzer queries)
 		w.OpenBlock();
 		if (usesEntity) w.WriteLine("var __entity = global::System.Runtime.CompilerServices.Unsafe.Add(ref __entities, __i);");
 
+		w.WriteLine($"{method.Name}({string.Join(", ", Arguments(query))});");
+		if (!query.Unchecked) w.WriteLine($"if (__chunk.Count != __count || world.Size != __size) global::Ion.Extensions.Ecs.QueryGuard.ThrowStructuralChange({Literal(stepName)}, __entity);");
+		w.CloseBlock();
+		w.CloseBlock();
+		w.CloseBlock();
+	}
+
+	/// <summary>
+	/// The body of a <c>[Query(Parallel = true)]</c> companion: gathers the matching chunks, runs each chunk's entities (in
+	/// the serial order) on the thread pool, or inline below <c>ParallelQuery.MinimumEntities</c>, and checks once that
+	/// the world's structure did not change. The chunk buffer is per calling thread, so applications on different
+	/// threads do not share it.
+	/// </summary>
+	private void WriteParallelQuery(SourceWriter w, QueryInfo query, string companion, string description, string stepName)
+	{
+		var chunks = companion + "_Chunks";
+		w.WriteLine($"var __chunks = {chunks};");
+		w.WriteLine($"var __chunkCount = global::Ion.Extensions.Ecs.ParallelQuery.Gather(world, in {description}, ref __chunks, out var __total);");
+		w.WriteLine($"{chunks} = __chunks;");
+		w.WriteLine("if (__chunkCount == 0) return;");
+		w.WriteLine("var __size = world.Size;");
+		w.WriteLine("if (__chunkCount == 1 || __total < global::Ion.Extensions.Ecs.ParallelQuery.MinimumEntities)");
+		w.OpenBlock();
+		w.WriteLine("for (var __ci = 0; __ci < __chunkCount; __ci++) __Run(in __chunks![__ci]);");
+		w.CloseBlock();
+		w.WriteLine("else");
+		w.OpenBlock();
+		w.WriteLine("try");
+		w.OpenBlock();
+		w.WriteLine("global::System.Threading.Tasks.Parallel.For(0, __chunkCount, global::Ion.Extensions.Ecs.ParallelQuery.Options, __ci => __Run(in __chunks![__ci]));");
+		w.CloseBlock();
+		w.WriteLine("catch (global::System.AggregateException __e)");
+		w.OpenBlock();
+		w.WriteLine("global::Ion.Extensions.Ecs.ParallelQuery.Rethrow(__e);");
+		w.CloseBlock();
+		w.CloseBlock();
+		w.WriteEmptyLines(1);
+		w.WriteLine("// Drop the chunk references, so a disposed world's arrays are not kept alive.");
+		w.WriteLine("global::System.Array.Clear(__chunks!, 0, __chunkCount);");
+		w.WriteLine($"if (world.Size != __size) global::Ion.Extensions.Ecs.QueryGuard.ThrowStructuralChange({Literal(stepName)}, global::Arch.Core.Entity.Null);");
+		w.WriteEmptyLines(1);
+
+		w.WriteLine("void __Run(in global::Arch.Core.Chunk __chunk)");
+		w.OpenBlock();
+		var usesEntity = query.Parameters.Any(p => p.Kind == QueryParameterKind.Entity);
+		w.WriteLine("var __count = __chunk.Count;");
+		if (usesEntity) w.WriteLine("ref var __entities = ref __chunk.Entity(0);");
+		for (var c = 0; c < query.Components.Count; c++)
+		{
+			w.WriteLine($"ref var __c{c.ToString(CultureInfo.InvariantCulture)} = ref __chunk.GetFirst<{Type(query.Components[c])}>();");
+		}
+
+		w.WriteLine("for (var __i = __count - 1; __i >= 0; __i--)");
+		w.OpenBlock();
+		if (usesEntity) w.WriteLine("var __entity = global::System.Runtime.CompilerServices.Unsafe.Add(ref __entities, __i);");
+		w.WriteLine($"{query.Method.Name}({string.Join(", ", Arguments(query))});");
+		w.CloseBlock();
+		w.CloseBlock();
+		w.CloseBlock();
+		w.WriteEmptyLines(1);
+		w.WriteLine($"[global::System.ThreadStatic] private static global::Arch.Core.Chunk[]? {chunks};");
+	}
+
+	/// <summary>The arguments of the per-entity call.</summary>
+	private static List<string> Arguments(QueryInfo query)
+	{
 		var arguments = new List<string>();
 		foreach (var parameter in query.Parameters)
 		{
@@ -160,11 +232,7 @@ internal sealed class QueryEmitter(KnownSymbols known, QueryAnalyzer queries)
 			arguments.Add(prefix + value);
 		}
 
-		w.WriteLine($"{method.Name}({string.Join(", ", arguments)});");
-		if (!query.Unchecked) w.WriteLine($"if (__chunk.Count != __count || world.Size != __size) global::Ion.Extensions.Ecs.QueryGuard.ThrowStructuralChange({Literal(stepName)}, __entity);");
-		w.CloseBlock();
-		w.CloseBlock();
-		w.CloseBlock();
+		return arguments;
 	}
 
 	private void WriteRegistrations(SourceWriter w, List<QueryInfo> queries)

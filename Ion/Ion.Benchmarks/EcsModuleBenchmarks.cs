@@ -93,6 +93,38 @@ public class EcsQueryBenchmarks
 }
 
 /// <summary>
+/// A serial <c>[Query]</c> against the same method as <c>[Query(Parallel = true)]</c> (<see cref="SerialOrbitSystem"/>,
+/// <see cref="ParallelOrbitSystem"/>), with about 100 ns of work per entity, at three sizes: below the inline threshold,
+/// and large enough for the thread pool to pay off.
+/// </summary>
+[MemoryDiagnoser]
+public class ParallelQueryBenchmarks
+{
+	private World _world = null!;
+	private GameTime _time = new() { Delta = 1f / 60 };
+
+	[Params(2_000, 50_000, 500_000)]
+	public int Entities { get; set; }
+
+	[GlobalSetup]
+	public void Setup()
+	{
+		_world = World.Create();
+		var rand = new Random(42);
+		for (var i = 0; i < Entities; i++) _world.Create(new BenchTransform(new Vector2(rand.NextSingle() * 1920, rand.NextSingle() * 1080), rand.NextSingle()), new BenchCorner());
+	}
+
+	[GlobalCleanup]
+	public void Cleanup() => World.Destroy(_world);
+
+	[Benchmark(Baseline = true)]
+	public void Serial() => SerialOrbitSystem.__IonQuery_Orbit(_time, _world);
+
+	[Benchmark]
+	public void Parallel() => ParallelOrbitSystem.__IonQuery_Orbit(_time, _world);
+}
+
+/// <summary>
 /// Transform propagation on a 10,000-entity tree of three levels (100 roots, 9 children each, 10 grandchildren each):
 /// every entity recomputed (all roots moved), and nothing changed (the dirty check only).
 /// </summary>

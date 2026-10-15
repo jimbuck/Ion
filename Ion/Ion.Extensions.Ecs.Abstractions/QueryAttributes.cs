@@ -39,6 +39,18 @@ public sealed class QueryAttribute : StepBinderAttribute
 	/// </summary>
 	public bool Unchecked { get; init; }
 
+	/// <summary>
+	/// Runs the query on several threads: the matching chunks are shared out among the thread pool's workers, each chunk's
+	/// entities run on one worker in the usual order, and the step returns when all are done. The method may then read and
+	/// write only its own entity's components (its <c>ref</c> and <c>in</c> parameters) and read data that does not change
+	/// during the query; it must not write shared state (fields, statics, services) without its own synchronization, and it
+	/// cannot take <see cref="Commands"/> or <see cref="Arch.Core.World"/> (ION308). Entities run in no fixed order across
+	/// chunks, so the result must not depend on it. Below <see cref="ParallelQuery.MinimumEntities"/> matching entities
+	/// (or with one chunk) it runs on the calling thread. A structural change is detected once, after the query. Needs the
+	/// Ion generator; the reflection binder runs it on the calling thread.
+	/// </summary>
+	public bool Parallel { get; init; }
+
 	/// <inheritdoc/>
 	public override string? Validate(MethodInfo method) => QueryMethod.Describe(method, out var reason) is null ? reason : null;
 
