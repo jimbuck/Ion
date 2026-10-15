@@ -101,6 +101,7 @@ composing the engine by hand, as the Scenes and Quad samples do. With them you r
 |---|---|---|---|
 | `Ion.Extensions.UI` | Immediate-mode UI on the sprite batch with flex layout, themes and focus navigation. | `AddUi`, `UseUi` | UI.Abstractions, `Ion`, Graphics.Abstractions |
 | `Ion.Extensions.UI.Abstractions` | `IUiTree`: the inspectable widget tree and its commands. No dependencies. | | none |
+| `Ion.Extensions.ImGui` | Dear ImGui (Hexa.NET.ImGui) on Ion's input, clock and RHI, drawn on top of the frame. | `AddImGui`, `UseImGui`, `ImGuiHost` | Core.Abstractions, Graphics.Abstractions, `Hexa.NET.ImGui` |
 | `Ion.Extensions.UI.Remote` | Remote methods `ui.tree`, `ui.click`, `ui.set_value`, `ui.focus`, `ui.type`, `ui.back`. | `AddUiRemote` | UI, Remote.Abstractions |
 | `Ion.Extensions.Http` | The embedded HTTP/1.1 and WebSocket server core shared by the remote and web modules. | | Logging abstractions |
 | `Ion.Extensions.Web` | The web server module: generated routing, static files, push channels, `/rpc`. | `AddWeb`, `UseWeb`, `AddWebRoutes` | Web.Abstractions, `Ion.Extensions.Http`, `Ion.Core` |
@@ -131,6 +132,7 @@ composing the engine by hand, as the Scenes and Quad samples do. With them you r
 | A 3D game on entities | the same | `AddEcsRendering3D` / `UseEcsRendering3D` |
 | Physics | add `Ion.Extensions.Physics2D` or `Ion.Extensions.Physics3D` | `AddPhysics2D` / `AddPhysics3D` |
 | Menus | add `Ion.Extensions.UI` | `AddUi` / `UseUi` |
+| Debug windows and in-game tools | add `Ion.Extensions.ImGui` | `AddImGui` / `UseImGui` |
 | Multiplayer | add `Ion.Extensions.Networking` and `Ion.Extensions.Networking.LiteNetLib` | `AddNetworking().AddLiteNetLibTransport()` / `UseNetworking` |
 | A companion web page | add `Ion.Extensions.Web` | `AddWeb` / `UseWeb` |
 | Tests | `Ion.Testing` in the test project | `new IonTestHost().UseEntryPoint<Program>()` |

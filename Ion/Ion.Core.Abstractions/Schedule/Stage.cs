@@ -87,6 +87,12 @@ public static class StageOrder
 	public const int NetworkSend = 870;
 
 	/// <summary>
+	/// Dear ImGui: the renderer at Init, the frame opened in First (after input) and a Render scope that opens before the
+	/// 3D renderer's and the sprite batch's and so closes after them: ImGui is drawn last, on top of the frame.
+	/// </summary>
+	public const int ImGui = -865;
+
+	/// <summary>
 	/// The 3D renderer: initialization (Init) and the frame scope (Render). Its scope opens before the sprite batch's and
 	/// closes after it, so when it closes every 3D and 2D submission of the frame is in and its render graph draws the
 	/// 3D passes and then the 2D overlay.

@@ -543,6 +543,11 @@ public sealed class Menu(Ui ui)
     `ui.focus`, `ui.type` and `ui.back` (and `Ion.Extensions.Physics2D.Remote` adds `physics2d.bodies` and `physics2d.raycast`).
   - Nothing is allocated per frame once every widget has been seen (tested); `UiBenchmarks` measures a 500-widget screen.
 
+For debug windows and in-game tools, `Ion.Extensions.ImGui` runs Dear ImGui (Hexa.NET.ImGui) on Ion's input, clock and
+RHI: `builder.Services.AddImGui(builder.Configuration)` and `app.UseImGui()`, then `ImGui.*` calls from any step. It is
+drawn on top of the frame on every backend; `ImGuiHost.WantCaptureMouse` and `WantCaptureKeyboard` tell the game when
+input was meant for ImGui. See [Dear ImGui](https://jimbuck.github.io/Ion/interaction/ui/dear-imgui/).
+
 The API, layout model, tree contract and theme are in [docs/design/ion-ui.md](./docs/design/ion-ui.md).
 
 ### Web server
