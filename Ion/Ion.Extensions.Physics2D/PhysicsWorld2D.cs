@@ -14,10 +14,17 @@ namespace Ion.Extensions.Physics2D;
 
 /// <summary>
 /// The Box2D v3 world of one scope (the root, or a scene) and its adapter to the scope's ECS <see cref="World"/>: every
-/// entity with a <see cref="Collider2D"/> and a <c>Transform2D</c> is a body (static unless it has a
-/// <see cref="RigidBody2D"/>), every <see cref="Joint2D"/> a joint.
+/// entity with a <c>Transform2D</c> and a <see cref="RigidBody2D"/>, or a root one with a <see cref="Collider2D"/>, is a
+/// body (static without a rigid body); a child collider without a rigid body is a part of the nearest ancestor body (a
+/// compound body); every <see cref="Joint2D"/> is a joint.
 /// </summary>
 /// <remarks>
+/// <para>
+/// Compound bodies: a part's shape is placed on its body by the <c>Transform2D</c>s between them (positions and
+/// rotations; scales are not applied, as for bodies), and contributes to the body's mass. Contacts, sensor events and
+/// queries report the part's entity. A rigid body without a collider of its own is a body only while it has parts. A
+/// child collider with no body above it is a static body of its own at its world position.
+/// </para>
 /// <para>
 /// <see cref="Step"/> (run by <see cref="Physics2DSystem"/> in FixedUpdate at <see cref="StageOrder.Physics"/>) does, in
 /// order: create the bodies of new colliders and push what game code changed since the last step (transforms, velocities,
@@ -37,7 +44,11 @@ namespace Ion.Extensions.Physics2D;
 public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 {
 	private static readonly QueryDescription Bodies = new QueryDescription().WithAll<Collider2D, Transform2D>();
+	private static readonly QueryDescription BareBodies = new QueryDescription().WithAll<RigidBody2D, Transform2D>().WithNone<Collider2D>();
 	private static readonly QueryDescription Joints = new QueryDescription().WithAll<Joint2D>();
+
+	// The deepest hierarchy searched for a part's body.
+	private const int MaxPartDepth = 64;
 
 	// Box2D's world table is global and not thread-safe to create and destroy worlds in.
 	private static readonly Lock WorldTableGate = new();
@@ -54,6 +65,15 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 	private int[] _freeBodies = new int[16];
 	private int _freeBodyCount;
 	private int _bodyCount;
+
+	// Compound parts (a part's Collider2D.BodySlot is the negated part slot), and the bodies of rigid bodies without a
+	// collider of their own (bodies of their parts).
+	private PartSlot[] _parts = new PartSlot[16];
+	private int _partHighWater = 1;
+	private int[] _freeParts = new int[8];
+	private int _freePartCount;
+	private int _partCount;
+	private readonly Dictionary<Entity, int> _bare = [];
 
 	private JointSlot[] _joints = new JointSlot[16];
 	private int _jointHighWater = 1;
@@ -114,6 +134,9 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 	/// <inheritdoc/>
 	public int JointCount => _jointCount;
 
+	/// <summary>The number of compound parts: child colliders whose shapes are on an ancestor's body.</summary>
+	public int PartCount => _partCount;
+
 	/// <inheritdoc/>
 	public long StepCount => _steps;
 
@@ -160,13 +183,15 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 
 	private void PushBodies(float dt)
 	{
+		// Bodies with a collider: roots, and entities with a rigid body.
 		foreach (ref var chunk in _ecs.Query(in Bodies))
 		{
+			var hasRigid = chunk.Has<RigidBody2D>();
+			if (!hasRigid && chunk.Has<Parent>()) continue;   // parts, below
 			var count = chunk.Count;
 			ref var entity0 = ref chunk.Entity(0);
 			ref var collider0 = ref chunk.GetFirst<Collider2D>();
 			ref var transform0 = ref chunk.GetFirst<Transform2D>();
-			var hasRigid = chunk.Has<RigidBody2D>();
 			ref var rigid0 = ref hasRigid ? ref chunk.GetFirst<RigidBody2D>() : ref Unsafe.NullRef<RigidBody2D>();
 
 			for (var i = 0; i < count; i++)
@@ -175,19 +200,202 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 				ref var collider = ref Unsafe.Add(ref collider0, i);
 				ref var transform = ref Unsafe.Add(ref transform0, i);
 				var rigid = hasRigid ? Unsafe.Add(ref rigid0, i) : RigidBody2D.Static();
-
-				var slot = collider.BodySlot;
-				if (slot <= 0 || slot >= _bodyHighWater || !_bodies[slot].Alive || _bodies[slot].Entity != entity)
-				{
-					collider.BodySlot = CreateBody(entity, collider, transform, rigid);
-					continue;
-				}
-
-				ref var body = ref _bodies[slot];
-				body.Seen = _stamp;
-				Push(ref body, collider, transform, rigid, dt);
+				PushOwnBody(entity, ref collider, transform, rigid, dt);
 			}
 		}
+
+		// Rigid bodies without a collider of their own that already have a body (it lives while they have parts).
+		if (_bare.Count > 0)
+		{
+			foreach (ref var chunk in _ecs.Query(in BareBodies))
+			{
+				var count = chunk.Count;
+				ref var entity0 = ref chunk.Entity(0);
+				ref var transform0 = ref chunk.GetFirst<Transform2D>();
+				ref var rigid0 = ref chunk.GetFirst<RigidBody2D>();
+				for (var i = 0; i < count; i++)
+				{
+					if (!_bare.TryGetValue(Unsafe.Add(ref entity0, i), out var slot)) continue;
+					Push(ref _bodies[slot], default, Unsafe.Add(ref transform0, i), Unsafe.Add(ref rigid0, i), dt);
+				}
+			}
+		}
+
+		// Parts: child colliders without a rigid body, on the nearest ancestor body.
+		foreach (ref var chunk in _ecs.Query(in Bodies))
+		{
+			if (chunk.Has<RigidBody2D>() || !chunk.Has<Parent>()) continue;
+			var count = chunk.Count;
+			ref var entity0 = ref chunk.Entity(0);
+			ref var collider0 = ref chunk.GetFirst<Collider2D>();
+			ref var transform0 = ref chunk.GetFirst<Transform2D>();
+			for (var i = 0; i < count; i++) PushPart(Unsafe.Add(ref entity0, i), ref Unsafe.Add(ref collider0, i), Unsafe.Add(ref transform0, i), dt);
+		}
+
+		RemoveUnseenParts();
+
+		// Shapes came and went: the masses of their bodies are recomputed once.
+		for (var slot = 1; slot < _bodyHighWater; slot++)
+		{
+			ref var body = ref _bodies[slot];
+			if (!body.Alive || !body.MassDirty) continue;
+			ApplyMass(body.Body, body.Rigid);
+			body.MassDirty = false;
+		}
+	}
+
+	private void PushOwnBody(Entity entity, ref Collider2D collider, in Transform2D transform, in RigidBody2D rigid, float dt)
+	{
+		var slot = collider.BodySlot;
+		if (slot <= 0 || slot >= _bodyHighWater || !_bodies[slot].Alive || _bodies[slot].Entity != entity)
+		{
+			collider.BodySlot = CreateBody(entity, collider, transform, rigid, hasCollider: true);
+			return;
+		}
+
+		ref var body = ref _bodies[slot];
+		body.Seen = _stamp;
+		Push(ref body, collider, transform, rigid, dt);
+	}
+
+	private void PushPart(Entity entity, ref Collider2D collider, in Transform2D transform, float dt)
+	{
+		var owner = FindBody(entity, transform, out var position, out var rotation);
+		if (owner <= 0)
+		{
+			// No body above it: a static body of its own, at its world position.
+			PushOwnBody(entity, ref collider, new Transform2D(position, rotation), RigidBody2D.Static(), dt);
+			return;
+		}
+
+		ref var body = ref _bodies[owner];
+		body.Seen = _stamp;   // a body without a collider of its own lives while it has parts
+
+		var partSlot = -collider.BodySlot;
+		if (partSlot > 0 && partSlot < _partHighWater && _parts[partSlot].Alive && _parts[partSlot].Entity == entity)
+		{
+			ref var part = ref _parts[partSlot];
+			part.Seen = _stamp;
+			if (part.Owner == owner && SameId(part.OwnerBody, body.Body) && part.Position == position && part.Rotation == rotation && Collider2D.SameShape(collider, part.Collider)) return;
+
+			// Moved within its body, reshaped, or onto another body: its shape is made again.
+			DestroyPartShape(ref part);
+			Attach(ref part, ref body, collider, position, rotation);
+			return;
+		}
+
+		Validate(entity, collider);
+		partSlot = AllocatePartSlot();
+		ref var created = ref _parts[partSlot];
+		created = new PartSlot { Alive = true, Entity = entity, Seen = _stamp };
+		Attach(ref created, ref body, collider, position, rotation);
+		collider.BodySlot = -partSlot;
+		_partCount++;
+	}
+
+	private void Attach(ref PartSlot part, ref BodySlot body, in Collider2D collider, Vector2 position, float rotation)
+	{
+		part.Owner = body.Slot;
+		part.OwnerBody = body.Body;
+		part.Collider = collider;
+		part.Position = position;
+		part.Rotation = rotation;
+		part.Shape = CreateShape(body.Body, body.Slot, Placed(collider, position, rotation), part.Entity);
+		body.MassDirty = true;
+	}
+
+	private void DestroyPartShape(ref PartSlot part)
+	{
+		// The body's destruction may have taken the shape with it.
+		if (!B2.ShapeIsValid(part.Shape)) return;
+		B2.DestroyShape(part.Shape, true);
+		if (part.Owner > 0 && part.Owner < _bodyHighWater && _bodies[part.Owner].Alive && SameId(_bodies[part.Owner].Body, part.OwnerBody)) _bodies[part.Owner].MassDirty = true;
+	}
+
+	private void RemoveUnseenParts()
+	{
+		for (var slot = 1; slot < _partHighWater; slot++)
+		{
+			ref var part = ref _parts[slot];
+			if (!part.Alive || part.Seen == _stamp) continue;
+			DestroyPartShape(ref part);
+			part.Alive = false;
+			part.Entity = Entity.Null;
+			if (_freePartCount == _freeParts.Length) Array.Resize(ref _freeParts, _freeParts.Length * 2);
+			_freeParts[_freePartCount++] = slot;
+			_partCount--;
+		}
+	}
+
+	private int AllocatePartSlot()
+	{
+		if (_freePartCount > 0) return _freeParts[--_freePartCount];
+		if (_partHighWater == _parts.Length) Array.Resize(ref _parts, _parts.Length * 2);
+		return _partHighWater++;
+	}
+
+	/// <summary>
+	/// The body slot of a part's nearest ancestor body (an entity with a rigid body, or a root with a collider), and the
+	/// part's pose in that body's space; or 0, with the part's world pose, when no ancestor is a body.
+	/// </summary>
+	private int FindBody(Entity entity, in Transform2D transform, out Vector2 position, out float rotation)
+	{
+		position = transform.Position;
+		rotation = transform.Rotation;
+		var current = entity;
+		for (var depth = 0; depth < MaxPartDepth; depth++)
+		{
+			if (!_ecs.TryGet<Parent>(current, out var parent) || !_ecs.IsAlive(parent.Value)) return 0;
+			current = parent.Value;
+			if (_ecs.Has<RigidBody2D>(current) || (_ecs.Has<Collider2D>(current) && !_ecs.Has<Parent>(current))) return BodySlotOf(current);
+
+			// An entity in between (a group, or another part): its transform places the part.
+			if (_ecs.TryGet<Transform2D>(current, out var between))
+			{
+				position = between.Position + RotateBy(between.Rotation, position);
+				rotation += between.Rotation;
+			}
+		}
+
+		return 0;
+	}
+
+	/// <summary>The body slot of a body entity, creating the body of a rigid body without a collider of its own (0 without a <c>Transform2D</c>).</summary>
+	private int BodySlotOf(Entity owner)
+	{
+		if (_ecs.TryGet<Collider2D>(owner, out var collider))
+		{
+			var slot = collider.BodySlot;
+			return slot > 0 && slot < _bodyHighWater && _bodies[slot].Alive && _bodies[slot].Entity == owner ? slot : 0;
+		}
+
+		if (_bare.TryGetValue(owner, out var bare)) return bare;
+		if (!_ecs.TryGet<Transform2D>(owner, out var transform) || !_ecs.TryGet<RigidBody2D>(owner, out var rigid)) return 0;
+		var created = CreateBody(owner, default, transform, rigid, hasCollider: false);
+		_bare[owner] = created;
+		return created;
+	}
+
+	/// <summary>A part's collider with its geometry moved into its body's space (<paramref name="position"/>, <paramref name="rotation"/>).</summary>
+	private static Collider2D Placed(in Collider2D collider, Vector2 position, float rotation)
+	{
+		var placed = collider;
+		placed.Offset = position + RotateBy(rotation, collider.Offset);
+		placed.Angle = collider.Angle + rotation;
+		if (collider.Shape == ColliderShape2D.Capsule)
+		{
+			// The capsule's ends are offset by Offset when the shape is made.
+			placed.PointA = RotateBy(rotation, collider.PointA);
+			placed.PointB = RotateBy(rotation, collider.PointB);
+		}
+
+		return placed;
+	}
+
+	private static Vector2 RotateBy(float angle, Vector2 v)
+	{
+		var (sin, cos) = MathF.SinCos(angle);
+		return new Vector2(cos * v.X - sin * v.Y, sin * v.X + cos * v.Y);
 	}
 
 	private void Push(ref BodySlot body, in Collider2D collider, in Transform2D transform, in RigidBody2D rigid, float dt)
@@ -202,7 +410,7 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 			massChanged = true;
 		}
 
-		if (!Collider2D.SameShape(collider, body.Collider))
+		if (!body.Bare && !Collider2D.SameShape(collider, body.Collider))
 		{
 			B2.DestroyShape(body.Shape, true);
 			body.Shape = CreateShape(id, body.Slot, collider, body.Entity);
@@ -216,7 +424,7 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 		if (rigid.FixedRotation != synced.FixedRotation) B2.BodySetFixedRotation(id, rigid.FixedRotation);
 		if (rigid.IsBullet != synced.IsBullet) B2.BodySetBullet(id, rigid.IsBullet);
 		if (rigid.Mass != synced.Mass) massChanged = true;
-		if (massChanged) ApplyMass(id, rigid);
+		if (massChanged) body.MassDirty = true;
 
 		if (rigid.LinearVelocity != synced.LinearVelocity) B2.BodySetLinearVelocity(id, ToB2(rigid.LinearVelocity * _toPhysics));
 		if (rigid.AngularVelocity != synced.AngularVelocity) B2.BodySetAngularVelocity(id, rigid.AngularVelocity);
@@ -249,9 +457,9 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 		body.Rigid = rigid;
 	}
 
-	private int CreateBody(Entity entity, in Collider2D collider, in Transform2D transform, in RigidBody2D rigid)
+	private int CreateBody(Entity entity, in Collider2D collider, in Transform2D transform, in RigidBody2D rigid, bool hasCollider)
 	{
-		Validate(entity, collider);
+		if (hasCollider) Validate(entity, collider);
 		var slot = AllocateBodySlot();
 
 		var def = B2.DefaultBodyDef();
@@ -280,8 +488,9 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 		body.Position = transform.Position;
 		body.Rotation = transform.Rotation;
 		body.Seen = _stamp;
-		body.Shape = CreateShape(id, slot, collider, entity);
-		if (rigid.Mass > 0) ApplyMass(id, rigid);
+		body.Bare = !hasCollider;
+		if (hasCollider) body.Shape = CreateShape(id, slot, collider, entity);
+		body.MassDirty = rigid.Mass > 0;
 		_bodyCount++;
 		return slot;
 	}
@@ -388,6 +597,7 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 		ref var body = ref _bodies[slot];
 		// Box2D destroys the body's shapes and joints with it (and reports the end of its contacts).
 		B2.DestroyBody(body.Body);
+		if (body.Bare) _bare.Remove(body.Entity);
 		body.Alive = false;
 		body.Entity = Entity.Null;
 		if (_freeBodyCount == _freeBodies.Length) Array.Resize(ref _freeBodies, _freeBodies.Length * 2);
@@ -602,11 +812,26 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 		return _jointHighWater++;
 	}
 
+	/// <summary>The Box2D body of an entity: its own, its part's body, or the body of its parts.</summary>
 	private B2.BodyId BodyOf(Entity entity)
 	{
-		if (!_ecs.IsAlive(entity) || !_ecs.TryGet<Collider2D>(entity, out var collider)) return default;
+		if (!_ecs.IsAlive(entity)) return default;
+		if (!_ecs.TryGet<Collider2D>(entity, out var collider))
+		{
+			return _bare.TryGetValue(entity, out var bare) ? _bodies[bare].Body : default;
+		}
+
 		var slot = collider.BodySlot;
-		if (slot <= 0 || slot >= _bodyHighWater) return default;
+		if (slot < 0)
+		{
+			var partSlot = -slot;
+			if (partSlot >= _partHighWater || !_parts[partSlot].Alive || _parts[partSlot].Entity != entity) return default;
+			ref readonly var part = ref _parts[partSlot];
+			ref readonly var owner = ref _bodies[part.Owner];
+			return owner.Alive && SameId(owner.Body, part.OwnerBody) ? owner.Body : default;
+		}
+
+		if (slot == 0 || slot >= _bodyHighWater) return default;
 		ref readonly var body = ref _bodies[slot];
 		return body.Alive && body.Entity == entity ? body.Body : default;
 	}
@@ -635,32 +860,49 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 
 		foreach (ref var chunk in _ecs.Query(in Bodies))
 		{
+			var hasRigid = chunk.Has<RigidBody2D>();
+			// Parts move with their body; a part that is a body of its own is static.
+			if (!hasRigid && chunk.Has<Parent>()) continue;
 			var count = chunk.Count;
 			ref var collider0 = ref chunk.GetFirst<Collider2D>();
 			ref var transform0 = ref chunk.GetFirst<Transform2D>();
-			var hasRigid = chunk.Has<RigidBody2D>();
 			ref var rigid0 = ref hasRigid ? ref chunk.GetFirst<RigidBody2D>() : ref Unsafe.NullRef<RigidBody2D>();
 
 			for (var i = 0; i < count; i++)
 			{
 				var slot = Unsafe.Add(ref collider0, i).BodySlot;
-				ref var body = ref _bodies[slot];
-				if (body.Moved != _stamp) continue;
-
-				ref var transform = ref Unsafe.Add(ref transform0, i);
-				transform.Position = FromB2(body.Pulled.p) * _toWorld;
-				transform.Rotation = B2.RotGetAngle(body.Pulled.q);
-				body.Position = transform.Position;
-				body.Rotation = transform.Rotation;
-
-				if (hasRigid)
-				{
-					ref var rigid = ref Unsafe.Add(ref rigid0, i);
-					rigid.LinearVelocity = FromB2(B2.BodyGetLinearVelocity(body.Body)) * _toWorld;
-					rigid.AngularVelocity = B2.BodyGetAngularVelocity(body.Body);
-					body.Rigid = rigid;
-				}
+				if (slot <= 0) continue;
+				Pull(ref _bodies[slot], ref Unsafe.Add(ref transform0, i), ref hasRigid ? ref Unsafe.Add(ref rigid0, i) : ref Unsafe.NullRef<RigidBody2D>());
 			}
+		}
+
+		if (_bare.Count == 0) return;
+		foreach (ref var chunk in _ecs.Query(in BareBodies))
+		{
+			var count = chunk.Count;
+			ref var entity0 = ref chunk.Entity(0);
+			ref var transform0 = ref chunk.GetFirst<Transform2D>();
+			ref var rigid0 = ref chunk.GetFirst<RigidBody2D>();
+			for (var i = 0; i < count; i++)
+			{
+				if (_bare.TryGetValue(Unsafe.Add(ref entity0, i), out var slot)) Pull(ref _bodies[slot], ref Unsafe.Add(ref transform0, i), ref Unsafe.Add(ref rigid0, i));
+			}
+		}
+	}
+
+	private void Pull(ref BodySlot body, ref Transform2D transform, ref RigidBody2D rigid)
+	{
+		if (body.Moved != _stamp) return;
+		transform.Position = FromB2(body.Pulled.p) * _toWorld;
+		transform.Rotation = B2.RotGetAngle(body.Pulled.q);
+		body.Position = transform.Position;
+		body.Rotation = transform.Rotation;
+
+		if (!Unsafe.IsNullRef(ref rigid))
+		{
+			rigid.LinearVelocity = FromB2(B2.BodyGetLinearVelocity(body.Body)) * _toWorld;
+			rigid.AngularVelocity = B2.BodyGetAngularVelocity(body.Body);
+			body.Rigid = rigid;
 		}
 	}
 
@@ -872,6 +1114,38 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 	}
 
 	/// <inheritdoc/>
+	public bool TryGetMass(Entity entity, out float mass, out Vector2 localCenter)
+	{
+		var body = BodyOf(entity);
+		if (body.index1 == 0)
+		{
+			mass = 0;
+			localCenter = default;
+			return false;
+		}
+
+		var data = B2.BodyGetMassData(body);
+		mass = data.mass;
+		localCenter = FromB2(data.center) * _toWorld;
+		return true;
+	}
+
+	/// <inheritdoc/>
+	public bool TryGetBodyEntity(Entity entity, out Entity body)
+	{
+		var id = BodyOf(entity);
+		if (id.index1 == 0)
+		{
+			body = Entity.Null;
+			return false;
+		}
+
+		var slot = (int)(nint)B2.BodyGetUserData(id);
+		body = _bodies[slot].Entity;
+		return true;
+	}
+
+	/// <inheritdoc/>
 	public ulong ComputeStateHash()
 	{
 		_ = Id;
@@ -920,48 +1194,15 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 			ref readonly var body = ref _bodies[slot];
 			if (!body.Alive) continue;
 
-			var transform = B2.BodyGetTransform(body.Body);
-			var position = FromB2(transform.p) * _toWorld;
-			var rotation = new Vector2(transform.q.c, transform.q.s);
-			var color = body.Collider.IsSensor ? DebugColor.Sensor
-				: body.Rigid.Type switch
-				{
-					RigidBodyType2D.Static => DebugColor.Static,
-					RigidBodyType2D.Kinematic => DebugColor.Kinematic,
-					_ => B2.BodyIsAwake(body.Body) ? DebugColor.Dynamic : DebugColor.Sleeping,
-				};
+			if (!body.Bare) DrawShape(lines, points, body.Body, body.Shape, body.Collider.IsSensor, body.Rigid.Type);
+		}
 
-			ref readonly var collider = ref body.Collider;
-			switch (collider.Shape)
-			{
-				case ColliderShape2D.Circle:
-				{
-					var center = position + Rotate(rotation, collider.Offset);
-					DrawCircle(lines, center, collider.Radius, color);
-					lines.Line(center, center + rotation * collider.Radius, color);
-					break;
-				}
-				case ColliderShape2D.Capsule:
-				{
-					var a = position + Rotate(rotation, collider.PointA + collider.Offset);
-					var b = position + Rotate(rotation, collider.PointB + collider.Offset);
-					DrawCircle(lines, a, collider.Radius, color);
-					DrawCircle(lines, b, collider.Radius, color);
-					var axis = b - a;
-					var normal = axis.LengthSquared() > 0 ? Vector2.Normalize(new Vector2(-axis.Y, axis.X)) * collider.Radius : Vector2.Zero;
-					lines.Line(a + normal, b + normal, color);
-					lines.Line(a - normal, b - normal, color);
-					break;
-				}
-				default:
-				{
-					var polygon = B2.ShapeGetPolygon(body.Shape);
-					var count = Math.Min(polygon.count, Polygon2D.MaxVertices);
-					for (var i = 0; i < count; i++) points[i] = position + Rotate(rotation, FromB2(polygon.vertices[i]) * _toWorld);
-					for (var i = 0; i < count; i++) lines.Line(points[i], points[(i + 1) % count], color);
-					break;
-				}
-			}
+		for (var slot = 1; slot < _partHighWater; slot++)
+		{
+			ref readonly var part = ref _parts[slot];
+			if (!part.Alive || !B2.ShapeIsValid(part.Shape)) continue;
+			ref readonly var owner = ref _bodies[part.Owner];
+			DrawShape(lines, points, owner.Body, part.Shape, part.Collider.IsSensor, owner.Rigid.Type);
 		}
 
 		for (var slot = 1; slot < _jointHighWater; slot++)
@@ -975,6 +1216,56 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 			lines.Line(centerA, a, DebugColor.Joint);
 			lines.Line(a, b, DebugColor.Joint);
 			lines.Line(b, centerB, DebugColor.Joint);
+		}
+	}
+
+	/// <summary>Draws one shape of <paramref name="body"/> from Box2D's geometry (in the body's space).</summary>
+	private void DrawShape(ILineSink lines, Span<Vector2> points, B2.BodyId body, B2.ShapeId shape, bool sensor, RigidBodyType2D type)
+	{
+		var transform = B2.BodyGetTransform(body);
+		var position = FromB2(transform.p) * _toWorld;
+		var rotation = new Vector2(transform.q.c, transform.q.s);
+		var color = sensor ? DebugColor.Sensor
+			: type switch
+			{
+				RigidBodyType2D.Static => DebugColor.Static,
+				RigidBodyType2D.Kinematic => DebugColor.Kinematic,
+				_ => B2.BodyIsAwake(body) ? DebugColor.Dynamic : DebugColor.Sleeping,
+			};
+
+		switch (B2.ShapeGetType(shape))
+		{
+			case B2.ShapeType.circleShape:
+			{
+				var circle = B2.ShapeGetCircle(shape);
+				var center = position + Rotate(rotation, FromB2(circle.center) * _toWorld);
+				var radius = circle.radius * _toWorld;
+				DrawCircle(lines, center, radius, color);
+				lines.Line(center, center + rotation * radius, color);
+				break;
+			}
+			case B2.ShapeType.capsuleShape:
+			{
+				var capsule = B2.ShapeGetCapsule(shape);
+				var a = position + Rotate(rotation, FromB2(capsule.center1) * _toWorld);
+				var b = position + Rotate(rotation, FromB2(capsule.center2) * _toWorld);
+				var radius = capsule.radius * _toWorld;
+				DrawCircle(lines, a, radius, color);
+				DrawCircle(lines, b, radius, color);
+				var axis = b - a;
+				var normal = axis.LengthSquared() > 0 ? Vector2.Normalize(new Vector2(-axis.Y, axis.X)) * radius : Vector2.Zero;
+				lines.Line(a + normal, b + normal, color);
+				lines.Line(a - normal, b - normal, color);
+				break;
+			}
+			default:
+			{
+				var polygon = B2.ShapeGetPolygon(shape);
+				var count = Math.Min(polygon.count, Polygon2D.MaxVertices);
+				for (var i = 0; i < count; i++) points[i] = position + Rotate(rotation, FromB2(polygon.vertices[i]) * _toWorld);
+				for (var i = 0; i < count; i++) lines.Line(points[i], points[(i + 1) % count], color);
+				break;
+			}
 		}
 	}
 
@@ -1020,6 +1311,12 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 	{
 		public bool Alive;
 		public bool Driven;
+
+		/// <summary>A rigid body without a collider of its own: the body of its parts (no own shape).</summary>
+		public bool Bare;
+
+		/// <summary>Its shapes changed this step: the mass is recomputed.</summary>
+		public bool MassDirty;
 		public int Slot;
 		public Entity Entity;
 		public B2.BodyId Body;
@@ -1031,6 +1328,22 @@ public sealed unsafe class PhysicsWorld2D : IPhysicsWorld2D, IDisposable
 		public uint Seen;
 		public uint Moved;
 		public B2.Transform Pulled;
+	}
+
+	/// <summary>A compound part: a child collider's shape on an ancestor's body.</summary>
+	private struct PartSlot
+	{
+		public bool Alive;
+		public Entity Entity;
+		public int Owner;
+		public B2.BodyId OwnerBody;
+		public B2.ShapeId Shape;
+		public Collider2D Collider;
+
+		/// <summary>The part's pose in its body's space.</summary>
+		public Vector2 Position;
+		public float Rotation;
+		public uint Seen;
 	}
 
 	private struct JointSlot

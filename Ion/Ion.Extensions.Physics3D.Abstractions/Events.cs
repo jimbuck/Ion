@@ -92,6 +92,19 @@ public interface IPhysicsWorld3D
 	/// <summary>Applies an angular impulse. Returns false when the entity has no dynamic body yet.</summary>
 	bool ApplyAngularImpulse(Entity entity, Vector3 impulse);
 
+	/// <summary>
+	/// The mass of the entity's body (<see cref="RigidBody3D.Mass"/>; 0 for a static or kinematic body) and its center of
+	/// mass in the body entity's local space. A compound body's mass is shared by its shapes in proportion to their volumes.
+	/// A part reports its body's. False when the entity has no body yet.
+	/// </summary>
+	bool TryGetMass(Entity entity, out float mass, out Vector3 localCenter);
+
+	/// <summary>
+	/// The entity whose body the entity's collider is on: the entity itself for a body, the ancestor body for a compound
+	/// part (a child collider without a <see cref="RigidBody3D"/>). False when it has no body yet.
+	/// </summary>
+	bool TryGetBodyEntity(Entity entity, out Entity body);
+
 	/// <summary>A hash of every body's pose and velocity bits in body creation order (the replay tests compare it).</summary>
 	ulong ComputeStateHash();
 }

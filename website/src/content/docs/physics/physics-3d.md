@@ -221,6 +221,8 @@ world.Create(Joint3D.Hinge(frame, door, Vector3.UnitY, localAnchorB: new Vector3
 | `ApplyLinearImpulse(Entity, Vector3)` | Changes a dynamic body's velocity immediately (and wakes it). |
 | `ApplyAngularImpulse(Entity, Vector3)` | Changes a dynamic body's angular velocity immediately. |
 | `ComputeStateHash()` | A hash of every body's pose and velocity bits. |
+| `TryGetMass(entity, out mass, out localCenter)` | The body's mass and its center of mass in the body's local space (a compound part reports its body's). |
+| `TryGetBodyEntity(entity, out body)` | The entity whose body a collider is on: itself, or the ancestor body of a compound part. |
 
 The impulse methods return `false` when the entity has no **dynamic** body yet. There is no continuous force or torque
 method in 3D: apply an impulse every fixed step (`force * dt`) or change the velocity.
@@ -270,15 +272,16 @@ results differ from a single-threaded run. See [determinism](/Ion/physics/determ
 | Box and sphere overlaps | Bounding-box based, not exact |
 | Linear and angular impulses | Supported; no continuous forces |
 | Exact restitution | Approximated by the contact spring |
-| **Compound colliders** (several shapes on one body, or child entities) | Not supported yet: one collider per entity |
+| Compound bodies (child colliders on an ancestor's body) | Supported; see [Compound bodies](/Ion/physics/overview/#compound-bodies). Changing a part rebuilds the body |
 | **Triangle mesh colliders** (static level geometry from a mesh) | Not supported yet: use convex hulls or boxes |
-| Collider offsets inside the entity | Not supported (hull centers aside) |
+| Collider offsets inside the entity | Not on the collider: put the shape on a child entity (a compound part) |
 | Joint motors and limits | Not supported yet |
 | Shape casts, pre-solve contact callbacks | Not supported yet |
 
 :::tip[Level geometry without mesh colliders]
-Until triangle mesh colliders exist, build static level geometry from several static entities with box colliders, or
-split concave props into convex pieces, each a `Collider3D.ConvexHull` on its own entity.
+Until triangle mesh colliders exist, build static level geometry from box colliders on child entities of one
+`RigidBody3D.Static()` entity (one compound static body), or split concave props into convex pieces, each a
+`Collider3D.ConvexHull` on a child entity of the prop.
 :::
 
 ## Allocations

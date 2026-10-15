@@ -60,6 +60,19 @@ public interface IPhysicsWorld2D
 	bool ApplyAngularImpulse(Entity entity, float impulse);
 
 	/// <summary>
+	/// The mass of the entity's body in kilograms (from the densities of all its shapes, its own and its parts', or
+	/// <see cref="RigidBody2D.Mass"/>), and its center of mass in the body entity's local space (world units). A part reports
+	/// its body's. False when the entity has no body yet; a static or kinematic body has a mass of 0.
+	/// </summary>
+	bool TryGetMass(Entity entity, out float mass, out Vector2 localCenter);
+
+	/// <summary>
+	/// The entity whose body the entity's collider is on: the entity itself for a body, the ancestor body for a compound
+	/// part (a child collider without a <see cref="RigidBody2D"/>). False when it has no body yet.
+	/// </summary>
+	bool TryGetBodyEntity(Entity entity, out Entity body);
+
+	/// <summary>
 	/// A hash of every body's position, rotation and velocities, in body creation order, bit for bit: two runs of the same
 	/// scene with the same inputs produce the same hash (the replay tests compare it).
 	/// </summary>

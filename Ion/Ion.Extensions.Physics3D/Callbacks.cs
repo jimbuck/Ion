@@ -13,7 +13,8 @@ namespace Ion.Extensions.Physics3D;
 /// <summary>
 /// The narrow phase callbacks: collision filtering by layer and mask, the material of a pair (friction, and restitution
 /// approximated by the contact spring), sensors (overlap recorded, no constraint) and the touching pairs recorded for the
-/// begin and end events.
+/// begin and end events. A compound body is filtered by the union of its shapes' layers and masks at the pair level, and
+/// by each shape's own in the per-child callbacks, which also record its events and drop its sensors' contacts.
 /// </summary>
 internal struct NarrowPhaseCallbacks(PhysicsWorld3D world) : INarrowPhaseCallbacks
 {
@@ -30,20 +31,30 @@ internal struct NarrowPhaseCallbacks(PhysicsWorld3D world) : INarrowPhaseCallbac
 			var slotA0 = world.SlotOf(a);
 			var slotB0 = world.SlotOf(b);
 			if (slotA0 == 0 || slotB0 == 0) return false;
-			ref readonly var sa = ref world.Slots[slotA0].Collider;
-			ref readonly var sb = ref world.Slots[slotB0].Collider;
-			if (!(sa.IsSensor || sb.IsSensor) || a.Mobility == CollidableMobility.Static && b.Mobility == CollidableMobility.Static) return false;
+			if (!(world.MaySense(slotA0) || world.MaySense(slotB0)) || a.Mobility == CollidableMobility.Static && b.Mobility == CollidableMobility.Static) return false;
 		}
 
 		var slotA = world.SlotOf(a);
 		var slotB = world.SlotOf(b);
 		if (slotA == 0 || slotB == 0) return false;
-		ref readonly var colliderA = ref world.Slots[slotA].Collider;
-		ref readonly var colliderB = ref world.Slots[slotB].Collider;
-		return (colliderA.Layer & colliderB.Mask) != 0 && (colliderB.Layer & colliderA.Mask) != 0;
+		var (layerA, maskA) = world.FilterOf(slotA);
+		var (layerB, maskB) = world.FilterOf(slotB);
+		return (layerA & maskB) != 0 && (layerB & maskA) != 0;
 	}
 
-	public readonly bool AllowContactGeneration(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB) => true;
+	public readonly bool AllowContactGeneration(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB)
+	{
+		var slotA = world.SlotOf(pair.A);
+		var slotB = world.SlotOf(pair.B);
+		if (slotA == 0 || slotB == 0) return false;
+		ref readonly var colliderA = ref world.ColliderOf(slotA, childIndexA);
+		ref readonly var colliderB = ref world.ColliderOf(slotB, childIndexB);
+		if ((colliderA.Layer & colliderB.Mask) == 0 || (colliderB.Layer & colliderA.Mask) == 0) return false;
+
+		// Two non-dynamic bodies only meet through a sensor.
+		if (pair.A.Mobility != CollidableMobility.Dynamic && pair.B.Mobility != CollidableMobility.Dynamic) return colliderA.IsSensor || colliderB.IsSensor;
+		return true;
+	}
 
 	public readonly bool ConfigureContactManifold<TManifold>(int workerIndex, CollidablePair pair, ref TManifold manifold, out PairMaterialProperties pairMaterial)
 		where TManifold : unmanaged, IContactManifold<TManifold>
@@ -68,6 +79,9 @@ internal struct NarrowPhaseCallbacks(PhysicsWorld3D world) : INarrowPhaseCallbac
 			pairMaterial.SpringSettings = new SpringSettings(30, 1);
 		}
 
+		// A compound's events and sensors are handled per shape (below).
+		if (world.IsCompound(slotA) || world.IsCompound(slotB)) return !sensor;
+
 		var wantsEvents = sensor ? colliderA.EnableEvents && colliderB.EnableEvents : colliderA.EnableEvents || colliderB.EnableEvents;
 		if (wantsEvents)
 		{
@@ -78,7 +92,7 @@ internal struct NarrowPhaseCallbacks(PhysicsWorld3D world) : INarrowPhaseCallbac
 				if (depth < 0) continue;
 				var positionA = PositionOf(pair.A);
 				// Bepu's manifold normal points from B to A.
-				world.RecordPair(workerIndex, slotA, slotB, positionA + offset, -normal, sensor, colliderA.IsSensor);
+				world.RecordPair(workerIndex, slotA, 0, slotB, 0, positionA + offset, -normal, sensor, colliderA.IsSensor);
 				break;
 			}
 		}
@@ -86,7 +100,33 @@ internal struct NarrowPhaseCallbacks(PhysicsWorld3D world) : INarrowPhaseCallbac
 		return !sensor;
 	}
 
-	public readonly bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ref ConvexContactManifold manifold) => true;
+	public readonly bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ref ConvexContactManifold manifold)
+	{
+		// Called for the shapes of compound pairs: events per shape, and a sensor shape's contacts are not solved.
+		var slotA = world.SlotOf(pair.A);
+		var slotB = world.SlotOf(pair.B);
+		ref readonly var colliderA = ref world.ColliderOf(slotA, childIndexA);
+		ref readonly var colliderB = ref world.ColliderOf(slotB, childIndexB);
+		var sensor = colliderA.IsSensor || colliderB.IsSensor;
+		var wantsEvents = sensor ? colliderA.EnableEvents && colliderB.EnableEvents : colliderA.EnableEvents || colliderB.EnableEvents;
+		if (wantsEvents)
+		{
+			for (var i = 0; i < manifold.Count; i++)
+			{
+				manifold.GetContact(i, out var offset, out var normal, out var depth, out _);
+				if (depth < 0) continue;
+				// The child manifold's offsets are from child A's center.
+				var positionA = PositionOf(pair.A) + Vector3.Transform(world.ChildOffset(slotA, childIndexA), OrientationOf(pair.A));
+				world.RecordPair(workerIndex, slotA, childIndexA, slotB, childIndexB, positionA + offset, -normal, sensor, colliderA.IsSensor);
+				break;
+			}
+		}
+
+		return !sensor;
+	}
+
+	private readonly Quaternion OrientationOf(CollidableReference collidable) =>
+		collidable.Mobility == CollidableMobility.Static ? _sim.Statics[collidable.StaticHandle].Pose.Orientation : _sim.Bodies[collidable.BodyHandle].Pose.Orientation;
 
 	private readonly Vector3 PositionOf(CollidableReference collidable) =>
 		collidable.Mobility == CollidableMobility.Static ? _sim.Statics[collidable.StaticHandle].Pose.Position : _sim.Bodies[collidable.BodyHandle].Pose.Position;

@@ -74,9 +74,10 @@ The 3D module works the same way; see [3D physics](/Ion/physics/physics-3d/).
 
 Three rules describe the whole adapter:
 
-1. **A collider makes a body.** Every entity with a collider and a transform (`Collider2D` plus `Transform2D`, or
-   `Collider3D` plus `Transform`) is a physics body. Without a rigid body component it is static. There is one collider
-   per entity.
+1. **A collider makes a body.** Every root entity with a collider and a transform (`Collider2D` plus `Transform2D`, or
+   `Collider3D` plus `Transform`), and every entity with a rigid body, is a physics body. Without a rigid body component
+   it is static. A child entity with a collider and no rigid body is a part of its ancestor's body (see
+   [Compound bodies](#compound-bodies)).
 2. **Components are the source of truth.** You change components; the next physics step applies the change. Moving the
    transform of a static or dynamic body teleports it, moving a kinematic body's transform drives it there, writing a
    velocity sets it, and changing a collider rebuilds its shape.
@@ -103,11 +104,44 @@ next step. The contacts it had end, with `End` events.
 `RigidBody3D.Dynamic()`, `Collider3D.Sphere(...)`) or the constructors, then adjust with `with { ... }`.
 :::
 
-:::caution[Put bodies on root entities]
-The physics step reads and writes the entity's `Transform2D` or `Transform` directly and treats it as a world transform.
-A transform is relative to its [parent](/Ion/ecs/transforms/), so a body on a child entity is simulated in the wrong
-place. Compound bodies made of child entities are not supported yet.
+:::caution[Put rigid bodies on root entities]
+The physics step reads and writes a body's `Transform2D` or `Transform` directly and treats it as a world transform. A
+transform is relative to its [parent](/Ion/ecs/transforms/), so a rigid body on a child entity is simulated in the wrong
+place. Child entities with colliders and no rigid body are fine: they are parts of a body.
 :::
+
+## Compound bodies
+
+One entity has one collider. To give a body several shapes, put the extra colliders on its **children**: a child entity
+with a collider and no rigid body is a *part* of the nearest ancestor body. Its shape sits where the hierarchy puts it,
+offset by the transforms between the part and the body.
+
+```csharp
+// A hammer: a handle and a head, one dynamic body.
+var hammer = world.Create(new Transform2D(new Vector2(400, 100)), RigidBody2D.Dynamic());
+var handle = world.Create(new Transform2D(new Vector2(0, 30)), Collider2D.Box(new Vector2(10, 80)));
+var head = world.Create(new Transform2D(new Vector2(0, -20)), Collider2D.Box(new Vector2(60, 24)) with { Density = 5 });
+world.SetParent(handle, hammer);
+world.SetParent(head, hammer);
+```
+
+- **The body** is the nearest ancestor with a rigid body, or the root of the hierarchy if it has a collider. A rigid body
+  without a collider of its own (the hammer above) is a body only while it has parts.
+- **Placement.** Positions and rotations of the transforms between the part and its body place the part. Scales are not
+  applied, as for bodies. Moving or reshaping a part updates the body at the next step.
+- **Mass.** In 2D each shape adds its own mass from its `Density`. In 3D the body's `RigidBody3D.Mass` is shared by its
+  shapes in proportion to their volumes. Either way, the center of mass ends up where the shapes are.
+  `TryGetMass(entity, out mass, out localCenter)` reads it.
+- **Surfaces, layers and sensors** are each part's own. In 3D the friction and restitution of the whole body come from
+  its own collider (or its first part).
+- **Events and queries name the part.** A `Collision2D` against the hammer's head has the head entity in it, and so does
+  a ray cast that hits it. `TryGetBodyEntity(part, out body)` gives the body. Forces and impulses on a part push its
+  body. In 3D, overlap queries report the body's entity.
+- **No body above it.** A child collider with no body anywhere above it (for example walls grouped under a plain
+  entity) is a static body of its own, at its world position. Give the group a `RigidBody2D.Static()` to make the walls
+  one static body instead.
+- **In 3D** adding, removing, moving or reshaping a part rebuilds the body (its contacts end and begin again). Change
+  parts at load time, not every frame.
 
 ## When physics runs: the fixed step
 
@@ -202,8 +236,7 @@ see [benchmarks](/Ion/tooling/benchmarks/) to run them.
 
 ## Not done yet
 
-These are planned, not built: compound colliders (several shapes per body through child entities), chain and segment
-shapes in 2D, triangle mesh colliders in 3D, motors and limits on 3D joints, shape casts, per-contact callbacks
+These are planned, not built: rigid bodies on child entities, chain and segment shapes in 2D, triangle mesh colliders in 3D, motors and limits on 3D joints, shape casts, per-contact callbacks
 (pre-solve), exact 3D overlap tests, and contraction-free Box2D natives built on CI for every platform.
 
 ## See also

@@ -181,6 +181,12 @@ The exception comes out of the physics step (FixedUpdate), not out of `world.Cre
 A collider stores which body it belongs to. Copying a collider to another entity copies that too; the world notices that
 the body belongs to another entity and creates a new one, so copies are safe.
 
+### Several shapes on one body
+
+A `Collider2D`'s `Offset` and `Angle` move its shape within its own entity. For a body made of several shapes, put the
+extra colliders on child entities: see [Compound bodies](/Ion/physics/overview/#compound-bodies). Each part adds its
+mass from its own `Density`, and a `RigidBody2D.Mass` override still sets the total.
+
 ## Joints: `Joint2D`
 
 A joint connects the bodies of two entities, each with a `Collider2D`. Put the `Joint2D` component on any entity (a third
@@ -280,9 +286,12 @@ Inject `IPhysicsWorld2D` (or the concrete `PhysicsWorld2D`) into a system; in a 
 | `RayCast`, `OverlapBox`, `OverlapCircle`, `OverlapPoint` | [Queries](/Ion/physics/queries-and-events/). |
 | `ApplyForce`, `ApplyLinearImpulse`, `ApplyTorque`, `ApplyAngularImpulse` | Forces, above. |
 | `ComputeStateHash()` | A hash of every body's state for [determinism checks](/Ion/physics/determinism/). |
+| `TryGetMass(entity, out mass, out localCenter)` | The mass of the entity's body and its center of mass in the body's local space. A [compound part](/Ion/physics/overview/#compound-bodies) reports its body's. |
+| `TryGetBodyEntity(entity, out body)` | The entity whose body a collider is on: itself, or the ancestor body of a compound part. |
 
-`PhysicsWorld2D` adds `Entities` (the ECS world it simulates), `Config`, `AwakeBodyCount` (Box2D skips sleeping bodies)
-and `Step(float dt)`, which the physics system calls and which you can call yourself in a standalone simulation.
+`PhysicsWorld2D` adds `Entities` (the ECS world it simulates), `Config`, `AwakeBodyCount` (Box2D skips sleeping bodies),
+`PartCount` (compound parts) and `Step(float dt)`, which the physics system calls and which you can call yourself in a
+standalone simulation.
 
 ## Configuration: `Physics2DConfig`
 
@@ -360,7 +369,7 @@ To test the game's own `Program.cs`, use `new IonTestHost().UseEntryPoint<Progra
 |---|---|
 | A dynamic body hangs in the air | It was created with `default(RigidBody2D)` or `new RigidBody2D()`, whose `GravityScale` is 0. Use `RigidBody2D.Dynamic()` or the constructor. |
 | Everything is sluggish or floats down slowly | `UnitsPerMeter` is 1 in a pixel game, so a 32 pixel ball is a 32 meter boulder, and `GravityY` is still 9.81 pixels per second squared. Set both (see the caution above). |
-| A body sits somewhere other than its sprite | The entity has a [parent](/Ion/ecs/transforms/): the physics step treats `Transform2D` as a world transform. Put bodies on root entities. Or the collider's `Offset` or size does not match the sprite; turn the [debug drawing](/Ion/physics/debug-draw/) on to compare. |
+| A body sits somewhere other than its sprite | The entity has a rigid body and a [parent](/Ion/ecs/transforms/): the physics step treats a body's `Transform2D` as a world transform, so put rigid bodies on root entities (child colliders without one are [compound parts](/Ion/physics/overview/#compound-bodies) and are placed correctly). Or the collider's `Offset` or size does not match the sprite; turn the [debug drawing](/Ion/physics/debug-draw/) on to compare. |
 | `ApplyLinearImpulse` (or a query) does not find the entity | The body is created by the next physics step after the collider is added. Wait one fixed step, or set `RigidBody2D.LinearVelocity` on the component instead, which the step applies when it creates the body. |
 | `InvalidOperationException` in FixedUpdate naming an entity | The collider's geometry is degenerate (a zero size, a rounding radius too large, a polygon without a convex hull); see [validation](#validation). The exception comes from the step, not from `world.Create`. |
 | Two bodies pass through each other | Each `Layer` must be in the other's `Mask`, on both sides. Fast small bodies against thin moving bodies also need `IsBullet`; continuous collision against static bodies is on by default. |
