@@ -172,12 +172,44 @@ written as its saved position and resolved on load.
 ### What is and is not saved
 
 `ComponentSerializerRegistry.CreateDefault()` registers `Transform2D`, `Transform`, `Parent`, `Children`, `EntityName`,
-`SpriteAnimation`, `Camera2D` and the tags `Hidden`, `Visible` and `MainCamera`. Not saved:
+`SpriteAnimation`, `Camera2D`, the 3D components (`MeshRenderer`, `Camera`, `DirectionalLight`, `PointLight`,
+`SpotLight` and `SceneEnvironment`) and the tags `Hidden`, `Visible` and `MainCamera`. Not saved:
 
 - Computed components (`GlobalTransform2D`, `GlobalTransform`, `Aabb2D`): the propagation recomputes them after a load.
 - `Sprite`: it holds a texture. Register your own codec that saves the asset path if you need it.
-- The 3D renderer components (`MeshRenderer`, cameras, lights): they hold renderer handles. Serializing them is planned.
 - Any component without a registration: skipped silently on save.
+
+### 3D components and renderer handles
+
+`MeshRenderer`, `Camera` and `SceneEnvironment` hold renderer handles (`MeshHandle`, `MaterialHandle`, `TextureHandle`,
+`RenderTargetHandle`): run-time ids that mean nothing in another process. The serializers save a **name** for each
+handle instead, from the registry's `RenderHandleNames` table (`registry.Handles`, also a service once
+`AddEcsSerialization` is called), and a load looks the handle up by that name. Name what you create, and add the
+models you load, before saving or loading:
+
+```csharp
+public sealed class LevelAssets(IRenderer3D renderer, IAssetManager assets, RenderHandleNames names)
+{
+    public void Create()
+    {
+        var crate = renderer.CreateMesh(MeshPrimitives.Cube());
+        var wood = renderer.CreateMaterial(new PbrMaterial(new Color(0x8B, 0x5A, 0x2B)));
+        names.Name(crate, "crate").Name(wood, "wood");
+
+        // Every mesh, material and texture of the model: "props.glb#mesh/0", "props.glb#material/0", ...
+        names.AddModel(assets.Load<IModel>("props.glb"));
+    }
+}
+```
+
+The same code runs before a load, so the names exist with this process's handles. In JSON a mesh renderer is saved as
+`{ "Mesh": "crate", "Material": "wood", "CastShadows": true, "ReceiveShadows": true, "LayerMask": 1 }`.
+
+- A handle with no name is saved as `#id`, its run-time id. That loads back as the same handle in the same process
+  (undo, the remote protocol, tests), but not after a restart.
+- `MeshHandle.None` (and the other `None`s) is saved as null.
+- Loading a name that has no handle throws `InvalidDataException`, naming it.
+- The lights are plain values and need no names.
 
 ### Saving and loading
 

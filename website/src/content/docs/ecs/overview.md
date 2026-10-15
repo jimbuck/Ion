@@ -215,8 +215,9 @@ and headless snapshot tests. See [Templates](/Ion/getting-started/templates/).
 
 ## Planned
 
-These are on the roadmap and not built yet: tilemaps and serialization of the 3D components (they hold renderer
-handles). Parallel queries are built: see [Queries](/Ion/ecs/queries/#parallel-queries).
+Tilemaps are on the roadmap and not built yet. Parallel queries are built (see
+[Queries](/Ion/ecs/queries/#parallel-queries)), and so is saving the 3D components (see
+[Components and serialization](/Ion/ecs/components-and-serialization/#3d-components-and-renderer-handles)).
 
 ## See also
 

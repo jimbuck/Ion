@@ -11,7 +11,7 @@ namespace Ion.Extensions.Ecs;
 /// <summary>Source-generated JSON metadata of the built-in components (NativeAOT-safe).</summary>
 [JsonSourceGenerationOptions(
 	IncludeFields = true,
-	Converters = [typeof(EntityJsonConverter), typeof(ChildrenJsonConverter), typeof(Vector2JsonConverter), typeof(Vector3JsonConverter), typeof(QuaternionJsonConverter), typeof(RectangleFJsonConverter), typeof(TransformJsonConverter)])]
+	Converters = [typeof(EntityJsonConverter), typeof(ChildrenJsonConverter), typeof(Vector2JsonConverter), typeof(Vector3JsonConverter), typeof(QuaternionJsonConverter), typeof(RectangleFJsonConverter), typeof(TransformJsonConverter), typeof(ColorJsonConverter)])]
 [JsonSerializable(typeof(Transform2D))]
 [JsonSerializable(typeof(Transform))]
 [JsonSerializable(typeof(Parent))]
@@ -19,6 +19,9 @@ namespace Ion.Extensions.Ecs;
 [JsonSerializable(typeof(EntityName))]
 [JsonSerializable(typeof(SpriteAnimation))]
 [JsonSerializable(typeof(Camera2D))]
+[JsonSerializable(typeof(DirectionalLight))]
+[JsonSerializable(typeof(PointLight))]
+[JsonSerializable(typeof(SpotLight))]
 internal sealed partial class EcsJsonContext : JsonSerializerContext
 {
 }

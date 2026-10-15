@@ -64,6 +64,7 @@ public static class EcsBuilderExtensions
 		configure?.Invoke(registry);
 
 		services.TryAddSingleton(registry);
+		services.TryAddSingleton(registry.Handles);
 		services.TryAddSingleton(static sp => new JsonWorldSerializer(sp.GetRequiredService<ComponentSerializerRegistry>()));
 		services.TryAddSingleton(static sp => new BinaryWorldSerializer(sp.GetRequiredService<ComponentSerializerRegistry>()));
 		services.TryAddSingleton<IWorldSerializer>(static sp => sp.GetRequiredService<BinaryWorldSerializer>());

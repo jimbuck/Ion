@@ -115,12 +115,17 @@ public sealed class ComponentSerializerRegistry
 	/// <summary>The registered component names.</summary>
 	public IEnumerable<string> Names => _items.Select(i => i.Name);
 
+	/// <summary>The names of the renderer handles the 3D components hold (see <see cref="RenderHandleNames"/>).</summary>
+	public RenderHandleNames Handles { get; } = new();
+
 	/// <summary>
 	/// A registry with the built-in components: <see cref="Transform2D"/>, <see cref="Transform"/>, <see cref="Parent"/>,
-	/// <see cref="Children"/>, <see cref="EntityName"/>, <see cref="SpriteAnimation"/>, <see cref="Camera2D"/>, and the tags
-	/// <see cref="Hidden"/>, <see cref="Visible"/> and <see cref="MainCamera"/>. Computed components (global transforms,
-	/// bounds) are not saved, and neither is <see cref="Sprite"/> (it holds a texture; register a codec that saves its
-	/// asset path).
+	/// <see cref="Children"/>, <see cref="EntityName"/>, <see cref="SpriteAnimation"/>, <see cref="Camera2D"/>, the 3D
+	/// components (<see cref="MeshRenderer"/>, <see cref="Camera"/>, <see cref="DirectionalLight"/>, <see cref="PointLight"/>,
+	/// <see cref="SpotLight"/> and <see cref="SceneEnvironment"/>, whose renderer handles are saved by name through
+	/// <see cref="Handles"/>), and the tags <see cref="Hidden"/>, <see cref="Visible"/> and <see cref="MainCamera"/>. Computed
+	/// components (global transforms, bounds) are not saved, and neither is <see cref="Sprite"/> (it holds a texture;
+	/// register a codec that saves its asset path).
 	/// </summary>
 	public static ComponentSerializerRegistry CreateDefault()
 	{
@@ -190,6 +195,7 @@ public sealed class ComponentSerializerRegistry
 		registry.AddTag<Hidden>("Hidden");
 		registry.AddTag<Visible>("Visible");
 		registry.AddTag<MainCamera>("MainCamera");
+		Components3D.Register(registry, registry.Handles);
 		return registry;
 	}
 
