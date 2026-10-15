@@ -16,7 +16,8 @@ namespace Ion.Extensions.Ecs;
 public sealed class Commands
 {
 	private CommandBuffer _buffer = new();
-	private readonly List<(Entity Child, Entity Parent)> _parents = [];
+	private readonly List<(Entity Child, Entity Parent, int Index)> _parents = [];
+	private readonly List<(Entity Child, int Index)> _siblings = [];
 	private readonly List<Entity> _unparents = [];
 	private readonly List<Entity> _destroyTrees = [];
 	private readonly QueryDescription _pending = new QueryDescription().WithAll<PendingParent>();
@@ -129,14 +130,28 @@ public sealed class Commands
 	}
 
 	/// <summary>
-	/// Records parenting <paramref name="child"/> to <paramref name="parent"/> (see <see cref="HierarchyExtensions.SetParent"/>),
+	/// Records parenting <paramref name="child"/> to <paramref name="parent"/> (see <see cref="HierarchyExtensions.SetParent(World, Entity, Entity)"/>),
 	/// applied after the other commands. The child may be an entity these commands create; the parent must exist already.
 	/// </summary>
-	public void SetParent(Entity child, Entity parent)
+	public void SetParent(Entity child, Entity parent) => SetParent(child, parent, -1);
+
+	/// <summary>
+	/// Records parenting <paramref name="child"/> to <paramref name="parent"/> at sibling <paramref name="index"/> (see
+	/// <see cref="HierarchyExtensions.SetParent(World, Entity, Entity, int)"/>), applied after the other commands, in the
+	/// order recorded. The child may be an entity these commands create; the parent must exist already.
+	/// </summary>
+	public void SetParent(Entity child, Entity parent, int index)
 	{
 		_count++;
-		if (child.Id < 0) _buffer.Add(in child, new PendingParent(parent));
-		else _parents.Add((child, parent));
+		if (child.Id < 0) _buffer.Add(in child, new PendingParent(parent, index));
+		else _parents.Add((child, parent, index));
+	}
+
+	/// <summary>Records moving <paramref name="child"/> (an existing entity) to <paramref name="index"/> among its siblings (see <see cref="HierarchyExtensions.SetSiblingIndex"/>), after the parenting commands.</summary>
+	public void SetSiblingIndex(Entity child, int index)
+	{
+		_count++;
+		_siblings.Add((child, index));
 	}
 
 	/// <summary>Records detaching <paramref name="child"/> (an existing entity) from its parent.</summary>
@@ -171,9 +186,9 @@ public sealed class Commands
 
 			foreach (var entity in _scratch)
 			{
-				var parent = World.Get<PendingParent>(entity).Value;
+				var pending = World.Get<PendingParent>(entity);
 				World.Remove<PendingParent>(entity);
-				if (World.IsAlive(parent)) World.SetParent(entity, parent);
+				if (World.IsAlive(pending.Value)) World.SetParent(entity, pending.Value, pending.Index);
 			}
 
 			_scratch.Clear();
@@ -198,15 +213,17 @@ public sealed class Commands
 			_scratch.Clear();
 		}
 
-		foreach (var (child, parent) in _parents)
+		foreach (var (child, parent, index) in _parents)
 		{
-			if (World.IsAlive(child) && World.IsAlive(parent)) World.SetParent(child, parent);
+			if (World.IsAlive(child) && World.IsAlive(parent)) World.SetParent(child, parent, index);
 		}
 
+		foreach (var (child, index) in _siblings) World.SetSiblingIndex(child, index);
 		foreach (var child in _unparents) World.RemoveParent(child);
 		foreach (var entity in _destroyTrees) World.DestroyRecursive(entity);
 
 		_parents.Clear();
+		_siblings.Clear();
 		_unparents.Clear();
 		_destroyTrees.Clear();
 	}
@@ -217,6 +234,7 @@ public sealed class Commands
 		_buffer.Dispose();
 		_buffer = new CommandBuffer();
 		_parents.Clear();
+		_siblings.Clear();
 		_unparents.Clear();
 		_destroyTrees.Clear();
 		_count = 0;

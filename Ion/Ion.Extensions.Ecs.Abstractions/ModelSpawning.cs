@@ -75,7 +75,7 @@ public static class ModelSpawnExtensions
 
 	/// <summary>
 	/// Records spawning <paramref name="model"/> with its root at <paramref name="transform"/>. Returns the root entity, a
-	/// placeholder until playback (use it with the same commands, for example <see cref="Commands.SetParent"/> or
+	/// placeholder until playback (use it with the same commands, for example <see cref="Commands.SetParent(Entity, Entity)"/> or
 	/// <see cref="Commands.Add{T}"/>); the node entities are created when the commands are played back.
 	/// </summary>
 	public static Entity SpawnModel(this Commands commands, IModel model, in Transform transform, ModelSpawnOptions? options = null)

@@ -163,4 +163,72 @@ public class HierarchyTests
 		Assert.True(world.Get<GlobalTransform2D>(sprite).IsComputed);
 		Assert.Equal(new Aabb2D(new Vector2(40, 30), new Vector2(60, 70)), world.Get<Aabb2D>(sprite));
 	}
+
+	[Fact]
+	public void SetParentInsertsAtAnIndex()
+	{
+		using var world = World.Create();
+		var parent = world.Create(new Transform2D());
+		var a = world.Create(new Transform2D());
+		var b = world.Create(new Transform2D());
+		var c = world.Create(new Transform2D());
+		var d = world.Create(new Transform2D());
+		world.SetParent(a, parent);
+		world.SetParent(b, parent);
+		world.SetParent(c, parent, 0);
+		world.SetParent(d, parent, 99); // clamped: appended
+
+		Assert.Equal([c, a, b, d], world.GetChildren(parent).ToArray());
+		Assert.Equal(0, world.GetSiblingIndex(c));
+		Assert.Equal(3, world.GetSiblingIndex(d));
+		Assert.Equal(-1, world.GetSiblingIndex(parent));
+	}
+
+	[Fact]
+	public void SetSiblingIndexMovesAChildAmongItsSiblings()
+	{
+		using var world = World.Create();
+		var parent = world.Create(new Transform2D());
+		var a = world.Create(new Transform2D());
+		var b = world.Create(new Transform2D());
+		var c = world.Create(new Transform2D());
+		foreach (var e in new[] { a, b, c }) world.SetParent(e, parent);
+
+		world.SetSiblingIndex(c, 0);
+		Assert.Equal([c, a, b], world.GetChildren(parent).ToArray());
+		world.SetSiblingIndex(c, 2);
+		Assert.Equal([a, b, c], world.GetChildren(parent).ToArray());
+		world.SetSiblingIndex(a, -5); // clamped to the front
+		Assert.Equal([a, b, c], world.GetChildren(parent).ToArray());
+		world.SetSiblingIndex(a, 1);
+		Assert.Equal([b, a, c], world.GetChildren(parent).ToArray());
+
+		// SetParent to the same parent with an index moves; without one it keeps the place.
+		world.SetParent(c, parent, 0);
+		Assert.Equal([c, b, a], world.GetChildren(parent).ToArray());
+		world.SetParent(c, parent);
+		Assert.Equal([c, b, a], world.GetChildren(parent).ToArray());
+		Assert.True(world.TryGetParent(c, out var found));
+		Assert.Equal(parent, found);
+
+		// A root has no siblings: nothing happens.
+		world.SetSiblingIndex(parent, 3);
+		Assert.Equal(-1, world.GetSiblingIndex(parent));
+	}
+
+	[Fact]
+	public void PropagationFollowsTheReorderedChildren()
+	{
+		using var world = World.Create();
+		var parent = world.Create(new Transform2D(new Vector2(10, 0)));
+		var a = world.Create(new Transform2D(new Vector2(1, 0)));
+		var b = world.Create(new Transform2D(new Vector2(2, 0)));
+		world.SetParent(a, parent);
+		world.SetParent(b, parent);
+		world.SetSiblingIndex(b, 0);
+
+		new TransformPropagationSystem(world).Propagate();
+		AssertClose(new Vector2(11, 0), world.Get<GlobalTransform2D>(a).Position);
+		AssertClose(new Vector2(12, 0), world.Get<GlobalTransform2D>(b).Position);
+	}
 }

@@ -148,6 +148,33 @@ public class SerializationTests
 		Assert.Equal(Entity.Null, names.Find("renamed"));
 		Assert.Null(names.NameOf(a));
 	}
+
+	[Theory]
+	[MemberData(nameof(Formats))]
+	public void SiblingOrderSurvivesSaveAndLoad(string format)
+	{
+		using var source = World.Create();
+		var parent = source.Create(new Transform2D(), new EntityName("parent"));
+		var a = source.Create(new Transform2D(), new EntityName("a"));
+		var b = source.Create(new Transform2D(), new EntityName("b"));
+		var c = source.Create(new Transform2D(), new EntityName("c"));
+		source.SetParent(a, parent);
+		source.SetParent(b, parent);
+		source.SetParent(c, parent, 0);
+		source.SetSiblingIndex(a, 2);
+		Assert.Equal([c, b, a], source.GetChildren(parent).ToArray());
+
+		var serializer = Serializer(format);
+		using var stream = new MemoryStream();
+		serializer.Serialize(source, stream);
+		stream.Position = 0;
+		using var target = World.Create();
+		serializer.Deserialize(stream, target);
+
+		var names = new NameRegistry(target);
+		var order = target.GetChildren(names.Find("parent")).ToArray().Select(e => target.Get<EntityName>(e).Value);
+		Assert.Equal(["c", "b", "a"], order);
+	}
 }
 
 [System.Text.Json.Serialization.JsonSourceGenerationOptions(IncludeFields = true)]

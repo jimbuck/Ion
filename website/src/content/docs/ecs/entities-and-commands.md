@@ -105,6 +105,8 @@ public sealed partial class DamageSystem
 | `Remove<T>(entity)` | Removing a component. |
 | `Set<T>(entity, in component)` | Setting a component the entity has, or gets from a `Create`/`Add` of the same commands. |
 | `SetParent(child, parent)` | Parenting (the child may be an entity these commands create; the parent must already exist). |
+| `SetParent(child, parent, index)` | Parenting at a sibling index (see [Sibling order](/Ion/ecs/transforms/#sibling-order)). |
+| `SetSiblingIndex(child, index)` | Moving an existing child among its siblings (applied after the parenting). |
 | `RemoveParent(child)` | Detaching an existing entity from its parent. |
 | `commands.SpawnModel(model, transform, options)` | Instantiating an `IModel` as an entity hierarchy (see [ECS rendering](/Ion/ecs/ecs-rendering/)). |
 
@@ -227,6 +229,9 @@ query):
 | Method | Does |
 |---|---|
 | `world.SetParent(child, parent)` | Parents `child`, moving it from a previous parent. Throws on cycles or dead entities. |
+| `world.SetParent(child, parent, index)` | The same, at sibling `index` (clamped). |
+| `world.SetSiblingIndex(child, index)` | Moves `child` among its siblings. |
+| `world.GetSiblingIndex(child)` | Its index among its siblings, or -1 for a root. |
 | `world.RemoveParent(child)` | Makes `child` a root. |
 | `world.TryGetParent(entity, out parent)` | The parent, or false for a root. |
 | `world.GetChildren(entity)` | A `ReadOnlySpan<Entity>` of children, valid until the hierarchy changes. |

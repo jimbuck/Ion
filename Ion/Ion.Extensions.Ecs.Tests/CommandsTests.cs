@@ -95,4 +95,31 @@ public class CommandsTests
 		Assert.Equal(0, world.Size);
 		Assert.Equal(0, commands.Playbacks);
 	}
+
+	[Fact]
+	public void SetParentAtAnIndexAndSetSiblingIndexApplyAtPlayback()
+	{
+		using var world = World.Create();
+		var commands = new Commands(world);
+		var parent = world.Create(new Transform2D());
+		var a = world.Create(new Transform2D());
+		var b = world.Create(new Transform2D());
+		world.SetParent(a, parent);
+		world.SetParent(b, parent);
+
+		var created = commands.Create(new Transform2D(), new Health(7));
+		commands.SetParent(created, parent, 0);
+		var existing = world.Create(new Transform2D());
+		commands.SetParent(existing, parent, 1);
+		commands.SetSiblingIndex(b, 0);
+		Assert.Equal([a, b], world.GetChildren(parent).ToArray());
+		commands.Flush();
+
+		var children = world.GetChildren(parent).ToArray();
+		Assert.Equal(4, children.Length);
+		Assert.Equal(b, children[0]);
+		Assert.True(world.Has<Health>(children[1]));
+		Assert.Equal(existing, children[2]);
+		Assert.Equal(a, children[3]);
+	}
 }

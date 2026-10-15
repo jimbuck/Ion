@@ -6,15 +6,17 @@ using Ion.Extensions.Graphics;
 namespace Ion.Extensions.Ecs;
 
 /// <summary>
-/// The parent of an entity in the transform hierarchy. Maintain it with <see cref="HierarchyExtensions.SetParent"/> (or
-/// <see cref="Commands.SetParent"/> inside a query), which also keeps the parent's <see cref="Children"/> in step.
+/// The parent of an entity in the transform hierarchy. Maintain it with <see cref="HierarchyExtensions.SetParent(World, Entity, Entity)"/> (or
+/// <see cref="Commands.SetParent(Entity, Entity)"/> inside a query), which also keeps the parent's <see cref="Children"/> in step.
 /// </summary>
 /// <param name="Value">The parent entity.</param>
 public readonly record struct Parent(Entity Value);
 
 /// <summary>
-/// The children of an entity, in the order they were attached (the order the transform propagation visits them).
-/// Maintained by <see cref="HierarchyExtensions.SetParent"/> and <see cref="HierarchyExtensions.RemoveParent"/>.
+/// The children of an entity, in sibling order: the order the transform propagation visits them and the serializers save
+/// them. A child is appended when parented, unless an index is given (<see cref="HierarchyExtensions.SetParent(World, Entity, Entity, int)"/>),
+/// and can be moved among its siblings (<see cref="HierarchyExtensions.SetSiblingIndex"/>). Maintained by those and
+/// <see cref="HierarchyExtensions.RemoveParent"/>.
 /// </summary>
 public struct Children
 {
@@ -35,6 +37,32 @@ public struct Children
 		Items ??= new Entity[4];
 		if (Length == Items.Length) Array.Resize(ref Items, Length * 2);
 		Items[Length++] = child;
+	}
+
+	/// <summary>Inserts <paramref name="child"/> at <paramref name="index"/> (clamped to the ends).</summary>
+	internal void Insert(int index, Entity child)
+	{
+		Add(child);
+		var at = Math.Clamp(index, 0, Length - 1);
+		if (at == Length - 1) return;
+		Array.Copy(Items!, at, Items!, at + 1, Length - 1 - at);
+		Items![at] = child;
+	}
+
+	/// <summary>The index of <paramref name="child"/>, or -1.</summary>
+	internal readonly int IndexOf(Entity child) => Items is null ? -1 : Array.IndexOf(Items, child, 0, Length);
+
+	/// <summary>Moves <paramref name="child"/> to <paramref name="index"/> (clamped to the ends). Returns false when it is not a child.</summary>
+	internal bool Move(Entity child, int index)
+	{
+		var from = IndexOf(child);
+		if (from < 0) return false;
+		var to = Math.Clamp(index, 0, Length - 1);
+		if (from == to) return true;
+		if (from < to) Array.Copy(Items!, from + 1, Items!, from, to - from);
+		else Array.Copy(Items!, to, Items!, to + 1, from - to);
+		Items![to] = child;
+		return true;
 	}
 
 	internal bool Remove(Entity child)
@@ -59,8 +87,8 @@ public struct Children
 	public override readonly string ToString() => $"Children {{ Count = {Length} }}";
 }
 
-/// <summary>A parent recorded by <see cref="Commands.SetParent"/> for an entity the same commands create; applied at playback.</summary>
-internal readonly record struct PendingParent(Entity Value);
+/// <summary>A parent (and sibling index, -1 to append) recorded by <see cref="Commands.SetParent(Entity, Entity)"/> for an entity the same commands create; applied at playback.</summary>
+internal readonly record struct PendingParent(Entity Value, int Index = -1);
 
 /// <summary>
 /// Hierarchy operations on an Arch <see cref="World"/>. They are structural changes (they add or remove
@@ -73,7 +101,15 @@ public static class HierarchyExtensions
 	/// it to the parent's <see cref="Children"/>.
 	/// </summary>
 	/// <exception cref="InvalidOperationException">The operation would create a cycle, or an entity is not alive.</exception>
-	public static void SetParent(this World world, Entity child, Entity parent)
+	public static void SetParent(this World world, Entity child, Entity parent) => SetParent(world, child, parent, -1);
+
+	/// <summary>
+	/// Makes <paramref name="child"/> a child of <paramref name="parent"/> at sibling <paramref name="index"/> of the
+	/// parent's <see cref="Children"/> (clamped; a negative index appends), moving it from its previous parent. Already a
+	/// child of <paramref name="parent"/>, it moves to <paramref name="index"/> among its siblings.
+	/// </summary>
+	/// <exception cref="InvalidOperationException">The operation would create a cycle, or an entity is not alive.</exception>
+	public static void SetParent(this World world, Entity child, Entity parent, int index)
 	{
 		ArgumentNullException.ThrowIfNull(world);
 		if (!world.IsAlive(child)) throw new InvalidOperationException($"Cannot parent {child}: it is not alive.");
@@ -88,7 +124,12 @@ public static class HierarchyExtensions
 
 		if (world.TryGet<Parent>(child, out var previous))
 		{
-			if (previous.Value == parent) return;
+			if (previous.Value == parent)
+			{
+				if (index >= 0 && world.Has<Children>(parent)) world.Get<Children>(parent).Move(child, index);
+				return;
+			}
+
 			if (world.IsAlive(previous.Value) && world.Has<Children>(previous.Value)) world.Get<Children>(previous.Value).Remove(child);
 			world.Set(child, new Parent(parent));
 		}
@@ -98,8 +139,29 @@ public static class HierarchyExtensions
 		}
 
 		if (!world.Has<Children>(parent)) world.Add(parent, new Children());
-		world.Get<Children>(parent).Add(child);
+		ref var children = ref world.Get<Children>(parent);
+		if (index < 0) children.Add(child);
+		else children.Insert(index, child);
 		Invalidate(world, child);
+	}
+
+	/// <summary>
+	/// Moves <paramref name="child"/> to <paramref name="index"/> among its siblings (clamped to the ends; 0 is first),
+	/// keeping its parent. Does nothing for a root. Not a structural change: no component is added or removed.
+	/// </summary>
+	public static void SetSiblingIndex(this World world, Entity child, int index)
+	{
+		ArgumentNullException.ThrowIfNull(world);
+		if (!world.IsAlive(child) || !world.TryGet<Parent>(child, out var parent) || !world.IsAlive(parent.Value) || !world.Has<Children>(parent.Value)) return;
+		world.Get<Children>(parent.Value).Move(child, index);
+	}
+
+	/// <summary>The index of <paramref name="child"/> among its siblings, or -1 for a root.</summary>
+	public static int GetSiblingIndex(this World world, Entity child)
+	{
+		ArgumentNullException.ThrowIfNull(world);
+		if (!world.IsAlive(child) || !world.TryGet<Parent>(child, out var parent) || !world.IsAlive(parent.Value) || !world.Has<Children>(parent.Value)) return -1;
+		return world.Get<Children>(parent.Value).IndexOf(child);
 	}
 
 	/// <summary>Makes the transform propagation recompute <paramref name="entity"/> (and so its descendants) on its next run.</summary>

@@ -122,13 +122,16 @@ The hierarchy is two components, maintained for you:
 | Component | Holds |
 |---|---|
 | `Parent(Entity Value)` | The parent entity (on the child) |
-| `Children` | The children in attach order (on the parent): `Count`, indexer, `AsSpan()` |
+| `Children` | The children in sibling order (on the parent): `Count`, indexer, `AsSpan()` |
 
 Do not add or edit `Parent` and `Children` yourself; use the operations, which keep both sides in step and reject cycles:
 
 | `World` extension | `Commands` equivalent | Does |
 |---|---|---|
-| `SetParent(child, parent)` | `commands.SetParent(child, parent)` | Attach (moving from a previous parent). Throws on a cycle or a dead entity. |
+| `SetParent(child, parent)` | `commands.SetParent(child, parent)` | Attach as the last child (moving from a previous parent). Throws on a cycle or a dead entity. |
+| `SetParent(child, parent, index)` | `commands.SetParent(child, parent, index)` | Attach at sibling `index`. Already a child of `parent`, it moves to `index`. |
+| `SetSiblingIndex(child, index)` | `commands.SetSiblingIndex(child, index)` | Move a child among its siblings (0 is first). Does nothing for a root. |
+| `GetSiblingIndex(child)` | | The child's index among its siblings, or -1 for a root. |
 | `RemoveParent(child)` | `commands.RemoveParent(child)` | Detach: the child becomes a root and its local transform is now relative to the world. |
 | `DestroyRecursive(entity)` | `commands.DestroyRecursive(entity)` | Destroy the entity and all its descendants. |
 | `TryGetParent(entity, out parent)` | | Read the parent. |
@@ -136,6 +139,22 @@ Do not add or edit `Parent` and `Children` yourself; use the operations, which k
 
 `commands.SetParent` accepts a child created by the same commands (a placeholder); the parent must already exist. Inside
 a `[Query]` method, only the `Commands` forms are allowed (ION305).
+
+### Sibling order
+
+A child is appended to its parent's `Children` unless you give an index. Indexes are clamped to the ends, so
+`int.MaxValue` means last, and a negative index in `SetParent` appends. The order matters wherever the children are
+visited in turn: the transform propagation, the scene and world serializers (the order survives a save and a load), and
+anything of yours that draws or lays children out in order.
+
+```csharp
+world.SetParent(card, hand, 0);            // the new card goes first
+world.SetSiblingIndex(card, int.MaxValue); // and now last
+var slot = world.GetSiblingIndex(card);    // 3, in a hand of four
+```
+
+Reordering is not a structural change (no component is added or removed) and does not dirty any transform.
+`commands.SetSiblingIndex` applies after the commands' parenting, so it can move a child those commands just attached.
 
 :::note[Detaching keeps the local values]
 `RemoveParent` does not convert the child's local transform into world space. A child at local `(0, -10)` under a
