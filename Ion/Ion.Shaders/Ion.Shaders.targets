@@ -35,7 +35,8 @@
   <!-- IntermediateOutputPath is only defined by the SDK targets imported after this file, so resolve it in a target. -->
   <Target Name="_IonShaderPaths">
     <PropertyGroup>
-      <IonShaderOutDir Condition="'$(IonShaderOutDir)' == ''">$(ProjectDir)$(IntermediateOutputPath)IonShaders/</IonShaderOutDir>
+      <!-- Path.Combine keeps a rooted IntermediateOutputPath as is (BenchmarkDotNet's generated projects set an absolute one). -->
+      <IonShaderOutDir Condition="'$(IonShaderOutDir)' == ''">$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::Combine('$(ProjectDir)', '$(IntermediateOutputPath)'))))IonShaders/</IonShaderOutDir>
     </PropertyGroup>
   </Target>
 
