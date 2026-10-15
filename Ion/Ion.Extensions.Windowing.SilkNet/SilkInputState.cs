@@ -160,8 +160,18 @@ public sealed class SilkInputState : TrackedInputState, IClipboard, ITextInputHo
 		}
 	}
 
-	/// <summary>Forgets the caret area (the next <see cref="SetTextInputArea"/> reaches the platform again).</summary>
-	public void ClearTextInputArea() => _textArea = (int.MinValue, 0, 0, 0);
+	/// <summary>
+	/// Forgets the caret area (the next <see cref="SetTextInputArea"/> reaches the platform again) and, on phones, stops
+	/// text input so the system keyboard goes away.
+	/// </summary>
+	public void ClearTextInputArea()
+	{
+		_textArea = (int.MinValue, 0, 0, 0);
+		if (ShowsScreenKeyboard) _textInput?.Stop();
+	}
+
+	/// <summary>True on Android and iOS with SDL, where starting text input shows the system's on-screen keyboard.</summary>
+	public bool ShowsScreenKeyboard => _textInput is { HasScreenKeyboard: true } && (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS());
 
 	/// <summary>Queues a touch event; thread-safe (SDL may deliver touches on another thread).</summary>
 	internal void EnqueueTouch(InputEvent e)

@@ -184,4 +184,7 @@ public sealed class UiOptions
 
 	/// <summary>The longest time, in seconds, between the clicks of a double click (a word) or a triple click (everything) in a text input.</summary>
 	public float DoubleClickSeconds { get; set; } = 0.4f;
+
+	/// <summary>When the built-in on-screen keyboard appears for a text field being edited (default: when editing starts from a gamepad).</summary>
+	public OnScreenKeyboardMode OnScreenKeyboard { get; set; } = OnScreenKeyboardMode.Auto;
 }

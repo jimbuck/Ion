@@ -153,12 +153,13 @@ move it, A activates, B goes back, and sliders adjust with the D-pad. Tips for s
 - Keep every screen reachable with the D-pad alone: avoid layouts where a widget has nothing beyond it in any
   direction and cannot be reached by spatial moves.
 - Give every screen a Back path through `ui.BackPressed`.
-- `TextInput` has no on-screen keyboard; avoid it on gamepad-only targets, or offer a list of choices instead.
+- Text fields open the built-in [on-screen keyboard](/Ion/interaction/ui/widgets/#on-screen-keyboard) when edited
+  from the gamepad. Typing on it is slow, so prefer a list of choices for short answers.
 - Size fonts and panels for 640x480 (there is no UI scaling); see
   [Layout and styling](/Ion/interaction/ui/layout-and-styling/#resolution-and-scaling).
 
-The gamepad path is tested with scripted input (the Menu sample's `MenuTests`); it has not been verified on the
-device itself yet. See [R36S](/Ion/platforms/r36s/) for building and deploying.
+The gamepad path, the on-screen keyboard included, is tested with scripted input (the Menu sample's `MenuTests`, the
+UI module's `OnScreenKeyboardTests`); it has not been verified on the device itself yet. See [R36S](/Ion/platforms/r36s/) for building and deploying.
 
 ## Testing navigation
 

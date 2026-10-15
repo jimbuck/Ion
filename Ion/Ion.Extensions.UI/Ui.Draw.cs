@@ -20,6 +20,7 @@ public sealed partial class Ui
 		try
 		{
 			for (var c = _nodes[0].FirstChild; c >= 0; c = _nodes[c].NextSibling) _drawNode(spriteBatch, c);
+			if (_keyboardOpen) _drawKeyboard(spriteBatch);
 		}
 		finally
 		{

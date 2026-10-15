@@ -280,11 +280,41 @@ the field's value changes only when it is committed. The caret is reported to th
 opens next to it. See [Input methods](/Ion/interaction/input/keyboard-and-mouse/#input-methods-ime) for what each
 platform supports.
 
-:::caution[Editing limits]
-There is no multi-line editing. On devices
-without a keyboard (gamepads, the R36S) there is no on-screen keyboard; `TextInput` is reachable but can only be typed
-into through `IUiTree` or injected text input (`ScriptedInput`, the remote `input.send`).
-:::
+For multi-line text, use [`TextArea`](#textarea). Devices without a keyboard get an
+[on-screen keyboard](#on-screen-keyboard).
+
+### On-screen keyboard
+
+When a text field starts editing on a device without a keyboard, an on-screen keyboard appears:
+
+- **Phones (SDL on Android and iOS)** show the system keyboard. The UI starts the platform's text input while a field
+  is edited and stops it afterwards, so the keyboard appears and goes away with the field.
+- **Elsewhere** the UI draws its own keyboard at the bottom of the screen, made for a controller. By default
+  (`UiOptions.OnScreenKeyboard = Auto`) it opens when editing starts from a gamepad, which covers the R36S and a
+  controller on a TV, and not when it starts from a keyboard, a mouse or the tree.
+
+| Gamepad | Effect |
+|---|---|
+| D-pad, left stick | Move between keys (wrapping at the edges) |
+| A | Type the selected key |
+| B | Delete the character before the caret |
+| X | Type a space |
+| Y | Shift (the next letter in upper case) |
+| Left and right shoulder | Move the caret |
+| Start, or the Done key | Finish editing |
+
+The keyboard has four rows of characters (digits, then `qwertyuiop`, `asdfghjkl'`, `zxcvbnm,.-`) and a row of Shift,
+Space, Del and Done. Its keys can also be clicked or tapped. While it is open the gamepad belongs to it: B deletes
+instead of stopping the edit, and the focus does not move. A physical keyboard keeps working alongside it.
+`ui.IsKeyboardOpen` tells you when it is showing.
+
+| `UiOptions.OnScreenKeyboard` | When the built-in keyboard opens |
+|---|---|
+| `Auto` (default) | Editing started from a gamepad |
+| `Always` | Any editing (a touch-only device without a system keyboard, a kiosk) |
+| `Never` | Never; gamepad A and B stop editing as before |
+
+On a phone, `ITextInputHost.ShowsScreenKeyboard` is true and the built-in keyboard never opens, whatever the mode.
 
 ## TextArea
 

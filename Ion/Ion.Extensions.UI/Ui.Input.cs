@@ -68,7 +68,11 @@ public sealed partial class Ui
 		_hotId = hit >= 0 ? _prev[hit].Id : 0;
 		IsPointerOverUi = overUi;
 
-		if (input.Pressed(MouseButton.Left))
+		// The built-in keyboard first: it takes the gamepad, and the pointer when a press lands on it.
+		var keyboardWasOpen = _keyboardOpen;
+		var keyboardPointer = _processKeyboard(dt);
+
+		if (input.Pressed(MouseButton.Left) && !keyboardPointer)
 		{
 			_activeId = _hotId;
 			if (hit >= 0)
@@ -102,12 +106,14 @@ public sealed partial class Ui
 		if (wheel != 0) _scrollAt(_pointer, wheel);
 
 		if (_editingId != 0) _processEditing(dt);
-		else _processNavigation(dt);
+		// The frame the keyboard finished, its button (A on Done, Start) must not also activate the focused widget.
+		else if (!keyboardWasOpen) _processNavigation(dt);
 	}
 
 	private void _endInput()
 	{
 		if (!_input.Down(MouseButton.Left)) _activeId = 0;
+		if (_editingId == 0) _keyboardOpen = false;
 		if (_focusId != 0 && !_focusSeen) _focusId = 0;
 		if (_editingId != 0 && _editingId != _focusId) _editingId = 0;
 		if (_focusId == 0 && _options.AutoFocus)
@@ -174,7 +180,9 @@ public sealed partial class Ui
 		var (pressed, held) = _navigation(editing: false);
 		var fire = _repeat(pressed, held, dt);
 
-		var activate = input.Pressed(Key.Enter) || input.Pressed(Key.KeypadEnter) || input.Pressed(Key.Space) || _gamepadPressed(GamepadButton.A);
+		var keyActivate = input.Pressed(Key.Enter) || input.Pressed(Key.KeypadEnter) || input.Pressed(Key.Space);
+		var padActivate = _gamepadPressed(GamepadButton.A);
+		var activate = keyActivate || padActivate;
 		if (input.Pressed(Key.Escape) || _gamepadPressed(GamepadButton.B)) BackPressed = true;
 
 		if (fire != Nav.None)
@@ -207,7 +215,7 @@ public sealed partial class Ui
 		{
 			var focused = _prevIndex(_focusId);
 			if (focused < 0) _focusFirst();
-			else _activate(focused);
+			else _activate(focused, fromGamepad: padActivate && !keyActivate);
 		}
 	}
 
@@ -274,7 +282,7 @@ public sealed partial class Ui
 					break;
 			}
 
-			if (input.Pressed(Key.Escape) || _gamepadPressed(GamepadButton.A) || _gamepadPressed(GamepadButton.B)) _editingId = 0;
+			if (input.Pressed(Key.Escape) || (!_keyboardOpen && (_gamepadPressed(GamepadButton.A) || _gamepadPressed(GamepadButton.B)))) _editingId = 0;
 			return;
 		}
 
@@ -305,7 +313,7 @@ public sealed partial class Ui
 		}
 
 		if (input.Pressed(Key.Enter) || input.Pressed(Key.KeypadEnter) || input.Pressed(Key.Escape)
-			|| _gamepadPressed(GamepadButton.A) || _gamepadPressed(GamepadButton.B))
+			|| (!_keyboardOpen && (_gamepadPressed(GamepadButton.A) || _gamepadPressed(GamepadButton.B))))
 		{
 			_editingId = 0;
 		}
@@ -464,30 +472,36 @@ public sealed partial class Ui
 		state.Insert(cleaned);
 	}
 
-	private (Nav Pressed, Nav Held) _navigation(bool editing)
+	private (Nav Pressed, Nav Held) _navigation(bool editing, bool keys = true)
 	{
 		var input = _input;
 		var shift = (input.Modifiers & ModifierKeys.Shift) != 0;
 		var pressed = Nav.None;
 		var held = Nav.None;
 
-		if (input.Pressed(Key.Up)) pressed = Nav.Up;
-		else if (input.Pressed(Key.Down)) pressed = Nav.Down;
-		else if (input.Pressed(Key.Left)) pressed = Nav.Left;
-		else if (input.Pressed(Key.Right)) pressed = Nav.Right;
-		else if (input.Pressed(Key.Tab)) pressed = shift ? Nav.Previous : Nav.Next;
-		else if (editing && input.Pressed(Key.BackSpace)) pressed = Nav.Backspace;
-		else if (editing && input.Pressed(Key.Delete)) pressed = Nav.Delete;
-		else if (editing && input.Pressed(Key.Home)) pressed = Nav.Home;
-		else if (editing && input.Pressed(Key.End)) pressed = Nav.End;
+		if (keys)
+		{
+			if (input.Pressed(Key.Up)) pressed = Nav.Up;
+			else if (input.Pressed(Key.Down)) pressed = Nav.Down;
+			else if (input.Pressed(Key.Left)) pressed = Nav.Left;
+			else if (input.Pressed(Key.Right)) pressed = Nav.Right;
+			else if (input.Pressed(Key.Tab)) pressed = shift ? Nav.Previous : Nav.Next;
+			else if (editing && input.Pressed(Key.BackSpace)) pressed = Nav.Backspace;
+			else if (editing && input.Pressed(Key.Delete)) pressed = Nav.Delete;
+			else if (editing && input.Pressed(Key.Home)) pressed = Nav.Home;
+			else if (editing && input.Pressed(Key.End)) pressed = Nav.End;
+		}
 
-		if (input.Down(Key.Up)) held = Nav.Up;
-		else if (input.Down(Key.Down)) held = Nav.Down;
-		else if (input.Down(Key.Left)) held = Nav.Left;
-		else if (input.Down(Key.Right)) held = Nav.Right;
-		else if (input.Down(Key.Tab)) held = shift ? Nav.Previous : Nav.Next;
-		else if (editing && input.Down(Key.BackSpace)) held = Nav.Backspace;
-		else if (editing && input.Down(Key.Delete)) held = Nav.Delete;
+		if (keys)
+		{
+			if (input.Down(Key.Up)) held = Nav.Up;
+			else if (input.Down(Key.Down)) held = Nav.Down;
+			else if (input.Down(Key.Left)) held = Nav.Left;
+			else if (input.Down(Key.Right)) held = Nav.Right;
+			else if (input.Down(Key.Tab)) held = shift ? Nav.Previous : Nav.Next;
+			else if (editing && input.Down(Key.BackSpace)) held = Nav.Backspace;
+			else if (editing && input.Down(Key.Delete)) held = Nav.Delete;
+		}
 
 		if (editing) return (pressed, held);
 
@@ -692,7 +706,7 @@ public sealed partial class Ui
 		}
 	}
 
-	private void _activate(int index)
+	private void _activate(int index, bool fromGamepad = false)
 	{
 		ref var node = ref _prev[index];
 		if (!node.Is(NodeFlags.Enabled)) return;
@@ -702,7 +716,7 @@ public sealed partial class Ui
 				_click(node.Id);
 				break;
 			case UiNodeKind.TextInput or UiNodeKind.TextArea:
-				_startEditing(node.State);
+				_startEditing(node.State, fromGamepad);
 				break;
 		}
 	}
@@ -712,12 +726,13 @@ public sealed partial class Ui
 		if (_clickedCount < MaxClicks && !_wasClicked(id)) _clicked[_clickedCount++] = id;
 	}
 
-	private void _startEditing(UiNodeState state)
+	private void _startEditing(UiNodeState state, bool fromGamepad = false)
 	{
 		_focusId = state.Id;
 		_editingId = state.Id;
 		state.Caret = state.Length;
 		state.Anchor = -1;
+		_openKeyboard(fromGamepad);
 	}
 
 	// Tree commands ---------------------------------------------------------------------------------------------------

@@ -93,7 +93,8 @@ public class TextInputTests
 	[Fact, Trait(CATEGORY, UNIT)]
 	public void EscapeAndGamepadBStopEditingWithoutReportingBack()
 	{
-		var h = new UiHarness();
+		// Without the built-in keyboard (with it, B deletes and Start finishes: see OnScreenKeyboardTests).
+		var h = new UiHarness(options: new UiOptions { OnScreenKeyboard = OnScreenKeyboardMode.Never });
 		var form = new Form();
 		h.Input.ConnectGamepad(0);
 		h.Frame(form.Build);

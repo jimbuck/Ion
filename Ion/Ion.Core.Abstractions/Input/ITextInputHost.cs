@@ -13,6 +13,12 @@ public interface ITextInputHost
 
 	/// <summary>No text is being edited any more.</summary>
 	void ClearTextInputArea();
+
+	/// <summary>
+	/// Whether the platform shows its own on-screen keyboard while text is edited (a phone's), so the UI does not show its
+	/// built-in one. False where there is none (desktops, handhelds without touch).
+	/// </summary>
+	bool ShowsScreenKeyboard => false;
 }
 
 /// <summary>A text input host that records the last area (headless runs and tests).</summary>

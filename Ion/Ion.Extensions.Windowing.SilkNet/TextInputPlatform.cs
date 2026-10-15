@@ -49,6 +49,15 @@ internal sealed unsafe class SdlTextInput : IDisposable
 		if (_sdl.IsTextInputActive() == SdlBool.False) _sdl.StartTextInput();
 	}
 
+	/// <summary>Whether the platform has an on-screen keyboard that text input shows (<c>SDL_HasScreenKeyboardSupport</c>).</summary>
+	public bool HasScreenKeyboard => _sdl.HasScreenKeyboardSupport() == SdlBool.True;
+
+	/// <summary>Stops text input (hides a phone's keyboard).</summary>
+	public void Stop()
+	{
+		if (_sdl.IsTextInputActive() == SdlBool.True) _sdl.StopTextInput();
+	}
+
 	[UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
 	private static int OnEvent(void* userdata, Event* e)
 	{
