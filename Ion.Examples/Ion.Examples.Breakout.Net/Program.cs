@@ -7,6 +7,7 @@ using Ion.Extensions.Ecs.Rendering;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Networking;
 using Ion.Extensions.Networking.LiteNetLib;
+using Ion.Extensions.Networking.WebSockets;
 using Ion.Extensions.Physics2D;
 using Ion.Extensions.Scenes;
 
@@ -29,6 +30,9 @@ EcsComponents.Register<Wall>();
 // Without a configured Ion:Network:Mode the game is a listen server.
 var modeConfigured = builder.Configuration[$"{NetworkConfig.Section}:Mode"] is not null;
 var headless = builder.Configuration.IsHeadless();
+// --Breakout:Transport=websocket plays over WebSockets (TCP) instead of UDP; client and server must agree.
+var webSocket = string.Equals(builder.Configuration["Breakout:Transport"], "websocket", StringComparison.OrdinalIgnoreCase);
+if (webSocket) builder.AddWebSocketTransport();
 
 builder.AddIon(graphics => graphics.ClearColor = new Color(0x223))
 	.AddEcsRendering()

@@ -13,9 +13,9 @@ protections. You register exactly one:
 |---|---|---|---|
 | **LiteNetLib** (UDP) | `Ion.Extensions.Networking.LiteNetLib` | `builder.AddLiteNetLibTransport()` | Real games on a LAN or the internet |
 | **Loopback** (in process) | `Ion.Extensions.Networking` | `builder.AddLoopbackTransport(network)` | Tests: a server and clients in one process, deterministic |
-| **WebSocket** | planned | | Browser clients and relays |
+| **WebSocket** (TCP) | `Ion.Extensions.Networking.WebSockets` | `builder.AddWebSocketTransport()` | Networks that block UDP, relays, and (once there is a browser build) browser clients |
 
-Both `AddLiteNetLibTransport()` and `AddLoopbackTransport()` also call `AddNetworking()` for you, and the transport is
+`AddLiteNetLibTransport()`, `AddWebSocketTransport()` and `AddLoopbackTransport()` also call `AddNetworking()` for you, and the transport is
 only started when `Ion:Network:Mode` is not `Offline`. Without a transport, a non-offline mode has nothing to start.
 
 ## LiteNetLib (UDP)
@@ -164,13 +164,36 @@ Over LiteNetLib, give its threads a moment each frame (`Thread.Sleep(1)` between
 does, and bind to `127.0.0.1` with `Port=0`.
 :::
 
-## WebSocket transport (planned)
+## WebSocket
 
-:::caution[Not built yet]
-A WebSocket transport is designed as the second transport and the only one available to a browser build: server side on
-the web module's HTTP core (see [HTTP server core](/Ion/networking/http-server/)), client side on `ClientWebSocket`. It
-is not implemented. Browsers can talk to a game today only through the web server's own
-[WebSocket endpoints](/Ion/networking/websockets/), which are not part of the multiplayer module.
+`WebSocketTransport` carries each packet as one binary WebSocket message:
+
+- **The server** listens with the HTTP module's socket listener (see [HTTP server core](/Ion/networking/http-server/)),
+  one thread per connection. It accepts upgrades on the transport's path (`/ion-net` by default, the
+  `AddWebSocketTransport(path)` argument) with the `ion-net` subprotocol. Any other request gets `404`, and a client
+  past `Ion:Network:MaxClients` gets `503`.
+- **The client** is .NET's `ClientWebSocket`, connecting to `ws://{Connect}:{Port}{path}`. It receives and sends on
+  tasks of its own and keeps the connection alive with pings every 10 seconds.
+- Packets reach the game thread through a queue of pooled buffers, like the UDP transport, so the receive path does not
+  allocate in steady state. A packet can be up to 64 KB (`WebSocketTransport.MaxPacket`).
+
+```csharp
+builder.AddWebSocketTransport();            // instead of AddLiteNetLibTransport(), on the server and every client
+```
+
+WebSockets run over TCP, so **every delivery is reliable and ordered**. `Delivery.Unreliable` and `Sequenced` packets
+(snapshots, inputs) arrive in order, never dropped, and a lost TCP segment delays everything behind it. Over a clean
+network that is fine. Over a lossy one, replication stays correct but hitches more than over UDP. Use it where UDP is
+not available: networks that block it, a relay that only forwards TCP, or a browser.
+
+The handshake, the join secret, the rate limits and the protocol checks are the networking module's own, the same as on
+UDP. There is no TLS (`wss://`) in the transport: put a TLS-terminating proxy in front of the server for internet play.
+
+:::note[Browser clients]
+The transport is what a browser build will use. Ion does not run in a browser yet: there is no WebAssembly target or
+browser graphics backend (see [Platforms](/Ion/platforms/overview/#the-browser)). Until there is, the WebSocket
+transport connects .NET clients, and browsers can talk to a game only through the web server's own
+[WebSocket endpoints](/Ion/networking/websockets/).
 :::
 
 ## Writing a transport
@@ -180,7 +203,7 @@ relay service) only moves bytes:
 
 | Member | Called | Contract |
 |---|---|---|
-| `Name` | logs | A short name (`loopback`, `litenetlib`). |
+| `Name` | logs | A short name (`loopback`, `litenetlib`, `websocket`). |
 | `IsRunning`, `LocalPort` | any time | State, and the actual port once started. |
 | `StartServer(bind, port, maxConnections)` | `Init` | Listen. |
 | `StartClient(address, port)` | `Init` | Connect; the server's connection id is 0. |

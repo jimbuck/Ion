@@ -82,6 +82,14 @@ public class ConvergenceTests(ITestOutputHelper output)
 		return new Session { Server = server, Client = client, AfterFrame = () => Thread.Sleep(1) };
 	}
 
+	internal static Session WebSocket()
+	{
+		var server = Host(null, "--Ion:Headless=true", "--Breakout:Transport=websocket", "--Ion:Network:Mode=Server", "--Ion:Network:Bind=127.0.0.1", "--Ion:Network:Port=0", "--Ion:Network:JoinSecret=breakout").Start();
+		var port = server.Get<NetworkSession>().Transport!.LocalPort.ToString(CultureInfo.InvariantCulture);
+		var client = Host(null, "--Ion:Headless=true", "--Breakout:Transport=websocket", "--Ion:Network:Mode=Client", "--Ion:Network:Connect=127.0.0.1", "--Ion:Network:Port=" + port, "--Ion:Network:JoinSecret=breakout").Start();
+		return new Session { Server = server, Client = client, AfterFrame = () => Thread.Sleep(1) };
+	}
+
 	/// <summary>
 	/// Whether the client's replicated state equals the server's in the root world and, when both have it live, the level:
 	/// at the client's newest snapshot tick of each, the same number of networked entities, and for each server entity
@@ -285,6 +293,15 @@ public class ConvergenceTests(ITestOutputHelper output)
 		using var session = Udp();
 		Play(session, frames: 900, convergeWithin: 30);
 		Assert.Equal("litenetlib", session.Server.Get<NetworkSession>().Transport!.Name);
+	}
+
+	[Fact, Trait(CATEGORY, E2E)]
+	public void ServerAndClientConvergeOverWebSocketsOnLocalhost()
+	{
+		using var session = WebSocket();
+		Play(session, frames: 900, convergeWithin: 30);
+		Assert.Equal("websocket", session.Server.Get<NetworkSession>().Transport!.Name);
+		Assert.Equal("websocket", session.Client.Get<NetworkSession>().Transport!.Name);
 	}
 
 	[Fact, Trait(CATEGORY, INTEGRATION)]

@@ -58,6 +58,7 @@ To play across machines, bind the server to the LAN address and point clients at
 ```bash
 dotnet run --project Ion.Examples/Ion.Examples.Breakout.Net -- --Ion:Network:Bind=0.0.0.0 --Ion:Network:JoinSecret=letmein
 dotnet run --project Ion.Examples/Ion.Examples.Breakout.Net -- --Ion:Network:Mode=Client --Ion:Network:Connect=192.168.1.20 --Ion:Network:JoinSecret=letmein
+dotnet run --project Ion.Examples/Ion.Examples.Breakout.Net -- --Breakout:Transport=websocket   # over WebSockets (TCP); pass it to the server and every client
 ```
 
 ## Program.cs
@@ -304,6 +305,7 @@ are in it.
 | `ServerAndClientConvergeOverLoopback` | `LoopbackTransport` | 900 frames in the level, converging within 10 ticks. |
 | `ServerAndClientConvergeOverALossyLaggyLoopback` | loopback with 40 ms latency, 10 ms jitter, 5% loss, 5% reordering | 900 frames, within 30 ticks. |
 | `ServerAndClientConvergeOverUdpOnLocalhost` (E2E) | LiteNetLib UDP with a join secret | 900 frames, within 30 ticks. |
+| `ServerAndClientConvergeOverWebSocketsOnLocalhost` (E2E) | The WebSocket transport (`--Breakout:Transport=websocket`) with a join secret | 900 frames, within 30 ticks. |
 | `TheGameGoesFromTheMenuToTheLevelAndBack` | loopback | Two-second levels: the client goes menu, level, menu, level, and gets each new level's blocks, converged with the server's. |
 | `AListenServerPlaysOnItsOwn` | loopback | 400 frames: the listen server reaches the level, and the autopilot launches balls and scores. |
 

@@ -266,8 +266,8 @@ column, so unchanged entities cost almost nothing.
 ## What is not built yet
 
 :::caution[Planned]
-- **WebSocket transport and browser clients.** Designed as the second transport (server side on the web module's HTTP
-  core), not implemented.
+- **Browser clients.** The [WebSocket transport](/Ion/networking/multiplayer/transports/#websocket) is built, but Ion
+  does not run in a browser yet, so its clients are .NET processes.
 - **Grid interest management.** The `IInterestPolicy` hook exists and works, but no ready-made spatial policy ships;
   write your own.
 - **Networked worlds outside scenes.** [Scene worlds](/Ion/networking/multiplayer/scene-worlds/) are replicated

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The WebSocket transport of the networking module: the server on the HTTP module's socket listener and WebSockets,
+    the client on System.Net.WebSockets.ClientWebSocket. Every delivery is reliable and ordered (TCP); the transport for
+    clients that cannot open UDP sockets (browsers, restrictive networks) and for relays. A separate package so the core
+    module does not depend on the HTTP module.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Networking.WebSockets</RootNamespace>
+    <Description>Ion's WebSocket transport for the networking module: AddWebSocketTransport(), an INetworkTransport whose server runs on the HTTP module's listener and whose client is ClientWebSocket; packets reach the game thread through a pooled queue.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Networking.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Extensions.Networking\Ion.Extensions.Networking.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Http\Ion.Extensions.Http.csproj" />
+  </ItemGroup>
+</Project>
