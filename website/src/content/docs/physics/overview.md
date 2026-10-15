@@ -104,11 +104,23 @@ next step. The contacts it had end, with `End` events.
 `RigidBody3D.Dynamic()`, `Collider3D.Sphere(...)`) or the constructors, then adjust with `with { ... }`.
 :::
 
-:::caution[Put rigid bodies on root entities]
-The physics step reads and writes a body's `Transform2D` or `Transform` directly and treats it as a world transform. A
-transform is relative to its [parent](/Ion/ecs/transforms/), so a rigid body on a child entity is simulated in the wrong
-place. Child entities with colliders and no rigid body are fine: they are parts of a body.
-:::
+## Bodies on child entities
+
+A rigid body can be on a child entity. Its transform is relative to its [parent](/Ion/ecs/transforms/), so the physics
+step composes it with its ancestors' transforms (as the transform propagation does) to get its world pose, simulates it
+there, and writes the result back relative to the parent:
+
+- A **dynamic** child is simulated in world space. After each step its local transform is set so that, under its
+  parent's new pose, it is where the simulation put it. Bodies are written back shallowest first, so a body under a
+  moving body is placed against its parent's new pose. If the game moves the parent (an entity that is not a body), the
+  child is moved with it. Without a joint, a dynamic child does not follow a dynamic parent: connect them with a
+  `Joint2D` or `Joint3D` for that.
+- A **kinematic** child is driven to where its transform puts it under its parent, so it is carried along by a moving
+  parent (a turret on a ship, a blade on a spinning wheel) and pushes dynamic bodies out of the way. Its transform is the
+  game's: the step does not write it back.
+- A **static** child sits at its world pose and follows a parent the game moves.
+
+A child with a collider and **no** rigid body is not a body of its own but a part of its ancestor's body; see below.
 
 ## Compound bodies
 
@@ -127,8 +139,9 @@ world.SetParent(head, hammer);
 
 - **The body** is the nearest ancestor with a rigid body, or the root of the hierarchy if it has a collider. A rigid body
   without a collider of its own (the hammer above) is a body only while it has parts.
-- **Placement.** Positions and rotations of the transforms between the part and its body place the part. Scales are not
-  applied, as for bodies. Moving or reshaping a part updates the body at the next step.
+- **Placement.** The transforms between the part and its body place it as the transform propagation places it: their
+  positions and rotations, with their scales (and the body's) applied to the positions below them. A collider's own
+  geometry is never scaled. Moving or reshaping a part updates the body at the next step.
 - **Mass.** In 2D each shape adds its own mass from its `Density`. In 3D the body's `RigidBody3D.Mass` is shared by its
   shapes in proportion to their volumes. Either way, the center of mass ends up where the shapes are.
   `TryGetMass(entity, out mass, out localCenter)` reads it.
@@ -236,7 +249,7 @@ see [benchmarks](/Ion/tooling/benchmarks/) to run them.
 
 ## Not done yet
 
-These are planned, not built: rigid bodies on child entities, chain and segment shapes in 2D, triangle mesh colliders in 3D, motors and limits on 3D joints, shape casts, per-contact callbacks
+These are planned, not built: chain and segment shapes in 2D, triangle mesh colliders in 3D, motors and limits on 3D joints, shape casts, per-contact callbacks
 (pre-solve), exact 3D overlap tests, and contraction-free Box2D natives built on CI for every platform.
 
 ## See also

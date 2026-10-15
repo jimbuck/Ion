@@ -27,13 +27,19 @@ namespace Ion.Extensions.Physics3D;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Compound bodies: a part's shape is placed on its body by the <see cref="Transform"/>s between them (positions and
-/// rotations; scales are not applied, as for bodies). A dynamic compound body's <see cref="RigidBody3D.Mass"/> is shared by
+/// Compound bodies: a part's shape is placed on its body by the <see cref="Transform"/>s between them, as the transform
+/// propagation places it (ancestors' positions, rotations, and scales applied to positions; a collider's own geometry is
+/// not scaled). A dynamic compound body's <see cref="RigidBody3D.Mass"/> is shared by
 /// its shapes in proportion to their volumes, which places the center of mass. Its friction and restitution are its own
 /// collider's (or its first part's); layers, masks, sensors and events are each shape's own, and contacts, sensor events
 /// and ray casts report the part's entity (overlap queries report the body's). Adding, removing, moving or reshaping a
 /// part rebuilds the body. A rigid body without a collider of its own is a body only while it has parts. A child collider
 /// with no body above it is a static body of its own at its world position.
+/// </para>
+/// <para>
+/// A rigid body on a child entity is simulated in world space: its pose is its <see cref="Transform"/> composed with its
+/// ancestors', and a dynamic one's simulated pose is written back relative to its parent (after its ancestors' bodies are
+/// written). A kinematic child is driven to where its transform puts it under its parent, so it is carried along.
 /// </para>
 /// <para>
 /// <see cref="Step"/> (run by <see cref="Physics3DSystem"/> in FixedUpdate at <see cref="StageOrder.Physics"/>) creates the
@@ -90,6 +96,10 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 	private readonly Dictionary<Entity, int> _partsOf = [];
 	private readonly Dictionary<Entity, int> _bare = [];
 	private int _partCount;
+
+	// Rigid bodies on child entities that moved this step, written back after the root bodies, shallowest first.
+	private ChildBody[] _childBodies = new ChildBody[8];
+	private int _childBodyCount;
 
 	// Contact tracking: one buffer per worker filled by the narrow phase, merged and sorted after the step.
 	internal readonly PairBuffer[] WorkerPairs;
@@ -202,11 +212,12 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 	{
 		GatherParts();
 
-		// Bodies with a collider: roots, and entities with a rigid body.
+		// Bodies with a collider: roots, and entities with a rigid body (on a child, at its world pose).
 		foreach (ref var chunk in _ecs.Query(in Bodies))
 		{
 			var hasRigid = chunk.Has<RigidBody3D>();
-			if (!hasRigid && chunk.Has<Parent>()) continue;   // parts, below
+			var parented = chunk.Has<Parent>();
+			if (!hasRigid && parented) continue;   // parts, below
 			var count = chunk.Count;
 			ref var entity0 = ref chunk.Entity(0);
 			ref var collider0 = ref chunk.GetFirst<Collider3D>();
@@ -218,7 +229,8 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 				var entity = Unsafe.Add(ref entity0, i);
 				ref var collider = ref Unsafe.Add(ref collider0, i);
 				var rigid = hasRigid ? Unsafe.Add(ref rigid0, i) : RigidBody3D.Static();
-				collider.BodySlot = PushBody(entity, collider.BodySlot, hasCollider: true, collider, Unsafe.Add(ref transform0, i), rigid, PartsOf(entity), dt);
+				var transform = parented ? WorldOf(entity, Unsafe.Add(ref transform0, i)) : Unsafe.Add(ref transform0, i);
+				collider.BodySlot = PushBody(entity, collider.BodySlot, hasCollider: true, collider, transform, rigid, PartsOf(entity), dt);
 			}
 		}
 
@@ -227,6 +239,7 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 		{
 			foreach (ref var chunk in _ecs.Query(in BareBodies))
 			{
+				var parented = chunk.Has<Parent>();
 				var count = chunk.Count;
 				ref var entity0 = ref chunk.Entity(0);
 				ref var transform0 = ref chunk.GetFirst<Transform>();
@@ -237,7 +250,8 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 					var parts = PartsOf(entity);
 					if (parts.IsEmpty) continue;
 					_bare.TryGetValue(entity, out var slot);
-					_bare[entity] = PushBody(entity, slot, hasCollider: false, default, Unsafe.Add(ref transform0, i), Unsafe.Add(ref rigid0, i), parts, dt);
+					var transform = parented ? WorldOf(entity, Unsafe.Add(ref transform0, i)) : Unsafe.Add(ref transform0, i);
+					_bare[entity] = PushBody(entity, slot, hasCollider: false, default, transform, Unsafe.Add(ref rigid0, i), parts, dt);
 				}
 			}
 		}
@@ -344,17 +358,90 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 		{
 			if (!_ecs.TryGet<Parent>(current, out var parent) || !_ecs.IsAlive(parent.Value)) return Entity.Null;
 			current = parent.Value;
-			if ((_ecs.Has<RigidBody3D>(current) || (_ecs.Has<Collider3D>(current) && !_ecs.Has<Parent>(current))) && _ecs.Has<Transform>(current)) return current;
-
-			// An entity in between (a group, or another part): its transform places the part.
-			if (_ecs.TryGet<Transform>(current, out var between))
+			var hasTransform = _ecs.TryGet<Transform>(current, out var between);
+			if ((_ecs.Has<RigidBody3D>(current) || (_ecs.Has<Collider3D>(current) && !_ecs.Has<Parent>(current))) && hasTransform)
 			{
-				position = between.Position + Vector3.Transform(position, between.Rotation);
+				// The body's own scale scales its parts' positions too (not its pose).
+				position *= between.Scale;
+				return current;
+			}
+
+			// An entity in between (a group, or another part): its transform places the part, as the propagation does.
+			if (hasTransform)
+			{
+				position = between.Position + Vector3.Transform(between.Scale * position, between.Rotation);
 				rotation = Quaternion.Concatenate(rotation, between.Rotation);
 			}
 		}
 
 		return Entity.Null;
+	}
+
+	/// <summary>The world pose of a child entity: its transform composed with its ancestors' (as the transform propagation does).</summary>
+	private Transform WorldOf(Entity entity, in Transform local)
+	{
+		var position = local.Position;
+		var rotation = local.Rotation;
+		var current = entity;
+		for (var depth = 0; depth < MaxPartDepth; depth++)
+		{
+			if (!_ecs.TryGet<Parent>(current, out var parent) || !_ecs.IsAlive(parent.Value)) break;
+			current = parent.Value;
+			if (!_ecs.TryGet<Transform>(current, out var ancestor)) continue;
+			position = ancestor.Position + Vector3.Transform(ancestor.Scale * position, ancestor.Rotation);
+			rotation = Quaternion.Concatenate(rotation, ancestor.Rotation);
+		}
+
+		return new Transform(position, rotation);
+	}
+
+	/// <summary>The local pose under <paramref name="entity"/>'s parent of a world pose: the inverse of <see cref="WorldOf"/> (shear aside).</summary>
+	private void LocalOf(Entity entity, Vector3 worldPosition, Quaternion worldRotation, out Vector3 position, out Quaternion rotation)
+	{
+		var framePosition = Vector3.Zero;
+		var frameRotation = Quaternion.Identity;
+		var frameScale = Vector3.One;
+		var first = true;
+		var current = entity;
+		for (var depth = 0; depth < MaxPartDepth; depth++)
+		{
+			if (!_ecs.TryGet<Parent>(current, out var parent) || !_ecs.IsAlive(parent.Value)) break;
+			current = parent.Value;
+			if (!_ecs.TryGet<Transform>(current, out var ancestor)) continue;
+			if (first)
+			{
+				framePosition = ancestor.Position;
+				frameRotation = ancestor.Rotation;
+				frameScale = ancestor.Scale;
+				first = false;
+				continue;
+			}
+
+			framePosition = ancestor.Position + Vector3.Transform(ancestor.Scale * framePosition, ancestor.Rotation);
+			frameRotation = Quaternion.Concatenate(frameRotation, ancestor.Rotation);
+			frameScale *= ancestor.Scale;
+		}
+
+		var inverse = Quaternion.Inverse(frameRotation);
+		var relative = Vector3.Transform(worldPosition - framePosition, inverse);
+		position = new Vector3(
+			frameScale.X != 0 ? relative.X / frameScale.X : relative.X,
+			frameScale.Y != 0 ? relative.Y / frameScale.Y : relative.Y,
+			frameScale.Z != 0 ? relative.Z / frameScale.Z : relative.Z);
+		rotation = Quaternion.Normalize(Quaternion.Concatenate(worldRotation, inverse));
+	}
+
+	private int DepthOf(Entity entity)
+	{
+		var depth = 0;
+		var current = entity;
+		while (depth < MaxPartDepth && _ecs.TryGet<Parent>(current, out var parent) && _ecs.IsAlive(parent.Value))
+		{
+			current = parent.Value;
+			depth++;
+		}
+
+		return depth;
 	}
 
 	private static bool SameParts(in BodySlot body, ReadOnlySpan<PartRecord> parts)
@@ -420,6 +507,8 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 				var sign = delta.W < 0 ? -1f : 1f;
 				reference.Velocity.Angular = new Vector3(delta.X, delta.Y, delta.Z) * (2f * sign / dt);
 				body.Driven = true;
+				body.Position = transform.Position;
+				body.Rotation = transform.Rotation;
 				wake = true;
 			}
 			else if (body.Driven)
@@ -918,13 +1007,16 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 		}
 
 		if (!any) return;
+		_childBodyCount = 0;
 
 		foreach (ref var chunk in _ecs.Query(in Bodies))
 		{
 			var hasRigid = chunk.Has<RigidBody3D>();
+			var parented = chunk.Has<Parent>();
 			// Parts move with their body; a part that is a body of its own is static.
-			if (!hasRigid && chunk.Has<Parent>()) continue;
+			if (!hasRigid && parented) continue;
 			var count = chunk.Count;
+			ref var entity0 = ref chunk.Entity(0);
 			ref var collider0 = ref chunk.GetFirst<Collider3D>();
 			ref var transform0 = ref chunk.GetFirst<Transform>();
 			ref var rigid0 = ref hasRigid ? ref chunk.GetFirst<RigidBody3D>() : ref Unsafe.NullRef<RigidBody3D>();
@@ -933,23 +1025,79 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 			{
 				var slot = Unsafe.Add(ref collider0, i).BodySlot;
 				if (slot <= 0) continue;
+				if (parented)
+				{
+					DeferChild(Unsafe.Add(ref entity0, i), slot);
+					continue;
+				}
+
 				Pull(ref Slots[slot], ref Unsafe.Add(ref transform0, i), ref hasRigid ? ref Unsafe.Add(ref rigid0, i) : ref Unsafe.NullRef<RigidBody3D>());
 			}
 		}
 
-		if (_bare.Count == 0) return;
-		foreach (ref var chunk in _ecs.Query(in BareBodies))
+		if (_bare.Count > 0)
 		{
-			var count = chunk.Count;
-			ref var entity0 = ref chunk.Entity(0);
-			ref var transform0 = ref chunk.GetFirst<Transform>();
-			ref var rigid0 = ref chunk.GetFirst<RigidBody3D>();
-			for (var i = 0; i < count; i++)
+			foreach (ref var chunk in _ecs.Query(in BareBodies))
 			{
-				if (_bare.TryGetValue(Unsafe.Add(ref entity0, i), out var slot) && slot > 0) Pull(ref Slots[slot], ref Unsafe.Add(ref transform0, i), ref Unsafe.Add(ref rigid0, i));
+				var parented = chunk.Has<Parent>();
+				var count = chunk.Count;
+				ref var entity0 = ref chunk.Entity(0);
+				ref var transform0 = ref chunk.GetFirst<Transform>();
+				ref var rigid0 = ref chunk.GetFirst<RigidBody3D>();
+				for (var i = 0; i < count; i++)
+				{
+					var entity = Unsafe.Add(ref entity0, i);
+					if (!_bare.TryGetValue(entity, out var slot) || slot <= 0) continue;
+					if (parented) DeferChild(entity, slot);
+					else Pull(ref Slots[slot], ref Unsafe.Add(ref transform0, i), ref Unsafe.Add(ref rigid0, i));
+				}
 			}
 		}
+
+		if (_childBodyCount == 0) return;
+
+		// Bodies on child entities, shallowest first, so each is written relative to its parent's new pose.
+		var children = _childBodies.AsSpan(0, _childBodyCount);
+		children.Sort(ChildOrder);
+		foreach (ref readonly var child in children)
+		{
+			ref var body = ref Slots[child.Slot];
+			var reference = _sim.Bodies[body.Body];
+			ref var rigid = ref _ecs.TryGetRef<RigidBody3D>(child.Entity, out var hasRigid);
+			if (hasRigid)
+			{
+				rigid.LinearVelocity = reference.Velocity.Linear;
+				rigid.AngularVelocity = reference.Velocity.Angular;
+				body.Rigid = rigid;
+			}
+
+			// A kinematic child goes where its transform says (relative to its parent, whose new pose it follows next step).
+			if (body.Rigid.Type == RigidBodyType3D.Kinematic) continue;
+
+			ref readonly var pose = ref reference.Pose;
+			var worldPosition = body.Center == Vector3.Zero ? pose.Position : pose.Position - Vector3.Transform(body.Center, pose.Orientation);
+			ref var transform = ref _ecs.Get<Transform>(child.Entity);
+			LocalOf(child.Entity, worldPosition, pose.Orientation, out var position, out var rotation);
+			transform.Position = position;
+			transform.Rotation = rotation;
+
+			// What the next push composes from this transform, so an unchanged child is not teleported by rounding.
+			var world = WorldOf(child.Entity, transform);
+			body.Position = world.Position;
+			body.Rotation = world.Rotation;
+		}
 	}
+
+	private void DeferChild(Entity entity, int slot)
+	{
+		if (Slots[slot].Moved != _stamp || Slots[slot].IsStatic) return;
+		if (_childBodyCount == _childBodies.Length) Array.Resize(ref _childBodies, _childBodies.Length * 2);
+		_childBodies[_childBodyCount++] = new ChildBody(entity, slot, DepthOf(entity));
+	}
+
+	private static readonly Comparison<ChildBody> ChildOrder = static (a, b) => a.Depth != b.Depth ? a.Depth.CompareTo(b.Depth) : a.Entity.Id.CompareTo(b.Entity.Id);
+
+	private readonly record struct ChildBody(Entity Entity, int Slot, int Depth);
 
 	private void Pull(ref BodySlot body, ref Transform transform, ref RigidBody3D rigid)
 	{
