@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Ion",
+  "classifications": [
+    "Game",
+    "Ion",
+    "ECS"
+  ],
+  "identity": "Ion.Templates.Ecs",
+  "name": "Ion ECS game",
+  "description": "An Ion game on the built-in ECS (Arch): bouncing balls with [Query] systems, a headless test, a world snapshot test and a CLAUDE.md for coding agents.",
+  "shortName": "ion-ecs",
+  "sourceName": "MyIonGame",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "IonSource": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "",
+      "replaces": "ION_SOURCE_PATH",
+      "description": "Path of an Ion source checkout to build against instead of the packages."
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/.ion/**",
+            "**/*.actual.*",
+            "**/*.diff.png"
+          ]
+        }
+      ]
+    }
+  ]
+}

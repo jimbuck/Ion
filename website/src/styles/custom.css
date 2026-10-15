@@ -1,0 +1,663 @@
+/*
+ * Ion docs theme: dark slate gray and teal. The site is dark only (see src/components/ThemeProvider.astro).
+ * Fonts are self-hosted via @fontsource-variable so the site makes no third-party requests.
+ */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+:root,
+:root[data-theme='dark'] {
+	color-scheme: dark;
+
+	/* Teal accent */
+	--sl-color-accent-low: #0f3b3a;
+	--sl-color-accent: #14b8a6;
+	--sl-color-accent-high: #99f6e4;
+	--ion-teal: #2dd4bf;
+	--ion-teal-soft: rgb(45 212 191 / 0.12);
+	--ion-teal-line: rgb(45 212 191 / 0.35);
+
+	/* Slate grays, from brightest text to the page background */
+	--sl-color-white: #f3f7f7;
+	--sl-color-gray-1: #dde6e6;
+	--sl-color-gray-2: #b9c7c7;
+	--sl-color-gray-3: #8a9e9e;
+	--sl-color-gray-4: #5b7373;
+	--sl-color-gray-5: #364b4b;
+	--sl-color-gray-6: #223030;
+	--sl-color-gray-7: #1a2424;
+	--sl-color-black: #121a1a;
+
+	--sl-color-bg: #121a1a;
+	--sl-color-bg-nav: rgb(18 26 26 / 0.85);
+	--sl-color-bg-sidebar: #151f1f;
+	--sl-color-bg-inline-code: #1f2c2c;
+	--sl-color-hairline: #263434;
+	--sl-color-hairline-light: #2f4040;
+	--sl-color-hairline-shade: #1c2727;
+	--sl-color-text: #c9d5d5;
+	--sl-color-text-accent: var(--ion-teal);
+
+	/* Type */
+	--sl-font: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+	--sl-font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', Menlo, monospace;
+	--sl-text-body: 1rem;
+	--sl-line-height: 1.7;
+	--sl-text-h1: clamp(2rem, 1.4rem + 2vw, 2.75rem);
+	--sl-text-h2: 1.5rem;
+	--sl-text-h3: 1.2rem;
+	--sl-text-h4: 1.05rem;
+	--sl-text-code: 0.9em;
+	--sl-text-code-sm: 0.85em;
+
+	/* Expressive Code frames */
+	--ec-brdRad: 0;
+	--ec-brdCol: var(--sl-color-hairline);
+	--ec-frm-edBg: #0e1616;
+	--ec-frm-edTabBarBg: #142020;
+	--ec-frm-edTabBarBrdBotCol: var(--sl-color-hairline);
+	--ec-frm-trmBg: #0e1616;
+	--ec-frm-trmTtbBg: #142020;
+	--ec-frm-trmTtbBrdBotCol: var(--sl-color-hairline);
+	--ec-frm-edActTabBg: #0e1616;
+	--ec-frm-edActTabIndTopCol: var(--ion-teal);
+	--ec-frm-edActTabIndBotCol: transparent;
+	--ec-frm-edActTabIndHt: 2px;
+	--ec-tm-lnHt: 1.65;
+	--ec-codeFontSize: 0.875rem;
+	--ec-uiFontFamily: var(--sl-font);
+}
+
+/* Smoother text on dark backgrounds */
+body {
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+/* A faint hex grid and a teal glow behind the whole page, strongest at the top */
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background:
+		radial-gradient(60rem 30rem at 80% -10%, rgb(20 184 166 / 0.10), transparent 60%),
+		radial-gradient(40rem 24rem at 0% 100%, rgb(20 184 166 / 0.05), transparent 60%);
+}
+body::after {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	opacity: 0.35;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='55.43' height='96' viewBox='0 0 55.43 96'%3E%3Cpath d='M27.71 0 55.43 16 55.43 48 27.71 64 0 48 0 16ZM27.71 64V96' fill='none' stroke='%232dd4bf' stroke-opacity='.12' stroke-width='1'/%3E%3C/svg%3E");
+	background-size: 55.43px 96px;
+	mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.9), transparent 55rem);
+	-webkit-mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.9), transparent 55rem);
+}
+
+/* Hex language: a corner clipped at the hexagon's 30 degree angle. A notched box is drawn as two clipped layers:
+   the element itself is the 1px "border" (its background is the border colour) and ::before is the fill, inset 1px,
+   so the cut corner keeps its edge and the box looks closed. Set --ion-fill and --ion-line per element. */
+:root {
+	--ion-notch: 10px;
+	--ion-notch-sm: 6px;
+	--ion-clip: polygon(var(--ion-notch) 0, 100% 0, 100% calc(100% - var(--ion-notch)), calc(100% - var(--ion-notch)) 100%, 0 100%, 0 var(--ion-notch));
+	--ion-clip-sm: polygon(var(--ion-notch-sm) 0, 100% 0, 100% calc(100% - var(--ion-notch-sm)), calc(100% - var(--ion-notch-sm)) 100%, 0 100%, 0 var(--ion-notch-sm));
+}
+.card,
+.sl-link-card,
+.ion-stat,
+
+.pagination-links a,
+.expressive-code,
+.hero .sl-link-button {
+	--ion-line: var(--sl-color-hairline);
+	--ion-fill: var(--sl-color-bg);
+	position: relative;
+	isolation: isolate;
+	border: 0 !important;
+	background: var(--ion-line) !important;
+	clip-path: var(--ion-clip);
+	transition: --ion-line 150ms ease, transform 150ms ease;
+}
+.card::before,
+.sl-link-card::before,
+.ion-stat::before,
+
+.pagination-links a::before,
+.expressive-code::before,
+.hero .sl-link-button::before {
+	content: '';
+	position: absolute;
+	inset: 1px;
+	z-index: -1;
+	background: var(--ion-fill);
+	clip-path: var(--ion-clip);
+}
+.hero .sl-link-button,
+.hero .sl-link-button::before {
+	clip-path: var(--ion-clip-sm);
+}
+
+/* ---------- Header ---------- */
+header.header {
+	backdrop-filter: blur(12px);
+	border-bottom-color: var(--sl-color-hairline);
+}
+.site-title {
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	color: var(--sl-color-white);
+}
+.site-title img {
+	height: 2.4rem;
+}
+site-search button[data-open-modal] {
+	border-radius: 0;
+	background: rgb(255 255 255 / 0.04);
+	border-color: var(--sl-color-hairline-light);
+}
+site-search button[data-open-modal]:hover {
+	border-color: var(--ion-teal-line);
+}
+
+/* ---------- Sidebar ---------- */
+nav.sidebar .sidebar-pane {
+	border-inline-end-color: var(--sl-color-hairline);
+}
+.sidebar-content {
+	padding-top: 1.25rem;
+}
+.sidebar-content summary {
+	padding-block: 0.4rem;
+}
+.sidebar-content .large {
+	font-size: 0.8rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-3);
+}
+.sidebar-content details > summary .large {
+	color: var(--sl-color-gray-2);
+}
+.sidebar-content ul ul li {
+	border-inline-start-color: var(--sl-color-hairline);
+	margin-inline-start: 0.5rem;
+}
+.sidebar-content a {
+	font-size: 0.9rem;
+	color: var(--sl-color-gray-2);
+	border-radius: 0;
+	padding-block: 0.3rem;
+	transition: color 120ms ease, background 120ms ease;
+}
+.sidebar-content a:hover {
+	color: var(--sl-color-white);
+	background: rgb(255 255 255 / 0.04);
+}
+/* The current page: teal text and a teal edge, not a filled pill */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+	color: var(--ion-teal);
+	font-weight: 600;
+	background: var(--ion-teal-soft);
+	box-shadow: inset 2px 0 0 var(--ion-teal);
+}
+.sidebar-content ul ul a[aria-current='page'] {
+	margin-inline-start: -1px;
+}
+
+/* ---------- Right-hand table of contents ---------- */
+.right-sidebar {
+	border-inline-start-color: var(--sl-color-hairline);
+}
+.right-sidebar-panel h2 {
+	font-size: 0.75rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-3);
+}
+.right-sidebar-panel a {
+	font-size: 0.85rem;
+	color: var(--sl-color-gray-3);
+	border-inline-start: 2px solid transparent;
+	margin-inline-start: -1px;
+}
+.right-sidebar-panel a:hover {
+	color: var(--sl-color-gray-1);
+}
+.right-sidebar-panel a[aria-current='true'] {
+	color: var(--ion-teal);
+	border-inline-start-color: var(--ion-teal);
+	background: transparent;
+}
+.right-sidebar-panel ul {
+	border-inline-start: 1px solid var(--sl-color-hairline);
+}
+
+/* ---------- Content typography ---------- */
+.sl-markdown-content {
+	font-size: var(--sl-text-body);
+	line-height: var(--sl-line-height);
+}
+.content-panel + .content-panel {
+	border-top-color: var(--sl-color-hairline);
+}
+.sl-markdown-content :is(h1, h2, h3, h4) {
+	color: var(--sl-color-white);
+	letter-spacing: -0.015em;
+	font-weight: 650;
+}
+.sl-markdown-content h2 {
+	margin-top: 2.5em;
+	padding-bottom: 0.35em;
+	border-bottom: 1px solid var(--sl-color-hairline);
+}
+.sl-markdown-content h3 {
+	margin-top: 1.8em;
+}
+h1[data-page-title] {
+	font-weight: 750;
+	letter-spacing: -0.03em;
+	color: var(--sl-color-white);
+}
+.sl-markdown-content a:not(:where(.not-content *)) {
+	color: var(--ion-teal);
+	text-decoration: underline;
+	text-decoration-color: var(--ion-teal-line);
+	text-underline-offset: 0.2em;
+	transition: text-decoration-color 120ms ease;
+}
+.sl-markdown-content a:not(:where(.not-content *)):hover {
+	text-decoration-color: var(--ion-teal);
+	color: var(--sl-color-accent-high);
+}
+.sl-markdown-content strong {
+	color: var(--sl-color-white);
+	font-weight: 650;
+}
+.sl-markdown-content :is(p, li) > code {
+	background: var(--sl-color-bg-inline-code);
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0;
+	padding: 0.1em 0.35em;
+	color: var(--sl-color-gray-1);
+	font-size: 0.875em;
+}
+.sl-markdown-content :is(h1, h2, h3, h4) code {
+	font-size: 0.85em;
+	background: transparent;
+	color: var(--ion-teal);
+}
+.sl-markdown-content blockquote {
+	border-inline-start: 3px solid var(--ion-teal-line);
+	color: var(--sl-color-gray-2);
+}
+.sl-markdown-content hr {
+	border-color: var(--sl-color-hairline);
+}
+.sl-markdown-content li + li {
+	margin-top: 0.35em;
+}
+.sl-markdown-content ::marker {
+	color: var(--sl-color-gray-3);
+}
+
+/* ---------- Tables ---------- */
+.sl-markdown-content table:not(:where(.not-content *)) {
+	display: table;
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0;
+	overflow: hidden;
+	font-size: 0.925rem;
+	line-height: 1.55;
+}
+.sl-markdown-content table:not(:where(.not-content *)) thead th {
+	background: #182323;
+	color: var(--sl-color-gray-2);
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	text-align: start;
+	padding: 0.6rem 0.9rem;
+	border-bottom: 1px solid var(--sl-color-hairline);
+}
+.sl-markdown-content table:not(:where(.not-content *)) td {
+	padding: 0.6rem 0.9rem;
+	border-bottom: 1px solid var(--sl-color-hairline-shade);
+	vertical-align: top;
+}
+.sl-markdown-content table:not(:where(.not-content *)) tbody tr:last-child td {
+	border-bottom: 0;
+}
+.sl-markdown-content table:not(:where(.not-content *)) tbody tr:nth-child(even) {
+	background: rgb(255 255 255 / 0.02);
+}
+.sl-markdown-content table:not(:where(.not-content *)) tbody tr:hover {
+	background: var(--ion-teal-soft);
+}
+.sl-markdown-content table:not(:where(.not-content *)) td code {
+	white-space: nowrap;
+}
+/* Long tables scroll instead of overflowing the column */
+.sl-markdown-content table:not(:where(.not-content *)) {
+	display: block;
+	overflow-x: auto;
+}
+.sl-markdown-content table:not(:where(.not-content *)) > :is(thead, tbody) {
+	display: table;
+	width: 100%;
+}
+
+/* ---------- Code blocks ---------- */
+.expressive-code {
+	--ion-fill: var(--ec-frm-edBg);
+	--ec-brdWd: 0px;
+	margin-block: 1.25rem;
+	padding: 1px;
+}
+.expressive-code .frame {
+	clip-path: var(--ion-clip);
+	box-shadow: none;
+}
+.expressive-code .frame.has-title .title {
+	font-family: var(--sl-font-mono);
+	font-size: 0.8rem;
+	color: var(--sl-color-gray-2);
+}
+.expressive-code .frame.is-terminal .header::after {
+	/* Hide the three fake window dots on terminal frames */
+	display: none;
+}
+.expressive-code .frame.is-terminal .header {
+	min-height: 0;
+	padding-block: 0;
+}
+.expressive-code .frame.is-terminal:not(.has-title) .header {
+	display: none;
+}
+.expressive-code .frame.is-terminal:not(.has-title) pre {
+	border-top-left-radius: var(--ec-brdRad);
+	border-top-right-radius: var(--ec-brdRad);
+}
+.expressive-code .copy button {
+	border-radius: 0;
+}
+
+/* ---------- Asides ---------- */
+.starlight-aside {
+	border-radius: 0;
+	border: 1px solid var(--sl-color-asides-border);
+	border-inline-start-width: 4px;
+	background: color-mix(in srgb, var(--sl-color-asides-border) 10%, transparent);
+	padding: 0.9rem 1.1rem;
+}
+.starlight-aside__title {
+	font-size: 0.85rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+.starlight-aside--note {
+	--sl-color-asides-text-accent: var(--ion-teal);
+	--sl-color-asides-border: var(--sl-color-accent);
+}
+.starlight-aside--tip {
+	--sl-color-asides-text-accent: #c4b5fd;
+	--sl-color-asides-border: #8b5cf6;
+}
+.starlight-aside--caution {
+	--sl-color-asides-text-accent: #fcd34d;
+	--sl-color-asides-border: #f59e0b;
+}
+.starlight-aside--danger {
+	--sl-color-asides-text-accent: #fca5a5;
+	--sl-color-asides-border: #ef4444;
+}
+
+/* ---------- Cards, link cards, steps, tabs ---------- */
+.card,
+.sl-link-card {
+	--ion-fill: linear-gradient(180deg, #1a2626, var(--sl-color-bg));
+}
+.sl-link-card:hover {
+	--ion-line: var(--ion-teal-line);
+	--ion-fill: linear-gradient(180deg, #14302d, var(--sl-color-bg));
+	transform: translateY(-1px);
+}
+.sl-link-card .title {
+	color: var(--sl-color-white);
+}
+.sl-link-card .description {
+	color: var(--sl-color-gray-3);
+}
+.card .title {
+	font-size: 1.05rem;
+	color: var(--sl-color-white);
+	align-items: center;
+	gap: 0.75rem;
+}
+.card .icon {
+	color: #06201d;
+	background: var(--ion-teal);
+	border: 0;
+	border-radius: 0;
+	clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+	padding: 0.5rem;
+	width: 2.5rem;
+	height: 2.5rem;
+	flex-shrink: 0;
+}
+.card .body {
+	color: var(--sl-color-gray-2);
+	font-size: 0.95rem;
+}
+.sl-steps > li::before {
+	background: var(--ion-teal);
+	color: #06201d;
+	font-weight: 700;
+	box-shadow: none;
+	clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+.sl-steps > li {
+	border-inline-start-color: var(--sl-color-hairline);
+}
+starlight-tabs .tablist-wrapper [role='tab'] {
+	color: var(--sl-color-gray-3);
+}
+starlight-tabs .tablist-wrapper [role='tab'][aria-selected='true'] {
+	color: var(--ion-teal);
+	border-color: var(--ion-teal);
+}
+.sl-badge {
+	border-radius: 0;
+}
+
+/* ---------- Search dialog ---------- */
+.pagefind-ui__result-link {
+	color: var(--ion-teal) !important;
+}
+
+/* ---------- Page footer ---------- */
+footer.sl-flex {
+	border-top: 1px solid var(--sl-color-hairline);
+	padding-top: 1.5rem;
+	color: var(--sl-color-gray-3);
+}
+.pagination-links a {
+	box-shadow: none;
+}
+.pagination-links a:hover {
+	--ion-line: var(--ion-teal-line);
+	--ion-fill: #14302d;
+}
+.pagination-links a .link-title {
+	color: var(--sl-color-white);
+}
+
+/* ---------- Landing page (template: splash) ---------- */
+[data-has-hero] .hero {
+	padding-block: clamp(2rem, 6vw, 5rem) 1rem;
+}
+.hero > img,
+.hero > .hero-html {
+	max-width: min(100%, 17rem);
+	filter: drop-shadow(0 0 40px rgb(45 212 191 / 0.25));
+}
+.hero h1 {
+	font-size: clamp(3rem, 2rem + 4vw, 4.5rem);
+	font-weight: 800;
+	letter-spacing: -0.04em;
+	background: linear-gradient(90deg, #f3f7f7 30%, var(--ion-teal));
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+}
+.hero .tagline {
+	font-size: clamp(1.05rem, 0.95rem + 0.5vw, 1.3rem);
+	color: var(--sl-color-gray-2);
+	max-width: 36rem;
+	line-height: 1.6;
+}
+.hero .sl-link-button.primary {
+	--ion-line: var(--ion-teal);
+	--ion-fill: var(--ion-teal);
+	color: #06201d;
+	font-weight: 600;
+	box-shadow: 0 8px 24px -10px rgb(45 212 191 / 0.6);
+}
+.hero .sl-link-button.primary:hover {
+	--ion-line: var(--sl-color-accent-high);
+	--ion-fill: var(--sl-color-accent-high);
+}
+.hero .sl-link-button.secondary {
+	--ion-line: var(--sl-color-gray-4);
+	color: var(--sl-color-white);
+}
+.hero .sl-link-button.secondary:hover {
+	--ion-line: var(--ion-teal);
+}
+.hero .sl-link-button.minimal {
+	--ion-line: transparent;
+	--ion-fill: transparent;
+	color: var(--sl-color-gray-1);
+}
+.hero .sl-link-button.minimal:hover {
+	color: var(--ion-teal);
+}
+/* The landing page's own layout helpers */
+.ion-eyebrow::before {
+	content: '';
+	display: inline-block;
+	width: 0.6em;
+	height: 0.6em;
+	margin-right: 0.5em;
+	vertical-align: -0.02em;
+	background: var(--ion-teal);
+	clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+.ion-eyebrow {
+	display: inline-block;
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--ion-teal);
+	margin-bottom: 0.25rem;
+}
+.ion-section {
+	margin-top: 3.5rem;
+}
+.ion-section > h2 {
+	border-bottom: 0;
+	margin-top: 0;
+	font-size: 1.75rem;
+}
+.ion-section > p.lede {
+	color: var(--sl-color-gray-2);
+	max-width: 44rem;
+	margin-top: 0.25rem;
+}
+.ion-quickstart {
+	display: grid;
+	grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+	gap: 2rem;
+	align-items: start;
+}
+.ion-quickstart .expressive-code {
+	margin-block: 0;
+}
+.ion-quickstart ol {
+	margin: 0;
+	padding-inline-start: 1.25rem;
+	color: var(--sl-color-gray-2);
+}
+.ion-quickstart ol li + li {
+	margin-top: 0.6rem;
+}
+@media (max-width: 72rem) {
+	.ion-quickstart {
+		grid-template-columns: 1fr;
+	}
+}
+.ion-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+	gap: 1rem;
+	margin-top: 2.5rem;
+}
+.ion-stats > .ion-stat {
+	margin-top: 0 !important;
+}
+.ion-stat {
+	--ion-fill: linear-gradient(180deg, #1a2626, var(--sl-color-bg));
+	padding: 1rem 1.1rem;
+}
+.ion-stat > * {
+	margin: 0 !important;
+}
+.ion-stat b {
+	display: block;
+	line-height: 1.2;
+	margin-bottom: 0.35rem !important;
+	font-size: 1.5rem;
+	font-weight: 750;
+	letter-spacing: -0.02em;
+	color: var(--sl-color-white);
+}
+.ion-stat span {
+	display: block;
+	line-height: 1.45;
+	font-size: 0.85rem;
+	color: var(--sl-color-gray-3);
+}
+
+/* ---------- Small screens ---------- */
+@media (max-width: 50rem) {
+	.sl-markdown-content h2 {
+		margin-top: 2em;
+	}
+	.hero h1 {
+		font-size: 2.75rem;
+	}
+	.hero > img,
+	.hero > .hero-html {
+		max-width: 10rem;
+	}
+}
+
+
+/* No rounded corners anywhere, including Starlight's own components (search, sidebar, tabs, copy buttons, badges) */
+*,
+*::before,
+*::after {
+	border-radius: 0 !important;
+}

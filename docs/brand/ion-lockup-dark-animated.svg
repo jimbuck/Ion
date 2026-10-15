@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 196 64" width="196" height="64"><title>Ion</title><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5eead4"/><stop offset="1" stop-color="#0d9488"/></linearGradient><clipPath id="c"><rect x="-8" y="0" width="72" height="64"/></clipPath></defs><style>
+.l{animation:ion-cradle 4.4s linear infinite}
+.l1{animation-delay:-1.1s}.l2{animation-delay:-2.2s}.l3{animation-delay:-3.3s}
+@keyframes ion-cradle{
+0%{transform:translateX(60px);stroke-opacity:0;stroke-width:4px}
+2.5%{transform:translateX(60px);stroke-opacity:1;stroke-width:4px}
+8.75%{transform:translateX(14px);stroke-opacity:1;stroke-width:4px}
+9.25%{transform:translateX(12.1px);stroke-opacity:1;stroke-width:4px}
+9.75%{transform:translateX(10.58px);stroke-opacity:1;stroke-width:4px}
+10.25%{transform:translateX(9.4px);stroke-opacity:1;stroke-width:4px}
+10.75%{transform:translateX(8.51px);stroke-opacity:1;stroke-width:4px}
+11.25%{transform:translateX(7.88px);stroke-opacity:1;stroke-width:4px}
+11.75%{transform:translateX(7.45px);stroke-opacity:1;stroke-width:4px}
+12.25%{transform:translateX(7.19px);stroke-opacity:1;stroke-width:4px}
+12.75%{transform:translateX(7.06px);stroke-opacity:1;stroke-width:4px}
+13.25%{transform:translateX(7.01px);stroke-opacity:1;stroke-width:4px}
+13.75%{transform:translateX(7px);stroke-opacity:1;stroke-width:4px}
+25%{transform:translateX(7px);stroke-opacity:1;stroke-width:4px}
+33.75%{transform:translateX(7px);stroke-opacity:1;stroke-width:4px}
+34.25%{transform:translateX(5.1px);stroke-opacity:0.89;stroke-width:3.73px}
+34.75%{transform:translateX(3.58px);stroke-opacity:0.8;stroke-width:3.51px}
+35.25%{transform:translateX(2.4px);stroke-opacity:0.74;stroke-width:3.34px}
+35.75%{transform:translateX(1.51px);stroke-opacity:0.69;stroke-width:3.22px}
+36.25%{transform:translateX(0.87px);stroke-opacity:0.65;stroke-width:3.12px}
+36.75%{transform:translateX(0.45px);stroke-opacity:0.63;stroke-width:3.06px}
+37.25%{transform:translateX(0.19px);stroke-opacity:0.61;stroke-width:3.03px}
+37.75%{transform:translateX(0.06px);stroke-opacity:0.6;stroke-width:3.01px}
+38.25%{transform:translateX(0.01px);stroke-opacity:0.6;stroke-width:3px}
+38.75%{transform:translateX(0px);stroke-opacity:0.6;stroke-width:3px}
+50%{transform:translateX(0px);stroke-opacity:0.6;stroke-width:3px}
+58.75%{transform:translateX(0px);stroke-opacity:0.6;stroke-width:3px}
+59.25%{transform:translateX(-1.9px);stroke-opacity:0.52;stroke-width:2.86px}
+59.75%{transform:translateX(-3.42px);stroke-opacity:0.45;stroke-width:2.76px}
+60.25%{transform:translateX(-4.6px);stroke-opacity:0.4;stroke-width:2.67px}
+60.75%{transform:translateX(-5.49px);stroke-opacity:0.36;stroke-width:2.61px}
+61.25%{transform:translateX(-6.13px);stroke-opacity:0.34;stroke-width:2.56px}
+61.75%{transform:translateX(-6.55px);stroke-opacity:0.32;stroke-width:2.53px}
+62.25%{transform:translateX(-6.81px);stroke-opacity:0.31;stroke-width:2.51px}
+62.75%{transform:translateX(-6.94px);stroke-opacity:0.3;stroke-width:2.5px}
+63.25%{transform:translateX(-6.99px);stroke-opacity:0.3;stroke-width:2.5px}
+63.75%{transform:translateX(-7px);stroke-opacity:0.3;stroke-width:2.5px}
+75%{transform:translateX(-7px);stroke-opacity:0.3;stroke-width:2.5px}
+83.75%{transform:translateX(-7px);stroke-opacity:0.3;stroke-width:2.5px}
+84.25%{transform:translateX(-8.79px);stroke-opacity:0.28;stroke-width:2.37px}
+84.75%{transform:translateX(-10.55px);stroke-opacity:0.25;stroke-width:2.25px}
+85%{transform:translateX(-11.42px);stroke-opacity:0.24;stroke-width:2.19px}
+85.25%{transform:translateX(-12.29px);stroke-opacity:0.23;stroke-width:2.12px}
+85.75%{transform:translateX(-14.01px);stroke-opacity:0.21;stroke-width:2px}
+86.25%{transform:translateX(-15.7px);stroke-opacity:0.19;stroke-width:1.88px}
+86.75%{transform:translateX(-17.37px);stroke-opacity:0.16;stroke-width:1.86px}
+87.25%{transform:translateX(-19.01px);stroke-opacity:0.14;stroke-width:1.86px}
+87.5%{transform:translateX(-19.82px);stroke-opacity:0.13;stroke-width:1.86px}
+87.75%{transform:translateX(-20.63px);stroke-opacity:0.12;stroke-width:1.86px}
+88.25%{transform:translateX(-22.23px);stroke-opacity:0.1;stroke-width:1.86px}
+88.75%{transform:translateX(-23.8px);stroke-opacity:0.08;stroke-width:1.86px}
+90%{transform:translateX(-27.63px);stroke-opacity:0.03;stroke-width:1.86px}
+91.25%{transform:translateX(-31.3px);stroke-opacity:0;stroke-width:1.86px}
+92.5%{transform:translateX(-34.83px);stroke-opacity:0;stroke-width:1.86px}
+93.75%{transform:translateX(-38.2px);stroke-opacity:0;stroke-width:1.86px}
+95%{transform:translateX(-41.43px);stroke-opacity:0;stroke-width:1.86px}
+96.25%{transform:translateX(-44.5px);stroke-opacity:0;stroke-width:1.86px}
+97.5%{transform:translateX(-47.43px);stroke-opacity:0;stroke-width:1.86px}
+98.75%{transform:translateX(-50.2px);stroke-opacity:0;stroke-width:1.86px}
+100%{transform:translateX(-52.82px);stroke-opacity:0;stroke-width:1.86px}}
+@media (prefers-reduced-motion:reduce){.l{animation:none}}
+</style><g transform="translate(4 4) scale(0.875)" clip-path="url(#c)"><path class="l l0" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-linejoin="round" stroke-width="4" stroke-opacity="0" style="transform:translateX(60px)"/><path class="l l3" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-linejoin="round" stroke-width="2.5" stroke-opacity="0.3" style="transform:translateX(-7px)"/><path class="l l2" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-linejoin="round" stroke-width="3" stroke-opacity="0.6" style="transform:translateX(0px)"/><path class="l l1" d="M32.0 13.0 48.5 22.5 48.5 41.5 32.0 51.0 15.5 41.5 15.5 22.5Z" fill="none" stroke="url(#g)" stroke-linejoin="round" stroke-width="4" stroke-opacity="1" style="transform:translateX(7px)"/></g><text x="70" y="45" font-family="Inter Variable, Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="38" font-weight="700" letter-spacing="-1" fill="#f3f7f7">Ion</text></svg>

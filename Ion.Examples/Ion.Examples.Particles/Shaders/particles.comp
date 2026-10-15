@@ -1,0 +1,85 @@
+#version 450
+// Steps every particle by one frame: gravity, a floor at y = -1 that the particles bounce on, and respawn at the emitter
+// when a particle's life runs out. A particle is two vec4s: (position, velocity) and (color, life in [0, 1]).
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 0) uniform Simulation
+{
+	vec2 emitter;
+	vec2 gravity;
+	float dt;
+	float time;
+	uint count;
+	uint frame;
+	float lifetime;
+	float speed;
+	float pad0;
+	float pad1;
+} uSim;
+
+struct Particle
+{
+	vec4 state;
+	vec4 color;
+};
+
+layout(set = 0, binding = 1) buffer Particles
+{
+	Particle particles[];
+} uParticles;
+
+uint hash(uint x)
+{
+	x ^= x >> 16;
+	x *= 0x7feb352du;
+	x ^= x >> 15;
+	x *= 0x846ca68bu;
+	x ^= x >> 16;
+	return x;
+}
+
+float random01(inout uint seed)
+{
+	seed = hash(seed);
+	return float(seed & 0xffffffu) / 16777216.0;
+}
+
+vec3 hue(float h)
+{
+	return clamp(abs(fract(h + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+}
+
+void main()
+{
+	uint i = gl_GlobalInvocationID.x;
+	if (i >= uSim.count) return;
+
+	Particle p = uParticles.particles[i];
+	float life = p.color.a - uSim.dt / uSim.lifetime;
+	if (life <= 0.0)
+	{
+		// Respawn: a fountain from the emitter (a cone around straight up), in a hue that drifts with time.
+		uint seed = i * 9781u + uSim.frame * 6271u + 1u;
+		float angle = 1.5707963 + (random01(seed) - 0.5) * 0.8;
+		float speed = uSim.speed * (0.7 + 0.5 * random01(seed));
+		p.state = vec4(uSim.emitter, vec2(cos(angle), sin(angle)) * speed);
+		p.color = vec4(hue(uSim.time * 0.05 + random01(seed) * 0.3), 1.0 + life);
+	}
+	else
+	{
+		vec2 velocity = p.state.zw + uSim.gravity * uSim.dt;
+		vec2 position = p.state.xy + velocity * uSim.dt;
+		if (position.y < -1.0)
+		{
+			position.y = -1.0 - (position.y + 1.0);
+			velocity.y = -velocity.y * 0.45;
+			velocity.x *= 0.85;
+		}
+
+		p.state = vec4(position, velocity);
+		p.color.a = life;
+	}
+
+	uParticles.particles[i] = p;
+}

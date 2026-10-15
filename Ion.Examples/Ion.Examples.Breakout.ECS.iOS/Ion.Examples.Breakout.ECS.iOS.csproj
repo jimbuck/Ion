@@ -1,0 +1,76 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Breakout ECS on iPhone and iPad: the desktop sample's game code (linked from ../Ion.Examples.Breakout.ECS) in an iOS
+    app, on the SDL windowing platform (Silk.NET's SilkMobile, a full-screen view), with the Vulkan backend over MoltenVK
+    and the OpenGL ES fallback (GraphicsBackend.Auto), NativeAOT, and touch driving the paddle.
+
+      dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS.iOS -c Release -p:IonMobileHeads=true   (an .ipa; needs signing)
+
+    Needs macOS with Xcode and the ios workload (dotnet workload install ios; the workload does not install on Linux or
+    Windows). Without -p:IonMobileHeads=true (the default, and in Ion.sln builds) this project builds as a net10.0 library
+    of the shared game code only; see build/Ion.Mobile.props.
+  -->
+  <PropertyGroup>
+    <IonMobileHeadKind>ios</IonMobileHeadKind>
+  </PropertyGroup>
+  <Import Project="..\..\build\Ion.Mobile.props" />
+
+  <PropertyGroup Condition="'$(IonBuildMobileHead)' == 'true'">
+    <TargetFramework>net10.0-ios</TargetFramework>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <ApplicationId>dev.ion.examples.breakout.ecs</ApplicationId>
+    <ApplicationTitle>Ion Breakout</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.3</ApplicationDisplayVersion>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">ios-arm64</RuntimeIdentifier>
+    <!-- NativeAOT on iOS (since .NET 8); Debug builds use the Mono interpreter. -->
+    <PublishAot Condition="'$(Configuration)' == 'Release'">true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+    <EventSourceSupport>false</EventSourceSupport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IonBuildMobileHead)' != 'true'">
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <IsPublishable>false</IsPublishable>
+    <IonPublishable>false</IonPublishable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <RootNamespace>Ion.Examples.Breakout.ECS.iOS</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The game: the same sources as the desktop sample (its Program.cs is the desktop entry point). -->
+    <Compile Include="..\Ion.Examples.Breakout.ECS\BreakoutGame.cs;..\Ion.Examples.Breakout.ECS\BreakoutSystems.cs;..\Ion.Examples.Breakout.ECS\BreakoutMobile.cs" Link="Game\%(Filename)%(Extension)" />
+    <Compile Include="..\Ion.Examples.Breakout.ECS\Common\**\*.cs" Link="Game\Common\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- The iOS entry point compiles only into the real head. -->
+    <Compile Remove="Platform\**" Condition="'$(IonBuildMobileHead)' != 'true'" />
+    <Using Include="System.Numerics" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(IonBuildMobileHead)' == 'true'">
+    <!-- The game's assets in the app bundle (AppContext.BaseDirectory), where Ion's content root points by default. -->
+    <BundleResource Include="..\Ion.Examples.Breakout.ECS\Assets\*" Exclude="..\Ion.Examples.Breakout.ECS\Assets\favicon.ico" Link="Assets\%(Filename)%(Extension)" />
+    <PartialAppManifest Include="Platform\Info.plist" />
+    <!-- SilkMobile (SDL's UIKit main loop) and SDL2 for iOS; MoltenVK (static) for the Vulkan backend. -->
+    <PackageReference Include="Silk.NET.Windowing.Sdl" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.MoltenVK.Native" Version="2.23.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Scenes.Generators\Ion.Extensions.Scenes.Generators.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" OutputItemType="Analyzer" />
+    <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Ecs.Rendering\Ion.Extensions.Ecs.Rendering.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
+  </ItemGroup>
+</Project>

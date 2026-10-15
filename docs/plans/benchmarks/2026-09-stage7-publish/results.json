@@ -1,0 +1,1 @@
+[{"target":"linux-x64","executableBytes":13184648,"shippedBytes":17244204,"startupMedianMs":"45.6","startupMinMs":"32.4","runs":10,"where":"native"},{"target":"r36s","executableBytes":12191488,"shippedBytes":15770937,"startupMedianMs":"611.1","startupMinMs":"570.2","runs":10,"where":"qemu-aarch64-static (user mode, TCG)"}]

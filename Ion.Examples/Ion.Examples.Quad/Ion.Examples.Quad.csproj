@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The smallest app on the Silk.NET stack: a Silk.NET window, the Vulkan or OpenGL ES RHI backend (chosen from
+    Ion:Graphics:PreferredBackend) and a textured quad drawn through the RHI. Publishes with NativeAOT:
+      dotnet publish -c Release -r linux-x64 -p:PublishAot=true
+      dotnet publish -c Release -r linux-arm64 -p:PublishAot=true   (R36S; see docs/platforms/r36s.md)
+    Run headless (offscreen, no window) with - -Ion:Headless=true, and add - -Quad:Frames=N - -Quad:Screenshot=quad.png to
+    stop after N frames and save the last one.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Keep NativeAOT stack traces readable. -->
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+  </PropertyGroup>
+  <ItemGroup>
+    <IonShader Include="Shaders/*.vert;Shaders/*.frag" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion.Core\Ion.Core.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Windowing.SilkNet\Ion.Extensions.Windowing.SilkNet.csproj" />
+    <!-- The backend-selecting RHI graphics (RhiGraphics): the Vulkan and OpenGL ES backends. -->
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Graphics.Headless\Ion.Extensions.Graphics.Headless.csproj" />
+  </ItemGroup>
+  <Import Project="..\..\Ion\Ion.Shaders\Ion.Shaders.targets" />
+</Project>

@@ -3,9 +3,10 @@
 namespace Ion;
 
 /// <summary>
-/// The game application used to build the game loop.
+/// The game application used to build the game loop. Systems (<c>UseSystem</c>) and function steps (<c>Update(...)</c>,
+/// <c>Render(...)</c>, ...) are added to its root <see cref="IScheduleBuilder.Schedule"/>.
 /// </summary>
-public interface IIonApplication
+public interface IIonApplication : IScheduleBuilder
 {
 	/// <summary>
 	/// The application's configured <see cref="IConfiguration"/>.
@@ -15,53 +16,31 @@ public interface IIonApplication
 	/// <summary>
 	/// The application's configured services.
 	/// </summary>
-	IServiceProvider Services { get; }
+	new IServiceProvider Services { get; }
 
 	/// <summary>
-	/// Adds the specified middleware to the application's Init pipeline.
+	/// Plans the schedule (validating it) and returns it as text: every stage with its steps in run order, their orders and
+	/// the scopes that wrap them, then each scene's schedule. The same text is printed at startup with
+	/// <c>--Ion:PrintSchedule=true</c>.
 	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds the specified middleware to the application's First pipeline.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseFirst(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds the specified middleware to the application's FixedUpdate pipeline.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseFixedUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds the specified middleware to the application's Update pipeline.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds the specified middleware to the application's Render pipeline.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseRender(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds the specified middleware to the application's Last pipeline.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseLast(Func<GameLoopDelegate, GameLoopDelegate> middleware);
-	/// <summary>
-	/// Adds the specified middleware to the application's Destroy pipeline.
-	/// </summary>
-	/// <param name="middleware">The game loop middleware function.</param>
-	/// <returns>The <see cref="IIonApplication"/> instance to chain `Use` calls.</returns>
-	IIonApplication UseDestroy(Func<GameLoopDelegate, GameLoopDelegate> middleware);
+	/// <exception cref="IonScheduleException">The schedule has errors.</exception>
+	string PrintSchedule();
 
 	/// <summary>
-	/// Builds and runs the game.
+	/// Builds and runs the game until it exits (see <see cref="ExitGameEvent"/>).
 	/// </summary>
 	void Run();
+
+	/// <summary>
+	/// Builds and runs the game until it exits or <paramref name="cancellationToken"/> is cancelled.
+	/// </summary>
+	/// <param name="cancellationToken">Stops the game loop (after the current frame) when cancelled.</param>
+	void Run(CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Builds the game and runs Init, at most <paramref name="frames"/> frames, then Destroy. Useful for headless tests
+	/// and deterministic runs.
+	/// </summary>
+	/// <param name="frames">The number of frames to run. Must not be negative.</param>
+	void RunFrames(int frames);
 }

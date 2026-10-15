@@ -5,7 +5,7 @@ namespace Ion.Benchmarks;
 /// <summary>
 /// Prototype of a delegate-free middleware chain: each hop is a constrained call on a value type, so the JIT (and NativeAOT's ILC,
 /// which has no dynamic PGO and therefore cannot devirtualize delegates) can inline the whole chain.
-/// Compared against the closure chain the engine builds today and against direct calls. Fixed depth of 8 middleware systems.
+/// Compared against the closure chain the engine built before 0.3 and against direct calls. Fixed depth of 8 middleware systems.
 /// Note: both the system slot and the continuation must be value types. Calling a generic method through an interface on a
 /// class-constrained type parameter is a generic virtual call (runtime dictionary lookup, ~10 ns per hop); the `StructGenericChain_ClassConstraint`
 /// variant is kept to show that trap.

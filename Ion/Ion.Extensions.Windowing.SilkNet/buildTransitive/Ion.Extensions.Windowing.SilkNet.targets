@@ -1,0 +1,19 @@
+<Project>
+  <!--
+    On NativeAOT publish, stub out the Silk.NET code paths Ion never runs (reflection-based platform discovery, deps.json
+    native library probing) so they neither produce trim warnings nor get compiled: SilkNet.Core.ILLink.Substitutions.xml
+    when Silk.NET.Core is referenced (every Silk.NET module), SilkNet.ILLink.Substitutions.xml when the windowing module is.
+    Imported by the repository's Directory.Build.targets, and shipped in buildTransitive/ for package consumers.
+    Opt out with IonSilkNetSubstitutions=false.
+  -->
+  <Target Name="IonSilkNetSubstitutions"
+          BeforeTargets="WriteIlcRspFileForCompilation"
+          Condition="'$(PublishAot)' == 'true' and '$(IonSilkNetSubstitutions)' != 'false'">
+    <ItemGroup>
+      <_IonSilkNetCore Include="@(ReferencePath)" Condition="'%(Filename)' == 'Silk.NET.Core'" />
+      <_IonSilkNetWindowing Include="@(ReferencePath)" Condition="'%(Filename)' == 'Silk.NET.Windowing.Common'" />
+      <IlcArg Include="--substitution:$(MSBuildThisFileDirectory)SilkNet.Core.ILLink.Substitutions.xml" Condition="'@(_IonSilkNetCore)' != ''" />
+      <IlcArg Include="--substitution:$(MSBuildThisFileDirectory)SilkNet.ILLink.Substitutions.xml" Condition="'@(_IonSilkNetWindowing)' != ''" />
+    </ItemGroup>
+  </Target>
+</Project>

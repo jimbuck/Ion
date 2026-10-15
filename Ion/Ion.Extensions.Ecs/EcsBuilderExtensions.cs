@@ -1,0 +1,163 @@
+using Arch.Core;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+using Ion.Extensions.Assets;
+using Ion.Extensions.Remote;
+using Ion.Extensions.Scenes;
+
+namespace Ion.Extensions.Ecs;
+
+/// <summary>Registration of the ECS module.</summary>
+public static class EcsBuilderExtensions
+{
+	/// <summary>
+	/// Registers the ECS module: <see cref="EcsWorlds"/>, and <see cref="World"/>, <see cref="Commands"/> and
+	/// <see cref="NameRegistry"/> resolved per scope (the root provider gets the root world; each scene scope its own,
+	/// disposed with the scene), the built-in systems (<see cref="EcsCommandsSystem"/>, <see cref="TransformPropagationSystem"/>,
+	/// <see cref="SpriteAnimationSystem"/>, <see cref="SkeletalAnimationSystem"/>, registered as transients so the root schedule and each scene get instances
+	/// bound to their own world) and <see cref="FrameStats.Entities"/>. Add the systems with
+	/// <see cref="UseEcs(IIonApplication)"/> (and <see cref="UseEcs(ISceneBuilder)"/> in scenes that use ECS), and the world
+	/// serializers with <see cref="AddEcsSerialization(IServiceCollection, Action{ComponentSerializerRegistry})"/>.
+	/// </summary>
+	public static IServiceCollection AddEcs(this IServiceCollection services)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+		EcsComponents.RegisterBuiltIns();
+
+		services.TryAddSingleton(static sp => new EcsWorlds(sp));
+		services.TryAddScoped(static sp => new EcsScope(sp.GetRequiredService<EcsWorlds>()));
+		services.TryAddTransient(static sp => sp.GetRequiredService<EcsWorlds>().WorldFor(sp));
+		services.TryAddTransient(static sp => sp.GetRequiredService<EcsWorlds>().CommandsFor(sp));
+		services.TryAddTransient(static sp => sp.GetRequiredService<EcsWorlds>().NamesFor(sp));
+
+		services.TryAddTransient(static sp => new EcsCommandsSystem(sp.GetRequiredService<Commands>()));
+		services.TryAddTransient(static sp => new TransformPropagationSystem(sp.GetRequiredService<World>()));
+		services.TryAddTransient(static _ => new SpriteAnimationSystem());
+		services.TryAddTransient(static _ => new SkeletalAnimationSystem());
+		services.TryAddTransient(static sp => new SpatialAudioSystem(sp.GetRequiredService<World>(), sp));
+		services.TryAddScoped(static _ => new SceneWorldFiles());
+		services.TryAddTransient(static sp => new WorldFileLoadSystem(sp.GetRequiredService<SceneWorldFiles>(), sp.GetRequiredService<World>(), sp.GetRequiredService<IAssetManager>()));
+
+		services.TryAddEnumerable(ServiceDescriptor.Singleton<IFrameStatsSource, EcsStatsSource>(static sp => new EcsStatsSource(sp.GetRequiredService<EcsWorlds>())));
+
+		// The remote protocol's world.* and registry.schema methods (only used when the remote server runs; removed from
+		// builds that compile the remote module out, see RemoteFeature).
+		if (RemoteFeature.IsSupported)
+		{
+			services.TryAddEnumerable(ServiceDescriptor.Singleton<IRemoteMethodProvider, EcsRemoteMethods>(static sp => new EcsRemoteMethods(sp)));
+		}
+
+		return services;
+	}
+
+	/// <summary>
+	/// Registers the world serializers: the <see cref="ComponentSerializerRegistry"/> (the built-in components, then
+	/// <paramref name="configure"/> adds the game's), <see cref="JsonWorldSerializer"/>, <see cref="BinaryWorldSerializer"/>,
+	/// and <see cref="IWorldSerializer"/> as the binary one. Separate from <see cref="AddEcs(IServiceCollection)"/> so that a game that does not
+	/// save worlds does not carry System.Text.Json's serializer into a NativeAOT image.
+	/// </summary>
+	public static IServiceCollection AddEcsSerialization(this IServiceCollection services, Action<ComponentSerializerRegistry>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+
+		// Called again: the game's components are added to the registry already registered.
+		var existing = services.LastOrDefault(static d => d.ServiceType == typeof(ComponentSerializerRegistry))?.ImplementationInstance as ComponentSerializerRegistry;
+		var registry = existing ?? ComponentSerializerRegistry.CreateDefault();
+		configure?.Invoke(registry);
+
+		services.TryAddSingleton(registry);
+		services.TryAddSingleton(registry.Handles);
+		services.TryAddSingleton(static sp => new JsonWorldSerializer(sp.GetRequiredService<ComponentSerializerRegistry>()));
+		services.TryAddSingleton(static sp => new BinaryWorldSerializer(sp.GetRequiredService<ComponentSerializerRegistry>()));
+		services.TryAddSingleton<IWorldSerializer>(static sp => sp.GetRequiredService<BinaryWorldSerializer>());
+		services.TryAddEnumerable(ServiceDescriptor.Singleton<IAssetLoader, WorldFileLoader>(static sp => new WorldFileLoader(
+			sp.GetRequiredService<IPersistentStorage>(), sp.GetRequiredService<JsonWorldSerializer>(), sp.GetRequiredService<BinaryWorldSerializer>())));
+		return services;
+	}
+
+	/// <summary>
+	/// Registers the ECS module (see <see cref="AddEcs(IServiceCollection)"/>). The ECS needs no other module; the modules
+	/// that simulate or draw entities (<c>AddEcsRendering</c>, <c>AddEcsRendering3D</c>, <c>AddPhysics2D</c>,
+	/// <c>AddPhysics3D</c>, <c>AddNetworking</c>) register it themselves. Add the systems with
+	/// <see cref="UseEcs(IIonApplication)"/>.
+	/// </summary>
+	public static IonApplicationBuilder AddEcs(this IonApplicationBuilder builder)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.Services.AddEcs();
+		return builder;
+	}
+
+	/// <summary>
+	/// Registers the ECS module and the world serializers (see <see cref="AddEcsSerialization(IServiceCollection, Action{ComponentSerializerRegistry})"/>);
+	/// <paramref name="configure"/> adds the game's components to the registry, on every call.
+	/// </summary>
+	public static IonApplicationBuilder AddEcsSerialization(this IonApplicationBuilder builder, Action<ComponentSerializerRegistry>? configure = null)
+	{
+		ArgumentNullException.ThrowIfNull(builder);
+		builder.Services.AddEcs().AddEcsSerialization(configure);
+		return builder;
+	}
+
+	/// <summary>
+	/// Adds the ECS systems to the root schedule (for the root world): commands played back at the end of every stage
+	/// (<see cref="StageOrder.Ecs"/>), transform propagation (<see cref="StageOrder.TransformPropagation"/> in Last and
+	/// Render), and sprite and skeletal animation (<see cref="StageOrder.SpriteAnimation"/> in Update).
+	/// </summary>
+	public static IIonApplication UseEcs(this IIonApplication app)
+	{
+		ArgumentNullException.ThrowIfNull(app);
+		return app
+			.UseSystem<EcsCommandsSystem>()
+			.UseSystem<TransformPropagationSystem>()
+			.UseSystem<SpriteAnimationSystem>()
+			.UseSystem<SkeletalAnimationSystem>();
+	}
+
+	/// <summary>
+	/// Adds positional audio from the ECS (<see cref="SpatialAudioSystem"/>, with the ECS systems): the listener follows the
+	/// entity with an <c>AudioListener</c>, and each <c>AudioEmitter</c>'s voice follows its entity.
+	/// </summary>
+	public static IIonApplication UseEcsAudio(this IIonApplication app)
+	{
+		ArgumentNullException.ThrowIfNull(app);
+		return app.UseEcs().UseSystem<SpatialAudioSystem>();
+	}
+
+	/// <summary>Adds positional audio from a scene's entities; see <see cref="UseEcsAudio(IIonApplication)"/>.</summary>
+	public static ISceneBuilder UseEcsAudio(this ISceneBuilder scene)
+	{
+		ArgumentNullException.ThrowIfNull(scene);
+		return scene.UseEcs().UseSystem<SpatialAudioSystem>();
+	}
+
+	/// <summary>
+	/// Fills the scene's world from a saved entity tree when the scene loads: the <see cref="WorldFile"/> at asset
+	/// <paramref name="path"/> (JSON or binary, as the world serializers write it) is instantiated in Init, at
+	/// <see cref="StageOrder.WorldFiles"/>, before the game's Init steps, with its hierarchy. Call it more than once to load
+	/// several files, in order. Needs <c>AddEcsSerialization</c> (the loader, and the registry that names the game's
+	/// components) and the assets module; the file is cached by the scene's asset manager.
+	/// </summary>
+	public static ISceneBuilder LoadWorld(this ISceneBuilder scene, string path)
+	{
+		ArgumentNullException.ThrowIfNull(scene);
+		ArgumentException.ThrowIfNullOrEmpty(path);
+		var files = scene.Services.GetRequiredService<SceneWorldFiles>();
+		if (files.Paths.Count == 0) scene.UseSystem<WorldFileLoadSystem>();
+		files.Paths.Add(path);
+		return scene;
+	}
+
+	/// <summary>Adds the ECS systems to a scene's schedule (for the scene's own world); see <see cref="UseEcs(IIonApplication)"/>.</summary>
+	public static ISceneBuilder UseEcs(this ISceneBuilder scene)
+	{
+		ArgumentNullException.ThrowIfNull(scene);
+		return scene
+			.UseSystem<EcsCommandsSystem>()
+			.UseSystem<TransformPropagationSystem>()
+			.UseSystem<SpriteAnimationSystem>()
+			.UseSystem<SkeletalAnimationSystem>();
+	}
+}

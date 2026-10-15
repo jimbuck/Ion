@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Tracy bridge (https://github.com/wolfpld/tracy) for the Ion frame profiler. A separate project so that the engine
+    has no native dependency: Tracy-CSharp ships TracyClient natives for win-x64 and linux-x64 only. Its bindings are
+    LibraryImport (source-generated, blittable), so they are trimming and NativeAOT compatible. Games reference this
+    project behind the TRACY symbol (see the Breakout ECS sample: dotnet run -p:IonTracy=true).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <RootNamespace>Ion.Extensions.Metrics.Tracy</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Tracy-CSharp" Version="0.13.1" />
+  </ItemGroup>
+</Project>

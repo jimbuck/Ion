@@ -1,0 +1,99 @@
+<Project>
+  <!--
+    Ion publishing presets (Stage 7). Pick one with IonTarget when publishing a game:
+
+      dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -p:IonTarget=linux-x64
+      dotnet publish Ion.Examples/Ion.Examples.Breakout.ECS -p:IonTarget=r36s
+
+    Presets: win-x64, win-arm64, osx-arm64, osx-x64, linux-x64, linux-arm64, r36s. Each one is a NativeAOT, self-contained,
+    trimmed publish for one runtime identifier; r36s is linux-arm64 with the handheld's defaults (OpenGL ES, SDL, fullscreen
+    640x480) and the ArkOS SD card layout (see Ion.Publish.targets and docs/platforms/publishing.md).
+
+    Imported by the repository's Directory.Build.props, so the preset is applied before the project body and before the
+    SDK's runtime identifier inference (output paths, self-contained defaults and the restore all see it). A project can
+    still override any single property in its csproj. Only projects that can be published get the preset: engine
+    libraries (IonAotLibrary), tests, benchmarks and generators ignore IonTarget, so passing it as a global property (it
+    flows to project references) changes nothing for them. Ion.Publish.targets checks the preset name and that the
+    project is an executable.
+
+    These properties are the contract the `ion publish` CLI builds on: it passes IonTarget (and IonArm64SysRoot when set).
+  -->
+  <PropertyGroup Condition="'$(IonPublishable)' == ''">
+    <IonPublishable>true</IonPublishable>
+    <IonPublishable Condition="'$(IonAotLibrary)' == 'true'">false</IonPublishable>
+    <IonPublishable Condition="$(MSBuildProjectName.EndsWith('.Tests'))">false</IonPublishable>
+    <IonPublishable Condition="$(MSBuildProjectName.EndsWith('.Benchmarks'))">false</IonPublishable>
+    <IonPublishable Condition="$(MSBuildProjectName.EndsWith('Generators'))">false</IonPublishable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IonTarget)' != '' and '$(IonPublishable)' == 'true'">
+    <!-- The runtime identifier of each preset; an unknown name leaves it empty and Ion.Publish.targets reports IONPUB001. -->
+    <IonTargetRid Condition="'$(IonTarget)' == 'win-x64'">win-x64</IonTargetRid>
+    <IonTargetRid Condition="'$(IonTarget)' == 'win-arm64'">win-arm64</IonTargetRid>
+    <IonTargetRid Condition="'$(IonTarget)' == 'osx-arm64'">osx-arm64</IonTargetRid>
+    <IonTargetRid Condition="'$(IonTarget)' == 'osx-x64'">osx-x64</IonTargetRid>
+    <IonTargetRid Condition="'$(IonTarget)' == 'linux-x64'">linux-x64</IonTargetRid>
+    <IonTargetRid Condition="'$(IonTarget)' == 'linux-arm64'">linux-arm64</IonTargetRid>
+    <IonTargetRid Condition="'$(IonTarget)' == 'r36s'">linux-arm64</IonTargetRid>
+
+    <!-- desktop or handheld: the handheld drops EventSource (no dotnet-trace on the device) and gets the ArkOS layout. -->
+    <IonTargetKind Condition="'$(IonTargetRid)' != ''">desktop</IonTargetKind>
+    <IonTargetKind Condition="'$(IonTarget)' == 'r36s'">handheld</IonTargetKind>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IonTargetRid)' != ''">
+    <!-- Runtime packs: one runtime identifier, self-contained, the NativeAOT runtime pack restored for it. -->
+    <RuntimeIdentifier>$(IonTargetRid)</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishAot>true</PublishAot>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishSingleFile>false</PublishSingleFile>
+    <!-- Only English satellite resources (none of Ion's dependencies need others). -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Ship the executable, its native libraries and content: no .pdb or .xml of the referenced assemblies. -->
+    <PublishDocumentationFiles>false</PublishDocumentationFiles>
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+    <AllowedReferenceRelatedFileExtensions>.none</AllowedReferenceRelatedFileExtensions>
+
+    <!-- Readable stack traces in release builds (the engine keeps them clean: see the schedule generator). -->
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+    <StackTraceSupport>true</StackTraceSupport>
+    <!-- EventSource for dotnet-trace and dotnet-counters on desktop; off on the handheld. -->
+    <EventSourceSupport Condition="'$(IonTargetKind)' == 'desktop'">true</EventSourceSupport>
+    <EventSourceSupport Condition="'$(IonTargetKind)' == 'handheld'">false</EventSourceSupport>
+    <!-- No ICU: games do not need culture data, and ArkOS and minimal images do not ship libicu. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Symbols go to a separate .dbg/.dSYM file (not shipped in the R36S layout). -->
+    <StripSymbols>true</StripSymbols>
+
+    <!-- Trimming: full trimming, analysis on, no debugger support; exception messages are kept for readable logs. -->
+    <TrimMode>full</TrimMode>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <DebuggerSupport>false</DebuggerSupport>
+    <UseSystemResourceKeys>false</UseSystemResourceKeys>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <UseNativeHttpHandler>false</UseNativeHttpHandler>
+  </PropertyGroup>
+
+  <!--
+    linux-arm64 cross-compilation from a linux-x64 machine (docs/platforms/r36s.md): clang links with lld, against the
+    sysroot in IonArm64SysRoot (an environment variable works too) when one is given. Without it the Ubuntu cross packages
+    are used and the binary needs the build machine's glibc, which is too new for ArkOS.
+  -->
+  <PropertyGroup Condition="'$(IonTargetRid)' == 'linux-arm64' and $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) == 'X64' and $([MSBuild]::IsOSPlatform('Linux'))">
+    <IonCrossArm64>true</IonCrossArm64>
+    <LinkerFlavor Condition="'$(LinkerFlavor)' == ''">lld</LinkerFlavor>
+    <SysRoot Condition="'$(SysRoot)' == '' and '$(IonArm64SysRoot)' != ''">$(IonArm64SysRoot)</SysRoot>
+  </PropertyGroup>
+
+  <!-- The R36S (ArkOS) handheld: its default configuration and SD card layout (Ion.Publish.targets). -->
+  <PropertyGroup Condition="'$(IonTarget)' == 'r36s' and '$(IonTargetRid)' != ''">
+    <IonArkOSLayout Condition="'$(IonArkOSLayout)' == ''">true</IonArkOSLayout>
+    <IonDefaultGraphicsBackend>OpenGLES</IonDefaultGraphicsBackend>
+    <IonDefaultWindowPlatform>Sdl</IonDefaultWindowPlatform>
+    <IonDefaultFullscreen>true</IonDefaultFullscreen>
+    <IonDefaultWidth>640</IonDefaultWidth>
+    <IonDefaultHeight>480</IonDefaultHeight>
+  </PropertyGroup>
+</Project>

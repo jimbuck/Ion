@@ -1,0 +1,9 @@
+# 10000 bodies, 600 steps, 1 repeats, linux-arm64, Arm64, AOT=True, 4 cpus
+engine | repeat | setup ms | total step ms | mean ms/step | p50 | p95 | max | first 60 mean | last 60 mean | awake/total | hash
+box2d-native | 0 | 114.0 | 195319 | 325.531 | 357.602 | 428.346 | 640.645 | 87.348 | 376.601 | 9999/10000 | 68F836FF638AE348
+# 10000 bodies, 600 steps, 1 repeats, linux-arm64, Arm64, AOT=True, 4 cpus
+engine | repeat | setup ms | total step ms | mean ms/step | p50 | p95 | max | first 60 mean | last 60 mean | awake/total | hash
+box2d-managed | 0 | 146.2 | 643198 | 1071.996 | 623.216 | 918.077 | 220501.314 | 135.517 | 649.644 | 10000/10000 | 21A1A5507E79D0C3
+# 10000 bodies, 600 steps, 1 repeats, linux-arm64, Arm64, AOT=True, 4 cpus
+engine | repeat | setup ms | total step ms | mean ms/step | p50 | p95 | max | first 60 mean | last 60 mean | awake/total | hash
+aether | 0 | 424.6 | 790333 | 1317.222 | 1242.880 | 2487.364 | 3421.990 | 308.909 | 1249.071 | 10000/10000 | 20678D5DDB712FF9

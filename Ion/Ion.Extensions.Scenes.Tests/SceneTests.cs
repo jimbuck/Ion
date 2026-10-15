@@ -20,7 +20,7 @@ public class SceneTests
 		};
 		using var _ = TestUtils.SetupWithScenes(3, out var services, out var game);
 
-		var eventEmitter = services.GetRequiredService<IEventEmitter>();
+		var eventEmitter = services.GetRequiredService<IEvents>();
 		var currentScene = services.GetRequiredService<ICurrentScene>();
 
 		var gameLoop = game.Build();

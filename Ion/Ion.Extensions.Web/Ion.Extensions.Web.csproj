@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The web server module (roadmap 4.12, Stage 6b): an embedded HTTP/1.1 and WebSocket server for companion apps and
+    integrations, on the shared server core (Ion.Extensions.Http: blocking sockets on their own threads, no Kestrel, no
+    async). Requests and WebSocket messages cross a lock-free queue into the game thread, where the game's [Http] and
+    [WebSocket] methods (a static route table emitted by Ion.Extensions.Web.Generators) run at StageOrder.Web in Last.
+    Static files, push channels, and the remote protocol at /rpc when both modules run. Off unless Ion:Web:Enabled.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Web</RootNamespace>
+    <Description>Ion's web server module: an embedded HTTP/1.1 and WebSocket server with generated routing for [Http] and [WebSocket] methods on systems, handlers on the game thread, static files, push channels, and the remote protocol at /rpc. Loopback by default, origin allow-list, bearer token for mutating endpoints, rate limits.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Web.Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Extensions.Web.Abstractions\Ion.Extensions.Web.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Http\Ion.Extensions.Http.csproj" />
+    <ProjectReference Include="..\Ion.Core\Ion.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+  </ItemGroup>
+</Project>

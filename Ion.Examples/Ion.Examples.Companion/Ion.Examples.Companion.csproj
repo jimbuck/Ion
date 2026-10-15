@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The companion-app sample of the web module: a paddle game whose paddle a phone drives. The game serves a controller
+    page (wwwroot, plain HTML and JavaScript, no build step) and a WebSocket endpoint that turns the page's touches into a
+    virtual gamepad on Input v2's scripted path, plus GET /score. On one machine: dotnet run, then open
+    http://127.0.0.1:15780/. From a phone on the same network:
+      dotnet run - -Ion:Web:Bind=0.0.0.0 - -Ion:Web:AllowNonLoopback=true
+    and open the printed "on the network" URL (it carries the per-run token after '#'). Publishes with NativeAOT:
+      dotnet publish -c Release -r linux-x64 -p:PublishAot=true
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Keep NativeAOT stack traces readable. -->
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The font of the Breakout sample (SIL Open Font License), shared rather than copied. -->
+    <None Include="..\Ion.Examples.Breakout\Assets\Bungee-Regular.ttf" Link="Assets\Bungee-Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <!-- The web module's routing generator: the [Http] and [WebSocket] methods below become a static route table. -->
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Web.Generators\Ion.Extensions.Web.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+    <ProjectReference Include="..\..\Ion\Ion.Extensions.Web\Ion.Extensions.Web.csproj" />
+  </ItemGroup>
+</Project>

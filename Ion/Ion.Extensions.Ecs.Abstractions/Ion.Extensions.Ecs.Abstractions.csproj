@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The ECS module's public surface without the module: the [Query] attributes, Commands, the built-in components
+    (transforms, hierarchy, sprites, tags, names) and IWorldSerializer. A game library can depend on this package only; the
+    game adds Ion.Extensions.Ecs (AddEcs/UseEcs and the built-in systems). Users stay on Arch's own World and Entity.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Ecs</RootNamespace>
+    <Description>Ion ECS abstractions on Arch 2.1: [Query] attributes (expanded by Ion.Generators into chunk loops, bound by reflection otherwise), the Commands buffer, and the built-in components (Transform2D/Transform, GlobalTransform2D/GlobalTransform, Parent/Children, Sprite, SpriteAnimation, Aabb2D, Visible/Hidden/MainCamera, EntityName), the 3D scene helpers (the SceneEnvironment singleton, SetHidden) and IModel spawning (SpawnModel on World and Commands).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Ecs" />
+    <InternalsVisibleTo Include="Ion.Extensions.Ecs.Rendering" />
+    <InternalsVisibleTo Include="Ion.Extensions.Ecs.Tests" />
+    <InternalsVisibleTo Include="Ion.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Arch" Version="2.1.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

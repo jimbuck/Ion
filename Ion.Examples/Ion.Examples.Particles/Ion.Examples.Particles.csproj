@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    GPU particles: a compute shader simulates every particle each frame (gravity, a bouncing floor, respawn at a moving
+    emitter) in a storage buffer, and the render pass draws the same buffer as per-instance vertex data, so the particles
+    never leave the GPU. Needs compute: Vulkan, or OpenGL ES 3.1 and later.
+    Options: - -Particles:Count=N (65536), - -Particles:Size=S (clip-space half size, 0.012), - -Ion:Run:Frames=N,
+    - -Ion:Run:Screenshot=file.png, - -Ion:Headless=true - -Ion:Headless:Render=true (offscreen).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <Platforms>AnyCPU</Platforms>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="appsettings.json" />
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <IonShader Include="Shaders/*.vert;Shaders/*.frag;Shaders/*.comp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\..\Ion\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\..\Ion\Ion\Ion.csproj" />
+  </ItemGroup>
+  <Import Project="..\..\Ion\Ion.Shaders\Ion.Shaders.targets" />
+</Project>

@@ -1,0 +1,162 @@
+---
+// Starlight's footer (edit link, last updated, previous/next) followed by the site footer: version, author and key pages.
+import fs from 'node:fs';
+import path from 'node:path';
+import Default from '@astrojs/starlight/components/Footer.astro';
+import logo from '../assets/logo.svg';
+
+// Versions come from the repository, so the footer stays current: the templates reference the version in development,
+// Ion.Core carries the latest release.
+// Paths are from the repository root (the build runs in website/).
+const read = (file: string, pattern: RegExp) => {
+	try {
+		return fs.readFileSync(path.resolve(process.cwd(), '..', file), 'utf8').match(pattern)?.[1];
+	} catch {
+		return undefined;
+	}
+};
+const next = read('templates/2d/Directory.Build.props', /<IonVersion>([^<]+)<\/IonVersion>/);
+const released = read('Ion/Ion.Core/Ion.Core.csproj', /<Version>([^<]+)<\/Version>/);
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const repo = 'https://github.com/jimbuck/Ion';
+const columns = [
+	{
+		title: 'Learn',
+		links: [
+			['Introduction', `${base}/getting-started/introduction/`],
+			['Installation', `${base}/getting-started/installation/`],
+			['Your first game', `${base}/getting-started/first-game/`],
+			['Project templates', `${base}/getting-started/templates/`],
+			['Examples', `${base}/examples/`],
+		],
+	},
+	{
+		title: 'Reference',
+		links: [
+			['Systems', `${base}/concepts/systems/`],
+			['Stage order', `${base}/reference/stage-order/`],
+			['Diagnostics', `${base}/reference/diagnostics/`],
+			['Configuration', `${base}/reference/configuration/`],
+			['Changelog', `${base}/reference/changelog/`],
+		],
+	},
+	{
+		title: 'Project',
+		links: [
+			['GitHub', repo],
+			['Releases', `${repo}/releases`],
+			['Issues', `${repo}/issues`],
+			['MIT license', `${repo}/blob/main/LICENSE`],
+		],
+	},
+];
+---
+
+<Default />
+
+<div class="ion-footer not-content">
+	<div class="ion-footer-brand">
+		<a href={`${base}/`} class="ion-footer-logo"><img src={logo.src} alt="" width="28" height="28" /> Ion</a>
+		<p>A small, schedule-based game engine for .NET 10.</p>
+		<p class="ion-footer-version">
+			{next && <a href={`${base}/reference/changelog/`}><span class="ion-footer-badge">{next}</span> in development</a>}
+			{released && <span>Latest release <a href={`${repo}/releases/tag/v${released}`}>{released}</a></span>}
+		</p>
+	</div>
+	{
+		columns.map((column) => (
+			<nav aria-label={column.title}>
+				<h2>{column.title}</h2>
+				<ul>
+					{column.links.map(([label, href]) => (
+						<li>
+							<a href={href}>{label}</a>
+						</li>
+					))}
+				</ul>
+			</nav>
+		))
+	}
+	<p class="ion-footer-credit">
+		Made by <a href="https://github.com/jimbuck">Jim Buck</a> · MIT licensed · © 2024–{new Date().getFullYear()}
+	</p>
+</div>
+
+<style>
+	.ion-footer {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.5rem 2rem;
+		margin-top: 3rem;
+		padding-top: 2rem;
+		border-top: 1px solid var(--sl-color-hairline);
+		font-size: var(--sl-text-sm);
+		color: var(--sl-color-gray-3);
+	}
+	@media (min-width: 50rem) {
+		.ion-footer {
+			grid-template-columns: 1.6fr repeat(3, 1fr);
+		}
+	}
+	.ion-footer p {
+		margin: 0;
+	}
+	.ion-footer a {
+		color: var(--sl-color-gray-2);
+		text-decoration: none;
+	}
+	.ion-footer a:hover {
+		color: var(--ion-teal);
+	}
+	.ion-footer-brand {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	.ion-footer-logo {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: var(--sl-text-lg);
+		font-weight: 700;
+	}
+	.ion-footer .ion-footer-logo {
+		color: var(--sl-color-white);
+	}
+	.ion-footer-version {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem 1rem;
+	}
+	.ion-footer-badge {
+		padding: 0.05rem 0.4rem;
+		border: 1px solid var(--ion-teal-line);
+		background: var(--ion-teal-soft);
+		color: var(--ion-teal);
+		font-family: var(--sl-font-mono);
+		font-size: var(--sl-text-xs);
+	}
+	.ion-footer h2 {
+		margin: 0 0 0.5rem;
+		font-size: var(--sl-text-xs);
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--sl-color-gray-3);
+	}
+	.ion-footer ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.ion-footer-credit {
+		grid-column: 1 / -1;
+		padding-top: 1rem;
+		border-top: 1px solid var(--sl-color-hairline-shade);
+		font-size: var(--sl-text-xs);
+	}
+</style>

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Stage 5b 2D physics decision benchmark (roadmap 4.12, section 7 item 3): 10,000 dynamic bodies falling into a box,
+    600 fixed steps of 1/60 s, on Box2D v3 (the C library through Box2D.NET.Bindings.Release and prebuilt natives),
+    Box2D.NET (ikpil's managed port of Box2D v3.1) and Aether.Physics2D. Not part of Ion.sln: run it with
+    dotnet run -c Release, or publish it with NativeAOT for linux-x64 and linux-arm64 (see README.md next to it).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- NativeAOT links the package's static libbox2d.a, unless Box2DNativeDir names a directory with <rid>/libbox2d.a (native/build.sh). -->
+    <Box2DStaticLink Condition="'$(Box2DNativeDir)' == ''">true</Box2DStaticLink>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Box2D.NET.Bindings.Release" Version="3.1.0" />
+    <PackageReference Include="Box2D.NET" Version="3.1.654" Aliases="Managed" />
+    <PackageReference Include="Aether.Physics2D" Version="2.2.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PublishAot)' == 'true' And '$(Box2DNativeDir)' != ''">
+    <DirectPInvoke Include="box2d" />
+    <NativeLibrary Include="$(Box2DNativeDir)/$(RuntimeIdentifier)/libbox2d.a" />
+  </ItemGroup>
+</Project>

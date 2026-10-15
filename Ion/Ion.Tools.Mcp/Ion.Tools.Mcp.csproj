@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The agent tooling core shared by the ion CLI: a client of the remote inspection protocol (token file, bearer token,
+    JSON-RPC over HTTP), the game runner (dotnet run with Ion:Run and Ion:Remote settings), image diffing, and an MCP
+    server on stdio that exposes the remote methods as tools (ion mcp). No engine dependency; AOT-compatible.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Tools</RootNamespace>
+    <Description>Ion agent tooling: remote protocol client, game runner, image diff and an MCP server exposing a running Ion game to coding agents.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Tools.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+  </ItemGroup>
+</Project>
