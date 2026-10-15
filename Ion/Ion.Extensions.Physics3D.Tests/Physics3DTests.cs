@@ -352,7 +352,7 @@ public class Physics3DTests
 	{
 		public List<DebugShape3D> Shapes { get; } = [];
 
-		public void Shape(DebugShape3D shape, in Matrix4x4 world, DebugColor3D color, ConvexHullId hull) => Shapes.Add(shape);
+		public void Shape(DebugShape3D shape, in Matrix4x4 world, DebugColor3D color, int id) => Shapes.Add(shape);
 	}
 }
 

@@ -193,6 +193,7 @@ public sealed class Physics3DDebugDrawSystem(PhysicsWorld3D physics, IRenderer3D
 		private readonly MeshHandle _sphere = renderer.CreateMesh(MeshPrimitives.Sphere(0.5f, 16, 8));
 		private readonly MeshHandle _cylinder = renderer.CreateMesh(MeshPrimitives.Cylinder(0.5f, 1f, 16));
 		private readonly Dictionary<int, MeshHandle> _hulls = [];
+		private readonly Dictionary<int, MeshHandle> _meshes = [];
 		private readonly MaterialHandle[] _materials =
 		[
 			Material(renderer, new Color(0x40, 0x60, 0xff, 0x60)),
@@ -202,13 +203,14 @@ public sealed class Physics3DDebugDrawSystem(PhysicsWorld3D physics, IRenderer3D
 			Material(renderer, new Color(0xff, 0xff, 0x00, 0x40)),
 		];
 
-		public void Shape(DebugShape3D shape, in Matrix4x4 world, DebugColor3D color, ConvexHullId hull)
+		public void Shape(DebugShape3D shape, in Matrix4x4 world, DebugColor3D color, int id)
 		{
 			var mesh = shape switch
 			{
 				DebugShape3D.Sphere => _sphere,
 				DebugShape3D.Cylinder => _cylinder,
-				DebugShape3D.Hull => HullMesh(hull),
+				DebugShape3D.Hull => HullMesh(new ConvexHullId(id)),
+				DebugShape3D.Mesh => ColliderMesh(new MeshColliderId(id)),
 				_ => _box,
 			};
 			renderer.Submit(new MeshRenderer(mesh, _materials[(int)color]) { CastShadows = false, ReceiveShadows = false }, world);
@@ -222,6 +224,17 @@ public sealed class Physics3DDebugDrawSystem(PhysicsWorld3D physics, IRenderer3D
 			data.ComputeNormals();
 			mesh = renderer.CreateMesh(data);
 			_hulls[hull.Value] = mesh;
+			return mesh;
+		}
+
+		private MeshHandle ColliderMesh(MeshColliderId id)
+		{
+			if (_meshes.TryGetValue(id.Value, out var mesh)) return mesh;
+			var (positions, indices) = physics.GetMeshData(id);
+			var data = new MeshData($"physics-mesh-{id.Value}", positions, indices);
+			data.ComputeNormals();
+			mesh = renderer.CreateMesh(data);
+			_meshes[id.Value] = mesh;
 			return mesh;
 		}
 

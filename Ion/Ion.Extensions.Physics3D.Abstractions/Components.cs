@@ -109,6 +109,20 @@ public enum ColliderShape3D : byte
 	Cylinder,
 	/// <summary>A convex hull created with <see cref="IPhysicsWorld3D.CreateConvexHull"/> (<see cref="Collider3D.Hull"/>), for example from a mesh's vertices.</summary>
 	ConvexHull,
+
+	/// <summary>
+	/// A triangle mesh created with <see cref="IPhysicsWorld3D.CreateMesh"/> (<see cref="Collider3D.Mesh"/>), for level
+	/// geometry: on static and kinematic bodies only, and not as a part of a compound body.
+	/// </summary>
+	Mesh,
+}
+
+/// <summary>A triangle mesh registered with a physics world (<see cref="IPhysicsWorld3D.CreateMesh"/>).</summary>
+/// <param name="Value">The world's mesh index plus one (0 is no mesh).</param>
+public readonly record struct MeshColliderId(int Value)
+{
+	/// <summary>Whether this names a mesh.</summary>
+	public bool IsValid => Value > 0;
 }
 
 /// <summary>A convex hull registered with a physics world (<see cref="IPhysicsWorld3D.CreateConvexHull"/>).</summary>
@@ -125,7 +139,7 @@ public readonly record struct ConvexHullId(int Value)
 /// not applied).
 /// </summary>
 /// <remarks>
-/// <para>Create one with a factory (<see cref="Box"/>, <see cref="Sphere"/>, <see cref="Capsule"/>, <see cref="Cylinder"/>, <see cref="ConvexHull"/>), which set the surface defaults.</para>
+/// <para>Create one with a factory (<see cref="Box"/>, <see cref="Sphere"/>, <see cref="Capsule"/>, <see cref="Cylinder"/>, <see cref="ConvexHull"/>, <see cref="TriangleMesh"/>), which set the surface defaults.</para>
 /// <para>
 /// Changing any field after the body exists rebuilds it at the next fixed step. Two colliders collide when each one's
 /// <see cref="Layer"/> is in the other's <see cref="Mask"/>; the queries filter by the same bits.
@@ -147,6 +161,9 @@ public struct Collider3D
 
 	/// <summary>The hull of a <see cref="ColliderShape3D.ConvexHull"/>.</summary>
 	public ConvexHullId Hull;
+
+	/// <summary>The triangle mesh of a <see cref="ColliderShape3D.Mesh"/>.</summary>
+	public MeshColliderId Mesh;
 
 	/// <summary>The friction coefficient (usually 0 to 1).</summary>
 	public float Friction;
@@ -195,11 +212,14 @@ public struct Collider3D
 	/// <summary>A convex hull registered with <see cref="IPhysicsWorld3D.CreateConvexHull"/>.</summary>
 	public static Collider3D ConvexHull(ConvexHullId hull) => new(ColliderShape3D.ConvexHull) { Hull = hull };
 
+	/// <summary>A triangle mesh registered with <see cref="IPhysicsWorld3D.CreateMesh"/> (static and kinematic bodies only).</summary>
+	public static Collider3D TriangleMesh(MeshColliderId mesh) => new(ColliderShape3D.Mesh) { Mesh = mesh };
+
 	/// <summary>Whether the physics world has created a body for this collider.</summary>
 	public readonly bool HasBody => BodySlot != 0;
 
 	internal static bool SameShape(in Collider3D a, in Collider3D b) =>
-		a.Shape == b.Shape && a.Size == b.Size && a.Radius == b.Radius && a.Length == b.Length && a.Hull == b.Hull &&
+		a.Shape == b.Shape && a.Size == b.Size && a.Radius == b.Radius && a.Length == b.Length && a.Hull == b.Hull && a.Mesh == b.Mesh &&
 		a.Friction == b.Friction && a.Restitution == b.Restitution && a.IsSensor == b.IsSensor && a.Layer == b.Layer &&
 		a.Mask == b.Mask && a.EnableEvents == b.EnableEvents;
 }

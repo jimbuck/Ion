@@ -74,6 +74,16 @@ public interface IPhysicsWorld3D
 	ConvexHullId CreateConvexHull(ReadOnlySpan<Vector3> points);
 
 	/// <summary>
+	/// Registers a triangle mesh (triangle-list <paramref name="indices"/> into <paramref name="positions"/>, in the
+	/// entity's local space) for <see cref="Collider3D.TriangleMesh"/>: level geometry for static and kinematic bodies.
+	/// Triangles collide on their front side, counterclockwise as drawn (the side their normal points to), so bodies that
+	/// get behind a surface pass through it; <paramref name="doubleSided"/> makes both sides collide. Degenerate triangles
+	/// are skipped. The mesh lives as long as the world.
+	/// </summary>
+	/// <exception cref="ArgumentException">No triangles, an index count that is not a multiple of 3, or an index out of range.</exception>
+	MeshColliderId CreateMesh(ReadOnlySpan<Vector3> positions, ReadOnlySpan<uint> indices, bool doubleSided = false);
+
+	/// <summary>
 	/// Casts a ray from <paramref name="origin"/> along <paramref name="direction"/> up to <paramref name="maxDistance"/>;
 	/// returns the closest hit on a collider in <paramref name="mask"/>. Sensors (<see cref="Collider3D.IsSensor"/>) are
 	/// skipped unless <paramref name="includeSensors"/> is true: the ray goes through them to the closest collider behind.

@@ -217,6 +217,18 @@ var stats = host.Get<IRenderer3D>().LastFrameStatistics;
 Assert.True(stats.Submitted > 0);
 ```
 
+## A model's triangles: `ModelGeometry`
+
+`assets.Load<ModelGeometry>("level.glb")` reads the same file as an `IModel` but keeps only its triangles, on the CPU:
+every triangle primitive of every node of the default scene, placed by the node's model matrix, merged into one
+triangle list in model space (`Positions`, `Indices`, `TriangleCount`, `Bounds`). No texture is decoded and nothing is
+uploaded. Mirrored nodes (a negative scale) have their winding turned back, so front faces stay counterclockwise.
+
+Use it for what needs geometry rather than pixels, such as a physics collider of the level
+(`physics.CreateMesh(geometry.Positions, geometry.Indices)`, see
+[3D physics](/Ion/physics/physics-3d/#triangle-meshes)), navigation or picking. Spawn the model at the same transform you
+give the collider.
+
 ## Cube maps
 
 `ICubemap` assets are loaded from a folder of six square images of one size, for skyboxes and image-based ambient:

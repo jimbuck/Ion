@@ -67,6 +67,7 @@ headless rendering, and under `--headless` (where the null loaders read only wha
 | `IFontSet` | `.ttf`, `.otf` | 2D renderer (`AddIon`) | Monospaced stand-in font |
 | `ISoundEffect` | WAV, OGG Vorbis, MP3 | Audio (`AddIon`) | Decoded, played by the null output |
 | `IModel` | glTF 2.0 `.gltf` and `.glb` | 3D renderer (`AddRendering3D`) | Geometry and materials loaded, textures are placeholders |
+| `ModelGeometry` | glTF 2.0 `.gltf` and `.glb` | 3D renderer (`AddRendering3D`) | The same: the model's triangles on the CPU, no GPU work |
 | `ICubemap` | A folder with six face images | 3D renderer (`AddRendering3D`) | Placeholder texture |
 
 See [Text](/Ion/rendering/text/) for fonts, [Models and glTF](/Ion/rendering/3d/models-gltf/) for models and cube maps,

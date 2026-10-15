@@ -123,6 +123,7 @@ A collider is centered on the entity's `Transform` position and rotation. Unlike
 | `Collider3D.Capsule(float radius, float length)` | Along local y: a cylinder part of `length` capped by half spheres of `radius` (total height `length + 2 * radius`). |
 | `Collider3D.Cylinder(float radius, float length)` | Along local y. |
 | `Collider3D.ConvexHull(ConvexHullId hull)` | A convex hull registered with `IPhysicsWorld3D.CreateConvexHull`. |
+| `Collider3D.TriangleMesh(MeshColliderId mesh)` | A triangle mesh registered with `IPhysicsWorld3D.CreateMesh`, for level geometry on static and kinematic bodies (see [Triangle meshes](#triangle-meshes)). |
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -138,7 +139,8 @@ Two colliders collide when each one's `Layer` intersects the other's `Mask`. Kin
 with each other (sensors aside: a sensor on a kinematic body still sees other kinematic and static bodies).
 
 Validation throws an `InvalidOperationException` naming the entity from the physics step: box sizes and radii must be
-positive, capsule and cylinder lengths non-negative, and a hull must come from this world's `CreateConvexHull`.
+positive, capsule and cylinder lengths non-negative, and a hull or mesh must come from this world's `CreateConvexHull` or
+`CreateMesh`. A triangle mesh on a dynamic body, or as a part of a compound body, is refused the same way.
 
 ### Convex hulls
 
@@ -167,6 +169,41 @@ public sealed class RockSystem(World world, IPhysicsWorld3D physics, IRenderer3D
 
 The hull lives as long as its physics world. A scene has its own physics world, so a scene registers its own hulls. The
 entity's origin stays the mesh's origin: the module offsets the body by the hull's center for you.
+
+### Triangle meshes
+
+Level geometry (terrain, rooms, ramps) is usually concave, so it is a triangle mesh rather than hulls. Register the mesh
+once, from the same triangles you draw, and put it on a static (or kinematic) entity:
+
+```csharp
+public sealed class LevelSystem(World world, IPhysicsWorld3D physics, IRenderer3D renderer, IAssetManager assets)
+{
+	[Init]
+	public void Init(GameTime dt)
+	{
+		// From a glTF file: the model to draw, and its triangles (no GPU work) for the collider.
+		var model = assets.Load<IModel>("level.glb");
+		var geometry = assets.Load<ModelGeometry>("level.glb");
+		var collider = physics.CreateMesh(geometry.Positions, geometry.Indices);
+		var level = world.SpawnModel(model, Transform.Identity);
+		world.Add(level, Collider3D.TriangleMesh(collider));   // static: no rigid body
+	}
+}
+```
+
+From mesh data you build yourself (the [Marbles](/Ion/examples/marbles/) sample's terrain), pass `mesh.Positions` and
+`mesh.Indices` the same way, and draw the same `MeshData` with `renderer.CreateMesh`.
+
+- **One-sided.** Triangles collide on their front side: counterclockwise as drawn, the side their normal points to. A
+  body that gets behind a surface passes through it, and a ray cast from behind does not hit it. Pass
+  `doubleSided: true` to `CreateMesh` for thin geometry seen from both sides.
+- **Static and kinematic bodies only.** A mesh has no volume to give a dynamic body a mass; use primitives or convex
+  hulls for those. A mesh cannot be a part of a compound body either (BepuPhysics compounds hold convex shapes): give it a
+  body of its own.
+- **Space and scale.** Positions are in the entity's local space, placed by its `Transform` (not scaled by it, like every
+  collider). Degenerate triangles are skipped.
+- **Cost.** BepuPhysics builds a bounding volume tree over the triangles when the mesh is registered (thousands of
+  triangles take milliseconds), so register meshes at load time. The mesh lives as long as its physics world.
 
 ### Restitution is approximated
 
@@ -217,6 +254,7 @@ world.Create(Joint3D.Hinge(frame, door, Vector3.UnitY, localAnchorB: new Vector3
 | `BodyCount` (static included), `JointCount`, `StepCount` | Counters. |
 | `DebugDraw` | Turns the [debug drawing](/Ion/physics/debug-draw/) on or off. |
 | `CreateConvexHull(ReadOnlySpan<Vector3>)` | Registers a hull. |
+| `CreateMesh(positions, indices, doubleSided)` | Registers a triangle mesh for `Collider3D.TriangleMesh`. |
 | `RayCast`, `OverlapBox`, `OverlapSphere` | [Queries](/Ion/physics/queries-and-events/). |
 | `ApplyLinearImpulse(Entity, Vector3)` | Changes a dynamic body's velocity immediately (and wakes it). |
 | `ApplyAngularImpulse(Entity, Vector3)` | Changes a dynamic body's angular velocity immediately. |
@@ -273,15 +311,14 @@ results differ from a single-threaded run. See [determinism](/Ion/physics/determ
 | Linear and angular impulses | Supported; no continuous forces |
 | Exact restitution | Approximated by the contact spring |
 | Compound bodies (child colliders on an ancestor's body) | Supported; see [Compound bodies](/Ion/physics/overview/#compound-bodies). Changing a part rebuilds the body |
-| **Triangle mesh colliders** (static level geometry from a mesh) | Not supported yet: use convex hulls or boxes |
+| Triangle mesh colliders (static level geometry from a mesh) | Supported on static and kinematic bodies; one-sided unless registered double-sided |
 | Collider offsets inside the entity | Not on the collider: put the shape on a child entity (a compound part) |
 | Joint motors and limits | Not supported yet |
 | Shape casts, pre-solve contact callbacks | Not supported yet |
 
-:::tip[Level geometry without mesh colliders]
-Until triangle mesh colliders exist, build static level geometry from box colliders on child entities of one
-`RigidBody3D.Static()` entity (one compound static body), or split concave props into convex pieces, each a
-`Collider3D.ConvexHull` on a child entity of the prop.
+:::tip[Level geometry]
+Use a [triangle mesh](#triangle-meshes) for level geometry. For a concave prop that moves (a dynamic body), split it into
+convex pieces, each a `Collider3D.ConvexHull` on a child entity of the prop: one compound body.
 :::
 
 ## Allocations

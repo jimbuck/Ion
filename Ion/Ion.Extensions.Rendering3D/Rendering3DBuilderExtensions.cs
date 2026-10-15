@@ -41,6 +41,7 @@ public static class Rendering3DBuilderExtensions
 			.AddSingleton<IMeshBatch>(static sp => sp.GetRequiredService<Renderer3D>())
 			.AddSingleton<IAssetLoader>(static sp => new ModelLoader(sp.GetRequiredService<Renderer3D>(), sp.GetRequiredService<IPersistentStorage>(), sp.GetService<TextureFactory>()))
 			.AddSingleton<IAssetLoader>(static sp => new CubemapLoader(sp.GetRequiredService<Renderer3D>(), sp.GetRequiredService<IPersistentStorage>()))
+			.AddSingleton<IAssetLoader>(static sp => new ModelGeometryLoader(sp.GetRequiredService<IPersistentStorage>()))
 			.AddSingleton<Rendering3DSystem>();
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IFrameStatsSource, Rendering3DStatsSource>());
 		return services;

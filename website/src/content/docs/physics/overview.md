@@ -249,7 +249,7 @@ see [benchmarks](/Ion/tooling/benchmarks/) to run them.
 
 ## Not done yet
 
-These are planned, not built: chain and segment shapes in 2D, triangle mesh colliders in 3D, motors and limits on 3D joints, shape casts, per-contact callbacks
+These are planned, not built: chain and segment shapes in 2D, motors and limits on 3D joints, shape casts, per-contact callbacks
 (pre-solve), exact 3D overlap tests, and contraction-free Box2D natives built on CI for every platform.
 
 ## See also

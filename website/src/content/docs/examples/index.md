@@ -1,12 +1,12 @@
 ---
 title: Examples
-description: The eleven sample games in Ion.Examples, what each one demonstrates, and how to run, test and publish them.
+description: The twelve sample games in Ion.Examples, what each one demonstrates, and how to run, test and publish them.
 sidebar:
   order: 0
   label: Overview
 ---
 
-The repository's [`Ion.Examples`](https://github.com/jimbuck/Ion/tree/main/Ion.Examples) folder holds eleven sample games.
+The repository's [`Ion.Examples`](https://github.com/jimbuck/Ion/tree/main/Ion.Examples) folder holds twelve sample games.
 Each is a small, complete program on the current API, with its setup inline in `Program.cs`, and most have a test
 project that runs that same `Program.cs` headless (`IonTestHost.UseEntryPoint<Program>()`). Read them in the order
 below to go from a single class to ECS, physics, networking and 3D.
@@ -26,6 +26,7 @@ below to go from a single class to ECS, physics, networking and 3D.
 | [Sprites 100k](/Ion/examples/sprites-100k/) | The sprite batch stress test: 100,000 moving sprites in 16 draw calls. | Rendering2D | Batching under validation; frame times |
 | [Quad](/Ion/examples/quad/) | The smallest app on the Silk.NET stack: a textured quad drawn through the RHI with build-time shaders. | Windowing, RHI (Vulkan, GLES) | Used by the Vulkan and GLES backend test suites |
 | [GPU particles](/Ion/examples/particles/) | Compute shaders: 65,536 particles simulated in a storage buffer and drawn from it as instanced quads. | RHI compute (Vulkan, GLES 3.1) | Particles read back after 30 frames on Vulkan and GLES; the no-compute fallback |
+| [Marbles](/Ion/examples/marbles/) | 3D physics: marbles rolling on a terrain mesh that is both drawn and collided against (a triangle-mesh collider). | Physics3D, Rendering3D, ECS rendering 3D | Every marble above the mesh after 600 frames; rendered on Vulkan and GLES |
 
 ![Breakout ECS with the physics debug drawing on](./images/breakout-physics-debug.png)
 
@@ -39,7 +40,7 @@ dotnet run --project Ion.Examples/Ion.Examples.Breakout.ECS
 
 The root `package.json` has a Release shortcut for each one (`npm install` once first): `npm run example:breakout`,
 `example:breakout-ecs`, `example:breakout-net`, `example:companion`, `example:menu`, `example:cubes`, `example:model`,
-`example:scenes`, `example:sprites`, `example:quad` and `example:particles`. Arguments follow `--`, as with `dotnet run`:
+`example:scenes`, `example:sprites`, `example:quad`, `example:particles` and `example:marbles`. Arguments follow `--`, as with `dotnet run`:
 
 ```bash
 npm run example:breakout-ecs -- --headless --Ion:Run:Frames=600

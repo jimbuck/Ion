@@ -88,6 +88,7 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 	private int _jointCount;
 
 	private readonly List<HullEntry> _hulls = [];
+	private readonly List<MeshEntry> _meshes = [];
 
 	// The parts found this step, sorted by body entity then part entity, and where each body's run starts; the bodies of
 	// rigid bodies without a collider of their own.
@@ -534,7 +535,12 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 	private int CreateBody(Entity entity, bool hasCollider, in Collider3D collider, in Transform transform, in RigidBody3D rigid, ReadOnlySpan<PartRecord> parts)
 	{
 		if (hasCollider) Validate(entity, collider, rigid);
-		foreach (ref readonly var part in parts) Validate(part.Entity, part.Collider, rigid);
+		foreach (ref readonly var part in parts)
+		{
+			// Bepu compounds hold convex shapes only.
+			if (part.Collider.Shape == ColliderShape3D.Mesh) throw new InvalidOperationException($"The mesh collider of {part.Entity} cannot be a part of {entity}'s body: give it a body of its own (a RigidBody3D.Static or Kinematic on it).");
+			Validate(part.Entity, part.Collider, rigid);
+		}
 		var slot = AllocateSlot();
 		ref var body = ref Slots[slot];
 		var generation = body.Generation;
@@ -566,6 +572,11 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 			var hull = _hulls[collider.Hull.Value - 1];
 			shape = hull.Shape;
 			body.Center = hull.Center;
+			body.OwnsShape = false;
+		}
+		else if (collider.Shape == ColliderShape3D.Mesh)
+		{
+			shape = _meshes[collider.Mesh.Value - 1].Shape;
 			body.OwnsShape = false;
 		}
 		else
@@ -698,6 +709,7 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 			ColliderShape3D.Capsule => MathF.PI * r * r * collider.Length + 4f / 3f * MathF.PI * r * r * r,
 			ColliderShape3D.Cylinder => MathF.PI * r * r * collider.Length,
 			ColliderShape3D.ConvexHull => _hulls[collider.Hull.Value - 1].Volume,
+			ColliderShape3D.Mesh => 0f,
 			_ => collider.Size.X * collider.Size.Y * collider.Size.Z,
 		};
 	}
@@ -725,9 +737,11 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 			ColliderShape3D.Sphere => collider.Radius > 0,
 			ColliderShape3D.Capsule or ColliderShape3D.Cylinder => collider.Radius > 0 && collider.Length >= 0,
 			ColliderShape3D.ConvexHull => collider.Hull.Value > 0 && collider.Hull.Value <= _hulls.Count,
+			ColliderShape3D.Mesh => collider.Mesh.Value > 0 && collider.Mesh.Value <= _meshes.Count,
 			_ => false,
 		};
-		if (!ok) throw new InvalidOperationException($"The {collider.Shape} collider of {entity} is invalid (sizes and radii must be positive, a hull must come from this world's CreateConvexHull).");
+		if (!ok) throw new InvalidOperationException($"The {collider.Shape} collider of {entity} is invalid (sizes and radii must be positive, a hull or mesh must come from this world's CreateConvexHull or CreateMesh).");
+		if (collider.Shape == ColliderShape3D.Mesh && rigid.Type == RigidBodyType3D.Dynamic) throw new InvalidOperationException($"The mesh collider of {entity} is on a dynamic body: triangle meshes are for static and kinematic bodies (use convex hulls or primitives for dynamic ones).");
 		if (rigid.Type == RigidBodyType3D.Dynamic && !(rigid.Mass >= 0)) throw new InvalidOperationException($"The rigid body of {entity} needs a non-negative mass.");
 	}
 
@@ -1265,6 +1279,48 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 		return volume;
 	}
 
+	/// <inheritdoc/>
+	public MeshColliderId CreateMesh(ReadOnlySpan<Vector3> positions, ReadOnlySpan<uint> indices, bool doubleSided = false)
+	{
+		if (indices.Length == 0 || indices.Length % 3 != 0) throw new ArgumentException($"A mesh collider needs a triangle list: a positive multiple of 3 indices ({indices.Length} given).", nameof(indices));
+		var count = 0;
+		for (var i = 0; i < indices.Length; i += 3)
+		{
+			if (indices[i] >= positions.Length || indices[i + 1] >= positions.Length || indices[i + 2] >= positions.Length) throw new ArgumentException($"Triangle {i / 3} of the mesh collider has an index past its {positions.Length} positions.", nameof(indices));
+			if (!Degenerate(positions[(int)indices[i]], positions[(int)indices[i + 1]], positions[(int)indices[i + 2]])) count++;
+		}
+
+		if (count == 0) throw new ArgumentException("Every triangle of the mesh collider is degenerate.", nameof(indices));
+
+		var sim = Simulation;
+		_pool.Take<Triangle>(doubleSided ? count * 2 : count, out var triangles);
+		var at = 0;
+		for (var i = 0; i < indices.Length; i += 3)
+		{
+			var a = positions[(int)indices[i]];
+			var b = positions[(int)indices[i + 1]];
+			var c = positions[(int)indices[i + 2]];
+			if (Degenerate(a, b, c)) continue;
+			// Bepu's triangles face the side they appear clockwise from; Ion's (and glTF's) front faces are counterclockwise.
+			triangles[at++] = new Triangle(a, c, b);
+			if (doubleSided) triangles[at++] = new Triangle(a, b, c);
+		}
+
+		var mesh = new Mesh(triangles, Vector3.One, _pool);
+		var shape = sim.Shapes.Add(mesh);
+		_meshes.Add(new MeshEntry(shape, positions.ToArray(), indices.ToArray()));
+		return new MeshColliderId(_meshes.Count);
+	}
+
+	private static bool Degenerate(Vector3 a, Vector3 b, Vector3 c) => Vector3.Cross(b - a, c - a).LengthSquared() <= 1e-12f;
+
+	/// <summary>The triangles of a mesh collider in the entity's local space (for drawing it).</summary>
+	internal (Vector3[] Positions, uint[] Indices) GetMeshData(MeshColliderId id)
+	{
+		var entry = _meshes[id.Value - 1];
+		return (entry.Positions, entry.Indices);
+	}
+
 	/// <summary>The triangles of a hull in the entity's local space (for drawing it).</summary>
 	internal (Vector3[] Positions, uint[] Indices) GetHullMesh(ConvexHullId id)
 	{
@@ -1531,7 +1587,10 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 				break;
 			case ColliderShape3D.ConvexHull:
 				// The hull mesh is in the entity's space: undo the hull's center offset.
-				sink.Shape(DebugShape3D.Hull, Matrix4x4.CreateTranslation(-hullCenter) * world, color, collider.Hull);
+				sink.Shape(DebugShape3D.Hull, Matrix4x4.CreateTranslation(-hullCenter) * world, color, collider.Hull.Value);
+				break;
+			case ColliderShape3D.Mesh:
+				sink.Shape(DebugShape3D.Mesh, world, color, collider.Mesh.Value);
 				break;
 			default:
 				sink.Shape(DebugShape3D.Box, Matrix4x4.CreateScale(collider.Size) * world, color, default);
@@ -1596,6 +1655,8 @@ public sealed class PhysicsWorld3D : IPhysicsWorld3D, IDisposable
 	}
 
 	private readonly record struct HullEntry(ConvexHullShape Hull, TypedIndex Shape, Vector3 Center, float Volume);
+
+	private readonly record struct MeshEntry(TypedIndex Shape, Vector3[] Positions, uint[] Indices);
 
 	/// <summary>A part found this step: its body, its entity, its collider and its pose in the body's space.</summary>
 	internal readonly record struct PartRecord(Entity Body, Entity Entity, Collider3D Collider, RigidPose Pose);
@@ -1686,6 +1747,7 @@ internal enum DebugShape3D : byte
 	Sphere,
 	Cylinder,
 	Hull,
+	Mesh,
 }
 
 /// <summary>The colors of the 3D debug drawing.</summary>
@@ -1701,5 +1763,6 @@ internal enum DebugColor3D : byte
 /// <summary>Where the 3D debug drawing goes (the 3D renderer, or a test recorder).</summary>
 internal interface IDebugShapeSink
 {
-	void Shape(DebugShape3D shape, in Matrix4x4 world, DebugColor3D color, ConvexHullId hull);
+	/// <summary>Draws one shape; <paramref name="id"/> is the hull's or the mesh's id for those shapes.</summary>
+	void Shape(DebugShape3D shape, in Matrix4x4 world, DebugColor3D color, int id);
 }
