@@ -135,8 +135,8 @@ public class GlesWindowTests
 		builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 		{
 			["Ion:Window:Platform"] = "Glfw",
-			["Ion:Window:Width"] = "64",
-			["Ion:Window:Height"] = "64",
+			["Ion:Window:Width"] = "256", // above the minimum width of a Windows window
+			["Ion:Window:Height"] = "256",
 			["Ion:Graphics:PreferredBackend"] = "Auto",
 			["Ion:Graphics:ClearColorHex"] = "#102030",
 			["Ion:Graphics:RetainLastFrame"] = "true",

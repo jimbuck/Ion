@@ -23,6 +23,11 @@ public abstract class WindowedContractTests
 	protected GraphicsBackend Backend => GetType().GetCustomAttribute<RhiBackendAttribute>()?.Backend
 		?? throw new InvalidOperationException($"{GetType().Name} needs an [RhiBackend] attribute.");
 
+	// Windows will not make a captioned window narrower than its minimum width (about 120 px of client area at 100 %), so the
+	// windows here are well above it.
+	private const int Size = 256;
+	private const int ResizedSize = 320;
+
 	private (IonApplication App, GameLoop Loop) Build(WindowPlatform platform, int width, int height, ValidationLog log)
 	{
 		var builder = IonApplication.CreateBuilder();
@@ -62,7 +67,7 @@ public abstract class WindowedContractTests
 	private void _rendersTheQuad(WindowPlatform platform)
 	{
 		var log = new ValidationLog();
-		var (app, loop) = Build(platform, 64, 64, log);
+		var (app, loop) = Build(platform, Size, Size, log);
 		try
 		{
 			var window = app.Services.GetRequiredService<SilkWindow>();
@@ -102,22 +107,22 @@ public abstract class WindowedContractTests
 	public void RecreatesTheSurfaceWhenTheWindowIsResized()
 	{
 		var log = new ValidationLog();
-		var (app, loop) = Build(WindowPlatform.Glfw, 64, 64, log);
+		var (app, loop) = Build(WindowPlatform.Glfw, Size, Size, log);
 		try
 		{
 			var window = app.Services.GetRequiredService<SilkWindow>();
 			loop.Step();
 
-			window.Size = new Vector2(96, 96);
-			for (var i = 0; i < 10 && window.FramebufferSize != new Vector2(96, 96); i++) loop.Step();
+			window.Size = new Vector2(ResizedSize, ResizedSize);
+			for (var i = 0; i < 10 && window.FramebufferSize != new Vector2(ResizedSize, ResizedSize); i++) loop.Step();
 			for (var i = 0; i < 3; i++) loop.Step();
 
-			Assert.Equal(new Vector2(96, 96), window.FramebufferSize);
+			Assert.Equal(new Vector2(ResizedSize, ResizedSize), window.FramebufferSize);
 			var surface = app.Services.GetRequiredService<IGraphicsFrame>().Device.Surface!;
-			Assert.Equal((96u, 96u), (surface.Width, surface.Height));
+			Assert.Equal(((uint)ResizedSize, (uint)ResizedSize), (surface.Width, surface.Height));
 
 			var shot = app.Services.GetRequiredService<IScreenshotSource>().Capture();
-			QuadAssert.Checkerboard(shot, 96, new Rgba8(0x10, 0x20, 0x30, 255));
+			QuadAssert.Checkerboard(shot, ResizedSize, new Rgba8(0x10, 0x20, 0x30, 255));
 		}
 		finally
 		{
