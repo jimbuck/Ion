@@ -20,6 +20,8 @@ mesh. The 3D renderer draws it, and the 3D physics module collides against the s
 - Collision layers: the marbles and the terrain are on different layers, so a ray cast can ask for the terrain alone.
 - Game code that tends the bodies from a `FixedUpdate` step: counting the resting marbles, and putting back any that
   leaves the terrain.
+- Positional audio: a marble that lands clicks from where it touched (`ISpatialAudio.Play` at the contact point,
+  louder the faster it lands), heard from the camera, which carries an `AudioListener` (`UseEcsAudio`).
 
 ## Run it
 
@@ -83,6 +85,20 @@ world.Create(new Transform(DropPosition(random, i)), new MeshRenderer(sphere, ma
 They are dropped at staggered heights over the middle of the bowl. A fixed step counts the resting ones for the HUD and
 puts back any marble that falls below the terrain. With a closed collider none does, which the tests check.
 
+## The clicks
+
+The camera entity is the listener (`new AudioListener()` on it, and `UseEcsAudio()` in `Program.cs`). After the physics
+step, a fixed step reads the contacts that began and plays a click at each contact point, up to four per step:
+
+```csharp title="Program.cs"
+var speed = world.Get<RigidBody3D>(marble).LinearVelocity.Length();
+if (speed < 1f) continue;
+spatial.Play(_click, contact.Point, volume: Math.Clamp(speed / 10f, 0.1f, 1f), pitchShift: pitch, attenuation: ClickFalloff);
+```
+
+A marble landing on the left of the screen is heard on the left, and the far side of the bowl is quieter than the near
+side. As the camera orbits, the same spot moves from ear to ear.
+
 ## Tests
 
 `Ion.Examples.Marbles.Tests` runs the sample's own `Program.cs`:
@@ -94,6 +110,7 @@ puts back any marble that falls below the terrain. With a closed collider none d
 - The terrain mesh matches the height function, and every triangle faces up.
 - Rendered headless on Vulkan and OpenGL ES after 240 frames: the marbles are visible, with pixels of their palette's
   colors.
+- The clicks: the listener is at the camera, and the clicks played are panned to both sides.
 
 ## See also
 

@@ -21,8 +21,12 @@
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <!-- The HUD font (SIL Open Font License), shared with the Breakout sample. -->
+    <!-- The HUD font (SIL Open Font License), shared with the Breakout ECS sample. -->
     <Content Include="..\Ion.Examples.Breakout\Assets\Bungee-Regular.ttf" Link="Assets\Bungee-Regular.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- The click of a landing marble, shared with the Breakout ECS sample. -->
+    <Content Include="..\Ion.Examples.Breakout.ECS\Assets\ping.wav" Link="Assets\ping.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

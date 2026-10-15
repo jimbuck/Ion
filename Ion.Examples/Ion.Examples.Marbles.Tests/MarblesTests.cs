@@ -3,6 +3,7 @@ using System.Numerics;
 using Arch.Core;
 
 using Ion.Examples.Tests;
+using Ion.Extensions.Audio;
 using Ion.Extensions.Ecs;
 using Ion.Extensions.Graphics;
 using Ion.Extensions.Physics3D;
@@ -63,6 +64,29 @@ public class MarblesTests
 
 		Assert.True(onSurface > count / 2, $"{onSurface} of {count} marbles on the surface");
 		Assert.True(marbles.Resting > count / 2, $"{marbles.Resting} of {count} marbles resting");
+	}
+
+	[Fact, Trait(CATEGORY, INTEGRATION)]
+	public void LandingMarblesClickFromWhereTheyLandHeardFromTheCamera()
+	{
+		using var host = Game();
+		host.Step(240);
+		var marbles = host.Get<MarblesSystem>();
+		var spatial = host.Get<ISpatialAudio>();
+
+		// The listener is the camera (its world position, as the ECS audio system set it).
+		var world = host.Get<World>();
+		Vector3 camera = default;
+		world.Query(new QueryDescription().WithAll<AudioListener, GlobalTransform>(), (ref GlobalTransform global) => camera = global.Matrix.Translation);
+		Assert.True(Vector3.Distance(camera, spatial.ListenerPosition) < 1f, $"listener {spatial.ListenerPosition}, camera {camera}");
+
+		// Clicks were played, positioned: panned to both sides, never louder than their landing speed allows.
+		var clicks = host.Audio.Plays.Where(p => p.Sound.Name == "ping.wav").ToList();
+		Assert.True(clicks.Count > 10, $"{clicks.Count} clicks");
+		Assert.Equal(marbles.Clicks, clicks.Count);
+		Assert.Contains(clicks, p => p.Pan < -0.1f);
+		Assert.Contains(clicks, p => p.Pan > 0.1f);
+		Assert.All(clicks, p => Assert.InRange(p.Volume, 0f, 1f));
 	}
 
 	[Fact, Trait(CATEGORY, UNIT)]

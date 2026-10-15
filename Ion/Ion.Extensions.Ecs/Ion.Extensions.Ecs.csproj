@@ -28,5 +28,6 @@
     <ProjectReference Include="..\Ion.Extensions.Scenes.Abstractions\Ion.Extensions.Scenes.Abstractions.csproj" />
     <!-- world.* remote methods (IRemoteMethodProvider); no dependency on the remote server itself. -->
     <ProjectReference Include="..\Ion.Extensions.Remote.Abstractions\Ion.Extensions.Remote.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Audio.Abstractions\Ion.Extensions.Audio.Abstractions.csproj" />
   </ItemGroup>
 </Project>

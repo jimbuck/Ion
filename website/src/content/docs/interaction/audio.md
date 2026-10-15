@@ -270,16 +270,57 @@ The mixed output is clamped to [-1, 1], so loud combinations clip rather than wr
 
 ## Spatial audio
 
-There is no 3D or positional audio: no listener, no distance attenuation and no Doppler. For 2D games, derive `pan`
-and `volume` from the source's position yourself:
+`ISpatialAudio` plays voices at positions, heard from a listener: a voice's gain falls off with its distance from the
+listener, and its pan follows its direction (left or right of where the listener faces). It works in 3D, or in 2D
+screen coordinates (y down), where a position is the point (x, y, 0).
 
 ```csharp
-// Pan by horizontal position on screen, quieter with distance from the player.
-var pan = Math.Clamp((source.X - window.Width / 2f) / (window.Width / 2f), -1f, 1f);
-var distance = Vector2.Distance(source, player);
-var volume = Math.Clamp(1f - distance / 1200f, 0f, 1f);
-audio.Play(_explosion, volume: volume, pan: pan);
+public sealed class ExplosionSystem(ISpatialAudio spatial, IAssetManager assets)
+{
+	private ISoundEffect _boom = default!;
+
+	[Init]
+	public void Init() => _boom = assets.Load<ISoundEffect>("boom.wav");
+
+	public void Explode(Vector2 where, Vector2 camera)
+	{
+		spatial.SetListener2D(camera);                        // usually once per frame
+		spatial.Play2D(_boom, where, volume: 0.8f);          // falls off from 64 pixels (Attenuation.Pixels)
+	}
+}
 ```
+
+In 3D, place the listener at the camera with `SetListener(position, forward, up)` and play with
+`Play(sound, position, ..., attenuation)`. A moving source keeps its handle: `SetPosition(voice, position)` every
+frame (or `SetPosition2D`). Gains and pans are worked out once per frame, when the audio commands are flushed, and
+sent as volume and pan changes, so positional voices mix, fade and stop like any others. Stop, pitch and seek them
+through `IAudioManager`, and set their volume through `ISpatialAudio.SetVolume` (the falloff scales it).
+
+| `Attenuation` | Default | Meaning |
+|---|---|---|
+| `MinDistance` | 1 (`Attenuation.Pixels`: 64) | Full gain within this distance. The pan also narrows to the center inside it, so a sound passing through the listener does not jump from one ear to the other. |
+| `MaxDistance` | 100 (`Attenuation.Pixels`: 4096) | Where the falloff stops: the gain stays constant beyond it (`Linear`: silent). |
+| `Rolloff` | 1 | How fast the gain falls. 0 never falls. |
+| `Model` | `Inverse` | `Inverse` (`min / (min + rolloff * (d - min))`, a point source), `Linear` (full to silent between min and max), `Exponential` (`(d / min) ^ -rolloff`) or `None`. |
+
+`ISpatialAudio.PanStrength` (0 to 1, default 1) narrows the stereo image, and `Evaluate(position, attenuation)` gives
+the gain and pan a position would get now. It is stereo panning, not HRTF: a sound straight ahead and one straight
+behind sound alike, and there is no Doppler shift.
+
+### With the ECS
+
+`app.UseEcsAudio()` (or `scene.UseEcsAudio()`) adds `SpatialAudioSystem`. It places the listener at the world transform
+of the entity with an `AudioListener` component, usually the camera, and moves each `AudioEmitter`'s voice with its
+entity, in 3D (`GlobalTransform`: the listener faces the entity's -Z) or 2D (`GlobalTransform2D`):
+
+```csharp
+world.Create(cameraTransform, new Camera(), new AudioListener());
+
+var hum = spatial.Play(_engine, carPosition, loop: true, attenuation: new Attenuation(MinDistance: 3f, MaxDistance: 60f));
+world.Add(car, new AudioEmitter(hum));   // the hum follows the car from now on
+```
+
+The [Marbles](/Ion/examples/marbles/) sample clicks where each marble lands, heard from its orbiting camera.
 
 ## Configuration
 
@@ -402,7 +443,8 @@ is off by default so long headless runs do not grow memory. See [Testing](/Ion/t
 ## Known gaps
 
 
-- No 3D or positional audio, effects (reverb, filters) or user-defined buses; only `Master`, `Sfx` and `Music`.
+- Positional audio is stereo panning and distance falloff: no HRTF, Doppler or occlusion.
+- No effects (reverb, filters) or user-defined buses; only `Master`, `Sfx` and `Music`.
 - Pitch changes the playback rate, so a shifted sound is also shorter or longer (there is no time stretching).
 - Not yet verified on real R36S hardware.
 

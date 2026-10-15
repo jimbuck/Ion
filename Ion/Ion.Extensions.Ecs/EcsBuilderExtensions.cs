@@ -34,6 +34,7 @@ public static class EcsBuilderExtensions
 		services.TryAddTransient(static sp => new EcsCommandsSystem(sp.GetRequiredService<Commands>()));
 		services.TryAddTransient(static sp => new TransformPropagationSystem(sp.GetRequiredService<World>()));
 		services.TryAddTransient(static _ => new SpriteAnimationSystem());
+		services.TryAddTransient(static sp => new SpatialAudioSystem(sp.GetRequiredService<World>(), sp));
 
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IFrameStatsSource, EcsStatsSource>(static sp => new EcsStatsSource(sp.GetRequiredService<EcsWorlds>())));
 
@@ -105,6 +106,23 @@ public static class EcsBuilderExtensions
 			.UseSystem<EcsCommandsSystem>()
 			.UseSystem<TransformPropagationSystem>()
 			.UseSystem<SpriteAnimationSystem>();
+	}
+
+	/// <summary>
+	/// Adds positional audio from the ECS (<see cref="SpatialAudioSystem"/>, with the ECS systems): the listener follows the
+	/// entity with an <c>AudioListener</c>, and each <c>AudioEmitter</c>'s voice follows its entity.
+	/// </summary>
+	public static IIonApplication UseEcsAudio(this IIonApplication app)
+	{
+		ArgumentNullException.ThrowIfNull(app);
+		return app.UseEcs().UseSystem<SpatialAudioSystem>();
+	}
+
+	/// <summary>Adds positional audio from a scene's entities; see <see cref="UseEcsAudio(IIonApplication)"/>.</summary>
+	public static ISceneBuilder UseEcsAudio(this ISceneBuilder scene)
+	{
+		ArgumentNullException.ThrowIfNull(scene);
+		return scene.UseEcs().UseSystem<SpatialAudioSystem>();
 	}
 
 	/// <summary>Adds the ECS systems to a scene's schedule (for the scene's own world); see <see cref="UseEcs(IIonApplication)"/>.</summary>

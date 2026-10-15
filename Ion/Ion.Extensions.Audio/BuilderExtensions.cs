@@ -35,6 +35,8 @@ public static class BuilderExtensions
 			.AddSingleton(sp => new AudioManager(sp.GetRequiredService<AudioMixer>(), sp.GetRequiredService<IAudioOutput>(), sp.GetService<ILogger<AudioManager>>()))
 			.AddSingleton<IAudioManager>(sp => sp.GetRequiredService<AudioManager>())
 			.AddSingleton<IAssetLoader, SoundEffectLoader>()
+			.AddSingleton(sp => new SpatialAudio(sp.GetRequiredService<IAudioManager>()))
+			.AddSingleton<ISpatialAudio>(sp => sp.GetRequiredService<SpatialAudio>())
 			.AddSingleton<AudioSystem>();
 
 		return services;
@@ -75,6 +77,8 @@ public static class BuilderExtensions
 			.AddSingleton<AudioManager>(sp => sp.GetRequiredService<NullAudioManager>())
 			.AddSingleton<IAudioManager>(sp => sp.GetRequiredService<NullAudioManager>())
 			.AddSingleton<IAssetLoader, NullSoundEffectLoader>()
+			.AddSingleton(sp => new SpatialAudio(sp.GetRequiredService<IAudioManager>()))
+			.AddSingleton<ISpatialAudio>(sp => sp.GetRequiredService<SpatialAudio>())
 			.AddSingleton<AudioSystem>();
 
 		return services;

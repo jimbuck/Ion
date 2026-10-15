@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Ion;
 using Ion.Examples.Marbles;
 using Ion.Extensions.Assets;
+using Ion.Extensions.Audio;
 using Ion.Extensions.Ecs;
 using Ion.Extensions.Ecs.Rendering;
 using Ion.Extensions.Graphics;
@@ -16,7 +17,8 @@ using Ion.Extensions.Physics3D;
 using Ion.Extensions.Rendering3D;
 
 // 3D physics on the ECS module: marbles dropped onto a rippled bowl of terrain. The terrain is one mesh, drawn by the 3D
-// renderer and, from the same triangles, a static triangle-mesh collider the marbles roll on.
+// renderer and, from the same triangles, a static triangle-mesh collider the marbles roll on. Landing marbles click
+// from where they land, heard from the orbiting camera (positional audio).
 //   --Marbles:Count=<n>   the number of marbles (default 80)
 //   --Marbles:Seed=<n>    where they are dropped (default 1)
 //   --Ion:Physics3D:DebugDraw=true   draw the colliders
@@ -25,7 +27,7 @@ builder.AddIon().AddRendering3D().AddEcs().AddEcsRendering3D().AddPhysics3D().Ad
 builder.Services.AddSingleton(MarbleSettings.From(builder.Configuration));
 
 using var game = builder.Build();
-game.UseIon().UseRendering3D().UseEcs().UseEcsRendering3D().UsePhysics3D().UseSystem<MarblesSystem>();
+game.UseIon().UseRendering3D().UseEcs().UseEcsRendering3D().UsePhysics3D().UseEcsAudio().UseSystem<MarblesSystem>();
 game.Run();
 
 namespace Ion.Examples.Marbles
@@ -75,10 +77,19 @@ namespace Ion.Examples.Marbles
 
 	/// <summary>
 	/// Creates the terrain (drawn, and a static mesh collider from the same mesh), the marbles (dynamic spheres), a sun and
-	/// an orbiting camera; puts back any marble that leaves the terrain; draws the HUD.
+	/// an orbiting camera (the audio listener); clicks where marbles land; puts back any marble that leaves the terrain;
+	/// draws the HUD.
 	/// </summary>
-	public sealed class MarblesSystem(World world, IRenderer3D renderer, IPhysicsWorld3D physics, MarbleSettings settings, ISpriteBatch sprites, IAssetManager assets, ILogger<MarblesSystem> logger)
+	public sealed class MarblesSystem(World world, IRenderer3D renderer, IPhysicsWorld3D physics, ISpatialAudio spatial, IEvents events, MarbleSettings settings, ISpriteBatch sprites, IAssetManager assets, ILogger<MarblesSystem> logger)
 	{
+		/// <summary>The most clicks started in one fixed step (a whole bowl landing at once would fill the voice pool).</summary>
+		public const int MaxClicksPerStep = 4;
+
+		/// <summary>How a click falls off: full volume within 4 units, inverse beyond.</summary>
+		public static readonly Attenuation ClickFalloff = new(MinDistance: 4f, MaxDistance: 80f);
+
+		private EventReader<Collision3D> _collisions = events.Reader<Collision3D>();
+		private ISoundEffect? _click;
 		/// <summary>The marbles' radius.</summary>
 		public const float Radius = 0.5f;
 
@@ -106,6 +117,9 @@ namespace Ion.Examples.Marbles
 		/// <summary>How many marbles were resting at the last count (speed under 0.2 units per second).</summary>
 		public int Resting { get; private set; }
 
+		/// <summary>How many clicks were played.</summary>
+		public int Clicks { get; private set; }
+
 		[Init]
 		public void Init(GameTime dt)
 		{
@@ -125,11 +139,13 @@ namespace Ion.Examples.Marbles
 			}
 
 			world.SetEnvironment(new SceneEnvironment { AmbientColor = new Color(0x9C, 0xB0, 0xD0), AmbientIntensity = 0.35f });
-			_camera = world.Create(Orbit(0f), new Camera { FieldOfView = MathF.PI / 4, Near = 0.5f, Far = 200f, ClearColor = new Color(0x87, 0xA9, 0xD6) }, new EntityName("camera"));
+			// The camera is the listener: clicks are heard from where it looks.
+			_camera = world.Create(Orbit(0f), new Camera { FieldOfView = MathF.PI / 4, Near = 0.5f, Far = 200f, ClearColor = new Color(0x87, 0xA9, 0xD6) }, new AudioListener(), new EntityName("camera"));
 			world.Create(new Transform(Vector3.Zero, Transform.LookRotation(new Vector3(-0.5f, -0.75f, -0.35f), Vector3.UnitY)),
 				new DirectionalLight(new Color(0xFF, 0xF4, 0xE0), intensity: 3f), new EntityName("sun"));
 
 			_font = assets.Load<IFontSet>("Bungee-Regular.ttf").CreateStyle(20);
+			_click = assets.Load<ISoundEffect>("ping.wav");
 			logger.LogInformation("{Count} marbles on a terrain of {Triangles} triangles.", settings.Count, terrain.TriangleCount);
 		}
 
@@ -139,6 +155,28 @@ namespace Ion.Examples.Marbles
 			var x = (random.NextSingle() - 0.5f) * 24f;
 			var z = (random.NextSingle() - 0.5f) * 24f;
 			return new Vector3(x, Terrain.Height(x, z) + 4f + index % 10 * 1.2f, z);
+		}
+
+		/// <summary>
+		/// A marble that lands (a contact begins) clicks where it touched, louder the faster it goes, a little higher or
+		/// lower in pitch per marble.
+		/// </summary>
+		[FixedUpdate(Order = StageOrder.Physics + 10)]
+		public void Click(GameTime dt)
+		{
+			var started = 0;
+			foreach (ref readonly var contact in _collisions.Read())
+			{
+				if (contact.Phase != ContactPhase3D.Begin || _click is null || started >= MaxClicksPerStep) continue;
+				var marble = world.IsAlive(contact.A) && world.Has<Marble>(contact.A) ? contact.A : world.IsAlive(contact.B) && world.Has<Marble>(contact.B) ? contact.B : Entity.Null;
+				if (marble == Entity.Null) continue;
+				var speed = world.Get<RigidBody3D>(marble).LinearVelocity.Length();
+				if (speed < 1f) continue;
+				var pitch = (world.Get<Marble>(marble).Index % 7 - 3) * 0.08f;
+				spatial.Play(_click, contact.Point, volume: Math.Clamp(speed / 10f, 0.1f, 1f), pitchShift: pitch, attenuation: ClickFalloff);
+				started++;
+				Clicks++;
+			}
 		}
 
 		/// <summary>Puts back a marble that fell off the terrain, and counts the resting ones.</summary>

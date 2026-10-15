@@ -9,7 +9,7 @@ namespace Ion.Extensions.Audio;
 /// The Last step runs in the engine setup band, before user Last steps: commands issued in Init, First, FixedUpdate,
 /// Update and Render reach the audio thread the same frame, commands issued in a user Last step the next frame.
 /// </remarks>
-internal sealed class AudioSystem(AudioManager audio)
+internal sealed class AudioSystem(AudioManager audio, SpatialAudio spatial)
 {
 	/// <summary>The order of the Last step that flushes commands.</summary>
 	public const int FlushOrder = StageOrder.Audio;
@@ -18,7 +18,12 @@ internal sealed class AudioSystem(AudioManager audio)
 	public void Init() => audio.Start();
 
 	[Last(Order = FlushOrder)]
-	public void Last(GameTime dt) => audio.Update(dt.Elapsed);
+	public void Last(GameTime dt)
+	{
+		// The positional voices' gains and pans for this frame's positions go out with the frame's commands.
+		spatial.Update();
+		audio.Update(dt.Elapsed);
+	}
 
 	[Destroy(Order = -StageOrder.Audio)]
 	public void Destroy() => audio.Stop();
