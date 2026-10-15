@@ -4,8 +4,8 @@ namespace Ion.Extensions.Audio;
 
 /// <summary>
 /// A sound loaded with <c>IAssetManager.Load&lt;ISoundEffect&gt;(path)</c> and played with <see cref="IAudioManager.Play"/>.
-/// The engine decodes the whole file at load time (WAV, OGG Vorbis and MP3) into float32 samples at the mixer's
-/// output rate.
+/// The engine decodes a short file (WAV, OGG Vorbis and MP3) whole at load time into float32 samples at the mixer's
+/// output rate, and streams a long one (music), decoding it while it plays (see <c>AudioConfig.StreamLongerThan</c>).
 /// </summary>
 public interface ISoundEffect : IAsset
 {

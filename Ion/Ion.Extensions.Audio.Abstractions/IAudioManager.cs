@@ -61,6 +61,13 @@ public interface IAudioManager
 	void SetPan(VoiceHandle voice, float pan);
 
 	/// <summary>
+	/// Moves a playing voice to <paramref name="seconds"/> from the start of its sound (wrapped for a looping voice,
+	/// clamped otherwise; a voice moved to its end finishes). A streamed sound starts decoding again from there, so it is
+	/// silent for a moment if the decoder falls behind. Does nothing when the voice has finished.
+	/// </summary>
+	void Seek(VoiceHandle voice, float seconds);
+
+	/// <summary>
 	/// Whether the voice is still playing, as seen from the game thread: true from <see cref="Play"/> until it is stopped
 	/// without a fade, or until the audio thread reports that it ended (reports are collected once per frame).
 	/// </summary>

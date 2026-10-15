@@ -21,6 +21,11 @@ namespace Ion.Extensions.Audio;
 /// (a channel is attenuated only when panned away from it), then the fade. Gain changes are ramped linearly over one
 /// buffer to avoid clicks; a new voice starts at its gain. The mix is clamped to [-1, 1].
 /// </para>
+/// <para>
+/// A <see cref="StreamedSound"/> plays from a ring of decoded frames that its voice's decoder fills ahead of it
+/// (<see cref="Streamer"/>): the voice reads the ring without waiting, and plays silence (an underrun) if it ever catches
+/// up with the decoder.
+/// </para>
 /// </remarks>
 public sealed class AudioMixer : IAudioManager
 {
@@ -38,6 +43,8 @@ public sealed class AudioMixer : IAudioManager
 	private readonly bool[] _slotBusy;
 	private readonly bool[] _slotLoop;
 	private readonly long[] _slotStarted;
+	private readonly StreamCursor?[] _slotStream;
+	private readonly double _streamBufferSeconds;
 	private readonly float[] _busVolume = [1f, 1f, 1f];
 	private readonly List<AudioCommand> _pending = [];
 	private long _playSequence;
@@ -73,6 +80,8 @@ public sealed class AudioMixer : IAudioManager
 		_slotBusy = new bool[MaxVoices];
 		_slotLoop = new bool[MaxVoices];
 		_slotStarted = new long[MaxVoices];
+		_slotStream = new StreamCursor?[MaxVoices];
+		_streamBufferSeconds = config.StreamBufferSeconds;
 		_voices = new Voice[MaxVoices];
 
 		_commands = new SpscQueue<AudioCommand>(config.CommandCapacity);
@@ -84,6 +93,14 @@ public sealed class AudioMixer : IAudioManager
 
 	/// <summary>Output frames per second.</summary>
 	public int SampleRate { get; }
+
+	/// <summary>Fills the rings of the streamed voices (see <see cref="AudioStreamer"/>).</summary>
+	public AudioStreamer Streamer { get; } = new();
+
+	/// <summary>Times a streamed voice caught up with its decoder and played silence.</summary>
+	public long StreamUnderruns => Interlocked.Read(ref _streamUnderruns);
+
+	private long _streamUnderruns;
 
 	/// <summary>The size of the voice pool.</summary>
 	public int MaxVoices { get; }
@@ -170,6 +187,7 @@ public sealed class AudioMixer : IAudioManager
 	public VoiceHandle Play(ISoundEffect soundEffect, float volume = 1f, float pitchShift = 0f, float pan = 0f, bool loop = false, AudioBus bus = AudioBus.Sfx, float fadeIn = 0f)
 	{
 		ArgumentNullException.ThrowIfNull(soundEffect);
+		if (soundEffect is StreamedSound streamed) return _playStreamed(streamed, volume, pitchShift, pan, loop, bus, fadeIn);
 		var sound = GetSamples(soundEffect);
 		if (sound is null || sound.Frames == 0) return VoiceHandle.None;
 
@@ -188,12 +206,7 @@ public sealed class AudioMixer : IAudioManager
 				_stolenVoices++;
 			}
 
-			var generation = _slotGeneration[slot] + 1;
-			if (generation <= 0) generation = 1;
-			_slotGeneration[slot] = generation;
-			_slotBusy[slot] = true;
-			_slotLoop[slot] = loop;
-			_slotStarted[slot] = ++_playSequence;
+			var generation = _claim(slot, loop);
 
 			_enqueue(new AudioCommand
 			{
@@ -213,6 +226,103 @@ public sealed class AudioMixer : IAudioManager
 		}
 	}
 
+	private VoiceHandle _playStreamed(StreamedSound sound, float volume, float pitchShift, float pan, bool loop, AudioBus bus, float fadeIn)
+	{
+		// The first ring's worth is decoded here, so the voice starts with audio.
+		var cursor = _openCursor(sound, 0, loop);
+		if (cursor is null) return VoiceHandle.None;
+
+		lock (_lock)
+		{
+			var slot = _findFreeSlot();
+			if (slot < 0)
+			{
+				if (VoiceStealing == VoiceStealing.Refuse)
+				{
+					_refusedVoices++;
+					cursor.Close();
+					cursor.Fill();
+					return VoiceHandle.None;
+				}
+
+				slot = _oldestSlot();
+				_stolenVoices++;
+			}
+
+			var generation = _claim(slot, loop);
+			_slotStream[slot] = cursor;
+			Streamer.Add(cursor);
+			_enqueue(new AudioCommand
+			{
+				Kind = CommandKind.Play,
+				Slot = slot,
+				Generation = generation,
+				Stream = cursor,
+				Value = _sanitizeGain(volume),
+				Pan = _sanitizePan(pan),
+				Step = (long)Math.Round(ToPitchFactor(pitchShift) * cursor.SampleRate / SampleRate * FixedOne),
+				Frames = _frames(fadeIn),
+				Bus = _sanitizeBus(bus),
+			});
+
+			return new VoiceHandle(slot, generation);
+		}
+	}
+
+	private StreamCursor? _openCursor(StreamedSound sound, double startSeconds, bool loop)
+	{
+		var cursor = new StreamCursor(sound, startSeconds, loop, _streamBufferSeconds);
+		cursor.Fill();
+		if (cursor.Written > 0) return cursor;
+		cursor.Close();
+		cursor.Fill();
+		return null;
+	}
+
+	/// <summary>Takes <paramref name="slot"/> for a new voice (closing the stream of the voice it replaces); returns its generation.</summary>
+	private int _claim(int slot, bool loop)
+	{
+		_closeStream(slot);
+		var generation = _slotGeneration[slot] + 1;
+		if (generation <= 0) generation = 1;
+		_slotGeneration[slot] = generation;
+		_slotBusy[slot] = true;
+		_slotLoop[slot] = loop;
+		_slotStarted[slot] = ++_playSequence;
+		return generation;
+	}
+
+	private void _closeStream(int slot)
+	{
+		if (_slotStream[slot] is not { } stream) return;
+		stream.Close();
+		_slotStream[slot] = null;
+	}
+
+	/// <inheritdoc/>
+	public void Seek(VoiceHandle voice, float seconds)
+	{
+		if (!float.IsFinite(seconds)) return;
+		seconds = Math.Max(0f, seconds);
+		lock (_lock)
+		{
+			if (!_isCurrent(voice)) return;
+			if (_slotStream[voice.Slot] is { } current)
+			{
+				// A stream starts over from a new decoder at the position; the voice keeps its gains and pitch.
+				var cursor = _openCursor(current.Sound, seconds, current.Loop);
+				if (cursor is null) return;
+				current.Close();
+				_slotStream[voice.Slot] = cursor;
+				Streamer.Add(cursor);
+				_enqueue(new AudioCommand { Kind = CommandKind.Restart, Slot = voice.Slot, Generation = voice.Generation, Stream = cursor });
+				return;
+			}
+
+			_enqueue(new AudioCommand { Kind = CommandKind.Seek, Slot = voice.Slot, Generation = voice.Generation, Value = seconds });
+		}
+	}
+
 	/// <inheritdoc/>
 	public void Stop(VoiceHandle voice, float fadeOut = 0f)
 	{
@@ -224,7 +334,11 @@ public sealed class AudioMixer : IAudioManager
 		if (!_isCurrent(voice)) return;
 
 		// Without a fade the voice is gone for the game at once; with one it plays until the audio thread reports it.
-		if (frames == 0) _slotBusy[voice.Slot] = false;
+		if (frames == 0)
+		{
+			_slotBusy[voice.Slot] = false;
+			_closeStream(voice.Slot);
+		}
 
 		_enqueue(new AudioCommand { Kind = CommandKind.Stop, Slot = voice.Slot, Generation = voice.Generation, Frames = frames });
 	}
@@ -299,7 +413,9 @@ public sealed class AudioMixer : IAudioManager
 		{
 			while (_finished.TryDequeue(out var done))
 			{
-				if (_slotGeneration[done.Slot] == done.Generation) _slotBusy[done.Slot] = false;
+				if (_slotGeneration[done.Slot] != done.Generation) continue;
+				_slotBusy[done.Slot] = false;
+				_closeStream(done.Slot);
 			}
 
 			var sent = 0;
@@ -419,6 +535,29 @@ public sealed class AudioMixer : IAudioManager
 
 		ref var voice = ref _voices[command.Slot];
 
+		if (command.Kind == CommandKind.Play && command.Stream is { } stream)
+		{
+			voice = new Voice
+			{
+				Active = true,
+				Generation = command.Generation,
+				Stream = stream,
+				Frames = int.MaxValue,
+				SourceChannels = stream.Channels,
+				RateStep = (double)stream.SampleRate / SampleRate,
+				Step = command.Step,
+				Volume = command.Value,
+				Pan = command.Pan,
+				Bus = command.Bus,
+				Fade = command.Frames > 0 ? 0f : 1f,
+				FadeFrom = 0f,
+				FadeTo = 1f,
+				FadeLength = command.Frames,
+				FadeElapsed = 0,
+			};
+			return;
+		}
+
 		if (command.Kind == CommandKind.Play)
 		{
 			var sound = command.Sound!;
@@ -471,6 +610,18 @@ public sealed class AudioMixer : IAudioManager
 			case CommandKind.SetPitch:
 				voice.Step = (long)Math.Round(command.Step * voice.RateStep);
 				break;
+			case CommandKind.Restart:
+				voice.Stream = command.Stream;
+				voice.Position = 0;
+				break;
+			case CommandKind.Seek:
+				if (voice.Samples is not null && voice.Frames > 0)
+				{
+					var frame = (long)Math.Round(command.Value * voice.RateStep * SampleRate);
+					frame = voice.Loop ? frame % voice.Frames : Math.Min(frame, voice.Frames);
+					voice.Position = frame << FixedShift;
+				}
+				break;
 		}
 	}
 
@@ -493,6 +644,14 @@ public sealed class AudioMixer : IAudioManager
 		var stepL = frames > 0 ? (targetL - gainL) / frames : 0f;
 		var stepR = frames > 0 ? (targetR - gainR) / frames : 0f;
 		var ramp = stepL != 0f || stepR != 0f;
+
+		if (voice.Stream is { } stream)
+		{
+			_mixStream(ref voice, stream, slot, buffer, frames, gainL, gainR, stepL, stepR, ramp);
+			voice.GainL = targetL;
+			voice.GainR = targetR;
+			return;
+		}
 
 		var samples = voice.Samples!;
 		var soundFrames = voice.Frames;
@@ -569,6 +728,112 @@ public sealed class AudioMixer : IAudioManager
 		voice.GainR = targetR;
 	}
 
+	/// <summary>
+	/// Mixes a streamed voice from its ring. Frames are absolute from the cursor's start (a loop keeps counting), so there
+	/// is no wrap here: the voice ends at the cursor's end, and stalls in silence when it reaches what is decoded.
+	/// </summary>
+	private void _mixStream(ref Voice voice, StreamCursor stream, int slot, Span<float> buffer, int frames, float gainL, float gainR, float stepL, float stepR, bool ramp)
+	{
+		var ring = stream.Ring;
+		var capacity = stream.Capacity;
+		var stereo = voice.SourceChannels == 2;
+		var cubic = Interpolation == AudioInterpolation.Cubic;
+		var written = stream.Written;
+		var end = stream.End;
+		var position = voice.Position;
+		var step = voice.Step;
+
+		for (var i = 0; i < frames; i++)
+		{
+			var index = position >> FixedShift;
+			if (index >= end)
+			{
+				voice.Position = position;
+				stream.ReadPosition = end;
+				_finish(ref voice, slot, notify: true);
+				return;
+			}
+
+			// The interpolation reads up to two frames ahead: wait for the decoder (silence) unless the file ends first.
+			if (index + 2 >= written && written < end)
+			{
+				stream.CountUnderrun();
+				Interlocked.Increment(ref _streamUnderruns);
+				break;
+			}
+
+			var t = (uint)position * FixedToFloat;
+			float left, right;
+			if (stereo)
+			{
+				left = _streamSample(ring, capacity, 2, 0, index, t, written, cubic);
+				right = _streamSample(ring, capacity, 2, 1, index, t, written, cubic);
+			}
+			else
+			{
+				left = right = _streamSample(ring, capacity, 1, 0, index, t, written, cubic);
+			}
+
+			var fade = voice.Fade;
+			var finished = false;
+			if (voice.FadeLength > 0)
+			{
+				fade = voice.FadeFrom + (voice.FadeTo - voice.FadeFrom) * ((float)voice.FadeElapsed / voice.FadeLength);
+				voice.Fade = fade;
+				if (++voice.FadeElapsed >= voice.FadeLength)
+				{
+					voice.Fade = voice.FadeTo;
+					voice.FadeLength = 0;
+					finished = voice.StopWhenFaded;
+				}
+			}
+
+			if (ramp)
+			{
+				gainL += stepL;
+				gainR += stepR;
+			}
+
+			buffer[i * 2] += left * gainL * fade;
+			buffer[i * 2 + 1] += right * gainR * fade;
+
+			if (finished)
+			{
+				_finish(ref voice, slot, notify: true);
+				return;
+			}
+
+			position += step;
+		}
+
+		voice.Position = position;
+		stream.ReadPosition = position >> FixedShift;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static float _streamSample(float[] ring, int capacity, int channels, int channel, long index, float t, long written, bool cubic)
+	{
+		var p1 = _ringAt(ring, capacity, channels, channel, index, written);
+		if (t == 0f) return p1;
+		var p2 = _ringAt(ring, capacity, channels, channel, index + 1, written);
+		if (!cubic) return p1 + (p2 - p1) * t;
+		var p0 = _ringAt(ring, capacity, channels, channel, index - 1, written);
+		var p3 = _ringAt(ring, capacity, channels, channel, index + 2, written);
+		var a = -0.5f * p0 + 1.5f * p1 - 1.5f * p2 + 0.5f * p3;
+		var b = p0 - 2.5f * p1 + 2f * p2 - 0.5f * p3;
+		var c = -0.5f * p0 + 0.5f * p2;
+		return ((a * t + b) * t + c) * t + p1;
+	}
+
+	/// <summary>The sample at absolute frame <paramref name="index"/> of a ring: the first frame before the start, silence past what is written.</summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static float _ringAt(float[] ring, int capacity, int channels, int channel, long index, long written)
+	{
+		if (index < 0) index = 0;
+		if (index >= written) return 0f;
+		return ring[(int)(index % capacity) * channels + channel];
+	}
+
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static float _sample(float[] samples, int frames, int channels, int channel, int index, float t, bool loop, bool cubic)
 	{
@@ -637,6 +902,8 @@ public sealed class AudioMixer : IAudioManager
 		SetPitch,
 		SetPan,
 		SetBus,
+		Seek,
+		Restart,
 	}
 
 	internal struct AudioCommand
@@ -651,6 +918,7 @@ public sealed class AudioMixer : IAudioManager
 		public float Pan;
 		public long Step;
 		public SoundEffect? Sound;
+		public StreamCursor? Stream;
 	}
 
 	internal readonly record struct FinishedVoice(int Slot, int Generation);
@@ -679,5 +947,6 @@ public sealed class AudioMixer : IAudioManager
 		public long Step;
 		public double RateStep;
 		public float[]? Samples;
+		public StreamCursor? Stream;
 	}
 }

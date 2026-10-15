@@ -49,7 +49,13 @@ public class AudioManager : IAudioManager, IDisposable
 
 		try
 		{
-			Output.Start(Mixer.Format, Mixer.Render);
+			// The null output renders on the game thread: the streamed voices are filled right before each mix there.
+			if (Output is NullAudioOutput) Output.Start(Mixer.Format, _renderPumped);
+			else
+			{
+				Mixer.Streamer.Start();
+				Output.Start(Mixer.Format, Mixer.Render);
+			}
 		}
 		catch (Exception ex) when (Output is not NullAudioOutput)
 		{
@@ -85,6 +91,13 @@ public class AudioManager : IAudioManager, IDisposable
 		if (!IsStarted) return;
 		IsStarted = false;
 		Output.Stop();
+		Mixer.Streamer.Stop();
+	}
+
+	private void _renderPumped(Span<float> buffer)
+	{
+		Mixer.Streamer.Pump();
+		Mixer.Render(buffer);
 	}
 
 	private void _fallBack(Exception? error, string what)
@@ -103,7 +116,8 @@ public class AudioManager : IAudioManager, IDisposable
 		}
 
 		var fallback = new NullAudioOutput(failed.BufferSize > 0 ? failed.BufferSize : 512);
-		fallback.Start(Mixer.Format, Mixer.Render);
+		Mixer.Streamer.Stop();
+		fallback.Start(Mixer.Format, _renderPumped);
 		Output = fallback;
 		IsFallback = true;
 	}
@@ -135,6 +149,9 @@ public class AudioManager : IAudioManager, IDisposable
 	public void SetPan(VoiceHandle voice, float pan) => Mixer.SetPan(voice, pan);
 
 	/// <inheritdoc/>
+	public void Seek(VoiceHandle voice, float seconds) => Mixer.Seek(voice, seconds);
+
+	/// <inheritdoc/>
 	public bool IsPlaying(VoiceHandle voice) => Mixer.IsPlaying(voice);
 
 	/// <inheritdoc/>
@@ -154,6 +171,7 @@ public class AudioManager : IAudioManager, IDisposable
 
 		IsStarted = false;
 		Output.Dispose();
+		Mixer.Streamer.Dispose();
 		GC.SuppressFinalize(this);
 	}
 }

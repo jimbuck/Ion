@@ -157,6 +157,8 @@ Bound to `AudioConfig`.
 | `Ion:Audio:Interpolation` | `AudioInterpolation` | `Linear` | Resampling for pitch: `Linear` or `Cubic`. |
 | `Ion:Audio:VoiceStealing` | `VoiceStealing` | `Oldest` | When every voice is busy: `Oldest` replaces the voice that started first (preferring one-shots), `Refuse` returns an invalid handle. |
 | `Ion:Audio:CommandCapacity` | int | `1024` | Capacity of the lock-free queue from the game thread to the audio thread (rounded up to a power of two). |
+| `Ion:Audio:StreamLongerThan` | float | `10` | Sounds longer than this many seconds are streamed (decoded while they play); 0 or less never streams. |
+| `Ion:Audio:StreamBufferSeconds` | float | `1` | Seconds of decoded audio each streamed voice keeps ahead of the mixer. |
 
 ## Metrics (Ion:Metrics)
 

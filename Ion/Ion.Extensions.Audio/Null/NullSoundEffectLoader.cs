@@ -75,6 +75,7 @@ public sealed class NullSoundEffect : ISoundEffect
 public sealed class NullSoundEffectLoader(IPersistentStorage storage, IOptions<AudioConfig>? config = null) : IAssetLoader<ISoundEffect>
 {
 	private readonly int _outputRate = config?.Value.OutputRate ?? new AudioConfig().OutputRate;
+	private readonly float _streamLongerThan = config?.Value.StreamLongerThan ?? new AudioConfig().StreamLongerThan;
 
 	public Type AssetType { get; } = typeof(ISoundEffect);
 
@@ -85,6 +86,9 @@ public sealed class NullSoundEffectLoader(IPersistentStorage storage, IOptions<A
 		{
 			throw new FileNotFoundException($"Sound effect '{path}' was not found at '{filepath}'. File names are case-sensitive on Linux and macOS; check the casing of the name.", filepath);
 		}
+
+		// Long tracks stream here too, so a headless server does not hold a decoded copy of its music.
+		if (SoundStreaming.TryOpen(storage, path, _streamLongerThan) is { } streamed) return streamed;
 
 		byte[] bytes;
 		using (var stream = storage.Assets.Read(path))

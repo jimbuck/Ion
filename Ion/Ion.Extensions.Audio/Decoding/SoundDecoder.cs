@@ -21,7 +21,8 @@ public enum SoundFormat
 
 /// <summary>
 /// Decodes whole sound files into <see cref="SoundEffect"/>s at a given output rate, all managed code: WAV
-/// (<see cref="WavDecoder"/>), OGG Vorbis (NVorbis) and MP3 (NLayer). Used at load time; streaming is not supported yet.
+/// (<see cref="WavDecoder"/>), OGG Vorbis (NVorbis) and MP3 (NLayer). Used at load time for short sounds; long ones are
+/// streamed (<see cref="StreamedSound"/>).
 /// </summary>
 public static class SoundDecoder
 {

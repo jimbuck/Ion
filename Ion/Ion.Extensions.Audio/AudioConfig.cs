@@ -94,6 +94,19 @@ public sealed class AudioConfig
 	public int CommandCapacity { get; set; } = 1024;
 
 	/// <summary>
+	/// Sounds longer than this many seconds are streamed (<see cref="StreamedSound"/>): decoded while they play, a piece
+	/// at a time, instead of whole when they load. Shorter ones are decoded whole, so they start instantly and any number
+	/// of voices share one copy. 0 or less never streams. Defaults to 10 (music streams, sound effects do not).
+	/// </summary>
+	public float StreamLongerThan { get; set; } = 10f;
+
+	/// <summary>
+	/// Seconds of decoded audio each streamed voice keeps ahead of the mixer. Larger rides out slower decoding (or a
+	/// stalled background thread) at the cost of memory: one second of 44.1 kHz stereo is 350 KB. Defaults to 1.
+	/// </summary>
+	public float StreamBufferSeconds { get; set; } = 1f;
+
+	/// <summary>
 	/// Throws <see cref="ArgumentOutOfRangeException"/> when a value is out of range.
 	/// </summary>
 	public void Validate()
@@ -108,5 +121,7 @@ public sealed class AudioConfig
 		ArgumentOutOfRangeException.ThrowIfGreaterThan(BufferCount, 64, nameof(BufferCount));
 		ArgumentOutOfRangeException.ThrowIfLessThan(CommandCapacity, 16, nameof(CommandCapacity));
 		ArgumentOutOfRangeException.ThrowIfGreaterThan(CommandCapacity, 1 << 20, nameof(CommandCapacity));
+		if (!(StreamBufferSeconds >= 0.05f) || StreamBufferSeconds > 30f) throw new ArgumentOutOfRangeException(nameof(StreamBufferSeconds), StreamBufferSeconds, "StreamBufferSeconds must be between 0.05 and 30.");
+		if (float.IsNaN(StreamLongerThan)) throw new ArgumentOutOfRangeException(nameof(StreamLongerThan), StreamLongerThan, "StreamLongerThan must be a number.");
 	}
 }

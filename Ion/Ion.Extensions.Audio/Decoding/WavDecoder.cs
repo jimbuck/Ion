@@ -113,7 +113,7 @@ public static class WavDecoder
 		return new DecodedAudio(output, outChannels, sampleRate, channels);
 	}
 
-	private static float _read(ReadOnlySpan<byte> s, ushort format, int bits)
+	internal static float _read(ReadOnlySpan<byte> s, ushort format, int bits)
 	{
 		if (format == FormatFloat)
 		{

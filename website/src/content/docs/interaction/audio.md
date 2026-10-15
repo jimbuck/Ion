@@ -92,8 +92,9 @@ var theme = assets.Load<ISoundEffect>("music/theme.ogg");
 Console.WriteLine($"{theme.Duration:0.0} s, {theme.Channels} channels, {theme.SampleRate} Hz");
 ```
 
-The loader (`SoundEffectLoader`) decodes the whole file at load time, in managed code that is NativeAOT-clean, and
-resamples it once to the mixer's output rate with a windowed-sinc filter:
+The loader (`SoundEffectLoader`) decodes a short file whole at load time, in managed code that is NativeAOT-clean, and
+resamples it once to the mixer's output rate with a windowed-sinc filter. A long file (music) is streamed instead: see
+[Streamed sounds](#streamed-sounds). The decoders are the same either way:
 
 | Format | Decoder | Notes |
 |---|---|---|
@@ -163,6 +164,7 @@ audio.Stop(engine, fadeOut: 0.25f);
 | `Stop(voice, fadeOut = 0)` | Stops the voice now, or after fading out over `fadeOut` seconds. |
 | `StopAll(fadeOut = 0)` | Stops every voice. |
 | `SetVolume(voice, volume)`, `SetPitch(voice, pitchShift)`, `SetPan(voice, pan)` | Change a playing voice. |
+| `Seek(voice, seconds)` | Moves the voice to `seconds` from the start of its sound (wrapped for a looping voice). A streamed voice starts decoding again from there. |
 | `IsPlaying(voice)` | True from `Play` until the voice is stopped without a fade, or until the audio thread reports that it ended (reports are collected once per frame, in `Last`). |
 | `VoiceHandle.IsValid` | False for `VoiceHandle.None` (`default`) and for a play that was refused. |
 
@@ -194,12 +196,38 @@ public sealed class MusicSystem(IAssetManager assets, IAudioManager audio)
 }
 ```
 
-:::caution[Streaming music is not implemented yet]
-Every sound, music included, is decoded whole into float32 stereo at the output rate. That is about 384 KB per second
-at 48 kHz, so a three-minute track takes around 69 MB of memory once loaded, and the decode happens on the thread that
-calls `Load`. Keep tracks short or loop them, load them during a loading screen, and consider a lower
-`Ion:Audio:OutputRate` on memory-constrained devices. Streaming decode is planned.
-:::
+A track longer than `Ion:Audio:StreamLongerThan` (10 seconds by default) is streamed, so a three-minute song takes a
+few hundred kilobytes while it plays instead of 69 MB.
+
+## Streamed sounds
+
+A sound is either decoded whole when it loads (a `SoundEffect`) or decoded while it plays (a `StreamedSound`). The
+loader picks by length, read from the file's headers without decoding it:
+
+| | Decoded whole (`SoundEffect`) | Streamed (`StreamedSound`) |
+|---|---|---|
+| Used for | Sounds up to `StreamLongerThan` seconds (10): effects, short loops | Longer ones: music, ambience, speech |
+| Memory | The whole sound as float32 at the output rate: about 384 KB per second of stereo at 48 kHz | Per playing voice, a ring of `StreamBufferSeconds` (1) of decoded audio (350 KB for 44.1 kHz stereo) and a decoder |
+| Load time | Decodes the whole file | Reads the headers only |
+| Playing it | Starts at once; any number of voices share the samples | Each voice opens the file and decodes the first second when it starts, then a background thread decodes ahead of it |
+| Loop, seek, pitch, pan, fades, buses | Yes | Yes |
+
+Both kinds are `ISoundEffect`s and play the same way. `Seek(voice, seconds)` works on both; a streamed voice reopens its
+decoder at the new position. A streamed loop is seamless, since the decoder carries straight on from the end to the
+start.
+
+A streamed voice reads its file while it plays, so the file must stay readable. A source that cannot seek (such as
+some platform asset streams) is read into memory once, still compressed. A WAV file is already PCM, so a long one
+streamed from disk takes no extra memory beyond its ring.
+
+The background thread (`AudioMixer.Streamer`) runs while a device plays. With the null output (headless runs and
+tests) the rings are filled on the game thread just before each mix instead, so headless runs stay deterministic. If a
+streamed voice ever catches up with its decoder, it plays silence until the decoder catches up, and
+`AudioMixer.StreamUnderruns` counts it. A larger `StreamBufferSeconds` rides out slow devices.
+
+Set `StreamLongerThan` to `0` to decode everything whole, or to a small value to stream more. To stream one sound
+regardless of the setting, create it yourself:
+`new StreamedSound("theme", () => File.OpenRead(path))`.
 
 ## Buses and volume
 
@@ -269,7 +297,9 @@ audio.Play(_explosion, volume: volume, pan: pan);
       "Device": null,
       "Interpolation": "Linear",
       "VoiceStealing": "Oldest",
-      "CommandCapacity": 1024
+      "CommandCapacity": 1024,
+      "StreamLongerThan": 10,
+      "StreamBufferSeconds": 1
     }
   }
 }
@@ -286,6 +316,8 @@ audio.Play(_explosion, volume: volume, pan: pan);
 | `Interpolation` | `Linear` | `Linear`, `Cubic` | Resampling for pitch. `Cubic` (Catmull-Rom) is smoother at high shifts and costs about twice as much. |
 | `VoiceStealing` | `Oldest` | `Oldest`, `Refuse` | When the pool is full: replace the voice that started first (preferring one-shots over loops), or refuse (`Play` returns an invalid handle). |
 | `CommandCapacity` | `1024` | 16 to 1048576 | The game-to-audio command queue, rounded up to a power of two. Commands that do not fit wait on the game thread until the next frame. |
+| `StreamLongerThan` | `10` | seconds | Sounds longer than this are [streamed](#streamed-sounds); 0 or less never streams. |
+| `StreamBufferSeconds` | `1` | 0.05 to 30 | Decoded audio each streamed voice keeps ahead of the mixer. |
 
 Output latency is about `BufferFrames * BufferCount / OutputRate`: 43 ms with the defaults. Lower `BufferFrames` for
 snappier sound at the risk of underruns on slow devices. From the command line, use the long form, for example
@@ -363,13 +395,13 @@ host.Step(20);
 float[] samples = output.Captured;   // interleaved stereo at the output rate
 ```
 
-The headless loader (`NullSoundEffectLoader`) reads the WAV header and decodes the samples too, so headless runs mix
-real audio and a test can compare the output sample by sample. The engine's own test does this with `bonk.wav`. Capture
+The headless loader (`NullSoundEffectLoader`) reads the WAV header and decodes the samples too (and streams long
+tracks, like the device loader), so headless runs mix real audio and a test can compare the output sample by sample. The engine's own test does this with `bonk.wav`. Capture
 is off by default so long headless runs do not grow memory. See [Testing](/Ion/tooling/testing/).
 
 ## Known gaps
 
-- No streaming decode: long music is decoded whole at load time (planned).
+
 - No 3D or positional audio, effects (reverb, filters) or user-defined buses; only `Master`, `Sfx` and `Music`.
 - Pitch changes the playback rate, so a shifted sound is also shorter or longer (there is no time stretching).
 - Not yet verified on real R36S hardware.
