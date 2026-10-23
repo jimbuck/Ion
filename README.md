@@ -773,11 +773,6 @@ Adds support for scenes that each have their own scope for dependency injection 
 
 ----
 
-## Planned Modules
- - Web-based UI Framework
- - WebSocket transport for the networking module (browser clients)
- - Multi-platform build support
-
 ## Built Using/Inspired By
   - [Silk.NET](https://github.com/dotnet/Silk.NET) for windowing, input, Vulkan, Shaderc and SPIRV-Cross
   - [FontStashSharp](https://github.com/FontStashSharp/FontStashSharp) for text and [ImageSharp](https://github.com/SixLabors/ImageSharp) for image decoding
@@ -786,7 +781,84 @@ Adds support for scenes that each have their own scope for dependency injection 
 
 ## Roadmap
 
-See [docs/plans/2026-09-engine-review-and-roadmap.md](./docs/plans/2026-09-engine-review-and-roadmap.md) for the current review, benchmark baseline and staged plan. Micro-benchmarks live in `Ion/Ion.Benchmarks`.
+An area is checked once everything under it is done. The staged plan, with the benchmark baseline and the reasoning behind each decision, is in [docs/plans/2026-09-engine-review-and-roadmap.md](./docs/plans/2026-09-engine-review-and-roadmap.md); micro-benchmarks live in `Ion/Ion.Benchmarks`.
+
+- [x] **Core**
+  - [x] Ordered schedule of steps, validated at build, printable (`--Ion:PrintSchedule=true`)
+  - [x] Compile-time schedule from the source generator, with clean stack traces
+  - [x] Typed, unboxed event channels
+  - [x] Coroutines, asset caching and hot reload, per-game storage
+  - [x] .NET 10, NativeAOT-clean
+- [ ] **Configuration and setup**
+  - [x] ASP.NET Core-style builder, modules that pull in their dependencies
+  - [ ] Options bound through the configuration-binding generator in every module, with `[OptionsValidator]`
+  - [ ] A `new`-based composition root (no reflection at startup)
+  - [ ] Registering and scheduling a system in one call
+- [ ] **Graphics**
+  - [x] RHI with Vulkan and OpenGL ES backends, headless and offscreen rendering
+  - [x] Build-time shaders (GLSL to SPIR-V and GLSL ES)
+  - [x] 2D sprite batch, render targets, text
+  - [x] GPU compute (particles sample)
+  - [ ] Even frame pacing with VSync on Vulkan (`VK_KHR_present_wait`)
+  - [ ] C# resource layouts generated from shader reflection
+- [x] **3D**
+  - [x] PBR materials, glTF 2.0 models, skybox and image-based ambient
+  - [x] Cascaded shadow maps, MSAA, HDR and post-processing
+  - [x] Skinned meshes and skeletal animation
+- [ ] **ECS** (Arch 2.1)
+  - [x] Transforms and hierarchy, `[Query]` steps, parallel queries, commands
+  - [x] 2D and 3D render extraction, inherited visibility
+  - [x] Saving and loading worlds, scene world files and prefabs
+  - [x] Transform interpolation between fixed steps (3D)
+  - [ ] Transform interpolation for 2D transforms
+- [ ] **Physics**
+  - [x] 2D on Box2D v3, 3D on BepuPhysics v2
+  - [x] Compound bodies, bodies on child entities, 3D triangle-mesh colliders
+  - [ ] 2D chain and segment shapes
+  - [ ] 3D joint motors and limits
+  - [ ] Shape casts
+  - [ ] Box2D natives built without FMA on CI, for lockstep across architectures
+- [x] **Audio**
+  - [x] Engine-owned mixer on OpenAL Soft
+  - [x] Positional audio and streamed music
+- [x] **Input**
+  - [x] Keyboard, mouse, gamepad and touch; recorded input
+  - [x] IME composition
+- [ ] **UI**
+  - [x] Immediate-mode UI with focus navigation, inspectable over `IUiTree`
+  - [x] Text selection, clipboard, multi-line text areas, on-screen keyboard
+  - [x] Dear ImGui module
+  - [ ] Flex shrink
+  - [ ] Drag-to-scroll gestures and nested scroll views that follow the focus
+  - [ ] Web-based UI framework
+- [ ] **Web server**
+  - [x] HTTP/1.1 and WebSocket server with generated routes
+  - [x] Companion apps (phone controller sample)
+  - [ ] TLS, HTTP/2 and compression
+  - [ ] Streamed bodies and server-sent events
+  - [ ] Route constraints and scene-scoped endpoints
+- [ ] **Networking**
+  - [x] Replicated components with delta encoding, typed network messages
+  - [x] LiteNetLib (UDP) and WebSocket transports
+  - [x] Client prediction, lag compensation, whole-schedule rollback
+  - [x] Replication in scene worlds
+  - [ ] Clock-rate nudging
+  - [ ] Grid interest management and bandwidth-aware snapshot prioritization
+  - [ ] NAT punch-through
+- [ ] **Platforms**
+  - [x] Windows, Linux and macOS publishing presets (`ion publish`)
+  - [x] R36S (ArkOS) preset, Android and iOS heads
+  - [ ] Verified on R36S, Android and iPad hardware
+  - [ ] Scaled views for fixed-size layouts on small and phone screens
+  - [ ] Signing and store packaging
+  - [ ] Browser target
+- [ ] **Tooling**
+  - [x] Remote protocol, `ion` CLI, MCP server and templates
+  - [x] Metrics: frame profiler, Chrome trace and Tracy export, frame log, overlay
+  - [x] Golden-image and replay tests for the samples
+  - [ ] Documentation site generated from the XML docs
+  - [ ] Hot-reload results on the remote protocol
+  - [ ] NativeAOT build of the `ion` tool
 
 ## Contributing
 
