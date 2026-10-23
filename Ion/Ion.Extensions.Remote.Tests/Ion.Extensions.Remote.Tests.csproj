@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Platforms>AnyCPU</Platforms>
+    <!-- The remote module is compiled out of Release builds by default; the tests run in Release. -->
+    <IonRemote>true</IonRemote>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Ion.Core.Tests\TestConstants.cs" Link="TestConstants.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Testing\Ion.Testing.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Remote\Ion.Extensions.Remote.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Ecs\Ion.Extensions.Ecs.csproj" />
+    <!-- The UI and 2D physics remote integrations, driven over the protocol. -->
+    <ProjectReference Include="..\Ion.Extensions.UI\Ion.Extensions.UI.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.UI.Remote\Ion.Extensions.UI.Remote.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Physics2D.Remote\Ion.Extensions.Physics2D.Remote.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="System.Numerics" />
+    <Using Include="System.Text.Json.Nodes" />
+  </ItemGroup>
+</Project>

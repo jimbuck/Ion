@@ -1,0 +1,361 @@
+---
+title: Your first game
+description: Build a small Ion game step by step, with a system, a sprite, keyboard input and an event, then run it windowed, headless and under test.
+sidebar:
+  order: 3
+---
+
+import { Steps, FileTree } from '@astrojs/starlight/components';
+
+In this tutorial you build **Starship**: a ship sprite that you steer left and right to catch falling stars. Along the
+way you meet the pieces every Ion game uses: the builder in `Program.cs`, systems with stage attributes, the sprite batch,
+input, an event, and a headless test that runs your real `Program.cs`.
+
+It takes about fifteen minutes. You need the .NET 10 SDK and the `ion` tool or the `Ion.Templates` pack (see
+[Installation](/Ion/getting-started/installation/)).
+
+<Steps>
+
+1. **Create the project**
+
+   Start from the 2D template. It gives you a game project, a test project and a working configuration:
+
+   ```bash
+   ion new 2d Starship
+   cd Starship
+   ```
+
+   (With the template pack: `dotnet new ion-2d -n Starship`.) If the Ion packages are not on your feed, add
+   `--ion-source <path to an Ion checkout>`.
+
+   The template ships a paddle game. Delete its game files and its snapshot so you can write your own:
+
+   ```bash
+   rm Starship/PaddleSystem.cs Starship/Game.cs Starship.Tests/Golden/state-300.json
+   ```
+
+   You are left with this layout (you will create the files marked new; `Program.cs` and `GameTests.cs` get replaced):
+
+   <FileTree>
+   - Starship.slnx
+   - Directory.Build.props
+   - Directory.Build.targets
+   - CLAUDE.md
+   - Starship/
+     - Assets/
+       - ship.png new
+     - Program.cs
+     - GameState.cs new
+     - ShipSystem.cs new
+     - ScoreSystem.cs new
+     - appsettings.json
+     - Starship.csproj
+   - Starship.Tests/
+     - GameTests.cs
+     - Golden/ empty now
+     - Starship.Tests.csproj
+   </FileTree>
+
+   `appsettings.json` keeps a `Game` section with the paddle game's speeds; it does no harm, and you can delete it.
+   `CLAUDE.md` still describes `PaddleSystem`; update it when you are done (it is the file coding agents read first).
+
+2. **Add a sprite**
+
+   Put any small PNG (64 by 64 pixels works well) at `Starship/Assets/ship.png`. It must be a real image file: the
+   headless texture loader used by the tests reads its header for the size. The project file already copies everything
+   under `Assets/` to the output folder (of the game and, through the project reference, of the tests):
+
+   ```xml title="Starship/Starship.csproj"
+   <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+   ```
+
+   Assets are loaded by path relative to that folder, so this file is `"ship.png"` in code. Paths are case-sensitive on
+   Linux and macOS.
+
+3. **Hold the game state in a service**
+
+   Keep what changes during play in a plain class. Registering it as a singleton lets every system and every test reach
+   the same instance:
+
+   ```csharp title="Starship/GameState.cs"
+   using System.Numerics;
+
+   namespace Starship;
+
+   /// <summary>Everything that changes during play.</summary>
+   public sealed class GameState
+   {
+       public Vector2 Ship { get; set; }
+       public Vector2 Star { get; set; }
+       public int Score { get; set; }
+   }
+
+   /// <summary>Emitted when the ship catches a star.</summary>
+   public record struct StarCaught(int Points);
+   ```
+
+   `StarCaught` is an event. Ion events are unmanaged structs, usually `record struct`s.
+
+4. **Write the ship system**
+
+   A system is a class whose constructor parameters are injected services and whose public methods carry a stage
+   attribute. `[Init]` runs once before the first frame, `[Update]` once per frame, `[FixedUpdate]` at a fixed 60 Hz, and
+   `[Render]` once per frame inside the engine's sprite batch scope:
+
+   ```csharp title="Starship/ShipSystem.cs"
+   using System.Numerics;
+
+   using Ion;
+   using Ion.Extensions.Assets;
+   using Ion.Extensions.Graphics;
+
+   namespace Starship;
+
+   public sealed class ShipSystem(GameState state, IInputState input, IWindow window, ISpriteBatch sprites, IAssetManager assets, IEvents events)
+   {
+       public const float Speed = 400f;
+       public const float FallSpeed = 150f;
+       public static readonly Vector2 ShipSize = new(64, 64);
+       public static readonly Vector2 StarSize = new(16, 16);
+
+       private readonly Random _random = new(1);
+       private ITexture2D _ship = null!;
+
+       [Init]
+       public void Load(GameTime dt)
+       {
+           _ship = assets.Load<ITexture2D>("ship.png");
+           state.Ship = new Vector2((window.Size.X - ShipSize.X) / 2, window.Size.Y - ShipSize.Y - 16);
+           SpawnStar();
+       }
+
+       // Input and movement that should follow the display rate: once per frame.
+       [Update]
+       public void Steer(GameTime dt)
+       {
+           var direction = 0f;
+           if (input.Down(Key.Left) || input.Down(Key.A)) direction -= 1;
+           if (input.Down(Key.Right) || input.Down(Key.D)) direction += 1;
+
+           var x = Math.Clamp(state.Ship.X + direction * Speed * dt.Delta, 0, window.Size.X - ShipSize.X);
+           state.Ship = new Vector2(x, state.Ship.Y);
+
+           if (input.Pressed(Key.Escape)) events.Emit<ExitGameEvent>();
+       }
+
+       // Simulation: a fixed step, so the game plays the same at any frame rate.
+       [FixedUpdate]
+       public void Fall(GameTime dt)
+       {
+           state.Star += new Vector2(0, FallSpeed * dt.Delta);
+
+           if (Overlaps(state.Star, StarSize, state.Ship, ShipSize))
+           {
+               events.Emit(new StarCaught(10));
+               SpawnStar();
+           }
+           else if (state.Star.Y > window.Size.Y)
+           {
+               SpawnStar();
+           }
+       }
+
+       [Render]
+       public void Draw(GameTime dt)
+       {
+           sprites.Draw(_ship, state.Ship, ShipSize);
+           sprites.DrawRect(Color.Gold, state.Star, StarSize);
+       }
+
+       private void SpawnStar() =>
+           state.Star = new Vector2(_random.NextSingle() * (window.Size.X - StarSize.X), -StarSize.Y);
+
+       private static bool Overlaps(Vector2 a, Vector2 aSize, Vector2 b, Vector2 bSize) =>
+           a.X < b.X + bSize.X && b.X < a.X + aSize.X && a.Y < b.Y + bSize.Y && b.Y < a.Y + aSize.Y;
+   }
+   ```
+
+   A few things to notice:
+
+   - `dt.Delta` is the frame's duration in seconds. In `[FixedUpdate]` it is always the fixed step (1/60 s by default).
+   - `input.Down` is true while a key is held; `input.Pressed` is true only on the frame it went down.
+   - Emitting `ExitGameEvent` ends the game after the current frame. Closing the window does the same.
+   - `ISpriteBatch` calls work from any `[Render]` step: the engine opens the batch before your steps and flushes it after.
+
+5. **Count the score with an event reader**
+
+   A second system reads `StarCaught`. Create the reader once and keep it in a field that is **not** `readonly`:
+
+   ```csharp title="Starship/ScoreSystem.cs"
+   using Ion;
+
+   namespace Starship;
+
+   public sealed class ScoreSystem(GameState state, IEvents events)
+   {
+       private EventReader<StarCaught> _caught = events.Reader<StarCaught>();
+
+       [Update]
+       public void Tally(GameTime dt)
+       {
+           foreach (var e in _caught.Read()) state.Score += e.Points;
+       }
+   }
+   ```
+
+   `Read()` returns every event this reader has not seen yet as a span, without allocating. The event was emitted in
+   `FixedUpdate` earlier in the same frame, so `Update` sees it immediately.
+
+6. **Register everything in Program.cs**
+
+   Replace `Starship/Program.cs` with the game's setup. `builder.AddX()` registers services, `game.UseX()` adds systems to
+   the schedule:
+
+   ```csharp title="Starship/Program.cs"
+   using Microsoft.Extensions.DependencyInjection;
+
+   using Ion;
+   using Starship;
+
+   var builder = IonApplication.CreateBuilder(args);
+   builder.AddIon(graphics => graphics.ClearColor = new Color(0x10, 0x14, 0x24))
+       .AddSystem<ShipSystem>()
+       .AddSystem<ScoreSystem>();
+   builder.Services.AddSingleton<GameState>();
+
+   using var game = builder.Build();
+   game.UseIon()
+       .UseSystem<ShipSystem>()
+       .UseSystem<ScoreSystem>();
+   game.Run();
+   ```
+
+   `AddIon()` registers the engine core: window and input, graphics, the 2D renderer, audio, assets and more; its
+   delegate sets the clear color (`Color` lives in the `Ion` namespace). `AddSystem<T>()` registers a system as a
+   singleton. Keep these calls in `Program.cs` (or methods it calls): the Ion source generator reads them and compiles
+   the schedule into direct method calls.
+
+   The template's `Program.cs` also registered the paddle state as a remote resource (`AddRemoteResource`); you dropped
+   that with `Game.cs`. See [Remote protocol](/Ion/tooling/remote-protocol/) to expose `GameState` the same way.
+
+7. **Run it in a window**
+
+   ```bash
+   cd Starship
+   dotnet run
+   ```
+
+   A 960 by 540 window opens (the size comes from `Ion:Window` in `appsettings.json`). Steer with the arrow keys or A
+   and D; press Escape to quit.
+
+   Ion reads `appsettings.json` from the executable's folder (the build copies it there), so
+   `dotnet run --project Starship` from the solution folder picks up the same settings.
+
+8. **Run it headless**
+
+   The same game runs without a window, GPU or audio device. Add a frame count so it stops on its own:
+
+   ```bash
+   dotnet run -- --headless --Ion:Run:Frames=600
+   ```
+
+   Headless runs with a frame count use a deterministic clock (exactly one 60 Hz frame per frame), so every run of the
+   same build produces the same state. With the `ion` tool, you also get a JSON summary and a non-zero exit code if the
+   game threw:
+
+   ```bash
+   ion run --headless --frames 600 --summary out/run.json
+   ion schedule        # every stage's steps, in the order they run
+   ```
+
+   `ion schedule` shows your `ShipSystem.Steer` and `ScoreSystem.Tally` at order 0 in `Update`, after the engine's setup
+   steps (negative orders, such as the coroutine runner at -600) and before the engine's teardown steps (positive
+   orders, such as the window close check at 900 in `Render`).
+
+9. **Test it**
+
+   Replace `Starship.Tests/GameTests.cs` with tests that run your real `Program.cs` headless:
+
+   ```csharp title="Starship.Tests/GameTests.cs"
+   using Ion;
+   using Ion.Testing;
+
+   namespace Starship.Tests;
+
+   public sealed class GameTests
+   {
+       [Fact]
+       public void HoldingRightMovesTheShipRight()
+       {
+           using var run = IonTestHost.RunEntryPoint<Program>(1);
+           var state = run.Get<GameState>();
+           var start = state.Ship.X;
+
+           run.Host.Input.Press(Key.Right);   // applied at the start of the next frame
+           run.Host.Step(30);                 // half a second at 60 frames per second
+
+           Assert.InRange(state.Ship.X - start, 150, 250);
+       }
+
+       [Fact]
+       public void CatchingAStarScoresTenPoints()
+       {
+           using var host = new IonTestHost().UseEntryPoint<Program>();
+           var caught = host.Collect<StarCaught>();   // starts the game and records every StarCaught
+
+           var state = host.Get<GameState>();
+           state.Star = state.Ship;                    // drop the star onto the ship
+           host.Step();
+
+           Assert.Single(caught);
+           Assert.Equal(10, state.Score);
+       }
+   }
+   ```
+
+   ```bash
+   cd ..
+   dotnet test
+   ```
+
+   `IonTestHost.RunEntryPoint<Program>(frames)` runs `Program.cs` on its own thread up to `game.Run()`, then takes over
+   the application: headless, on a fixed 60 Hz clock, with scripted input (`host.Input`). The Ion generator makes the
+   top-level `Program` class public so the test project can name it, and the test namespace `Starship.Tests` sees
+   `GameState` and `StarCaught` from `Starship` without a `using`.
+
+   In the second test, `Collect<StarCaught>()` starts the game (`Init` runs, the star is spawned), then the test drops
+   the star onto the ship. The next frame's `FixedUpdate` catches it and emits the event, and `Update` tallies it in the
+   same frame.
+
+</Steps>
+
+:::caution[Common first mistakes]
+- **A step that never runs.** Stage methods must be `public` (a private one is error `ION004`), and the system must be
+  both registered (`AddSystem<T>()`, else `ION009`) and added (`UseSystem<T>()`). A system added but without any stage
+  method logs warning `ION013`.
+- **An `async` step.** Steps are synchronous; `async` or `Task`-returning steps are error `ION005`. Use a coroutine or
+  state across frames instead.
+- **A reader in a `readonly` field.** The reader is a struct; in a `readonly` field every read advances a copy, so it
+  sees the same events forever (`ION106`).
+- **Moving things in `Render`.** Keep simulation in `FixedUpdate` or `Update`; `Render` should only draw.
+:::
+
+## What you built
+
+| Piece | Where | Concept |
+|---|---|---|
+| `IonApplication.CreateBuilder`, `AddIon`, `AddSystem`, `UseSystem`, `Run` | `Program.cs` | [The application](/Ion/concepts/application/) |
+| `[Init]`, `[Update]`, `[FixedUpdate]`, `[Render]` | `ShipSystem` | [Stages](/Ion/concepts/stages/), [Systems](/Ion/concepts/systems/) |
+| `GameTime.Delta`, fixed step | `ShipSystem` | [Time and determinism](/Ion/concepts/time-and-determinism/) |
+| `IEvents.Emit`, `EventReader<T>` | `ShipSystem`, `ScoreSystem` | [Events](/Ion/concepts/events/) |
+| `ISpriteBatch.Draw`, `IAssetManager.Load` | `ShipSystem` | [Sprites](/Ion/rendering/sprites/), [Assets](/Ion/rendering/assets/) |
+| `IInputState.Down`, `Pressed` | `ShipSystem` | [Keyboard and mouse](/Ion/interaction/input/keyboard-and-mouse/) |
+| `IonTestHost.RunEntryPoint<Program>` | `GameTests` | [Testing](/Ion/tooling/testing/) |
+
+## Where to go from here
+
+- Show the score on screen with a font: `assets.Load<IFontSet>("MyFont.ttf").CreateStyle(24)` and
+  `sprites.DrawString(...)`. See [Text](/Ion/rendering/text/).
+- Play a sound when a star is caught. See [Audio](/Ion/interaction/audio/).
+- Rebuild the game on the ECS with the `ecs` template. See [ECS overview](/Ion/ecs/overview/).
+- Read the [next steps](/Ion/getting-started/next-steps/) for a guided path through the rest of the docs.

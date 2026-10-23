@@ -1,0 +1,313 @@
+using System.Numerics;
+using System.Runtime.CompilerServices;
+
+using Arch.Core;
+
+using Ion.Extensions.Graphics;
+
+namespace Ion.Extensions.Ecs;
+
+/// <summary>
+/// Computes <see cref="GlobalTransform2D"/> from <see cref="Transform2D"/> and <see cref="GlobalTransform"/> from
+/// <see cref="Transform"/>, down the <see cref="Parent"/>/<see cref="Children"/> hierarchy, and the <see cref="Aabb2D"/> of
+/// sprites.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Runs at <see cref="StageOrder.TransformPropagation"/> in Last (after the frame's gameplay, so the next frame reads fresh
+/// world transforms) and again in Render before the extraction (<see cref="StageOrder.Extract"/>), so a frame draws what
+/// its own Update did and entities created this frame are not drawn at the origin; the second pass only recomputes what
+/// changed since the first. The Render pass also updates <see cref="Aabb2D"/>.
+/// </para>
+/// <para>
+/// It records the <see cref="Transform"/> of every entity with a <see cref="TransformInterpolation"/> at the end of each
+/// fixed step (<see cref="StageOrder.TransformInterpolation"/>), and the Render pass draws those entities between their
+/// last two records at <see cref="GameTime.Alpha"/>; the Last pass computes their simulated world transforms, which
+/// gameplay reads.
+/// </para>
+/// <para>
+/// It first adds the missing <see cref="GlobalTransform2D"/>, <see cref="GlobalTransform"/> and (for sprites)
+/// <see cref="Aabb2D"/> components with Arch's bulk operations, then walks the tree: roots (entities without a
+/// <see cref="Parent"/>) in query order, children in their <see cref="Children"/> order, so the order is deterministic.
+/// An entity is recomputed only when its local transform differs from the one its global transform was computed from,
+/// or its parent was recomputed (a dirty-tree walk without change flags). Children need a transform of the same kind as
+/// their parent; an entity whose parent has none is not reached.
+/// </para>
+/// <para>
+/// It also works out whether each entity is hidden (<see cref="GlobalTransform2D.IsHidden"/>,
+/// <see cref="GlobalTransform.IsHidden"/>): tagged <see cref="Hidden"/> itself, or under a hidden ancestor. That is
+/// refreshed on every visit, so hiding or showing a parent takes effect for its whole subtree at the next propagation.
+/// </para>
+/// <para>
+/// When the walk finds a dead child, or reaches fewer children than there are entities with a <see cref="Parent"/>, it
+/// calls <see cref="HierarchyExtensions.RepairHierarchy"/>: an entity destroyed with a plain <c>World.Destroy</c> takes its
+/// descendants with it at the next propagation.
+/// </para>
+/// </remarks>
+public sealed class TransformPropagationSystem(World world)
+{
+	private static readonly QueryDescription Missing2D = new QueryDescription().WithAll<Transform2D>().WithNone<GlobalTransform2D>();
+	private static readonly QueryDescription Missing3D = new QueryDescription().WithAll<Transform>().WithNone<GlobalTransform>();
+	private static readonly QueryDescription MissingBounds = new QueryDescription().WithAll<Sprite, GlobalTransform2D>().WithNone<Aabb2D>();
+	private static readonly QueryDescription Roots2D = new QueryDescription().WithAll<Transform2D, GlobalTransform2D>().WithNone<Parent>();
+	private static readonly QueryDescription Roots3D = new QueryDescription().WithAll<Transform, GlobalTransform>().WithNone<Parent>();
+	private static readonly QueryDescription Bounds = new QueryDescription().WithAll<Sprite, GlobalTransform2D, Aabb2D>();
+	private static readonly QueryDescription Parented = new QueryDescription().WithAll<Parent>();
+	private static readonly QueryDescription Interpolated = new QueryDescription().WithAll<Transform, TransformInterpolation>();
+
+	private int _updated;
+	private int _visited;
+	private int _childVisits;
+	private bool _sawDead;
+	// The Render pass's GameTime.Alpha, at which the TransformInterpolation entities are drawn between records; -1 otherwise.
+	private float _alpha = -1;
+
+	/// <summary>The world.</summary>
+	public World World => world;
+
+	/// <summary>The number of global transforms recomputed by the last <see cref="Propagate()"/>.</summary>
+	public int LastUpdated { get; private set; }
+
+	/// <summary>The number of entities visited by the last <see cref="Propagate()"/>.</summary>
+	public int LastVisited { get; private set; }
+
+	/// <summary>Propagates after the frame's gameplay (Last).</summary>
+	[Last(Order = StageOrder.TransformPropagation)]
+	public void PropagateLast(GameTime dt) => Propagate();
+
+	/// <summary>
+	/// Propagates what changed since Last and updates the sprite bounds, before the extraction (Render). The entities with
+	/// a <see cref="TransformInterpolation"/> (and their descendants) are drawn between their last two fixed steps, at
+	/// <see cref="GameTime.Alpha"/>.
+	/// </summary>
+	[Render(Order = StageOrder.TransformPropagation)]
+	public void PropagateBeforeRender(GameTime dt)
+	{
+		_alpha = Math.Clamp(dt.Alpha, 0f, 1f);
+		try
+		{
+			Propagate();
+		}
+		finally
+		{
+			_alpha = -1;
+		}
+
+		UpdateBounds();
+	}
+
+	/// <summary>Records the transforms of the <see cref="TransformInterpolation"/> entities at the end of each fixed step.</summary>
+	[FixedUpdate(Order = StageOrder.TransformInterpolation)]
+	public void RecordInterpolation(GameTime dt)
+	{
+		foreach (ref var chunk in world.Query(in Interpolated))
+		{
+			var locals = chunk.GetSpan<Transform>();
+			var records = chunk.GetSpan<TransformInterpolation>();
+			for (var i = 0; i < chunk.Count; i++) records[i].Record(locals[i]);
+		}
+	}
+
+	/// <summary>Adds missing global transforms and recomputes the ones that changed.</summary>
+	public void Propagate()
+	{
+		if (world.CountEntities(in Missing2D) > 0) world.Add(in Missing2D, new GlobalTransform2D());
+		if (world.CountEntities(in Missing3D) > 0) world.Add(in Missing3D, new GlobalTransform());
+
+		_updated = 0;
+		_visited = 0;
+		_childVisits = 0;
+		_sawDead = false;
+		Propagate2D();
+		Propagate3D();
+		LastUpdated = _updated;
+		LastVisited = _visited;
+
+		// A plain World.Destroy leaves a dead child in its parent's Children, or children under a dead parent, which the
+		// walk does not reach. Either shows here; the repair destroys the orphaned subtrees and drops the dead entries.
+		if (_sawDead || _childVisits != world.CountEntities(in Parented)) LastRepaired = world.RepairHierarchy();
+		else LastRepaired = 0;
+	}
+
+	/// <summary>
+	/// The number of entities the last <see cref="Propagate()"/> destroyed because their parent had been destroyed
+	/// without <see cref="HierarchyExtensions.DestroyRecursive"/> (see <see cref="HierarchyExtensions.RepairHierarchy"/>).
+	/// </summary>
+	public int LastRepaired { get; private set; }
+
+	/// <summary>Adds missing <see cref="Aabb2D"/> components to sprites and computes every sprite's bounds.</summary>
+	public void UpdateBounds()
+	{
+		if (world.CountEntities(in MissingBounds) > 0) world.Add(in MissingBounds, new Aabb2D());
+
+		foreach (ref var chunk in world.Query(in Bounds))
+		{
+			var sprites = chunk.GetSpan<Sprite>();
+			var globals = chunk.GetSpan<GlobalTransform2D>();
+			var bounds = chunk.GetSpan<Aabb2D>();
+			for (var i = 0; i < chunk.Count; i++)
+			{
+				ref readonly var sprite = ref sprites[i];
+				ref readonly var global = ref globals[i];
+				bounds[i] = BoundsOf(sprite, global);
+			}
+		}
+	}
+
+	/// <summary>The world bounds of <paramref name="sprite"/> drawn at <paramref name="global"/>.</summary>
+	public static Aabb2D BoundsOf(in Sprite sprite, in GlobalTransform2D global) =>
+		Aabb2D.FromSprite(global.Position, global.Rotation, sprite.ResolveSize() * global.Scale, sprite.Origin);
+
+	private void Propagate2D()
+	{
+		foreach (ref var chunk in world.Query(in Roots2D))
+		{
+			var locals = chunk.GetSpan<Transform2D>();
+			var globals = chunk.GetSpan<GlobalTransform2D>();
+			var hidden = chunk.Has<Hidden>();
+			var hasChildren = chunk.Has<Children>();
+			var children = hasChildren ? chunk.GetSpan<Children>() : default;
+			var count = chunk.Count;
+			_visited += count;
+
+			for (var i = 0; i < count; i++)
+			{
+				ref readonly var local = ref locals[i];
+				ref var global = ref globals[i];
+
+				if (global.Version == 0 || !Same(local, global.Local))
+				{
+					global.Matrix = local.ToMatrix();
+					global.Position = local.Position;
+					global.Rotation = local.Rotation;
+					global.Scale = local.Scale;
+					global.Local = local;
+					global.Version = NextVersion(global.Version);
+					_updated++;
+				}
+
+				global.IsHidden = hidden;
+				if (hasChildren && children[i].Count > 0) PropagateChildren2D(global, children[i]);
+			}
+		}
+	}
+
+	private void PropagateChildren2D(in GlobalTransform2D parent, in Children children)
+	{
+		foreach (var child in children.AsSpan())
+		{
+			// One entity lookup: its chunk and index, then the components by index.
+			ref var data = ref world.IsAlive(child, out var alive);
+			if (!alive)
+			{
+				_sawDead = true;
+				continue;
+			}
+
+			ref var chunk = ref data.Archetype.GetChunk(data.Slot.ChunkIndex);
+			if (!chunk.Has<Transform2D>() || !chunk.Has<GlobalTransform2D>()) continue;
+			var index = data.Slot.Index;
+			ref var local = ref Unsafe.Add(ref chunk.GetFirst<Transform2D>(), index);
+			ref var global = ref Unsafe.Add(ref chunk.GetFirst<GlobalTransform2D>(), index);
+			_visited++;
+			_childVisits++;
+
+			if (global.Version == 0 || global.ParentVersion != parent.Version || !Same(local, global.Local))
+			{
+				var matrix = local.ToMatrix() * parent.Matrix;
+				global.Matrix = matrix;
+				global.Position = new Vector2(matrix.M31, matrix.M32);
+				global.Rotation = parent.Rotation + local.Rotation;
+				global.Scale = parent.Scale * local.Scale;
+				global.Local = local;
+				global.ParentVersion = parent.Version;
+				global.Version = NextVersion(global.Version);
+				_updated++;
+			}
+
+			global.IsHidden = parent.IsHidden || chunk.Has<Hidden>();
+			if (chunk.Has<Children>())
+			{
+				ref var grandchildren = ref Unsafe.Add(ref chunk.GetFirst<Children>(), index);
+				if (grandchildren.Count > 0) PropagateChildren2D(global, grandchildren);
+			}
+		}
+	}
+
+	private void Propagate3D()
+	{
+		foreach (ref var chunk in world.Query(in Roots3D))
+		{
+			var locals = chunk.GetSpan<Transform>();
+			var globals = chunk.GetSpan<GlobalTransform>();
+			var interpolated = _alpha >= 0 && chunk.Has<TransformInterpolation>();
+			var records = interpolated ? chunk.GetSpan<TransformInterpolation>() : default;
+			var hidden = chunk.Has<Hidden>();
+			var hasChildren = chunk.Has<Children>();
+			var children = hasChildren ? chunk.GetSpan<Children>() : default;
+			var count = chunk.Count;
+			_visited += count;
+
+			for (var i = 0; i < count; i++)
+			{
+				var local = interpolated ? records[i].Drawn(locals[i], _alpha) : locals[i];
+				ref var global = ref globals[i];
+
+				if (global.Version == 0 || !Same(local, global.Local))
+				{
+					global.Matrix = local.ToMatrix();
+					global.Local = local;
+					global.Version = NextVersion(global.Version);
+					_updated++;
+				}
+
+				global.IsHidden = hidden;
+				if (hasChildren && children[i].Count > 0) PropagateChildren3D(global, children[i]);
+			}
+		}
+	}
+
+	private void PropagateChildren3D(in GlobalTransform parent, in Children children)
+	{
+		foreach (var child in children.AsSpan())
+		{
+			ref var data = ref world.IsAlive(child, out var alive);
+			if (!alive)
+			{
+				_sawDead = true;
+				continue;
+			}
+
+			ref var chunk = ref data.Archetype.GetChunk(data.Slot.ChunkIndex);
+			if (!chunk.Has<Transform>() || !chunk.Has<GlobalTransform>()) continue;
+			var index = data.Slot.Index;
+			var local = Unsafe.Add(ref chunk.GetFirst<Transform>(), index);
+			if (_alpha >= 0 && chunk.Has<TransformInterpolation>()) local = Unsafe.Add(ref chunk.GetFirst<TransformInterpolation>(), index).Drawn(local, _alpha);
+			ref var global = ref Unsafe.Add(ref chunk.GetFirst<GlobalTransform>(), index);
+			_visited++;
+			_childVisits++;
+
+			if (global.Version == 0 || global.ParentVersion != parent.Version || !Same(local, global.Local))
+			{
+				global.Matrix = local.ToMatrix() * parent.Matrix;
+				global.Local = local;
+				global.ParentVersion = parent.Version;
+				global.Version = NextVersion(global.Version);
+				_updated++;
+			}
+
+			global.IsHidden = parent.IsHidden || chunk.Has<Hidden>();
+			if (chunk.Has<Children>())
+			{
+				ref var grandchildren = ref Unsafe.Add(ref chunk.GetFirst<Children>(), index);
+				if (grandchildren.Count > 0) PropagateChildren3D(global, grandchildren);
+			}
+		}
+	}
+
+	private static bool Same(in Transform2D a, in Transform2D b) => a.Position == b.Position && a.Rotation == b.Rotation && a.Scale == b.Scale;
+
+	private static bool Same(in Transform a, in Transform b) => a.Position == b.Position && a.Rotation == b.Rotation && a.Scale == b.Scale;
+
+	private static uint NextVersion(uint version) => version == uint.MaxValue ? 1 : version + 1;
+}

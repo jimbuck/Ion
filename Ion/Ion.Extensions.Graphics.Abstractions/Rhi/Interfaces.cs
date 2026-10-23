@@ -1,0 +1,438 @@
+using System.Runtime.InteropServices;
+
+namespace Ion.Extensions.Graphics.Rhi;
+
+/*
+ * The render hardware interface (RHI): a thin, explicit abstraction shaped like WebGPU, which is the common subset of
+ * Vulkan, Metal and Direct3D 12 and maps onto OpenGL ES 3.1. Renderers (2D, 3D) are written once against it; nothing
+ * backend-specific appears above it.
+ *
+ * Mapping onto OpenGL ES 3.1 (the GLES backend, Ion.Extensions.Graphics.GLES), which constrains what portable code may do:
+ * - Bind groups have no GLES equivalent. The backend flattens (group, binding) pairs with GlesBindings.Slot, group * 8 +
+ *   binding: uniform buffer entries become uniform block binding points and texture entries texture units at that slot.
+ *   The shader tool writes the same numbers into the GLSL ES (layout(binding = N)) and a flattening table. A texture is
+ *   sampled through one combined sampler (SPIRV-Cross builds combined image samplers at build time) whose sampler object
+ *   is the sampler the shader used with it, so sample each texture with one sampler. Keep binding numbers below 8, to 4
+ *   bind groups (3 on ES 3.0 devices with 24 uniform buffer bindings) and 16 textures per stage.
+ * - Storage buffers are not guaranteed in the vertex stage (DeviceLimits.VertexStorageBuffers). Per-instance data goes
+ *   through vertex buffers with VertexStepMode.Instance.
+ * - Render passes become framebuffer binds; LoadOp.Clear is a glClearBuffer, StoreOp.Discard a glInvalidateFramebuffer.
+ * - Shader modules are GLSL ES 3.10 source translated from the same SPIR-V at build time, with clip-space y negated so
+ *   that texture row 0 is the top row as in WebGPU (the window surface is blitted with a flip at present).
+ * - One blend state and write mask apply to every color target (target 0's), without OES_draw_buffers_indexed.
+ * - Cube maps (TextureDimension.Cube) are GL_TEXTURE_CUBE_MAP textures whose faces are written as array layers 0 to 5;
+ *   sample them with samplerCube (textureCube plus sampler in the GLSL 4.5 source). Depth textures can be sampled, with
+ *   a comparison sampler (sampler2DShadow after translation) for shadow maps. A depth-only pipeline (no fragment state)
+ *   gets an empty fragment stage of the vertex stage's GLSL ES version.
+ * - Compute needs OpenGL ES 3.1 (DeviceLimits.ComputeShaders is false at the ES 3.0 feature level). Storage buffers and
+ *   storage textures flatten like the rest (storage block binding points and image units at group * 8 + binding), but
+ *   ES 3.1 guarantees only 4 storage buffer bindings and 4 image units in the compute stage, so portable compute shaders
+ *   keep their storage buffers and storage textures in group 0, bindings 0 to 3. The backend checks the device's limits
+ *   when it creates a pipeline. Every dispatch ends with a full glMemoryBarrier, so later dispatches, draws and copies see
+ *   its writes, as in WebGPU.
+ */
+
+/// <summary>
+/// A graphics device: creates every GPU resource and owns the <see cref="Queue"/> and, when windowed, the
+/// <see cref="Surface"/>. One per application, registered as a singleton by the backend.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Frames: unlike WebGPU, frames in flight are explicit. The engine's graphics system calls <see cref="BeginFrame"/> at the
+/// start of the Render stage (it waits until the GPU has finished the frame that last used this frame slot, then recycles
+/// that frame's command buffers, staging memory and deferred deletions) and <see cref="EndFrame"/> at its end (after
+/// <see cref="ISurface.Present"/>). Code that renders inside the Render stage never calls them.
+/// </para>
+/// <para>
+/// Lifetime: every object is <see cref="IDisposable"/>. Disposing one that the GPU may still use is safe: the backend
+/// defers the destruction until the frames in flight have completed.
+/// </para>
+/// <para>
+/// Threading: the device and everything created from it are used from the main thread (the game loop's thread).
+/// </para>
+/// </remarks>
+public interface IGraphicsDevice : IDisposable
+{
+	/// <summary>The graphics API behind this device.</summary>
+	GraphicsBackend Backend { get; }
+
+	/// <summary>The adapter (GPU) name, for logs.</summary>
+	string AdapterName { get; }
+
+	/// <summary>The language <see cref="CreateShaderModule"/> accepts.</summary>
+	ShaderLanguage ShaderLanguage { get; }
+
+	/// <summary>Limits that portable code must respect.</summary>
+	DeviceLimits Limits { get; }
+
+	/// <summary>The number of frames the CPU may record ahead of the GPU (2 or 3).</summary>
+	int FramesInFlight { get; }
+
+	/// <summary>The index of the current frame slot, from 0 to <see cref="FramesInFlight"/> minus one. Per-frame ring buffers index with it.</summary>
+	int FrameIndex { get; }
+
+	/// <summary>The queue commands are submitted to.</summary>
+	IQueue Queue { get; }
+
+	/// <summary>The window surface, or null for a headless (offscreen) device.</summary>
+	ISurface? Surface { get; }
+
+	/// <summary>Creates a buffer.</summary>
+	IBuffer CreateBuffer(in BufferDescriptor descriptor);
+
+	/// <summary>Creates a 2D texture or a cube map (<see cref="TextureDescriptor.Dimension"/>).</summary>
+	ITexture CreateTexture(in TextureDescriptor descriptor);
+
+	/// <summary>Creates a sampler.</summary>
+	ISampler CreateSampler(in SamplerDescriptor descriptor);
+
+	/// <summary>Creates a shader module from code in <see cref="ShaderLanguage"/>.</summary>
+	IShaderModule CreateShaderModule(in ShaderModuleDescriptor descriptor);
+
+	/// <summary>Creates a bind group layout.</summary>
+	IBindGroupLayout CreateBindGroupLayout(in BindGroupLayoutDescriptor descriptor);
+
+	/// <summary>Creates a bind group: the resources bound to one group index.</summary>
+	IBindGroup CreateBindGroup(in BindGroupDescriptor descriptor);
+
+	/// <summary>Creates a pipeline layout.</summary>
+	IPipelineLayout CreatePipelineLayout(in PipelineLayoutDescriptor descriptor);
+
+	/// <summary>Creates a render pipeline. Pipelines are expensive: create them at load time, not per frame.</summary>
+	IRenderPipeline CreateRenderPipeline(RenderPipelineDescriptor descriptor);
+
+	/// <summary>
+	/// Creates a compute pipeline. Pipelines are expensive: create them at load time, not per frame.
+	/// </summary>
+	/// <exception cref="NotSupportedException">The device has no compute (<see cref="DeviceLimits.ComputeShaders"/> is false).</exception>
+	IComputePipeline CreateComputePipeline(ComputePipelineDescriptor descriptor);
+
+	/// <summary>Creates a command encoder for this frame. Record into it, <see cref="ICommandEncoder.Finish"/> it and submit the result.</summary>
+	ICommandEncoder CreateCommandEncoder(string? label = null);
+
+	/// <summary>Starts a frame: waits for the frame slot to be free and recycles its per-frame resources.</summary>
+	void BeginFrame();
+
+	/// <summary>Ends a frame: submits pending work and advances <see cref="FrameIndex"/>.</summary>
+	void EndFrame();
+
+	/// <summary>Submits pending work and runs completed deferred work without blocking (<paramref name="wait"/> false), or blocks until the GPU is idle.</summary>
+	void Poll(bool wait = false);
+}
+
+/// <summary>
+/// The device queue: submits command buffers and uploads data.
+/// </summary>
+/// <remarks>
+/// Writes are ordered with submissions as in WebGPU: a <see cref="WriteBuffer"/> or <see cref="WriteTexture"/> is seen by
+/// every command buffer submitted after it and by none submitted before it. Data is copied into per-frame staging memory at
+/// the call, so the source span can be reused immediately.
+/// </remarks>
+public interface IQueue
+{
+	/// <summary>Submits one command buffer.</summary>
+	void Submit(ICommandBuffer commandBuffer);
+
+	/// <summary>Submits command buffers in order.</summary>
+	void Submit(ReadOnlySpan<ICommandBuffer> commandBuffers);
+
+	/// <summary>Writes <paramref name="data"/> into <paramref name="buffer"/> (which needs <see cref="BufferUsage.CopyDst"/>) at <paramref name="offset"/>.</summary>
+	void WriteBuffer(IBuffer buffer, ulong offset, ReadOnlySpan<byte> data);
+
+	/// <summary>
+	/// Writes rows of texels into a region of <paramref name="texture"/> (which needs <see cref="TextureUsage.CopyDst"/>).
+	/// <paramref name="data"/> holds <paramref name="region"/>.Height rows of <paramref name="bytesPerRow"/> bytes, top row first.
+	/// </summary>
+	void WriteTexture(ITexture texture, ReadOnlySpan<byte> data, uint bytesPerRow, TextureRegion region);
+
+	/// <summary>Blocks until every submitted command buffer has completed on the GPU.</summary>
+	void WaitIdle();
+}
+
+/// <summary>
+/// Extension methods for <see cref="IQueue"/>.
+/// </summary>
+public static class QueueExtensions
+{
+	/// <summary>Writes a span of unmanaged values into <paramref name="buffer"/> at <paramref name="offset"/>.</summary>
+	public static void WriteBuffer<T>(this IQueue queue, IBuffer buffer, ulong offset, ReadOnlySpan<T> data) where T : unmanaged =>
+		queue.WriteBuffer(buffer, offset, MemoryMarshal.AsBytes(data));
+
+	/// <summary>Writes one unmanaged value into <paramref name="buffer"/> at <paramref name="offset"/>.</summary>
+	public static void WriteBuffer<T>(this IQueue queue, IBuffer buffer, ulong offset, in T value) where T : unmanaged =>
+		queue.WriteBuffer(buffer, offset, MemoryMarshal.AsBytes(new ReadOnlySpan<T>(in value)));
+
+	/// <summary>Writes tightly packed texels to the whole of mip level 0 of <paramref name="texture"/>.</summary>
+	public static void WriteTexture(this IQueue queue, ITexture texture, ReadOnlySpan<byte> data) =>
+		queue.WriteTexture(texture, data, texture.Width * (uint)texture.Format.BytesPerPixel(), TextureRegion.Whole(texture));
+}
+
+/// <summary>A GPU buffer.</summary>
+public interface IBuffer : IDisposable
+{
+	/// <summary>The size in bytes.</summary>
+	ulong Size { get; }
+
+	/// <summary>The usages it was created with.</summary>
+	BufferUsage Usage { get; }
+
+	/// <summary>
+	/// Copies bytes out of a <see cref="BufferUsage.MapRead"/> buffer. Blocks until every submitted command buffer has
+	/// completed (so the copy that filled it is visible). For readbacks and tests, not for per-frame use.
+	/// </summary>
+	void Read(ulong offset, Span<byte> destination);
+}
+
+/// <summary>A 2D texture (optionally mipmapped or multisampled) or a cube map.</summary>
+public interface ITexture : IDisposable
+{
+	/// <summary>A 2D texture or a cube map (six faces as array layers 0 to 5).</summary>
+	TextureDimension Dimension { get; }
+
+	/// <summary>The width of mip level 0 in texels.</summary>
+	uint Width { get; }
+
+	/// <summary>The height of mip level 0 in texels.</summary>
+	uint Height { get; }
+
+	/// <summary>The texel format.</summary>
+	TextureFormat Format { get; }
+
+	/// <summary>The usages it was created with.</summary>
+	TextureUsage Usage { get; }
+
+	/// <summary>The number of mip levels.</summary>
+	uint MipLevelCount { get; }
+
+	/// <summary>The sample count (1 unless multisampled).</summary>
+	uint SampleCount { get; }
+
+	/// <summary>A view of every mip level, created on first use and owned by the texture.</summary>
+	ITextureView DefaultView { get; }
+
+	/// <summary>Creates a view of some mip levels. The caller owns it.</summary>
+	ITextureView CreateView(in TextureViewDescriptor descriptor);
+}
+
+/// <summary>A view of a texture, bound in bind groups and used as a render pass attachment.</summary>
+public interface ITextureView : IDisposable
+{
+	/// <summary>The viewed texture.</summary>
+	ITexture Texture { get; }
+
+	/// <summary>The view format (the texture's format).</summary>
+	TextureFormat Format { get; }
+}
+
+/// <summary>A sampler.</summary>
+public interface ISampler : IDisposable;
+
+/// <summary>A compiled shader stage.</summary>
+public interface IShaderModule : IDisposable
+{
+	/// <summary>The stage.</summary>
+	ShaderStage Stage { get; }
+}
+
+/// <summary>
+/// The shape of one bind group: which binding numbers hold which kind of resource, visible to which stages. GLES: see the
+/// mapping notes at the top of this file (uniform block binding points and texture units).
+/// </summary>
+public interface IBindGroupLayout : IDisposable
+{
+	/// <summary>The entries.</summary>
+	IReadOnlyList<BindGroupLayoutEntry> Entries { get; }
+}
+
+/// <summary>
+/// A set of resources bound together at one group index with <see cref="IRenderPassEncoder.SetBindGroup"/>. Bind groups
+/// are immutable; create them at load time (one per material or texture) and reuse them every frame.
+/// </summary>
+public interface IBindGroup : IDisposable
+{
+	/// <summary>The layout it was created with.</summary>
+	IBindGroupLayout Layout { get; }
+}
+
+/// <summary>The bind group layouts a pipeline uses, by group index.</summary>
+public interface IPipelineLayout : IDisposable;
+
+/// <summary>A compiled render pipeline: shaders, vertex layout, primitive, depth and blend state.</summary>
+public interface IRenderPipeline : IDisposable;
+
+/// <summary>A compiled compute pipeline: one compute shader and the bind group layouts it uses.</summary>
+public interface IComputePipeline : IDisposable;
+
+/// <summary>A finished, submittable command buffer. Submit it once; it is recycled after its frame completes.</summary>
+public interface ICommandBuffer;
+
+/// <summary>
+/// Records commands: render passes, compute passes and copies. Created per frame by <see cref="IGraphicsDevice.CreateCommandEncoder"/>,
+/// finished with <see cref="Finish"/>.
+/// </summary>
+public interface ICommandEncoder
+{
+	/// <summary>
+	/// Begins a render pass. Record draws into the returned encoder and call <see cref="IRenderPassEncoder.End"/> before any
+	/// other command on this encoder.
+	/// </summary>
+	IRenderPassEncoder BeginRenderPass(in RenderPassDescriptor descriptor);
+
+	/// <summary>
+	/// Begins a compute pass. Record dispatches into the returned encoder and call <see cref="IComputePassEncoder.End"/>
+	/// before any other command on this encoder.
+	/// </summary>
+	/// <exception cref="NotSupportedException">The device has no compute (<see cref="DeviceLimits.ComputeShaders"/> is false).</exception>
+	IComputePassEncoder BeginComputePass(string? label = null);
+
+	/// <summary>Copies <paramref name="size"/> bytes between buffers (<see cref="BufferUsage.CopySrc"/> to <see cref="BufferUsage.CopyDst"/>).</summary>
+	void CopyBufferToBuffer(IBuffer source, ulong sourceOffset, IBuffer destination, ulong destinationOffset, ulong size);
+
+	/// <summary>
+	/// Copies a region of <paramref name="source"/> (which needs <see cref="TextureUsage.CopySrc"/>) into
+	/// <paramref name="destination"/> as rows of <paramref name="bytesPerRow"/> bytes, top row first.
+	/// </summary>
+	void CopyTextureToBuffer(ITexture source, TextureRegion region, IBuffer destination, ulong destinationOffset, uint bytesPerRow);
+
+	/// <summary>
+	/// Resolves (averages the samples of) a multisampled color texture into a single-sampled one of the same size and
+	/// format, outside any pass. Both must be render attachments (<see cref="TextureUsage.RenderAttachment"/>); the
+	/// destination is then sampled or drawn into like any texture. Vulkan: <c>vkCmdResolveImage</c>; OpenGL ES: a
+	/// framebuffer blit.
+	/// </summary>
+	/// <exception cref="ArgumentException">The source is not multisampled, the destination is, or their sizes or formats differ.</exception>
+	void ResolveTexture(ITexture source, ITexture destination);
+
+	/// <summary>Finishes recording. The encoder cannot be used afterwards.</summary>
+	ICommandBuffer Finish();
+}
+
+/// <summary>
+/// Records the draws of one render pass. Viewport and scissor are dynamic state and start as the full attachment.
+/// </summary>
+public interface IRenderPassEncoder
+{
+	/// <summary>Sets the pipeline for the following draws.</summary>
+	void SetPipeline(IRenderPipeline pipeline);
+
+	/// <summary>Binds <paramref name="group"/> at group index <paramref name="index"/> (<c>layout(set = index)</c>).</summary>
+	void SetBindGroup(uint index, IBindGroup group);
+
+	/// <summary>Binds a vertex buffer to vertex buffer slot <paramref name="slot"/>.</summary>
+	void SetVertexBuffer(uint slot, IBuffer buffer, ulong offset = 0);
+
+	/// <summary>Binds the index buffer.</summary>
+	void SetIndexBuffer(IBuffer buffer, IndexFormat format, ulong offset = 0);
+
+	/// <summary>Sets the viewport in pixels (origin top-left).</summary>
+	void SetViewport(float x, float y, float width, float height, float minDepth = 0f, float maxDepth = 1f);
+
+	/// <summary>Sets the scissor rectangle in pixels (origin top-left).</summary>
+	void SetScissorRect(uint x, uint y, uint width, uint height);
+
+	/// <summary>Draws non-indexed primitives.</summary>
+	void Draw(uint vertexCount, uint instanceCount = 1, uint firstVertex = 0, uint firstInstance = 0);
+
+	/// <summary>Draws indexed primitives.</summary>
+	void DrawIndexed(uint indexCount, uint instanceCount = 1, uint firstIndex = 0, int baseVertex = 0, uint firstInstance = 0);
+
+	/// <summary>Ends the pass.</summary>
+	void End();
+}
+
+/// <summary>
+/// Records the dispatches of one compute pass.
+/// </summary>
+/// <remarks>
+/// Ordering is WebGPU's: every dispatch sees the writes of the dispatches, draws and copies recorded before it, and the
+/// commands after it see its writes (storage buffers read as vertex, index, uniform or storage buffers, indirect
+/// arguments, storage textures sampled or copied). The backends insert the barriers; nothing is synchronized by hand.
+/// </remarks>
+public interface IComputePassEncoder
+{
+	/// <summary>Sets the pipeline for the following dispatches.</summary>
+	void SetPipeline(IComputePipeline pipeline);
+
+	/// <summary>Binds <paramref name="group"/> at group index <paramref name="index"/> (<c>layout(set = index)</c>).</summary>
+	void SetBindGroup(uint index, IBindGroup group);
+
+	/// <summary>
+	/// Runs the pipeline over a grid of workgroups. Each count is at most
+	/// <see cref="DeviceLimits.MaxComputeWorkgroupsPerDimension"/>; a zero count dispatches nothing.
+	/// </summary>
+	void DispatchWorkgroups(uint workgroupCountX, uint workgroupCountY = 1, uint workgroupCountZ = 1);
+
+	/// <summary>
+	/// Runs the pipeline over a grid whose workgroup counts the GPU reads from <paramref name="buffer"/> at
+	/// <paramref name="offset"/> (a <see cref="DispatchIndirectArgs"/>; the buffer needs <see cref="BufferUsage.Indirect"/>,
+	/// the offset a multiple of 4). A compute pass may write the arguments for a later dispatch.
+	/// </summary>
+	void DispatchWorkgroupsIndirect(IBuffer buffer, ulong offset = 0);
+
+	/// <summary>Ends the pass.</summary>
+	void End();
+}
+
+/// <summary>
+/// Extension methods for <see cref="IComputePassEncoder"/>.
+/// </summary>
+public static class ComputePassEncoderExtensions
+{
+	/// <summary>
+	/// Dispatches enough workgroups of <paramref name="workgroupSize"/> invocations (the shader's <c>local_size_x</c>) to
+	/// cover <paramref name="count"/> items in one dimension: <c>ceil(count / workgroupSize)</c>. The shader must skip the
+	/// invocations past the end (<c>if (gl_GlobalInvocationID.x &gt;= count) return;</c>).
+	/// </summary>
+	public static void DispatchFor(this IComputePassEncoder pass, uint count, uint workgroupSize)
+	{
+		ArgumentNullException.ThrowIfNull(pass);
+		ArgumentOutOfRangeException.ThrowIfZero(workgroupSize);
+		pass.DispatchWorkgroups((count + workgroupSize - 1) / workgroupSize);
+	}
+}
+
+/// <summary>
+/// A window's presentable surface (a Vulkan swapchain, the GLES default framebuffer).
+/// </summary>
+/// <remarks>
+/// Per frame: <see cref="GetCurrentTexture"/>, render into its view, submit, then <see cref="Present"/>. The engine's
+/// graphics system does this and reconfigures the surface when the window's framebuffer is resized; games render through
+/// <see cref="IGraphicsFrame"/> instead of using the surface directly.
+/// </remarks>
+public interface ISurface
+{
+	/// <summary>The format of the surface textures (for pipeline color targets).</summary>
+	TextureFormat Format { get; }
+
+	/// <summary>The width in pixels.</summary>
+	uint Width { get; }
+
+	/// <summary>The height in pixels.</summary>
+	uint Height { get; }
+
+	/// <summary>(Re)configures the surface: size in pixels, present mode, format.</summary>
+	void Configure(in SurfaceConfiguration configuration);
+
+	/// <summary>Acquires the texture to render this frame into.</summary>
+	SurfaceTexture GetCurrentTexture();
+
+	/// <summary>Presents the acquired texture. Submits pending work first.</summary>
+	void Present();
+}
+
+/// <summary>The checks every backend makes in <see cref="ICommandEncoder.ResolveTexture"/>.</summary>
+public static class ResolveChecks
+{
+	/// <summary>Throws when <paramref name="source"/> cannot be resolved into <paramref name="destination"/>.</summary>
+	/// <exception cref="ArgumentException">The source is not multisampled, the destination is, either is not a color render attachment, or their sizes or formats differ.</exception>
+	public static void Validate(ITexture source, ITexture destination)
+	{
+		ArgumentNullException.ThrowIfNull(source);
+		ArgumentNullException.ThrowIfNull(destination);
+		if (source.SampleCount <= 1) throw new ArgumentException("The resolve source must be multisampled.", nameof(source));
+		if (destination.SampleCount != 1) throw new ArgumentException("The resolve destination must be single-sampled.", nameof(destination));
+		if (source.Format.IsDepth() || source.Format != destination.Format) throw new ArgumentException($"A resolve needs two color textures of one format ({source.Format} into {destination.Format}).", nameof(destination));
+		if (source.Width != destination.Width || source.Height != destination.Height) throw new ArgumentException($"A resolve needs textures of one size ({source.Width}x{source.Height} into {destination.Width}x{destination.Height}).", nameof(destination));
+		if ((source.Usage & TextureUsage.RenderAttachment) == 0 || (destination.Usage & TextureUsage.RenderAttachment) == 0) throw new ArgumentException("Both textures of a resolve must be render attachments.", nameof(destination));
+	}
+}

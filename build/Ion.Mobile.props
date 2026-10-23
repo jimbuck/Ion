@@ -1,0 +1,43 @@
+<Project>
+  <!--
+    Mobile heads (Stage 7): imported by the Android and iOS projects of a game, before their TargetFramework is chosen.
+
+    IonAndroidWorkload / IonIosWorkload: true when the .NET workload's SDK pack is installed (machine-wide under the .NET
+    root, or user-local under ~/.dotnet). The iOS workload installs on macOS only; Android installs anywhere, but a build
+    also needs the Android SDK (android.jar, build tools) and a JDK.
+
+    IonMobileHeads: opt in to building the real heads (net10.0-android, net10.0-ios). Off by default, so Ion.sln builds
+    and tests the same way on every machine: a head then builds as a net10.0 library of the shared game code (its
+    platform entry point is left out), which keeps the shared code compiling in every desktop build. CI's mobile job passes
+    -p:IonMobileHeads=true on a machine with the workloads; asking for a head whose workload is missing is error IONMOB001.
+  -->
+  <PropertyGroup>
+    <_IonUserPacks Condition="'$(DOTNET_CLI_HOME)' != ''">$(DOTNET_CLI_HOME)/.dotnet/packs/</_IonUserPacks>
+    <_IonUserPacks Condition="'$(_IonUserPacks)' == '' and '$(HOME)' != ''">$(HOME)/.dotnet/packs/</_IonUserPacks>
+    <_IonUserPacks Condition="'$(_IonUserPacks)' == '' and '$(USERPROFILE)' != ''">$(USERPROFILE)/.dotnet/packs/</_IonUserPacks>
+    <_IonMachinePacks>$(NetCoreRoot)packs/</_IonMachinePacks>
+
+    <IonAndroidWorkload Condition="'$(IonAndroidWorkload)' == '' and (Exists('$(_IonMachinePacks)Microsoft.Android.Sdk.Linux') or Exists('$(_IonMachinePacks)Microsoft.Android.Sdk.Darwin') or Exists('$(_IonMachinePacks)Microsoft.Android.Sdk.Windows'))">true</IonAndroidWorkload>
+    <IonAndroidWorkload Condition="'$(IonAndroidWorkload)' == '' and '$(_IonUserPacks)' != '' and (Exists('$(_IonUserPacks)Microsoft.Android.Sdk.Linux') or Exists('$(_IonUserPacks)Microsoft.Android.Sdk.Darwin') or Exists('$(_IonUserPacks)Microsoft.Android.Sdk.Windows'))">true</IonAndroidWorkload>
+    <IonAndroidWorkload Condition="'$(IonAndroidWorkload)' == ''">false</IonAndroidWorkload>
+
+    <!-- The iOS SDK pack's folder carries the Xcode version (Microsoft.iOS.Sdk.net10.0_26.0), hence the directory search. -->
+    <IonIosWorkload Condition="'$(IonIosWorkload)' == '' and Exists('$(_IonMachinePacks)') and '$([System.IO.Directory]::GetDirectories($(_IonMachinePacks), Microsoft.iOS.Sdk*))' != ''">true</IonIosWorkload>
+    <IonIosWorkload Condition="'$(IonIosWorkload)' == '' and '$(_IonUserPacks)' != '' and Exists('$(_IonUserPacks)') and '$([System.IO.Directory]::GetDirectories($(_IonUserPacks), Microsoft.iOS.Sdk*))' != ''">true</IonIosWorkload>
+    <IonIosWorkload Condition="'$(IonIosWorkload)' == ''">false</IonIosWorkload>
+
+    <IonMobileHeads Condition="'$(IonMobileHeads)' == ''">false</IonMobileHeads>
+
+    <!-- IonMobileHeadKind (android or ios) is set by the head before this import; IonBuildMobileHead picks its TFM. -->
+    <_IonMobileWorkload Condition="'$(IonMobileHeadKind)' == 'android'">$(IonAndroidWorkload)</_IonMobileWorkload>
+    <_IonMobileWorkload Condition="'$(IonMobileHeadKind)' == 'ios'">$(IonIosWorkload)</_IonMobileWorkload>
+    <IonBuildMobileHead>false</IonBuildMobileHead>
+    <IonBuildMobileHead Condition="'$(IonMobileHeads)' == 'true' and '$(_IonMobileWorkload)' == 'true'">true</IonBuildMobileHead>
+  </PropertyGroup>
+
+  <Target Name="_IonCheckMobileWorkload" BeforeTargets="Restore;CollectPackageReferences;Build"
+          Condition="'$(IonMobileHeads)' == 'true' and '$(IonMobileHeadKind)' != '' and '$(_IonMobileWorkload)' != 'true'">
+    <Error Code="IONMOB001"
+           Text="IonMobileHeads=true, but the $(IonMobileHeadKind) workload is not installed (dotnet workload install $(IonMobileHeadKind)). $(MSBuildProjectName) would only build its shared game code." />
+  </Target>
+</Project>

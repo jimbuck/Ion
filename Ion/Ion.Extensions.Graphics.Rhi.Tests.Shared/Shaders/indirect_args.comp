@@ -1,0 +1,23 @@
+#version 450
+// Writes the dispatch arguments that cover every value of the data buffer with workgroups of 64 (increment.comp).
+
+layout(local_size_x = 1) in;
+
+layout(set = 0, binding = 0) buffer Args
+{
+	uint x;
+	uint y;
+	uint z;
+} uArgs;
+
+layout(set = 0, binding = 1) readonly buffer Data
+{
+	uint values[];
+} uData;
+
+void main()
+{
+	uArgs.x = (uint(uData.values.length()) + 63u) / 64u;
+	uArgs.y = 1u;
+	uArgs.z = 1u;
+}

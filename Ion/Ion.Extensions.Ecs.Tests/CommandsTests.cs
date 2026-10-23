@@ -1,0 +1,180 @@
+using Arch.Core;
+
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Ion.Extensions.Ecs.Tests;
+
+/// <summary>Records a creation in Update and looks at the world later in Update, in Render and in Last.</summary>
+public sealed class Spawner(World world, Commands commands, Journal journal)
+{
+	[Update]
+	public void Spawn(GameTime dt)
+	{
+		commands.Create(new Transform2D(new Vector2(dt.Frame, 0)), new Health(1));
+		journal.Add($"update {world.Count<Health>()}");
+	}
+
+	[Update(Order = 100)]
+	public void LaterInUpdate(GameTime dt) => journal.Add($"later {world.Count<Health>()}");
+
+	[Render]
+	public void Render(GameTime dt) => journal.Add($"render {world.Count<Health>()}");
+}
+
+public class CommandsTests
+{
+	[Fact]
+	public void CommandsRecordedInAStageAreAppliedAtItsEnd()
+	{
+		using var host = Hosts.Ecs().Configure(s => s.AddJournal()).WithSystem<Spawner>();
+		host.Step(2);
+
+		Assert.Equal(["update 0", "later 0", "render 1", "update 1", "later 1", "render 2"], host.Get<Journal>().Entries);
+	}
+
+	[Fact]
+	public void PlaybackAppliesCreatesAddsRemovesAndDestroysInOrder()
+	{
+		using var world = World.Create();
+		var commands = new Commands(world);
+		var existing = world.Create(new Health(5));
+		var doomed = world.Create(new Health(9));
+
+		var created = commands.Create(new Transform2D(new Vector2(3, 4)), new Health(2));
+		commands.Add(existing, new Marker());
+		commands.Set(existing, new Health(6));
+		commands.Destroy(doomed);
+		Assert.Equal(4, commands.Count);
+		Assert.Equal(2, world.Size);
+
+		commands.Flush();
+
+		Assert.True(commands.IsEmpty);
+		Assert.Equal(1, commands.Playbacks);
+		Assert.Equal(2, world.Size);
+		Assert.False(world.IsAlive(doomed));
+		Assert.True(world.Has<Marker>(existing));
+		Assert.Equal(6, world.Get<Health>(existing).Value);
+		Assert.Equal(1, world.Count<Transform2D>());
+		_ = created;
+
+		commands.Flush();
+		Assert.Equal(1, commands.Playbacks);
+	}
+
+	[Fact]
+	public void SetParentWorksForEntitiesTheSameCommandsCreate()
+	{
+		using var world = World.Create();
+		var commands = new Commands(world);
+		var parent = world.Create(new Transform2D());
+
+		var child = commands.Create(new Transform2D(new Vector2(1, 0)));
+		commands.SetParent(child, parent);
+		commands.Flush();
+
+		var children = world.GetChildren(parent);
+		Assert.Equal(1, children.Length);
+		Assert.True(world.TryGetParent(children[0], out var found));
+		Assert.Equal(parent, found);
+		Assert.False(world.Has<PendingParent>(children[0]));
+
+		commands.DestroyRecursive(parent);
+		commands.Flush();
+		Assert.Equal(0, world.Size);
+	}
+
+	[Fact]
+	public void ClearDiscardsRecordedCommands()
+	{
+		using var world = World.Create();
+		var commands = new Commands(world);
+		commands.Create(new Health(1));
+		commands.Clear();
+		commands.Flush();
+		Assert.Equal(0, world.Size);
+		Assert.Equal(0, commands.Playbacks);
+	}
+
+	[Fact]
+	public void SetParentAtAnIndexAndSetSiblingIndexApplyAtPlayback()
+	{
+		using var world = World.Create();
+		var commands = new Commands(world);
+		var parent = world.Create(new Transform2D());
+		var a = world.Create(new Transform2D());
+		var b = world.Create(new Transform2D());
+		world.SetParent(a, parent);
+		world.SetParent(b, parent);
+
+		var created = commands.Create(new Transform2D(), new Health(7));
+		commands.SetParent(created, parent, 0);
+		var existing = world.Create(new Transform2D());
+		commands.SetParent(existing, parent, 1);
+		commands.SetSiblingIndex(b, 0);
+		Assert.Equal([a, b], world.GetChildren(parent).ToArray());
+		commands.Flush();
+
+		var children = world.GetChildren(parent).ToArray();
+		Assert.Equal(4, children.Length);
+		Assert.Equal(b, children[0]);
+		Assert.True(world.Has<Health>(children[1]));
+		Assert.Equal(existing, children[2]);
+		Assert.Equal(a, children[3]);
+	}
+
+	[Fact]
+	public void DestroyTakesTheSubtreeAndLeavesTheParent()
+	{
+		using var world = World.Create();
+		var commands = new Commands(world);
+		var root = world.Create(new Transform2D());
+		var parent = world.Create(new Transform2D());
+		var child = world.Create(new Transform2D());
+		var grandchild = world.Create(new Transform2D());
+		var sibling = world.Create(new Transform2D());
+		world.SetParent(parent, root);
+		world.SetParent(sibling, root);
+		world.SetParent(child, parent);
+		world.SetParent(grandchild, child);
+
+		commands.Destroy(parent);
+		commands.Flush();
+
+		Assert.False(world.IsAlive(parent));
+		Assert.False(world.IsAlive(child));
+		Assert.False(world.IsAlive(grandchild));
+		Assert.Equal([sibling], world.GetChildren(root).ToArray());
+
+		// A child destroyed through the commands leaves its parent's Children at once.
+		commands.Destroy(sibling);
+		commands.Flush();
+		Assert.Equal(0, world.GetChildren(root).Length);
+		Assert.Equal(1, world.Size);
+	}
+
+	[Fact]
+	public void DestroyKeepsChildrenTheSameCommandsMoveAway()
+	{
+		using var world = World.Create();
+		var commands = new Commands(world);
+		var parent = world.Create(new Transform2D());
+		var keeper = world.Create(new Transform2D());
+		var moved = world.Create(new Transform2D());
+		var detached = world.Create(new Transform2D());
+		var doomed = world.Create(new Transform2D());
+		foreach (var e in new[] { moved, detached, doomed }) world.SetParent(e, parent);
+
+		commands.Destroy(parent);
+		commands.SetParent(moved, keeper);
+		commands.RemoveParent(detached);
+		commands.Flush();
+
+		Assert.False(world.IsAlive(doomed));
+		Assert.True(world.TryGetParent(moved, out var found));
+		Assert.Equal(keeper, found);
+		Assert.Equal([moved], world.GetChildren(keeper).ToArray());
+		Assert.True(world.IsAlive(detached));
+		Assert.False(world.TryGetParent(detached, out _));
+	}
+}

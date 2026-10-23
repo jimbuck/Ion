@@ -1,0 +1,8 @@
+---
+// The site is dark only: always set the dark theme (replaces Starlight's light/dark/auto provider).
+---
+
+<script is:inline>
+	document.documentElement.dataset.theme = 'dark';
+	window.StarlightThemeProvider = { updatePickers() {} };
+</script>

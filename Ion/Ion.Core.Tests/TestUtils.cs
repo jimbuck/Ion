@@ -31,39 +31,32 @@ public class TestSystem
 	public int DestroyCount { get; private set; } = 0;
 
 	[Init]
-	public void Initialize(GameTime dt, GameLoopDelegate next) {
+	public void Initialize(GameTime dt) {
 		InitializeCount++;
-		next(dt);
 	}
 	[First]
-	public void First(GameTime dt, GameLoopDelegate next) {
+	public void First(GameTime dt) {
 		FirstCount++;
-		next(dt);
 	}
 	[FixedUpdate]
-	public void FixedUpdate(GameTime dt, GameLoopDelegate next) {
+	public void FixedUpdate(GameTime dt) {
 		FixedUpdateCount++;
-		next(dt);
 	}
 	[Update]
-	public void Update(GameTime dt, GameLoopDelegate next) {
+	public void Update(GameTime dt) {
 		UpdateCount++;
-		next(dt);
 	}
 	[Render]
-	public void Render(GameTime dt, GameLoopDelegate next) {
+	public void Render(GameTime dt) {
 		RenderCount++;
-		next(dt);
 	}
 	[Last]
-	public void Last(GameTime dt, GameLoopDelegate next) {
+	public void Last(GameTime dt) {
 		LastCount++;
-		next(dt);
 	}
 	[Destroy]
-	public void Destroy(GameTime dt, GameLoopDelegate next) {
+	public void Destroy(GameTime dt) {
 		DestroyCount++;
-		next(dt);
 	}
 
 	public void Reset()

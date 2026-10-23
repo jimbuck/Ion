@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The embedded HTTP/1.1 and WebSocket server core shared by the remote inspection protocol (Ion.Extensions.Remote) and
+    the web server module (Ion.Extensions.Web): a blocking System.Net.Sockets listener with one thread per connection,
+    an allocation-free request parser and response writer, RFC 6455 framing with a writer thread per WebSocket, the
+    shared security policy (loopback bind, Host and Origin checks, bearer tokens, rate limits) and a bounded lock-free
+    queue into the game thread. No Kestrel, no async. Not a module: it has no Add/Use methods of its own.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Http</RootNamespace>
+    <Description>Ion's embedded HTTP/1.1 and WebSocket server core, shared by the remote protocol and the web module: blocking sockets, allocation-free parsing and responses, WebSocket framing, loopback/Host/Origin/token policy, rate limits and a lock-free queue into the game thread.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.Web.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Ion",
+  "classifications": [
+    "Game",
+    "Ion",
+    "3D"
+  ],
+  "identity": "Ion.Templates.3D",
+  "name": "Ion 3D game",
+  "description": "An Ion 3D game: spinning cubes with the immediate-mode 3D renderer (PBR, shadows), a headless test, a state snapshot test and a CLAUDE.md for coding agents.",
+  "shortName": "ion-3d",
+  "sourceName": "MyIonGame",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "IonSource": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "",
+      "replaces": "ION_SOURCE_PATH",
+      "description": "Path of an Ion source checkout to build against instead of the packages."
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/.ion/**",
+            "**/*.actual.*",
+            "**/*.diff.png"
+          ]
+        }
+      ]
+    }
+  ]
+}

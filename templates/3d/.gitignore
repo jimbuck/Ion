@@ -1,0 +1,8 @@
+bin/
+obj/
+out/
+.ion/
+*.actual.json
+*.actual.png
+*.diff.png
+trace.json

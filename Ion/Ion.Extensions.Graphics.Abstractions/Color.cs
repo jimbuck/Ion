@@ -41,15 +41,27 @@ public struct Color : IEquatable<Color>
 	public float A => _channels.W;
 
 	/// <summary>
-	/// Gets or sets packed value of this <see cref="Color"/>.
+	/// Gets the packed RRGGBBAA value of this <see cref="Color"/>, with A in the least significant octet.
+	/// Channels are clamped to [0, 1] and rounded to the nearest 8-bit value, so
+	/// <c>new Color(0xRRGGBBAA).PackedValue == 0xRRGGBBAA</c> for any value above <c>0xFFFFFF</c>.
 	/// </summary>
-	public uint PackedValue => ((uint)(R * 255) << 24) | ((uint)(G * 255) << 16) | ((uint)(B * 255) << 8) | (uint)(A * 255);
+	public uint PackedValue => ((uint)_toByte(R) << 24) | ((uint)_toByte(G) << 16) | ((uint)_toByte(B) << 8) | _toByte(A);
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static byte _toByte(float channel) => (byte)MathF.Round(Math.Clamp(channel, 0f, 1f) * 255f);
 
 	/// <summary>
 	/// Constructs an RGBA color from a packed value.
 	/// The value is a 32-bit unsigned integer, with A in the least significant octet.
 	/// Acceptable formats include 8 value (RRGGBBAA), 6 value (RRGGBB), 4 value (RGBA) and 3 value (RGB).
 	/// </summary>
+	/// <remarks>
+	/// The form is chosen from the magnitude of the value: <c>&lt;= 0xFFF</c> is RGB, <c>&lt;= 0xFFFF</c> is RGBA,
+	/// <c>&lt;= 0xFFFFFF</c> is RRGGBB and anything larger is RRGGBBAA. Leading zero digits are therefore
+	/// ambiguous: <c>0x00FFFF</c> reads as the 4 digit RGBA value <c>0xFFFF</c> (white), not as RRGGBB cyan, and an
+	/// RRGGBBAA value with a zero red channel reads as RRGGBB. When the leading digits may be zero, use the
+	/// channel constructors such as <see cref="Color(int, int, int, int)"/> instead.
+	/// </remarks>
 	/// <param name="hex">The packed value.</param>
 	public Color(uint hex)
 	{
@@ -63,13 +75,12 @@ public struct Color : IEquatable<Color>
 				b = (byte)((hex & 0xF) * 0x11); // replicate 4-bit value
 				a = 255; // fully opaque
 			}
-			else if (hex <= 0xFFFF)
+			else if (hex <= 0xFFFF) // RGBA
 			{
-				r = (byte)((hex >> 16 & 0xF) * 0x11); // replicate 4-bit value
+				r = (byte)((hex >> 12 & 0xF) * 0x11); // replicate 4-bit value
 				g = (byte)((hex >> 8 & 0xF) * 0x11); // replicate 4-bit value
-				g = (byte)((hex >> 4 & 0xF) * 0x11); // replicate 4-bit value
-				b = (byte)((hex & 0xF) * 0x11); // replicate 4-bit value
-				a = 255; // fully opaque
+				b = (byte)((hex >> 4 & 0xF) * 0x11); // replicate 4-bit value
+				a = (byte)((hex & 0xF) * 0x11); // replicate 4-bit value
 			}
 			else if (hex <= 0xFFFFFF) // RRGGBB
 			{
@@ -308,7 +319,7 @@ public struct Color : IEquatable<Color>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public override string ToString()
 	{
-		return $"#{(uint)(R * 255):X2}{(uint)(G * 255):X2}{(uint)(B * 255):X2} {A:0.##}";
+		return $"#{_toByte(R):X2}{_toByte(G):X2}{_toByte(B):X2} {A:0.##}";
 	}
 
 	#region IEquatable<Color> Members
@@ -334,9 +345,9 @@ public struct Color : IEquatable<Color>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Deconstruct(out byte r, out byte g, out byte b)
 	{
-		r = (byte)(R * 255);
-		g = (byte)(G * 255);
-		b = (byte)(B * 255);
+		r = _toByte(R);
+		g = _toByte(G);
+		b = _toByte(B);
 	}
 
 	/// <summary>
@@ -349,10 +360,10 @@ public struct Color : IEquatable<Color>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Deconstruct(out byte r, out byte g, out byte b, out byte a)
 	{
-		r = (byte)(R * 255);
-		g = (byte)(G * 255);
-		b = (byte)(B * 255);
-		a = (byte)(A * 255);
+		r = _toByte(R);
+		g = _toByte(G);
+		b = _toByte(B);
+		a = _toByte(A);
 	}
 
 	/// <summary>
@@ -378,10 +389,10 @@ public struct Color : IEquatable<Color>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Deconstruct(out float r, out float g, out float b, out float a)
 	{
-		r = R / 255f;
-		g = G / 255f;
-		b = B / 255f;
-		a = A / 255f;
+		r = R;
+		g = G;
+		b = B;
+		a = A;
 	}
 
 	#region Named Colors

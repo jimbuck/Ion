@@ -1,0 +1,289 @@
+---
+title: Project templates
+description: The 2d, 3d and ecs game templates, the files they generate, how they build against packages or sources, and the CLAUDE.md they ship for coding agents.
+sidebar:
+  order: 4
+---
+
+import { FileTree, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Ion ships three game templates. Each one creates a complete, runnable solution: a game project, a test project with a
+headless test and a snapshot test, `appsettings.json`, and a `CLAUDE.md` that teaches a coding agent how to work on the
+game without reading the engine's source.
+
+| Template | `ion new` | `dotnet new` | What the game is | Modules |
+|---|---|---|---|---|
+| 2D | `ion new 2d <Name>` | `dotnet new ion-2d -n <Name>` | A paddle keeps a ball in play. Plain systems and a state class, drawn with the sprite batch; the state is readable and writable over the remote protocol. | `AddIon` |
+| 3D | `ion new 3d <Name>` | `dotnet new ion-3d -n <Name>` | A row of spinning PBR cubes on a ground plane, lit by a sun with shadows, on the immediate-mode 3D renderer. | `AddIon`, `AddRendering3D` |
+| ECS | `ion new ecs <Name>` | `dotnet new ion-ecs -n <Name>` | Bouncing balls as ECS entities, moved by a generated `[Query]` loop and drawn with the sprite batch. | `AddIon`, `AddEcs`, `AddEcsSerialization` |
+
+Both commands produce the same files: the `ion` tool embeds the `templates/` folder of the repository, and the
+`Ion.Templates` package is that same folder as a `dotnet new` pack. See [Installation](/Ion/getting-started/installation/)
+for installing either.
+
+## Naming and parameters
+
+Every occurrence of `MyIonGame` in file names and file contents is replaced by your game's name, so `ion new ecs Arena`
+creates `Arena/Arena.slnx`, `Arena/Arena/Arena.csproj`, `namespace Arena;` and so on. The name must start with a letter
+and contain only letters, digits and `_`.
+
+| `ion new` option | `dotnet new` parameter | Effect |
+|---|---|---|
+| `[name]` | `-n <Name>` | The game's name (default `MyGame` for `ion new`). |
+| `--output <dir>` | `-o <dir>` | The folder to write into (default: a folder named after the game). |
+| `--ion-source <repo>` | `--IonSource <repo>` | Build against an Ion source checkout instead of the NuGet packages. |
+| `--force` | | Write into a folder that is not empty. |
+
+## Common layout
+
+All three templates share this shape (shown for a game named `Arena`):
+
+<FileTree>
+- Arena/
+  - .gitignore
+  - Arena.slnx
+  - CLAUDE.md instructions for coding agents
+  - Directory.Build.props shared settings: net10.0, IonVersion, IonSource
+  - Directory.Build.targets imports from an Ion checkout, when IonSource is set
+  - Arena/
+    - Arena.csproj
+    - Program.cs the setup: modules and systems
+    - Game.cs settings, state, JSON metadata
+    - ...
+    - appsettings.json
+  - Arena.Tests/
+    - Arena.Tests.csproj
+    - GameTests.cs headless tests and a snapshot test
+    - Golden/ committed snapshots
+</FileTree>
+
+### Directory.Build.props
+
+```xml title="Directory.Build.props"
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- The Ion packages this game uses. -->
+    <IonVersion>0.3.0</IonVersion>
+    <!-- An Ion source checkout to build against instead of the packages; empty uses the packages.
+         ion new --ion-source (or dotnet new --IonSource) fills it in. -->
+    <IonSource></IonSource>
+    <!-- The Ion schedule generator emits C# interceptors in this namespace. -->
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Ion.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+  <!-- With IonSource set: the packages' build props and the publishing presets from the checkout. -->
+</Project>
+```
+
+With `IonSource` empty, the game references the `Ion` package and the tests `Ion.Testing`, both at `$(IonVersion)`.
+With a path, they switch to project references into the checkout (`Ion/Ion/Ion.csproj`, the `Ion.Generators` analyzer,
+`Ion/Ion.Testing/Ion.Testing.csproj`) and import the checkout's `build/Ion.Publish.props` and `.targets`, so
+`dotnet publish -p:IonTarget=linux-x64` and `ion publish` work. You can change `IonSource` by hand at any time.
+
+### The game project
+
+```xml title="Arena/Arena.csproj"
+<PropertyGroup>
+  <OutputType>Exe</OutputType>
+  <InvariantGlobalization>true</InvariantGlobalization>
+  <!-- Keeps readable stack traces in NativeAOT builds. -->
+  <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+</PropertyGroup>
+<ItemGroup>
+  <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+</ItemGroup>
+```
+
+Put textures, fonts, sounds and models under `Assets/`; they are copied next to the executable and loaded by relative
+path (`assets.Load<ITexture2D>("tiles.png")`).
+
+### appsettings.json
+
+Every template starts from the same `Ion:*` settings, which configure the engine; `Game:*` is the game's own (the ECS
+template's `Balls` is shown; the 2D template has `PaddleSpeed` and `BallSpeed`, the 3D template `Cubes` and
+`SpinSpeed`):
+
+```json title="Arena/appsettings.json"
+{
+  "Logging": { "LogLevel": { "Default": "Information", "Ion": "Information" } },
+  "Ion": {
+    "Title": "Arena",
+    "MaxFPS": 120,
+    "Window": { "Width": 960, "Height": 540 },
+    "Metrics": { "Profiling": false }
+  },
+  "Game": { "Balls": 8 }
+}
+```
+
+`Ion:Title` names the window and the per-user data folder. `Ion:MaxFPS` caps the render rate (the engine default is
+300). See [Services and configuration](/Ion/concepts/services-and-configuration/) and the
+[configuration reference](/Ion/reference/configuration/).
+
+### Program.cs
+
+Each template's `Program.cs` is the whole setup, in the order the builder expects: create the builder, register modules
+and systems, build, add the systems to the schedule, run. The tests run this same file, and the source generator
+compiles the schedule it builds, so the comments ask you to keep registrations here (or in methods it calls).
+
+<Tabs>
+<TabItem label="2d">
+
+```csharp title="Program.cs"
+var builder = IonApplication.CreateBuilder(args);
+builder.AddIon(graphics => graphics.ClearColor = new Color(0x1B, 0x26, 0x3B))
+	.AddSystem<PaddleSystem>();
+builder.Services.AddSingleton(GameSettings.From(builder.Configuration));
+builder.Services.AddSingleton<PlayState>();
+
+// The state is a remote resource: resources.get/set "Game.State" read and write it on a running game
+// (--remote-allow-mutations), and the snapshot test serializes it with the same metadata.
+builder.Services.AddRemoteResource("Game.State", "Paddle, ball, score and misses.", GameJson.Default.PlayState,
+	static sp => sp.GetRequiredService<PlayState>(),
+	static (sp, value) => sp.GetRequiredService<PlayState>().CopyFrom(value));
+
+using var game = builder.Build();
+game.UseIon()
+	.UseSystem<PaddleSystem>();
+game.Run();
+```
+
+</TabItem>
+<TabItem label="3d">
+
+```csharp title="Program.cs"
+var builder = IonApplication.CreateBuilder(args);
+builder.AddIon()
+	.AddRendering3D()
+	.AddSystem<SceneSystem3D>();
+builder.Services.AddSingleton(GameSettings.From(builder.Configuration));
+builder.Services.AddSingleton<SpinState>();
+
+// Readable and writable on a running game (--remote-allow-mutations): resources.get/set "Game.Spin".
+builder.Services.AddRemoteResource("Game.Spin", "The cubes' spin angle and speed.", GameJson.Default.SpinState,
+	static sp => sp.GetRequiredService<SpinState>(),
+	static (sp, value) => sp.GetRequiredService<SpinState>().CopyFrom(value));
+
+using var game = builder.Build();
+game.UseIon()
+	.UseRendering3D()
+	.UseSystem<SceneSystem3D>();
+game.Run();
+```
+
+</TabItem>
+<TabItem label="ecs">
+
+```csharp title="Program.cs"
+var builder = IonApplication.CreateBuilder(args);
+builder.AddIon(graphics => graphics.ClearColor = new Color(0x1B, 0x26, 0x3B))
+	.AddEcs()
+	// Components registered here are saved by the world serializers (world snapshots in tests) and are readable and
+	// writable over the remote protocol (world.query, world.mutate_components). Register every component you add.
+	.AddEcsSerialization(components => components
+		.AddUnmanaged("Velocity", GameJson.Default.Velocity)
+		.AddTag<Ball>("Ball"))
+	.AddSystem<BallSystem>()
+	.AddSystem<DrawSystem>();
+builder.Services.AddSingleton(GameSettings.From(builder.Configuration));
+
+using var game = builder.Build();
+game.UseIon()
+	.UseEcs()
+	.UseSystem<BallSystem>()
+	.UseSystem<DrawSystem>();
+game.Run();
+```
+
+</TabItem>
+</Tabs>
+
+The templates list every module they use (`AddIon().AddRendering3D()`), which is explicit for the reader. Because modules
+register their dependencies, `builder.AddRendering3D()` alone would do the same.
+
+## The 2D template
+
+| File | Contents |
+|---|---|
+| `Game.cs` | `GameSettings` (read from `Game:PaddleSpeed`, `Game:BallSpeed` and `Ion:Seed` through `IonRun.Seed`), `PlayState` (paddle, ball, score, misses) and `GameJson`, a source-generated `JsonSerializerContext` that works under NativeAOT. |
+| `PaddleSystem.cs` | `[Init]` places the paddle and serves; `[Update]` moves the paddle from the keyboard; `[FixedUpdate]` moves the ball and bounces it; `[Render]` draws both with `ISpriteBatch.DrawRect`. Counts hits with an `IMetrics` counter named `hits`. |
+| `GameTests.cs` | Class `GameTests`: `HoldingRightMovesThePaddleRight` (scripted input) and `TheBallStaysInPlayOrIsServedAgain` (600 frames, checks the `hits` counter against the score and `LastFrame.Sprites`). Class `SnapshotTests`: `StateAfter300FramesMatchesTheSnapshot` (JSON snapshot in `Golden/state-300.json`). |
+
+The simulation is in `FixedUpdate` and the ball's serve angle comes from a seeded `Random`, so the same seed gives the
+same state after the same number of frames. That is what makes the snapshot test stable.
+
+## The 3D template
+
+| File | Contents |
+|---|---|
+| `Game.cs` | `GameSettings` (`Game:Cubes`, default 5; `Game:SpinSpeed`, default 1.2 rad/s), `SpinState` and `GameJson`. |
+| `SceneSystem3D.cs` | `[Init]` creates a cube and a plane mesh (`MeshPrimitives`), two `PbrMaterial`s and the ambient light; `[FixedUpdate]` advances the spin; `[Render]` submits the camera, a directional light, the ground and the cubes every frame. |
+| `GameTests.cs` | `CubesSpinAndAreSubmitted` (60 frames, asserts the angle and `IRenderer3D.LastFrameStatistics`) and `StateAfter120FramesMatchesTheSnapshot` (the state plus the renderer's `Submitted` and `Batches` counts, in `Golden/state-120.json`). |
+
+The 3D renderer runs its CPU pipeline (culling, sorting, batching) even headless without a GPU, so its statistics are
+meaningful in tests. Screenshots need headless rendering and a Vulkan or EGL driver.
+
+## The ECS template
+
+| File | Contents |
+|---|---|
+| `Game.cs` | `GameSettings` (`Game:Balls`, default 8; `Ion:Seed`), the components `Velocity` and `Ball` (a tag), and `GameJson` for the component serializer. |
+| `Systems.cs` | `BallSystem` spawns seeded balls in `[Init]` and moves them in a `[FixedUpdate, Query]` method; `DrawSystem` draws every entity with `Ball` in a `[Render, Query, All<Ball>]` method. Both classes are `partial` so the generator can expand the queries. |
+| `GameTests.cs` | `BallsMoveAndStayInsideTheWindow` (600 frames, queries the root world and checks the `bounces` counter), `TheSameSeedGivesTheSameWorld` (two runs with `Ion:Seed` 7 compared as JSON) and `WorldAfter120FramesMatchesTheSnapshot` (`Golden/world-120.json`). |
+
+Components registered with `AddEcsSerialization` appear in world snapshots (`run.WorldJson()`) and over the remote
+protocol. Register every component you add. See [Components and serialization](/Ion/ecs/components-and-serialization/).
+
+## Tests and snapshots
+
+Every test project references xUnit and `Ion.Testing` and runs the game's own `Program.cs`:
+
+```csharp title="Arena.Tests/GameTests.cs"
+[Fact]
+public void WorldAfter120FramesMatchesTheSnapshot()
+{
+    using var run = IonTestHost.RunEntryPoint<Program>(120, host => host.WithConfiguration("Ion:Seed", "1"));
+    JsonSnapshot.AssertMatches(run.WorldJson()!, RenderingEnvironment.GoldenPath("world-120.json"));
+}
+```
+
+A missing snapshot is written and the test fails, so CI never passes on a missing file. When the game changes on
+purpose, update the snapshots and review the diff:
+
+```bash
+ION_UPDATE_GOLDEN=1 dotnet test
+```
+
+On a mismatch, a `*.actual.json` (or `*.actual.png` and `*.diff.png` for images) is written next to the golden file;
+the template's `.gitignore` excludes them. See [Snapshots and goldens](/Ion/tooling/snapshots-and-goldens/).
+
+## CLAUDE.md
+
+Each template includes a `CLAUDE.md` written for coding agents such as Claude Code. It is short and specific to the
+template, and covers:
+
+- **Layout.** What each file is for, and the rule to keep registrations in `Program.cs` between `CreateBuilder` and
+  `game.Run()`.
+- **The loop.** The stages, the step signature (`GameTime dt`, `dt.Delta`, `dt.Frame`), what can be injected
+  (`IInputState`, `ISpriteBatch`, `IWindow`, `IAssetManager`, `IAudioManager`, `IEvents`, `IMetrics`; `IRenderer3D` in
+  the 3D template), ordering (`Order`, `[After<T>]`, `[Before<T>]`), events, and the ban on `async` steps (`ION005`).
+- **Commands.** `dotnet build` (zero warnings), `dotnet test`, `ion run --headless --frames 600 --seed 1 --screenshot
+  ... --summary ...`, `ion diff`, `ion schedule`, `ion trace`, and what the run summary JSON contains.
+- **Inspecting a running game.** The MCP server (`claude mcp add ion -- ion mcp`), `ion_run` with `live=true`,
+  `resources.get`/`resources.set` on the game's remote resource, scripted input, stepping and screenshots.
+- **Tests.** `IonTestHost.RunEntryPoint<Program>`, scripted input, JSON snapshots, golden images and
+  `ION_UPDATE_GOLDEN=1`.
+
+Edit it as your game grows: it is the place to record your own conventions for agents. See
+[Agentic development](/Ion/tooling/agentic-development/).
+
+## See also
+
+- [Your first game](/Ion/getting-started/first-game/): turns the 2D template into a new game step by step.
+- [The ion CLI](/Ion/tooling/ion-cli/): `ion new`, `ion run` and the rest.
+- [Testing](/Ion/tooling/testing/): `IonTestHost` in depth.
+- [Publishing](/Ion/platforms/publishing/): the `IonTarget` presets the templates import.

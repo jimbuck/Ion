@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Dear ImGui on Ion: Hexa.NET.ImGui (cimgui) driven by Ion's input and clock, drawn by its own pipeline on the RHI after
+    every other pass of the frame. Written against the abstractions only, so it runs on every RHI backend, headless too.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.ImGui</RootNamespace>
+    <Description>Dear ImGui for Ion: AddImGui()/UseImGui() run Hexa.NET.ImGui with Ion's input, clock and RHI (a pipeline of its own, drawn on top of the frame), with texture registration and input-capture flags for the game.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ion.Extensions.ImGui.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <IonShader Include="Shaders/imgui.vert;Shaders/imgui.frag" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Ion schedule generator: intercepts this project's registrations (reflection-free). -->
+    <ProjectReference Include="..\Ion.Generators\Ion.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="PublishAot;RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Ion.Core.Abstractions\Ion.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Graphics.Abstractions\Ion.Extensions.Graphics.Abstractions.csproj" />
+  </ItemGroup>
+  <Import Project="..\Ion.Shaders\Ion.Shaders.targets" />
+</Project>

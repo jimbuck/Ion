@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+using System.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -9,14 +10,19 @@ namespace Ion;
 public class IonApplication : IIonApplication, IDisposable
 {
 	private readonly IHost _host;
+	private readonly IonApplicationHook? _hook;
+	private bool _disposed;
 
-	private readonly MiddlewarePipelineBuilder _init = new();
-	private readonly MiddlewarePipelineBuilder _first = new();
-	private readonly MiddlewarePipelineBuilder _fixedUpdate = new();
-	private readonly MiddlewarePipelineBuilder _update = new();
-	private readonly MiddlewarePipelineBuilder _render = new();
-	private readonly MiddlewarePipelineBuilder _last = new();
-	private readonly MiddlewarePipelineBuilder _destroy = new();
+	/// <summary>
+	/// The configuration key that prints the schedule (<see cref="PrintSchedule"/>) to standard output when the game loop
+	/// is built: <c>Ion:PrintSchedule = true</c>, or <c>--Ion:PrintSchedule=true</c> on the command line.
+	/// </summary>
+	public const string PrintScheduleKey = "Ion:PrintSchedule";
+
+	/// <summary>
+	/// The root schedule's registrations: systems and function steps.
+	/// </summary>
+	public ScheduleModel Schedule { get; } = new("root", isRoot: true);
 
 	/// <summary>
 	/// The application's configured services.
@@ -28,14 +34,31 @@ public class IonApplication : IIonApplication, IDisposable
 	/// </summary>
 	public IConfiguration Configuration => _host.Services.GetRequiredService<IConfiguration>();
 
-	internal IonApplication(IHost host)
+	internal IonApplication(IHost host, IonApplicationHook? hook = null)
 	{
 		_host = host;
+		_hook = hook;
 	}
 
+	/// <summary>
+	/// Creates the application builder: the configuration from the command line (<paramref name="args"/>, with the short
+	/// switches of <see cref="IonCommandLine"/>), <c>appsettings.json</c> and the environment, and the core services.
+	/// <c>appsettings.json</c> (and <c>appsettings.{Environment}.json</c>) are read from the folder of the game's
+	/// executable (<see cref="AppContext.BaseDirectory"/>), whatever the working directory; <c>--contentRoot=&lt;folder&gt;</c>
+	/// (or the <c>DOTNET_CONTENTROOT</c> environment variable) reads them from another folder.
+	/// </summary>
 	public static IonApplicationBuilder CreateBuilder(string[] args)
 	{
-		return new IonApplicationBuilder(args);
+		var builder = new IonApplicationBuilder(args);
+
+		// A test host running this program's entry point (see IonApplicationHook) configures the first builder.
+		if (IonApplicationHook.Claim() is { } hook)
+		{
+			builder.Hook = hook;
+			hook.OnBuilderCreated(builder);
+		}
+
+		return builder;
 	}
 
 	public static IonApplicationBuilder CreateBuilder()
@@ -43,67 +66,85 @@ public class IonApplication : IIonApplication, IDisposable
 		return CreateBuilder([]);
 	}
 
-	public IIonApplication UseInit(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_init.Use(middleware);
-		return this;
-	}
+	/// <summary>
+	/// Plans, validates and binds the root schedule: resolves every system and injected service and creates the stage
+	/// runners. Warnings are logged once (category <c>Ion.Schedule</c>).
+	/// </summary>
+	/// <exception cref="IonScheduleException">The schedule has errors (ION001 to ION009, ION011 to ION013).</exception>
+	public Ion.Schedule BuildSchedule() => Schedule.Build(Services);
 
-	public IIonApplication UseFirst(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_first.Use(middleware);
-		return this;
-	}
+	/// <inheritdoc/>
+	public string PrintSchedule() => Schedule.Plan(Services).Print();
 
-	public IIonApplication UseFixedUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_fixedUpdate.Use(middleware);
-		return this;
-	}
-
-	public IIonApplication UseUpdate(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_update.Use(middleware);
-		return this;
-	}
-
-	public IIonApplication UseRender(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_render.Use(middleware);
-		return this;
-	}
-
-
-	public IIonApplication UseLast(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_last.Use(middleware);
-		return this;
-	}
-
-	public IIonApplication UseDestroy(Func<GameLoopDelegate, GameLoopDelegate> middleware)
-	{
-		_destroy.Use(middleware);
-		return this;
-	}
-
+	/// <summary>
+	/// Builds the root schedule (see <see cref="BuildSchedule"/>) and a game loop that runs it. When
+	/// <see cref="PrintScheduleKey"/> is set, the schedule is printed to standard output first.
+	/// </summary>
+	/// <exception cref="IonScheduleException">The schedule has errors.</exception>
 	public GameLoop Build()
 	{
+		var schedule = BuildSchedule();
+
+		if (bool.TryParse(Configuration[PrintScheduleKey], out var print) && print)
+		{
+			Console.Out.Write(schedule.Print());
+			Console.Out.Flush();
+		}
+
 		var gameLoop = ActivatorUtilities.CreateInstance<GameLoop>(Services);
-
-		gameLoop.InitBuilder = _init;
-		gameLoop.FirstBuilder = _first;
-		gameLoop.FixedUpdateBuilder = _fixedUpdate;
-		gameLoop.UpdateBuilder = _update;
-		gameLoop.RenderBuilder = _render;
-		gameLoop.LastBuilder = _last;
-		gameLoop.DestroyBuilder = _destroy;
-
-		gameLoop.Build();
+		gameLoop.ScheduleFactory = BuildSchedule;
+		gameLoop.UseSchedule(schedule);
 
 		return gameLoop;
 	}
 
-	public void Run()
+	/// <inheritdoc/>
+	[StackTraceHidden]
+	public void Run() => Run(CancellationToken.None);
+
+	/// <inheritdoc/>
+	[StackTraceHidden]
+	public void Run(CancellationToken cancellationToken)
+	{
+		if (_hook is { } hook)
+		{
+			hook.OnRun(this);
+			return;
+		}
+
+		var loop = BuildForRun();
+		if (int.TryParse(Configuration[RunFramesKey], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var frames) && frames >= 0)
+		{
+			loop.RunFrames(frames);
+		}
+		else
+		{
+			loop.Run(cancellationToken);
+		}
+	}
+
+	/// <summary>
+	/// The configuration key that makes <see cref="Run()"/> stop after a number of frames, as <see cref="RunFrames"/>:
+	/// <c>Ion:Run:Frames = 600</c>, or <c>--Ion:Run:Frames=600</c> on the command line (what <c>ion run --frames</c>
+	/// passes). The game still exits earlier if it asks to.
+	/// </summary>
+	public const string RunFramesKey = "Ion:Run:Frames";
+
+	/// <inheritdoc/>
+	[StackTraceHidden]
+	public void RunFrames(int frames)
+	{
+		ArgumentOutOfRangeException.ThrowIfNegative(frames);
+		if (_hook is { } hook)
+		{
+			hook.OnRun(this);
+			return;
+		}
+
+		BuildForRun().RunFrames(frames);
+	}
+
+	private GameLoop BuildForRun()
 	{
 		var gameLoop = Build();
 
@@ -111,11 +152,14 @@ public class IonApplication : IIonApplication, IDisposable
 		HotReloadService.ActiveApplication = this;
 		HotReloadService.ActiveGameLoop = gameLoop;
 #endif
-		gameLoop.Run();
+		return gameLoop;
 	}
 
+	/// <summary>Disposes the application's services. Calling it again does nothing.</summary>
 	public void Dispose()
 	{
+		if (_disposed) return;
+		_disposed = true;
 		_host.Dispose();
 	}
 }

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The 2D physics module on the remote protocol: physics2d.bodies and physics2d.raycast (read scope), registered through
+    IRemoteMethodProvider (AddPhysics2DRemote). The remote server does not reference physics; compiled out with the
+    remote module (Ion.Remote.IsSupported).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU</Platforms>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Ion.Extensions.Physics2D</RootNamespace>
+    <Description>Ion 2D physics remote methods: physics2d.bodies (watchable) and physics2d.raycast on the remote protocol, for agents and tools inspecting a running simulation.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ion.Extensions.Physics2D\Ion.Extensions.Physics2D.csproj" />
+    <ProjectReference Include="..\Ion.Extensions.Remote.Abstractions\Ion.Extensions.Remote.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
