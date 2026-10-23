@@ -20,6 +20,12 @@ namespace Ion.Extensions.Ecs;
 /// changed since the first. The Render pass also updates <see cref="Aabb2D"/>.
 /// </para>
 /// <para>
+/// It records the <see cref="Transform"/> of every entity with a <see cref="TransformInterpolation"/> at the end of each
+/// fixed step (<see cref="StageOrder.TransformInterpolation"/>), and the Render pass draws those entities between their
+/// last two records at <see cref="GameTime.Alpha"/>; the Last pass computes their simulated world transforms, which
+/// gameplay reads.
+/// </para>
+/// <para>
 /// It first adds the missing <see cref="GlobalTransform2D"/>, <see cref="GlobalTransform"/> and (for sprites)
 /// <see cref="Aabb2D"/> components with Arch's bulk operations, then walks the tree: roots (entities without a
 /// <see cref="Parent"/>) in query order, children in their <see cref="Children"/> order, so the order is deterministic.
@@ -47,11 +53,14 @@ public sealed class TransformPropagationSystem(World world)
 	private static readonly QueryDescription Roots3D = new QueryDescription().WithAll<Transform, GlobalTransform>().WithNone<Parent>();
 	private static readonly QueryDescription Bounds = new QueryDescription().WithAll<Sprite, GlobalTransform2D, Aabb2D>();
 	private static readonly QueryDescription Parented = new QueryDescription().WithAll<Parent>();
+	private static readonly QueryDescription Interpolated = new QueryDescription().WithAll<Transform, TransformInterpolation>();
 
 	private int _updated;
 	private int _visited;
 	private int _childVisits;
 	private bool _sawDead;
+	// The Render pass's GameTime.Alpha, at which the TransformInterpolation entities are drawn between records; -1 otherwise.
+	private float _alpha = -1;
 
 	/// <summary>The world.</summary>
 	public World World => world;
@@ -66,12 +75,37 @@ public sealed class TransformPropagationSystem(World world)
 	[Last(Order = StageOrder.TransformPropagation)]
 	public void PropagateLast(GameTime dt) => Propagate();
 
-	/// <summary>Propagates what changed since Last and updates the sprite bounds, before the extraction (Render).</summary>
+	/// <summary>
+	/// Propagates what changed since Last and updates the sprite bounds, before the extraction (Render). The entities with
+	/// a <see cref="TransformInterpolation"/> (and their descendants) are drawn between their last two fixed steps, at
+	/// <see cref="GameTime.Alpha"/>.
+	/// </summary>
 	[Render(Order = StageOrder.TransformPropagation)]
 	public void PropagateBeforeRender(GameTime dt)
 	{
-		Propagate();
+		_alpha = Math.Clamp(dt.Alpha, 0f, 1f);
+		try
+		{
+			Propagate();
+		}
+		finally
+		{
+			_alpha = -1;
+		}
+
 		UpdateBounds();
+	}
+
+	/// <summary>Records the transforms of the <see cref="TransformInterpolation"/> entities at the end of each fixed step.</summary>
+	[FixedUpdate(Order = StageOrder.TransformInterpolation)]
+	public void RecordInterpolation(GameTime dt)
+	{
+		foreach (ref var chunk in world.Query(in Interpolated))
+		{
+			var locals = chunk.GetSpan<Transform>();
+			var records = chunk.GetSpan<TransformInterpolation>();
+			for (var i = 0; i < chunk.Count; i++) records[i].Record(locals[i]);
+		}
 	}
 
 	/// <summary>Adds missing global transforms and recomputes the ones that changed.</summary>
@@ -206,6 +240,8 @@ public sealed class TransformPropagationSystem(World world)
 		{
 			var locals = chunk.GetSpan<Transform>();
 			var globals = chunk.GetSpan<GlobalTransform>();
+			var interpolated = _alpha >= 0 && chunk.Has<TransformInterpolation>();
+			var records = interpolated ? chunk.GetSpan<TransformInterpolation>() : default;
 			var hidden = chunk.Has<Hidden>();
 			var hasChildren = chunk.Has<Children>();
 			var children = hasChildren ? chunk.GetSpan<Children>() : default;
@@ -214,7 +250,7 @@ public sealed class TransformPropagationSystem(World world)
 
 			for (var i = 0; i < count; i++)
 			{
-				ref readonly var local = ref locals[i];
+				var local = interpolated ? records[i].Drawn(locals[i], _alpha) : locals[i];
 				ref var global = ref globals[i];
 
 				if (global.Version == 0 || !Same(local, global.Local))
@@ -245,7 +281,8 @@ public sealed class TransformPropagationSystem(World world)
 			ref var chunk = ref data.Archetype.GetChunk(data.Slot.ChunkIndex);
 			if (!chunk.Has<Transform>() || !chunk.Has<GlobalTransform>()) continue;
 			var index = data.Slot.Index;
-			ref var local = ref Unsafe.Add(ref chunk.GetFirst<Transform>(), index);
+			var local = Unsafe.Add(ref chunk.GetFirst<Transform>(), index);
+			if (_alpha >= 0 && chunk.Has<TransformInterpolation>()) local = Unsafe.Add(ref chunk.GetFirst<TransformInterpolation>(), index).Drawn(local, _alpha);
 			ref var global = ref Unsafe.Add(ref chunk.GetFirst<GlobalTransform>(), index);
 			_visited++;
 			_childVisits++;

@@ -18,7 +18,8 @@ using Ion.Extensions.Rendering3D;
 
 // 3D physics on the ECS module: marbles dropped onto a rippled bowl of terrain. The terrain is one mesh, drawn by the 3D
 // renderer and, from the same triangles, a static triangle-mesh collider the marbles roll on. Landing marbles click
-// from where they land, heard from the orbiting camera (positional audio).
+// from where they land, heard from the orbiting camera (positional audio). The marbles are drawn between their last two
+// physics steps (TransformInterpolation), so they move smoothly whatever the frame rate.
 //   --Marbles:Count=<n>   the number of marbles (default 80)
 //   --Marbles:Seed=<n>    where they are dropped (default 1)
 //   --Ion:Physics3D:DebugDraw=true   draw the colliders
@@ -96,7 +97,7 @@ namespace Ion.Examples.Marbles
 		/// <summary>The marbles' collision layer.</summary>
 		public const uint MarbleLayer = 2;
 
-		private static readonly QueryDescription Marbles = new QueryDescription().WithAll<Marble, Transform, RigidBody3D>();
+		private static readonly QueryDescription Marbles = new QueryDescription().WithAll<Marble, Transform, RigidBody3D, TransformInterpolation>();
 
 		private static readonly Color[] Palette =
 		[
@@ -135,7 +136,8 @@ namespace Ion.Examples.Marbles
 			for (var i = 0; i < settings.Count; i++)
 			{
 				world.Create(new Transform(DropPosition(random, i)), new MeshRenderer(sphere, materials[i % materials.Length]),
-					Collider3D.Sphere(Radius) with { Layer = MarbleLayer, Friction = 0.5f }, RigidBody3D.Dynamic(mass: 1f) with { AngularDamping = 0.4f }, new Marble(i));
+					Collider3D.Sphere(Radius) with { Layer = MarbleLayer, Friction = 0.5f }, RigidBody3D.Dynamic(mass: 1f) with { AngularDamping = 0.4f }, new Marble(i),
+					new TransformInterpolation());
 			}
 
 			world.SetEnvironment(new SceneEnvironment { AmbientColor = new Color(0x9C, 0xB0, 0xD0), AmbientIntensity = 0.35f });
@@ -190,6 +192,7 @@ namespace Ion.Examples.Marbles
 				var transforms = chunk.GetSpan<Transform>();
 				var bodies = chunk.GetSpan<RigidBody3D>();
 				var marbles = chunk.GetSpan<Marble>();
+				var interpolations = chunk.GetSpan<TransformInterpolation>();
 				for (var i = 0; i < chunk.Count; i++)
 				{
 					if (bodies[i].LinearVelocity.LengthSquared() < 0.04f) resting++;
@@ -198,6 +201,7 @@ namespace Ion.Examples.Marbles
 					transforms[i].Position = DropPosition(random, marbles[i].Index);
 					bodies[i].LinearVelocity = Vector3.Zero;
 					bodies[i].AngularVelocity = Vector3.Zero;
+					interpolations[i].Snap();   // drawn where it is put back, not gliding up from below the terrain
 					respawns++;
 				}
 			}

@@ -172,6 +172,13 @@ public static class StageOrder
 	/// </summary>
 	public const int SceneTransition = 750;
 
+	/// <summary>
+	/// ECS transform interpolation (FixedUpdate): the transforms of the entities with a <c>TransformInterpolation</c> are
+	/// recorded at the end of every fixed step, after the physics step (<see cref="Physics"/>) and the game's own fixed
+	/// steps at <see cref="Default"/>, so the record is where the step left them.
+	/// </summary>
+	public const int TransformInterpolation = 850;
+
 	/// <summary>The metrics overlay (Render), inside the sprite batch scope and after the game's own drawing.</summary>
 	public const int MetricsOverlay = 800;
 

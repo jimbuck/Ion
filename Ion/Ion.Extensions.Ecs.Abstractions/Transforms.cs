@@ -131,3 +131,47 @@ public struct GlobalTransform
 	/// <inheritdoc/>
 	public override readonly string ToString() => $"GlobalTransform {{ Position = {Position} }}";
 }
+
+/// <summary>
+/// Draws the entity between its last two fixed steps instead of where the last one left it, so motion simulated at the
+/// fixed rate (3D physics, or any FixedUpdate step) moves smoothly at any frame rate. Add it to the entities to smooth,
+/// usually dynamic rigid bodies. Only what is drawn changes: <see cref="Transform"/>, and the <see cref="GlobalTransform"/>
+/// of the Last propagation that gameplay reads, keep the simulated values.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The transform propagation records the entity's <see cref="Transform"/> at the end of every fixed step
+/// (<c>StageOrder.TransformInterpolation</c>), and its Render pass draws the transform between the last two records at
+/// <see cref="GameTime.Alpha"/>: up to one fixed step behind the simulation. A transform changed since the last record
+/// (in Update) is drawn as it is.
+/// </para>
+/// <para>Call <see cref="Snap"/> after teleporting the entity in a fixed step, so it does not glide to where it was put.</para>
+/// </remarks>
+public struct TransformInterpolation
+{
+	internal Transform Previous;
+	internal Transform Current;
+	internal bool Recorded;
+
+	/// <summary>Draws the entity where it is from the next record on, without gliding from where it was.</summary>
+	public void Snap() => Recorded = false;
+
+	internal void Record(in Transform transform)
+	{
+		Previous = Recorded ? Current : transform;
+		Current = transform;
+		Recorded = true;
+	}
+
+	/// <summary>Where to draw <paramref name="transform"/>: between the last two records, unless it moved since the last one.</summary>
+	internal readonly Transform Drawn(in Transform transform, float alpha)
+	{
+		if (!Recorded || transform.Position != Current.Position || transform.Rotation != Current.Rotation || transform.Scale != Current.Scale) return transform;
+		return new Transform
+		{
+			Position = Vector3.Lerp(Previous.Position, Current.Position, alpha),
+			Rotation = Quaternion.Slerp(Previous.Rotation, Current.Rotation, alpha),
+			Scale = Vector3.Lerp(Previous.Scale, Current.Scale, alpha),
+		};
+	}
+}
